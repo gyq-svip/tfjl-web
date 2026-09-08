@@ -26178,6 +26178,11 @@ ${maSection}
             const content = document.getElementById('apiMonitorContent');
             if (!content) return;
             content.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.4);padding:10px;">查询中...</div>';
+            // 🔴 2026-09-08：刷新后会渲染出同功能的日志区块（含 workflow 下拉 + summary），
+            //    若静态日志区块仍在，actionsWorkflowSel / actionsStatusSummary 会出现重复 id，
+            //    getElementById 只会取到第一个（静态那个），导致动态区块的下拉选择失效。故先移除静态区块。
+            const _staticLogBox = document.getElementById('staticActionsLogBox');
+            if (_staticLogBox) _staticLogBox.remove();
             try {
                 const token = getGistToken();
                 if (!token) {
@@ -26364,11 +26369,16 @@ ${maSection}
                         ${gistHtml}
                     </div>
                     <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;margin-top:12px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                            <div style="color:rgba(255,255,255,0.6);font-size:0.8rem;">📋 部署日志（GitHub Actions · deploy.yml）</div>
-                            <button onclick="loadActionsLogs()" style="padding:3px 10px;border-radius:4px;border:1px solid rgba(78,205,196,0.3);background:rgba(78,205,196,0.1);color:#4ecdc4;cursor:pointer;font-size:0.7rem;">查看日志</button>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap;">
+                            <div style="color:rgba(255,255,255,0.6);font-size:0.8rem;">📋 Actions 运行日志（部署 / 定时任务）</div>
+                            <div style="display:flex;align-items:center;gap:6px;">
+                                <select id="actionsWorkflowSel" style="background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(78,205,196,0.3);border-radius:4px;padding:3px 6px;font-size:0.7rem;cursor:pointer;">
+                                    ${ACTIONS_WORKFLOWS.map(function (w) { return '<option value="' + w.id + '"' + (w.id === 'deploy.yml' ? ' selected' : '') + '>' + w.name + '（' + w.desc + '）</option>'; }).join('')}
+                                </select>
+                                <button onclick="loadActionsLogs()" style="padding:3px 10px;border-radius:4px;border:1px solid rgba(78,205,196,0.3);background:rgba(78,205,196,0.1);color:#4ecdc4;cursor:pointer;font-size:0.7rem;">查看日志</button>
+                            </div>
                         </div>
-                        <div id="actionsStatusSummary" style="font-size:0.75rem;color:rgba(255,255,255,0.5);">点击「查看日志」加载最近 10 次部署运行记录</div>
+                        <div id="actionsStatusSummary" style="font-size:0.75rem;color:rgba(255,255,255,0.5);">选择任务后点「查看日志」加载最近 10 次运行记录（诊断聚合=每10分钟、需求墙备份=每天04:00）</div>
                     </div>
                     <div style="margin-top:12px;color:rgba(255,255,255,0.4);font-size:0.7rem;">检测时间：${new Date().toLocaleString('zh-CN')}</div>
                 `;
@@ -26378,8 +26388,18 @@ ${maSection}
         }
         window.refreshApiMonitor = refreshApiMonitor;
 
-        // ==================== 部署日志（克隆自拍卖行管理员 API 监控） ====================
-        // 加载 GitHub Actions deploy.yml 运行记录（最近10次）+ 成功/失败统计 + 单次日志展开
+        // ==================== Actions 运行日志（部署 / 定时任务 / 校验，可切换） ====================
+        // 🔴 2026-09-08 扩展：原本硬编码只查 deploy.yml（只能看部署日志），
+        //    仓库实际的定时任务（诊断聚合 每10分钟 / 需求墙备份 每天04:00）与 verify 校验都看不到。
+        //    改为下拉选择 workflow：deploy(部署) / diag-aggregate(诊断聚合·定时) / wall-backup(需求墙备份·定时) / verify(代码校验)。
+        const ACTIONS_WORKFLOWS = [
+            { id: 'deploy.yml', name: '部署', desc: 'push main 自动部署' },
+            { id: 'diag-aggregate.yml', name: '诊断聚合', desc: '每 10 分钟定时' },
+            { id: 'wall-backup.yml', name: '需求墙备份', desc: '每天 04:00 定时' },
+            { id: 'verify.yml', name: '代码校验', desc: 'push/PR 触发' }
+        ];
+
+        // 加载 GitHub Actions 运行记录（最近10次）+ 成功/失败统计 + 单次日志展开
         async function loadActionsLogs() {
             const summary = document.getElementById('actionsStatusSummary');
             if (!summary) return;
@@ -26392,7 +26412,9 @@ ${maSection}
 
             const token = (typeof getGistToken === 'function') ? getGistToken() : localStorage.getItem('gistToken') || '';
             const REPO = 'gyq-svip/tfjl-web';
-            const WORKFLOW_ID = 'deploy.yml';
+            // 从下拉读取所选工作流（默认部署），不再写死 deploy.yml
+            const _wfSel = document.getElementById('actionsWorkflowSel');
+            const WORKFLOW_ID = (_wfSel && _wfSel.value) || 'deploy.yml';
 
             try {
                 // 1. 获取 workflow 运行记录（最近 10 次）
