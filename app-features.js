@@ -6453,17 +6453,16 @@
             //   做法：从已排序的 arrangedCards 移除小野/凤凰，再用 filteredCards 中未被选的其他卡补足6张
             //        （保留原排序顺序，避免加速卡4-5位等回归），蛇女固定第6。
             {
-                const _xyFh = arrangedCards.filter(n => n.includes('小野') || n.includes('凤凰'));
-                if (_xyFh.length) {
-                    const _kept = arrangedCards.filter(n => !n.includes('小野') && !n.includes('凤凰'));
-                    const _extra = filteredCards.filter(n =>
-                        !n.includes('小野') && !n.includes('凤凰') && !_kept.some(k => k === n)
-                    );
-                    const _fill = [..._kept, ..._extra];
-                    arrangedCards = hasSheNv
-                        ? [..._fill.filter(n => !n.includes('蛇女')).slice(0, 5), ...sheNvCards]
-                        : _fill.slice(0, 6);
-                }
+                // 其他卡优先；小野/凤凰作为无敌链替代卡，排在所有其他卡之后（其他卡不足6张时才由它们补位）
+                const _others = arrangedCards.filter(n => !n.includes('小野') && !n.includes('凤凰')); // 已选其他卡（保留原排序顺序）
+                const _extra = filteredCards.filter(n =>
+                    !n.includes('小野') && !n.includes('凤凰') && !_others.some(k => k === n)
+                );
+                const _xyFhAll = filteredCards.filter(n => n.includes('小野') || n.includes('凤凰')); // 小野/凤凰兜底
+                const _ordered = [..._others, ..._extra, ..._xyFhAll].slice(0, 6); // 其他卡优先，不足6张才补小野/凤凰
+                arrangedCards = hasSheNv
+                    ? [..._ordered.filter(n => !n.includes('蛇女')).slice(0, 5), ...sheNvCards] // 蛇女固定第6
+                    : _ordered;
             }
 
             // 生成上卡字符串
