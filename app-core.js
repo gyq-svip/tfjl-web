@@ -25392,8 +25392,8 @@ ${maSection}
                             const grandTotal = fnList.reduce(function (s, f) { return s + f.total; }, 0);
                             // 🔴 2026-09-09 整块再包一层折叠：功能多时榜单很长，可整体收起；每个功能内部仍可单独展开
                             let rkHtml = '<div style="margin-bottom:16px;">';
-                            rkHtml += '<details open style="border:1px solid rgba(251,191,36,0.35);border-radius:10px;background:rgba(251,191,36,0.04);overflow:hidden;">';
-                            rkHtml += '<summary style="cursor:pointer;padding:9px 12px;font-size:0.85rem;color:#fbbf24;font-weight:700;">🏆 按功能使用排行榜 <span style="color:#94a3b8;font-size:0.72rem;font-weight:400;">（共 ' + fnList.length + ' 个功能 · 总计 ' + grandTotal + ' 次 · 点此收起/展开整体，每个功能可再单独展开看用户排名）</span></summary>';
+                            rkHtml += '<details style="border:1px solid rgba(251,191,36,0.35);border-radius:10px;background:rgba(251,191,36,0.04);overflow:hidden;">';
+                            rkHtml += '<summary style="cursor:pointer;padding:9px 12px;font-size:0.85rem;color:#fbbf24;font-weight:700;">🏆 按功能使用排行榜 <span style="color:#94a3b8;font-size:0.72rem;font-weight:400;">（共 ' + fnList.length + ' 个功能 · 总计 ' + grandTotal + ' 次 · 点此展开/收起整体，每个功能可再单独展开看用户排名）</span></summary>';
                             rkHtml += '<div style="padding:6px 12px 10px 12px;">';
                             if (!fnList.length) {
                                 rkHtml += '<div style="color:#94a3b8;font-size:0.74rem;">暂无功能使用数据（需客户端上报过功能埋点）</div>';
