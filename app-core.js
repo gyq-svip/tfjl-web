@@ -25249,12 +25249,15 @@ ${maSection}
                     // 上报时间规律说明（2026-08-26 补，避免日后忘记）
                     head += '<div style="margin-top:10px;border-top:1px dashed rgba(255,255,255,0.12);padding-top:8px;font-size:0.74rem;line-height:1.7;color:#cbd5e1;">';
                     head += '<span style="color:#ffd700;">📊 上报时间规律（客户端侧实际触发时机）：</span><br>';
+                    // 🔴 2026-09-09 核实更新（对照 _scheduleDiagUpload / _initDiagReporter / _recordDiagWrite 实际代码）：
+                    //   原 ② 过时——心跳默认 15±5（非 45±10，见 _HB_DEF_BASE/_HB_DEF_JITTER，事故后已改小）；
+                    //   原 ③ 过时——buffer 写入已不再单独触发立即上报（_recordDiagWrite/_recordFeatureUse 只累加，_scheduleDiagUpload('immediate') 现仅 online 调用且受 allowImmediate 控制）。
                     head += '① <b>打开延迟首报</b>：页面加载 3 秒后读配置，若总闸开则安排首报，延迟 ' + C.openDelayMin + '~' + C.openDelayMax + ' 分钟（随机错峰，避免一打开就全员正点报）。<br>';
-                    head += '② <b>规律心跳</b>：从打开起每 45 分钟（基础间隔）+ 0~10 分钟（随机抖动）自动上报一次，写盘健康 + 缓冲合并。间隔与抖动均可在「功能开关面板」调节，全网统一跟随。离线阈值由「功能开关面板→离线判定阈值」控制（默认30分钟）。<br>';
-                    head += '③ <b>缓冲触发</b>：本地有写操作埋点进 buffer 时顺带排程，"立即类"延迟 ' + C.immediateDelayMin + '~' + C.immediateDelayMax + ' 分钟合批上报（省 API，可由「允许立即上报」关掉）。<br>';
-                    head += '④ <b>联网恢复</b>：online 事件立即补报（' + C.immediateDelayMin + '~' + C.immediateDelayMax + ' 分钟延迟）。<br>';
-                    head += '⑤ <b>手动</b>：本面板「立即拉取」按钮可补报。<br>';
-                    head += '👉 所以读写量大的客户端（如一直挂机的老顽固）心跳 + 频繁缓冲上报，频率远高于普通用户，面板上活跃度/写盘次数自然长期最高。延迟数值即上方配置框，可改（立即上报 1~20 分、周期 5~10 分）。';
+                    head += '② <b>规律心跳</b>：从打开起每 <b>15</b> 分钟（基础间隔）+ <b>0~5</b> 分钟（随机抖动）自动上报一次，写盘健康 + 缓冲合并。间隔 / 抖动可在「功能开关面板 → 💓 诊断心跳间隔 / 💓 诊断心跳抖动范围」调节（默认 15 / 5，全网统一跟随）。离线阈值由「功能开关面板 → 🟢 离线判定阈值」控制（默认 30 分钟）。<br>';
+                    head += '③ <b>缓冲合批</b>：写操作 / 功能埋点只累加进本地 buffer，<b>不单独触发上报</b>，统一随 ①首报 / ②心跳 / ④联网恢复 / ⑤手动 合批上报（省 API）。<br>';
+                    head += '④ <b>联网恢复</b>：online 事件补报（' + C.immediateDelayMin + '~' + C.immediateDelayMax + ' 分钟延迟），但受「允许立即上报」开关控制——关掉则该路径不上报，等下次心跳。<br>';
+                    head += '⑤ <b>手动</b>：本面板「⚡ 立即拉取配置」按钮 = 立即拉取最新策略 + 本机<b>立刻补报一次心跳</b>（跳过随机延迟）。<br>';
+                    head += '👉 读写量大的客户端（如一直挂机的老顽固）心跳 + 联网恢复补报更频繁，面板上活跃度 / 写盘次数自然长期最高。延迟均可调：打开首报 ' + C.openDelayMin + '~' + C.openDelayMax + ' 分、立即补报 ' + C.immediateDelayMin + '~' + C.immediateDelayMax + ' 分（诊断配置框）；心跳周期默认 15 分、可配 1~1440（功能开关面板）。';
                     head += '</div>';
                     head += '</div>';
                     head += '</div>';
