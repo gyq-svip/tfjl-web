@@ -19588,7 +19588,9 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         // ====== 个人主页·作品（P1：收录/发布，复用需求墙 Gist 独立文件 works.json）======
         const WORKS_GIST_ID = MESSAGES_GIST_ID;
         const WORKS_FILE = 'works.json';
-        window.WORK_CATEGORIES = ['未分类', '寒冰', '暗月', '漩涡', '深海', '对战', '隐藏'];
+        // 🔴 2026-09-08 新增「活动」分类：此前按副本/玩法命名，活动脚本分享时无对应分类可选。
+        //    该数组同时用于：分享脚本时的「🏷️ 分类标签」下拉、「我的」页面分类筛选。
+        window.WORK_CATEGORIES = ['未分类', '寒冰', '暗月', '漩涡', '深海', '对战', '隐藏', '活动'];
         window.WALL_CATEGORIES = window.WORK_CATEGORIES;
         async function fetchWorksGist() {
             try {

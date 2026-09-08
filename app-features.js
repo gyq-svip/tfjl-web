@@ -7380,7 +7380,8 @@
 
         // 分享选项弹窗（时长 + 密码，所有分享入口统一调用）
         // callback(expireMinutes, password): expireMinutes 0=永久, null=用户取消; password ''=无密码
-        function showShareOptionsDialog(callback) {
+        // defCat：可选，指定「🏷️ 分类标签」下拉的默认选中项（如分享活动脚本时传「活动」）
+        function showShareOptionsDialog(callback, defCat) {
             const existing = document.getElementById('shareOptionsModal');
             if (existing) existing.remove();
 
@@ -7446,7 +7447,7 @@
                     <div style="margin-bottom:16px;">
                         <label style="color:rgba(255,255,255,0.8);font-size:0.85rem;display:block;margin-bottom:6px;">🏷️ 分类标签</label>
                         <select id="shareCategory" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:white;font-size:0.85rem;outline:none;box-sizing:border-box;">
-                            ${(window.WALL_CATEGORIES || ['未分类']).map(function(c){ return '<option value="'+c+'" style="background:#1a1a2e;">'+c+'</option>'; }).join('')}
+                            ${(window.WALL_CATEGORIES || ['未分类']).map(function(c){ return '<option value="'+c+'" style="background:#1a1a2e;"' + (defCat && c === defCat ? ' selected' : '') + '>'+c+'</option>'; }).join('')}
                         </select>
                     </div>
 
@@ -7537,7 +7538,8 @@
             const fileName = inputName.endsWith('.txt') ? inputName : inputName + '.txt';
 
             // 分享选项弹窗（时长 + 密码）
-            const shareOpts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk, cat) { resolve([e, p, rk, cat]); }); });
+            // 🔴 2026-09-08：分享活动脚本时，「🏷️ 分类标签」默认选中「活动」，省去每次手动选
+            const shareOpts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk, cat) { resolve([e, p, rk, cat]); }, (type === 'activity' ? '活动' : '')); });
             if (shareOpts === null || shareOpts[0] === null) return;
             const expireMinutes = shareOpts[0];
             const sharePassword = shareOpts[1];
