@@ -6792,12 +6792,20 @@
             const jingLingNames = ['冰精灵', '光精灵', '魔精灵', '木精灵', '土精灵', '雷精灵', '暗精灵', '幻精灵', '魂精灵', '彩精灵'];
             const gongChengNames = ['火炮', '咬人娃娃', '潜艇', '射线', '宝库'];
 
-            // 精灵类卡统一排到最后（非精灵保持原相对顺序，精灵也保持原相对顺序）
+            // 🔴 2026-09-08 新排序规则（隐藏榜）：小野 / 凤凰是「到时间替换上去」的卡，不是开局上阵卡。
+            //    顺序 = ①其他卡（非精灵、非小野、非凤凰）→ ②小野 → ③凤凰 → ④精灵卡（精灵仍排最后）。
+            //    效果：其他卡够数时，小野/凤凰自然落在上阵位之后（不上阵，由 02:26 上小野 / 02:38 上凤凰 的切卡逻辑处理）；
+            //          其他卡不足时小野优先补位上阵；小野永远排在凤凰前面，凤凰开局不上阵。
+            const _isJL = name => jingLingNames.some(jl => name.includes(jl));
+            const _isXY = name => name.includes('小野');
+            const _isFH = name => name.includes('凤凰');
             heroNames = [
-                ...heroNames.filter(name => !jingLingNames.some(jl => name.includes(jl))),
-                ...heroNames.filter(name => jingLingNames.some(jl => name.includes(jl)))
+                ...heroNames.filter(name => !_isJL(name) && !_isXY(name) && !_isFH(name)),
+                ...heroNames.filter(name => _isXY(name)),
+                ...heroNames.filter(name => _isFH(name)),
+                ...heroNames.filter(name => _isJL(name))
             ];
-            // 上阵行按重排后的顺序重建，保证输出的"上阵："也是精灵在最后
+            // 上阵行按重排后的顺序重建，保证输出的"上阵："也是小野/凤凰在精灵之前、精灵在最后
             if (zhenZhanLine) zhenZhanLine = '上阵：' + heroNames.join(',');
 
             const hasSheNv = heroNames.some(name => name.includes('蛇女'));
@@ -6854,7 +6862,8 @@
                 // 前三位：剩余优先级卡 + 非优先级非工程非蛇女的卡
                 const nonPriorityNonGongCheng = filteredCards.filter(name =>
                     !priorityCards.some(p => p === name) && !name.includes('蛇女') &&
-                    !gongChengNames.some(gc => name.includes(gc)) && !name.includes('射线') && !name.includes('宝库')
+                    !gongChengNames.some(gc => name.includes(gc)) && !name.includes('射线') && !name.includes('宝库') &&
+                    !name.includes('凤凰')   // 🔴 2026-09-08：凤凰开局不上阵，仅 02:38 切卡替换
                 );
                 const first3 = [...restPriority, ...nonPriorityNonGongCheng].slice(0, 3);
                 
@@ -6863,10 +6872,12 @@
                 arrangedCards.push(...sheNvCards); // 第6位：蛇女
             } else {
                 // 无蛇女：工程卡单独放 gongChengOrder（最上面），非工程卡正常排
+                // 🔴 2026-09-08：凤凰不进上阵池（凤凰开局不上阵，只在 02:38 切卡替换上去）；
+                //    小野保留在池里，靠上面的排序落在其他卡之后 → 其他卡够6张时不上阵，不够才补位上阵。
                 const otherCards = filteredCards.filter(name =>
                     !gongChengNames.some(gc => name.includes(gc)) &&
                     !name.includes('射线') && !name.includes('宝库') &&
-                    !name.includes('蛇女')
+                    !name.includes('蛇女') && !name.includes('凤凰')
                 );
                 arrangedCards.push(...otherCards);
                 // 注意：风灵/火灵/虎弓/天使/蛇女 已包含在 otherCards 中，切勿重复 push，否则重复占位置导致少上一张卡
