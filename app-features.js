@@ -6860,10 +6860,10 @@
                 const top2 = priorityCards.slice(0, 2); // 优先级最高的2张放第4-5位
                 const restPriority = priorityCards.slice(2); // 剩余优先级卡
                 // 前三位：剩余优先级卡 + 非优先级非工程非蛇女的卡
+                // 🔴 2026-09-09 修正：与无蛇女分支一致，凤凰保留兜底（排序靠后，卡够时轮不到它），避免凑不满 6 张非工程
                 const nonPriorityNonGongCheng = filteredCards.filter(name =>
                     !priorityCards.some(p => p === name) && !name.includes('蛇女') &&
-                    !gongChengNames.some(gc => name.includes(gc)) && !name.includes('射线') && !name.includes('宝库') &&
-                    !name.includes('凤凰')   // 🔴 2026-09-08：凤凰开局不上阵，仅 02:38 切卡替换
+                    !gongChengNames.some(gc => name.includes(gc)) && !name.includes('射线') && !name.includes('宝库')
                 );
                 const first3 = [...restPriority, ...nonPriorityNonGongCheng].slice(0, 3);
                 
@@ -6872,12 +6872,14 @@
                 arrangedCards.push(...sheNvCards); // 第6位：蛇女
             } else {
                 // 无蛇女：工程卡单独放 gongChengOrder（最上面），非工程卡正常排
-                // 🔴 2026-09-08：凤凰不进上阵池（凤凰开局不上阵，只在 02:38 切卡替换上去）；
-                //    小野保留在池里，靠上面的排序落在其他卡之后 → 其他卡够6张时不上阵，不够才补位上阵。
+                // 🔴 2026-09-09 修正：此前直接把凤凰过滤掉 → 非工程凑不满 6 张时总数变成 5+1=6（有工程却只上 6 张）。
+                //    现在凤凰保留在池中兜底：上方排序已把凤凰排在其他卡/小野之后，
+                //    其他卡够 6 张时 slice(0,6) 会自然挤掉凤凰（仍不上阵）；不够时才由小野、凤凰依次补位，
+                //    保证「6 张非工程 + 1 张工程 = 7 张」。
                 const otherCards = filteredCards.filter(name =>
                     !gongChengNames.some(gc => name.includes(gc)) &&
                     !name.includes('射线') && !name.includes('宝库') &&
-                    !name.includes('蛇女') && !name.includes('凤凰')
+                    !name.includes('蛇女')
                 );
                 arrangedCards.push(...otherCards);
                 // 注意：风灵/火灵/虎弓/天使/蛇女 已包含在 otherCards 中，切勿重复 push，否则重复占位置导致少上一张卡
