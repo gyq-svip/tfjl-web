@@ -25262,7 +25262,8 @@ ${maSection}
                         box.innerHTML = head + '<div style="color:#4ade80;">✅ 暂无上报文件（总闸未开 / 没有客户端在写 / 或已优化完毕）。<br><span style="color:#94a3b8;font-size:0.75rem;">→ 先点上方「全网诊断上报总闸」开启，等客户端上报一会儿再刷新本页即可看到 TOP 归因。</span></div>';
                     } else {
                         // 聚合
-                        const perUser = {}, perGist = {}, perFn = {};
+                        // featureRank：🔴 2026-09-09 新增「按功能使用排行榜」数据源 → { 功能名: { 用户: 次数 } }
+                        const perUser = {}, perGist = {}, perFn = {}, featureRank = {};
                         let totalWrites = 0;
                         const fileMetas = [];
                         // 详情抽屉（按维度展开）
@@ -25284,6 +25285,13 @@ ${maSection}
                                 }
                                 perUser[who] += e.count; totalWrites += e.count;
                                 perGist[e.gistId] = (perGist[e.gistId] || 0) + e.count;
+                                // 🔴 2026-09-09 功能使用排行：只统计「功能埋点」条目（gistId='feature' 或 method='USE'），
+                                //    按「功能名 → 用户」累计次数，供下方「🏆 按功能使用排行榜」渲染（每个功能一个可折叠榜单）。
+                                if (e.gistId === 'feature' || e.method === 'USE') {
+                                    const _fnKey = displayFn || '未命名功能';
+                                    featureRank[_fnKey] = featureRank[_fnKey] || {};
+                                    featureRank[_fnKey][who] = (featureRank[_fnKey][who] || 0) + (e.count || 0);
+                                }
                                 detailByGist[e.gistId] = detailByGist[e.gistId] || [];
                                 detailByGist[e.gistId].push({ file: fileMetas[fileMetas.length - 1], entry: e });
                                 const isWrite = e.gistId !== 'feature' && e.method !== 'GET' && e.method !== 'USE' && e.method !== 'unknown';
@@ -25367,6 +25375,41 @@ ${maSection}
                             }
                             dayHtml += '</div>';
                             html += dayHtml;
+                        })();
+                        // ============ 🏆 按功能使用排行榜（2026-09-09 新增）============
+                        // 每个功能一个可折叠榜单：标题显示「总次数 / 使用人数」，展开看「谁用得最多」（按用户降序）。
+                        (function () {
+                            const fnList = Object.keys(featureRank).map(function (name) {
+                                const users = Object.keys(featureRank[name]).map(function (u) { return { who: u, v: featureRank[name][u] }; }).sort(function (a, b) { return b.v - a.v; });
+                                const total = users.reduce(function (s, u) { return s + u.v; }, 0);
+                                return { name: name, users: users, total: total };
+                            }).sort(function (a, b) { return b.total - a.total; });
+                            let rkHtml = '<div style="margin-bottom:16px;"><div style="color:#fbbf24;margin-bottom:6px;font-weight:700;">🏆 按功能使用排行榜 <span style="color:#94a3b8;font-size:0.7rem;font-weight:400;">（每个功能一个榜单，点标题展开看谁用得最多）</span></div>';
+                            if (!fnList.length) {
+                                rkHtml += '<div style="color:#94a3b8;font-size:0.74rem;">暂无功能使用数据（需客户端上报过功能埋点）</div>';
+                            } else {
+                                fnList.forEach(function (f) {
+                                    const rawName = (typeof _fnZh === 'function') ? _fnZh('feature', f.name) : f.name;
+                                    const safeName = String(rawName || f.name).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                                    const maxV = f.users.length ? f.users[0].v : 1;
+                                    rkHtml += '<details style="margin-bottom:6px;border:1px solid rgba(255,255,255,0.12);border-radius:8px;">';
+                                    rkHtml += '<summary style="cursor:pointer;background:rgba(251,191,36,0.08);padding:7px 12px;font-size:0.78rem;color:#cbd5e1;">';
+                                    rkHtml += '<span style="font-weight:700;color:#fbbf24;">🏅 ' + safeName + '</span>';
+                                    rkHtml += ' ｜ 总计 <b style="color:' + C_NUM + ';">' + f.total + '</b> 次 ｜ 👥 ' + f.users.length + ' 人';
+                                    rkHtml += '</summary>';
+                                    rkHtml += '<div style="padding:8px 12px;">';
+                                    f.users.slice(0, 20).forEach(function (u, i) {
+                                        rkHtml += '<div style="font-size:0.75rem;color:#cbd5e1;line-height:1.75;">'
+                                            + '<span style="color:#64748b;">#' + (i + 1) + '</span> '
+                                            + bar(u.v, maxV) + ' <b style="color:' + C_NUM + ';">' + u.v + '</b>　'
+                                            + _colorWho(u.who) + '</div>';
+                                    });
+                                    if (f.users.length > 20) rkHtml += '<div style="font-size:0.7rem;color:#94a3b8;">… 其余 ' + (f.users.length - 20) + ' 人未显示</div>';
+                                    rkHtml += '</div></details>';
+                                });
+                            }
+                            rkHtml += '</div>';
+                            html += rkHtml;
                         })();
                         html += '<div style="margin-bottom:16px;"><div style="color:#4ade80;margin-bottom:4px;font-weight:700;">👤 按用户 TOP <span style="color:#94a3b8;font-size:0.7rem;font-weight:400;">（点行展开该用户的上报详情）</span></div>';
                         uTop.forEach((x, i) => {
