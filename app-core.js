@@ -1000,6 +1000,7 @@
                 });
                 initForceReloadFromIndex(); // 从索引 Gist 读「强制更新」开关（功能开关面板权威来源）
                 applyServerNickOverride(); // 🔴 2026-09-07 方案B：启动即应用管理员远程改名（若有）
+                initFabQrcode(); // 🔴 2026-09-08：读取管理员设置的悬浮按钮二维码（群二维码），绑定 hover 浮层
             }, 3000); // 启动 3s 后才去读配置，避免阻塞首屏
             // 规律心跳：每 45 分钟上报一次（写盘健康 + 缓冲合并），面板离线阈值 60 分钟。
             // 从"打开 App 那一刻"开始计时，每人打开时刻不同 → 天然错峰（不会卡正点同时触发）。
@@ -25991,11 +25992,130 @@ ${maSection}
                 <div style="font-size:0.66rem;color:rgba(255,255,255,0.4);margin-top:6px;">列表仅显示最近 30 分钟内有心跳的在线设备（昵称 · 版本 · 平台）。点列表项即自动填入设备ID。</div>
                 <div id="frStatus" style="font-size:0.72rem;color:#ffd700;margin-top:8px;min-height:14px;"></div>
             </div>`;
+
+            // 🔴 2026-09-08：悬浮按钮（💬 问题反馈）hover 二维码设置——存 room_index.json 的 fabQrcode / fabQrcodeTip（全网生效）
+            html += `
+            <div style="grid-column:1/-1;margin-top:14px;padding:14px;border:1px solid rgba(79,195,247,0.45);border-radius:12px;background:rgba(79,195,247,0.06);">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                    <span style="font-size:1.1rem;">💬</span>
+                    <span style="font-size:0.92rem;color:#4fc3f7;font-weight:700;">悬浮按钮二维码（群二维码）</span>
+                </div>
+                <div style="font-size:0.68rem;color:rgba(255,255,255,0.5);line-height:1.5;margin-bottom:10px;">
+                    设置后，所有用户把鼠标移到右下角「💬 问题反馈」悬浮按钮上，会浮出该二维码（存索引 Gist，全网生效）。
+                </div>
+                <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;">
+                    <div id="fabQrPreview" style="width:132px;height:132px;border:1px dashed rgba(255,255,255,0.25);border-radius:10px;background:rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.35);font-size:0.7rem;overflow:hidden;">未设置</div>
+                    <div style="flex:1;min-width:230px;display:flex;flex-direction:column;gap:8px;">
+                        <input type="file" id="fabQrFile" accept="image/*" onchange="onFabQrFile(this)" style="font-size:0.72rem;color:rgba(255,255,255,0.7);">
+                        <input type="text" id="fabQrUrlInput" placeholder="或粘贴图片链接（http…）" style="padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:#16213e;color:#fff;font-size:0.78rem;">
+                        <input type="text" id="fabQrTipInput" placeholder="二维码下方文字（如：扫码加群）" style="padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:#16213e;color:#fff;font-size:0.78rem;">
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <button onclick="adminSaveFabQrcode()" style="padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-weight:700;color:#fff;background:linear-gradient(90deg,#4f9bff,#2f6bff);">💾 保存（全网生效）</button>
+                            <button onclick="adminClearFabQrcode()" style="padding:8px 16px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);cursor:pointer;font-weight:600;color:#fff;background:rgba(255,255,255,0.08);">🗑 清除</button>
+                        </div>
+                        <div id="fabQrStatus" style="font-size:0.72rem;color:#ffd700;min-height:14px;"></div>
+                    </div>
+                </div>
+            </div>`;
             html += '</div>';
             html += '<div style="font-size:0.7rem;color:rgba(255,255,255,0.4);margin-top:12px;line-height:1.6;">鼠标悬浮在每个开关上可查看详细说明。远程开关存于索引 Gist（全网生效），本机开关仅影响当前设备。新增开关只须在 FEATURE_TOGGLES 追加一条配置，矩阵会自动排版。</div>';
             box.innerHTML = html;
+            initFabQrPreview(remoteCfg);
         }
         window.renderFeatureToggles = renderFeatureToggles;
+
+        // ==================== 悬浮按钮二维码（💬 问题反馈 hover 显示，全网生效）====================
+        // 存储：room_index.json 的 fabQrcode（图片 dataURL 或 http 链接）+ fabQrcodeTip（二维码下方文字）
+        function initFabQrPreview(cfg) {
+            try {
+                const src = (cfg && cfg.fabQrcode) || '';
+                const pv = document.getElementById('fabQrPreview');
+                if (pv) pv.innerHTML = src ? '<img src="' + src.replace(/"/g, '&quot;') + '" style="max-width:100%;max-height:100%;object-fit:contain;background:#fff;">' : '未设置';
+                const u = document.getElementById('fabQrUrlInput');
+                if (u && /^https?:/i.test(src)) u.value = src;
+                const t = document.getElementById('fabQrTipInput');
+                if (t && cfg && cfg.fabQrcodeTip) t.value = cfg.fabQrcodeTip;
+            } catch (e) {}
+        }
+
+        // 选择本地图片 → 转 base64（暂存，点保存才写入）
+        window.onFabQrFile = function (input) {
+            const f = input && input.files && input.files[0];
+            if (!f) return;
+            const rd = new FileReader();
+            rd.onload = function () {
+                const data = String(rd.result || '');
+                const st = document.getElementById('fabQrStatus');
+                if (data.length > 500000) {
+                    if (st) st.textContent = '⚠️ 图片过大（约 ' + Math.round(data.length / 1024) + 'KB），请压缩后再上传或改用图片链接';
+                    return;
+                }
+                window.__fabQrPending = data;
+                const pv = document.getElementById('fabQrPreview');
+                if (pv) pv.innerHTML = '<img src="' + data.replace(/"/g, '&quot;') + '" style="max-width:100%;max-height:100%;object-fit:contain;background:#fff;">';
+                if (st) st.textContent = '已选择图片，点「保存」生效';
+            };
+            rd.readAsDataURL(f);
+        };
+
+        window.adminSaveFabQrcode = async function () {
+            const st = document.getElementById('fabQrStatus');
+            if (!getGistToken()) { if (st) st.textContent = '⚠️ 未配置 Gist Token，无法保存（请在 Token 页填写）'; return; }
+            let val = (window.__fabQrPending || '').trim();
+            const urlEl = document.getElementById('fabQrUrlInput');
+            if (!val && urlEl) val = (urlEl.value || '').trim();
+            const tipEl = document.getElementById('fabQrTipInput');
+            const tip = (tipEl && tipEl.value.trim()) ? tipEl.value.trim() : '扫码加群';
+            try {
+                if (st) st.textContent = '保存中…';
+                await setRoomIndexConfigField('fabQrcode', val || '');
+                await setRoomIndexConfigField('fabQrcodeTip', val ? tip : '');
+                window.__fabQrPending = '';
+                if (st) st.textContent = val ? '✅ 已保存（全网生效，用户刷新页面后 hover 可见）' : '✅ 已清除';
+            } catch (e) {
+                if (st) st.textContent = '❌ 保存失败：' + ((e && e.message) || e);
+            }
+        };
+
+        window.adminClearFabQrcode = async function () {
+            const st = document.getElementById('fabQrStatus');
+            if (!getGistToken()) { if (st) st.textContent = '⚠️ 未配置 Gist Token，无法清除'; return; }
+            try {
+                await setRoomIndexConfigField('fabQrcode', '');
+                await setRoomIndexConfigField('fabQrcodeTip', '');
+                window.__fabQrPending = '';
+                const u = document.getElementById('fabQrUrlInput'); if (u) u.value = '';
+                const pv = document.getElementById('fabQrPreview'); if (pv) pv.innerHTML = '未设置';
+                if (st) st.textContent = '✅ 已清除（悬浮按钮不再显示二维码）';
+            } catch (e) {
+                if (st) st.textContent = '❌ 清除失败：' + ((e && e.message) || e);
+            }
+        };
+
+        // 用户端：读取二维码 → 给「💬 问题反馈」悬浮按钮绑定 hover 浮层
+        async function initFabQrcode() {
+            try {
+                const fab = document.getElementById('feedbackFab');
+                if (!fab || document.getElementById('fabQrcodePop')) return;
+                const cfg = await getRoomIndexConfig();
+                const src = (cfg && cfg.fabQrcode) || '';
+                if (!src) return;
+                const tip = (cfg && cfg.fabQrcodeTip) || '扫码加群';
+                const box = document.createElement('div');
+                box.id = 'fabQrcodePop';
+                box.style.cssText = 'display:none;position:fixed;right:70px;bottom:150px;z-index:1300;padding:12px;background:rgba(18,20,38,0.98);border:1px solid rgba(79,195,247,0.55);border-radius:12px;box-shadow:0 10px 34px rgba(0,0,0,0.55);text-align:center;';
+                box.innerHTML = '<img src="' + src.replace(/"/g, '&quot;') + '" style="width:150px;height:150px;object-fit:contain;display:block;border-radius:8px;background:#fff;">'
+                    + '<div style="margin-top:8px;color:#fff;font-size:0.75rem;">' + String(tip).replace(/</g, '&lt;') + '</div>';
+                document.body.appendChild(box);
+                let timer = null;
+                const show = function () { if (timer) { clearTimeout(timer); timer = null; } box.style.display = 'block'; };
+                const hide = function () { if (timer) clearTimeout(timer); timer = setTimeout(function () { box.style.display = 'none'; }, 200); };
+                fab.addEventListener('mouseenter', show);
+                fab.addEventListener('mouseleave', hide);
+                box.addEventListener('mouseenter', show);
+                box.addEventListener('mouseleave', hide);
+            } catch (e) {}
+        }
 
         async function toggleFeature(key) {
             const t = FEATURE_TOGGLES.find(x => x.key === key);
