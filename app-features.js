@@ -6201,7 +6201,9 @@
             };
             const _accelAll = uniq.filter(_isAccel).sort(_accelCmp);
             const _accelFront = _accelAll.slice(0, 2);   // 加速卡前2张，占 4-5 位
-            const _isMain = n => !_isJ(n) && !_isG(n) && !_isShe(n) && !_accelAll.some(a => a === n); // 主战（含凤凰、含未进top2的加速卡如风灵/小野，统一归主战组避免重复）
+            // 🔴 2026-09-09 修复：_isMain 只排除「加速前2张」，其余加速卡（如水灵，常排第3+）必须归主战组，
+            //    否则会像之前那样被整体排除且未 push 而丢失（表现：水灵读取不到 / 阵容读取不完整）。
+            const _isMain = n => !_isJ(n) && !_isG(n) && !_isShe(n) && !_accelFront.some(f => f === n); // 主战（含凤凰、含未进top2的加速卡如水灵/风灵/小野）
             const _mainCards = uniq.filter(_isMain);
             const _mainFront = _mainCards.slice(0, 3);   // 前3位主战卡
             const _mainRest = _mainCards.slice(3);        // 多余主战卡（移到蛇女之后）
