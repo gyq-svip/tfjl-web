@@ -25247,9 +25247,10 @@ ${maSection}
                     head += '<span id="diagCfgPullInfo" style="color:#94a3b8;font-size:0.72rem;"></span>';
                     head += '</div>';
                     // 上报时间规律说明（2026-08-26 补，避免日后忘记）
-                    head += '<div style="margin-top:10px;border-top:1px dashed rgba(255,255,255,0.12);padding-top:8px;font-size:0.74rem;line-height:1.7;color:#cbd5e1;">';
-                    head += '<span style="color:#ffd700;">📊 上报时间规律（客户端侧实际触发时机）：</span><br>';
-                    // 🔴 2026-09-09 核实更新（对照 _scheduleDiagUpload / _initDiagReporter / _recordDiagWrite 实际代码）：
+                    // 🔴 2026-09-09 核实更新 + 默认折叠：说明较长占版面，改为点标题展开（默认收起）
+                    head += '<div style="margin-top:10px;border-top:1px dashed rgba(255,255,255,0.12);padding-top:8px;">';
+                    head += '<div id="diagRuleToggle" onclick="var e=document.getElementById(\'diagRuleDetail\');var a=document.getElementById(\'diagRuleArrow\');if(e&&a){e.style.display=e.style.display===\'none\'?\'block\':\'none\';a.textContent=e.style.display===\'none\'?\'▸\':\'▾\';}" style="cursor:pointer;font-size:0.74rem;color:#ffd700;user-select:none;"><span id="diagRuleArrow">▸</span> 📊 上报时间规律（客户端侧实际触发时机，点击展开）</div>';
+                    head += '<div id="diagRuleDetail" style="display:none;margin-top:6px;font-size:0.74rem;line-height:1.7;color:#cbd5e1;">';
                     //   原 ② 过时——心跳默认 15±5（非 45±10，见 _HB_DEF_BASE/_HB_DEF_JITTER，事故后已改小）；
                     //   原 ③ 过时——buffer 写入已不再单独触发立即上报（_recordDiagWrite/_recordFeatureUse 只累加，_scheduleDiagUpload('immediate') 现仅 online 调用且受 allowImmediate 控制）。
                     head += '① <b>打开延迟首报</b>：页面加载 3 秒后读配置，若总闸开则安排首报，延迟 ' + C.openDelayMin + '~' + C.openDelayMax + ' 分钟（随机错峰，避免一打开就全员正点报）。<br>';
@@ -25258,6 +25259,7 @@ ${maSection}
                     head += '④ <b>联网恢复</b>：online 事件补报（' + C.immediateDelayMin + '~' + C.immediateDelayMax + ' 分钟延迟），但受「允许立即上报」开关控制——关掉则该路径不上报，等下次心跳。<br>';
                     head += '⑤ <b>手动</b>：本面板「⚡ 立即拉取配置」按钮 = 立即拉取最新策略 + 本机<b>立刻补报一次心跳</b>（跳过随机延迟）。<br>';
                     head += '👉 读写量大的客户端（如一直挂机的老顽固）心跳 + 联网恢复补报更频繁，面板上活跃度 / 写盘次数自然长期最高。延迟均可调：打开首报 ' + C.openDelayMin + '~' + C.openDelayMax + ' 分、立即补报 ' + C.immediateDelayMin + '~' + C.immediateDelayMax + ' 分（诊断配置框）；心跳周期默认 15 分、可配 1~1440（功能开关面板）。';
+                    head += '</div>';
                     head += '</div>';
                     head += '</div>';
                     head += '</div>';
