@@ -1138,17 +1138,59 @@ if (true) {
         showSaveScriptDialog(fileName, text);
     }
 
+    // 🔴 2026-09-08：网页版「预览模式」守卫——面板照常渲染（能看界面内容），
+    //    但屏蔽一切交互（关闭按钮除外），点击提示「仅桌面版可用」，避免 Web 下调 Tauri 命令报错。
+    function _webPreviewGuard(modal) {
+        if (!modal || _isTauriRuntime()) return;
+        try {
+            const box = modal.firstElementChild || modal;
+            const tip = document.createElement('div');
+            tip.style.cssText = 'margin:0 0 12px;padding:9px 12px;border-radius:8px;background:rgba(255,152,0,0.14);border:1px solid rgba(255,152,0,0.45);color:#ffb74d;font-size:0.78rem;line-height:1.5;';
+            tip.innerHTML = '⚠️ <b>网页版仅预览界面</b>：以下功能需要 <b>桌面版（塔防精灵助手）</b> 才能实际使用。';
+            box.insertBefore(tip, box.firstChild);
+        } catch (e) {}
+        // 拦截交互（捕获阶段优先于内联 onclick）：除「关闭」外一律提示
+        modal.addEventListener('click', function (e) {
+            const t = e.target;
+            if (!t || !t.closest) return;
+            const el = t.closest('button,input,select,textarea');
+            if (!el || !modal.contains(el)) return;
+            const oc = (el.getAttribute && el.getAttribute('onclick')) || '';
+            if (oc.indexOf('close') >= 0 || (el.tagName === 'BUTTON' && (el.textContent || '').trim() === '×')) return; // 关闭按钮放行
+            e.preventDefault(); e.stopPropagation();
+            if (typeof showToast === 'function') showToast('仅桌面版可用（网页版仅预览界面）', 'error');
+        }, true);
+        // 视觉降透明度，直观表明「不可用」
+        try {
+            modal.querySelectorAll('button,input,select,textarea').forEach(function (el) {
+                const oc = (el.getAttribute && el.getAttribute('onclick')) || '';
+                if (oc.indexOf('close') >= 0 || (el.tagName === 'BUTTON' && (el.textContent || '').trim() === '×')) return;
+                el.style.opacity = '0.55';
+            });
+        } catch (e) {}
+    }
+
+    // 网页版预览占位：统计区显示「仅桌面版可用」
+    function _renderWebOnlyHint(containerId) {
+        const el = document.getElementById(containerId);
+        if (!el) return;
+        el.innerHTML = '<div style="color:rgba(255,152,0,0.8);text-align:center;padding:16px;font-size:0.8rem;line-height:1.6;">⚠️ 网页版仅预览界面<br>统计 / 扫盘需 <b>桌面版（塔防精灵助手）</b></div>';
+    }
+
     function openAppLocalSettings() {
-        // 网页版按钮已隐藏，此分支只剩「其他入口误调」场景：给提示而非静默无反应
-        if (!_isTauriRuntime()) {
-            try { if (typeof showToast === 'function') showToast('此功能仅在桌面应用中可用', 'error'); } catch (e) {}
+        // 🔴 2026-09-08：网页版也打开面板（仅预览界面），不再 toast 后 return。
+        const _isApp = _isTauriRuntime();
+        showSettingsModal();
+        try { fillSettingsForm(); } catch (e) { console.warn('[APP设置] 填充表单失败(预览降级):', e); }
+        if (_isApp) scanAllFiles(); // 扫描文件列表：依赖本机磁盘，仅桌面版执行
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('打开APP设置');
+        if (!_isApp) {
+            // 网页版预览：统计区显示占位，且不触发任何本机扫盘
+            _renderWebOnlyHint('screenshotStats');
+            _renderWebOnlyHint('logBattleStats');
+            _webPreviewGuard(document.getElementById('appLocalSettingsModal'));
             return;
         }
-        showSettingsModal();
-        fillSettingsForm();
-        // 扫描文件列表总是执行（轻量）
-        scanAllFiles();
-        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('打开APP设置');
         // 🔴 2026-08-31 开关恢复：默认开启时打开面板即自动加载两项统计（默认显示）；
         //    低配电脑关闭后不再自动扫盘（防卡死），统计区显示关闭提示，仍可手动强制刷新。
         //    calcScreenshotStats/calcLogBattleStats 内部自带"缓存优先、无缓存才扫盘"的分级策略。
@@ -5337,10 +5379,8 @@ if (true) {
     }
 
     function openGameMonitor() {
-        if (!_isTauriRuntime()) {
-            if (typeof showToast === 'function') showToast('游戏监控仅在桌面 APP 中可用', 'error');
-            return;
-        }
+        // 🔴 2026-09-08：网页版也打开面板（仅预览界面）；依赖 Tauri 的动作（枚举窗口 / 恢复状态）在下方按平台跳过
+        const _isApp = _isTauriRuntime();
         if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('打开游戏监控');
         const cfg = _gmLoadCfg();
         const old = document.getElementById('gameMonitorModal');
@@ -5482,10 +5522,19 @@ if (true) {
         }
         // 点击组配置区渲染（⑥到波点击 / ⑦文字点击）
         _gmRenderRules();
-        // 刷新窗口列表（按上次的窗口标题自动勾选）
-        gmRefreshWindows();
-        // Rust 线程可能在面板外继续跑：恢复按钮状态 + 绑实时事件
-        _gmRestoreState();
+        if (_isApp) {
+            // 刷新窗口列表（按上次的窗口标题自动勾选）——依赖 Tauri 枚举窗口
+            gmRefreshWindows();
+            // Rust 线程可能在面板外继续跑：恢复按钮状态 + 绑实时事件
+            _gmRestoreState();
+        } else {
+            // 🔴 2026-09-08 网页版预览：跳过本机窗口枚举 / Rust 状态查询，给占位提示 + 屏蔽交互
+            const _wl = modal.querySelector('#gmWinList');
+            if (_wl) _wl.innerHTML = '<span style="color:rgba(255,152,0,0.85);">⚠️ 网页版仅预览界面：窗口枚举 / 波数识别需桌面版</span>';
+            const _st = modal.querySelector('#gmStatus');
+            if (_st) _st.innerHTML = '⚠️ 网页版仅预览界面：监控、框选、语音播报均需 <b>桌面版（塔防精灵助手）</b>。';
+            _webPreviewGuard(modal);
+        }
     }
 
     // 🔴 关面板不停监控（用户重点需求）：只解绑 UI 事件，Rust 后台线程继续播报+托盘角标。
