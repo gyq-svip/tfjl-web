@@ -2767,6 +2767,23 @@
                 padding: 8px !important;
             }
             #txtPreviewHeader h3 { font-size: 0.95rem !important; }
+
+            /* ---- 本地文件「预览/编辑」窗口（.floating-txt-window）：原 width:650px/height:500px/left:200px，
+                   手机上只能看到左上角一块且看不到底部按钮；改成撑满可视宽度、高度受限可滚动 ---- */
+            .floating-txt-window {
+                left: 8px !important;
+                right: 8px !important;
+                top: 8px !important;
+                width: auto !important;
+                min-width: 0 !important;
+                max-width: calc(100vw - 16px) !important;
+                /* 高度给确定值：height:auto 会让 flex 内容区塌陷（textarea 撑不开） */
+                height: min(520px, calc(100vh - 100px)) !important;
+                min-height: 0 !important;
+                max-height: calc(100vh - 100px) !important;
+                resize: none !important;
+            }
+            .floating-txt-window textarea { font-size: 16px !important; }   /* 防 iOS 聚焦自动放大 */
         }
 
         /* 超小屏（≤480px）进一步压缩 */

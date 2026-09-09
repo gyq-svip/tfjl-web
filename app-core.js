@@ -5343,30 +5343,43 @@
         // 窗口拖拽
         function makeWindowDraggable(windowDiv, handle) {
             let isDragging = false;
-            let startX, startY, startLeft, startTop;
-            
+            let startX = 0, startY = 0, dx = 0, dy = 0;
+            // 🔴 2026-09-10：改用 transform 位移（而不是改 left/top）——
+            //    手机端 CSS 会用 !important 锁定 left/right（防止窗口溢出屏幕），
+            //    若这里仍改 left/top 会被锁死导致拖不动；transform 不受影响。
+            //    同时补上 touch 事件，手机上才能拖动（原来只绑了 mouse，触屏完全无效）。
+            function start(x, y) {
+                isDragging = true;
+                startX = x; startY = y;
+                windowDiv.style.transition = 'none';
+            }
+            function move(x, y) {
+                if (!isDragging) return;
+                dx += (x - startX); dy += (y - startY);
+                startX = x; startY = y;
+                windowDiv.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+            }
+            function end() { isDragging = false; windowDiv.style.transition = ''; }
+
             handle.addEventListener('mousedown', (e) => {
                 if (e.target.tagName === 'BUTTON') return;
-                isDragging = true;
-                startX = e.clientX;
-                startY = e.clientY;
-                startLeft = windowDiv.offsetLeft;
-                startTop = windowDiv.offsetTop;
-                windowDiv.style.transition = 'none';
+                start(e.clientX, e.clientY);
+                e.preventDefault();
             });
-            
-            document.addEventListener('mousemove', (e) => {
-                if (!isDragging) return;
-                const dx = e.clientX - startX;
-                const dy = e.clientY - startY;
-                windowDiv.style.left = (startLeft + dx) + 'px';
-                windowDiv.style.top = (startTop + dy) + 'px';
-            });
-            
-            document.addEventListener('mouseup', () => {
-                isDragging = false;
-                windowDiv.style.transition = '';
-            });
+            document.addEventListener('mousemove', (e) => move(e.clientX, e.clientY));
+            document.addEventListener('mouseup', end);
+
+            handle.addEventListener('touchstart', (e) => {
+                if (!e.touches || e.touches.length !== 1) return;
+                if (e.target.tagName === 'BUTTON') return;
+                start(e.touches[0].clientX, e.touches[0].clientY);
+            }, { passive: true });
+            document.addEventListener('touchmove', (e) => {
+                if (!e.touches || !e.touches.length) return;
+                move(e.touches[0].clientX, e.touches[0].clientY);
+            }, { passive: true });
+            document.addEventListener('touchend', end);
+            document.addEventListener('touchcancel', end);
         }
 
         // 窗口调整大小
