@@ -3088,10 +3088,11 @@
             if (!file) return;
 
             const modal = document.createElement('div');
+            modal.id = 'txtPreviewModal';   // 便于手机端 CSS 适配
             modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:3000;display:flex;align-items:center;justify-content:center;padding:20px;';
             modal.innerHTML = `
-                <div style="background:#1a1a2e;border:2px solid rgba(255,215,0,0.3);border-radius:16px;padding:24px;max-width:900px;width:100%;max-height:85vh;display:flex;flex-direction:column;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                <div id="txtPreviewCard" style="background:#1a1a2e;border:2px solid rgba(255,215,0,0.3);border-radius:16px;padding:24px;max-width:900px;width:100%;max-height:85vh;display:flex;flex-direction:column;">
+                    <div id="txtPreviewHeader" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;cursor:move;" title="拖动此处可移动窗口">
                         <h3 style="margin:0;color:#ffd700;">📄 ${escapeHtml(file.name)}</h3>
                         <span onclick="this.closest('div').parentElement.remove()" style="cursor:pointer;color:#f44336;font-size:1.5rem;">✕</span>
                     </div>
@@ -3117,7 +3118,52 @@
             modal.addEventListener('click', function(e) {
                 if (e.target === modal) modal.remove();
             });
+            // 手机/桌面都能拖动窗口（原来这个弹窗完全不能移动）
+            if (typeof bindDragMove === 'function') {
+                bindDragMove(document.getElementById('txtPreviewCard'), document.getElementById('txtPreviewHeader'));
+            }
         }
+
+        // 通用：让元素可通过指定把手拖动（同时支持鼠标与触摸；用 transform 位移，不影响居中布局）
+        function bindDragMove(el, handle) {
+            if (!el || !handle || handle.__dragBound) return;
+            handle.__dragBound = true;
+            var dx = 0, dy = 0, lx = 0, ly = 0;
+            var onMove = null, onUp = null;
+            function start(x, y) {
+                lx = x; ly = y;
+                onMove = function (ev) {
+                    var p = ev.touches ? ev.touches[0] : ev;
+                    if (!p) return;
+                    dx += (p.clientX - lx); dy += (p.clientY - ly);
+                    lx = p.clientX; ly = p.clientY;
+                    el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+                };
+                onUp = function () {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                    document.removeEventListener('touchmove', onMove);
+                    document.removeEventListener('touchend', onUp);
+                    document.removeEventListener('touchcancel', onUp);
+                };
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+                document.addEventListener('touchmove', onMove, { passive: true });
+                document.addEventListener('touchend', onUp);
+                document.addEventListener('touchcancel', onUp);
+            }
+            function isCtl(t) { return t && t.closest && t.closest('button,select,input,span'); }
+            handle.addEventListener('mousedown', function (e) {
+                if (isCtl(e.target)) return;
+                start(e.clientX, e.clientY);
+                e.preventDefault();
+            });
+            handle.addEventListener('touchstart', function (e) {
+                if (!e.touches || e.touches.length !== 1 || isCtl(e.target)) return;
+                start(e.touches[0].clientX, e.touches[0].clientY);
+            }, { passive: true });
+        }
+        window.bindDragMove = bindDragMove;
 
         // 从TXT文件内容解析英雄阵容
         function parseTxtFileContent(index) {
