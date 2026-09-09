@@ -2658,6 +2658,121 @@
         #messageWallContent::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); border-radius: 3px; }
         #messageWallContent::-webkit-scrollbar-thumb { background: rgba(255,215,0,0.5); border-radius: 3px; }
         #messageWallContent::-webkit-scrollbar-thumb:hover { background: rgba(255,215,0,0.8); }
+
+        /* ============ 2026-09-10 手机端适配增强（≤768px） ============ */
+        /* 说明：主页面 index.html 全部是内联固定宽高，只能用 !important 覆盖；
+           全部规则限定在手机断点内，桌面端完全不受影响。 */
+        @media (max-width: 768px) {
+            /* ---- 1. 手牌容器：解除 433px 死宽（原规则带 !important，旧媒体查询覆盖不了，是手机横向溢出主因）---- */
+            .selected-cards-container {
+                width: 100% !important;
+                max-width: 100% !important;
+                min-width: 0 !important;
+                grid-template-columns: repeat(5, 1fr) !important;
+                grid-template-rows: repeat(2, auto) !important;
+                gap: 4px !important;
+            }
+            .selected-card {
+                width: 100% !important;
+                min-width: 0 !important;
+                min-height: 42px !important;
+                font-size: 0.62rem !important;
+                padding: 4px 2px !important;
+            }
+
+            /* ---- 2. 出战槽：72px 定宽 → 自适应两列 ---- */
+            .battle-slots-container { width: 100% !important; max-width: 210px !important; }
+            .battle-slots { grid-template-columns: repeat(2, 1fr) !important; width: 100% !important; gap: 6px !important; }
+            .battle-slot {
+                width: 100% !important;
+                min-width: 0 !important;
+                max-width: none !important;
+                height: auto !important;
+                min-height: 64px !important;
+            }
+            .battle-slots-container .engineering-slot { width: 100% !important; max-width: 100px !important; margin: 0 auto 6px !important; }
+
+            /* ---- 3. 卡池卡片：重置 90px 定宽（旧规则只改了 width，min/max 未重置导致失效。不动 padding，避免破坏皮肤卡名定位）---- */
+            .collapsible-section .card-item,
+            .cards-grid .card-item {
+                width: auto !important;
+                min-width: 62px !important;
+                max-width: none !important;
+                flex: 1 1 62px !important;
+                height: 46px !important;
+                font-size: 0.72rem !important;
+            }
+            .favorite-group .card-item { min-width: 62px !important; max-width: none !important; height: 40px !important; }
+
+            /* ---- 4. 浮动面板 / 浮窗：全部收进视口（原 width 350~1100px 在 360px 屏必然溢出）---- */
+            #activityCalcPanel, #referencePanel, #notepadPanel, #txtFilesPanel,
+            #messageWall, #reputationPanel, #chatRoomPanel, #floatConsole {
+                left: 8px !important;
+                right: 8px !important;
+                width: auto !important;
+                min-width: 0 !important;
+                max-width: none !important;
+                resize: none !important;          /* 触屏 resize 无效，去掉避免占位 */
+                box-sizing: border-box !important;
+            }
+            #txtFilesPanel, #notepadPanel, #referencePanel, #activityCalcPanel {
+                top: 8px !important;
+                height: min(645px, 82vh) !important;
+                min-height: 0 !important;
+            }
+            #messageWall, #reputationPanel, #chatRoomPanel {
+                top: 8px !important;
+                height: min(480px, 76vh) !important;
+                min-height: 0 !important;
+            }
+            #floatConsole { bottom: 56px !important; max-height: 56vh !important; }
+            #contributionCard {
+                width: 96vw !important;
+                min-width: 0 !important;
+                height: min(720px, 88vh) !important;
+            }
+
+            /* ---- 5. 顶部 / 底部固定栏（原 h1 2.5rem + 状态栏换行会占满首屏、遮挡内容）---- */
+            h1 { font-size: 1.5rem !important; }
+            /* 底部固定状态栏会盖住页面末尾（免责声明等），留出安全高度 */
+            body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important; }
+            #statsBar {
+                gap: 10px !important;
+                padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px)) !important;
+                font-size: 0.72rem !important;
+                flex-wrap: nowrap !important;     /* 单行横滚，避免换行成 3-4 行遮挡底部 */
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch;
+            }
+            #statsBar > * { white-space: nowrap !important; flex-shrink: 0 !important; }
+            #feedbackFab { bottom: calc(56px + env(safe-area-inset-bottom, 0px)) !important; }
+
+            /* ---- 6. 触摸与排版 ---- */
+            button, select, input[type="button"], input[type="submit"] { min-height: 44px !important; }
+            .rep-tab { padding: 8px 12px !important; min-height: 36px !important; }
+            .admin-form-row { flex-direction: column !important; }
+            #adminMenuGrid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important; }
+            .admin-panel { width: 94% !important; padding: 16px !important; }
+            #fileListHint { white-space: normal !important; }
+            #scriptEditorFindInput, #scriptEditorReplaceInput { width: auto !important; flex: 1 1 100px !important; min-width: 0 !important; }
+        }
+
+        /* 超小屏（≤480px）进一步压缩 */
+        @media (max-width: 480px) {
+            .selected-cards-container { gap: 3px !important; }
+            .collapsible-section .card-item,
+            .cards-grid .card-item { min-width: 56px !important; flex: 1 1 56px !important; font-size: 0.68rem !important; }
+            .battle-slots-container { max-width: 180px !important; }
+            h1 { font-size: 1.25rem !important; }
+        }
+
+        /* 无 hover 设备（手机）：补按压反馈，并让原本靠 hover 才可见的元素常显 */
+        @media (hover: none) {
+            button:active, .card-item:active, .battle-slot:active, .admin-menu-item:active, .rep-tab:active {
+                filter: brightness(1.3);
+            }
+            .pool-skin-lock { opacity: 1 !important; }
+        }
         
         /* 拍卖行面板拖拽调整大小样式 */
         #chatRoomPanel {
