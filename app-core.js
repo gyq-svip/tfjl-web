@@ -30027,4 +30027,120 @@ ${maSection}
                 if (window._hideLoadingScreen) window._hideLoadingScreen('app-core就绪');
             }, 3000);
         })();
+
+        // ==================== 手机端「悬浮退出」按钮（2026-09-10）====================
+        // 背景：手机上浮动面板/弹窗经常关不掉（关闭按钮太小、被挤出视口），
+        // 该按钮可逐级关闭最上层浮层；没有浮层时执行「返回上一页 / 回到顶部」。
+        // 仅手机显示（样式见 styles.css 的 @media max-width:768px 段）。
+        (function () {
+            // 永不关闭的固定元素（工具栏 / 状态栏 / 悬浮按钮自身 / 登录门禁）
+            var ESC_IGNORE = { statsBar: 1, feedbackFab: 1, mobileEscapeFab: 1, floatConsoleToggle: 1,
+                messageWallToggle: 1, fixedHeader: 1, mainContent: 1 };
+
+            function _vis(el) {
+                var s = getComputedStyle(el);
+                if (s.display === 'none' || s.visibility === 'hidden' || parseFloat(s.opacity) === 0) return false;
+                var r = el.getBoundingClientRect();
+                return r.width > 0 && r.height > 0;
+            }
+
+            // 找出当前可见的"浮层"：fixed/absolute + z-index 够高 + 尺寸够大 + 可交互
+            function _collectLayers() {
+                var out = [];
+                var all = document.querySelectorAll('body > div, body > section, body > aside');
+                for (var i = 0; i < all.length; i++) {
+                    var el = all[i];
+                    if (el.id && ESC_IGNORE[el.id]) continue;
+                    if (el.classList && el.classList.contains('password-overlay')) continue; // 登录门禁不可关
+                    var s = getComputedStyle(el);
+                    if (s.pointerEvents === 'none') continue;
+                    if (s.position !== 'fixed' && s.position !== 'absolute') continue;
+                    if (!_vis(el)) continue;
+                    var r = el.getBoundingClientRect();
+                    if (r.width < 150 || r.height < 120) continue;      // 排除小按钮 / 提示条
+                    var z = parseInt(s.zIndex, 10);
+                    if (isNaN(z) || z < 1000) continue;
+                    out.push({ el: el, z: z, area: r.width * r.height });
+                }
+                out.sort(function (a, b) { return (b.z - a.z) || (a.area - b.area); }); // 层级高的优先；同层取面积小的
+                return out;
+            }
+
+            // 在浮层内找"关闭 / 取消 / ×"控件
+            function _findCloseBtn(layer) {
+                var all = layer.querySelectorAll('button, span, div, a, i');
+                var fallback = null;
+                for (var i = 0; i < all.length; i++) {
+                    var c = all[i];
+                    var r = c.getBoundingClientRect();
+                    if (r.width < 6 || r.height < 6 || r.width > 220 || r.height > 120) continue;
+                    var txt = (c.textContent || '').trim();
+                    var oc = c.getAttribute('onclick') || '';
+                    var cls = (typeof c.className === 'string') ? c.className : '';
+                    var key = (c.id || '') + ' ' + cls;
+                    if (/close|关闭|取消|cancel/i.test(key) || /close|关闭|取消|cancel/i.test(oc)) return c;
+                    var isX = (txt === '×' || txt === '✕' || txt === '✖' || txt === '✗' || txt === 'X');
+                    if (isX && !fallback) fallback = c;
+                }
+                return fallback;
+            }
+
+            function _closeTopLayer() {
+                var layers = _collectLayers();
+                if (!layers.length) return null;
+                var target = layers[0].el;
+                var btn = _findCloseBtn(target);
+                if (btn) { try { btn.click(); } catch (e) {} }
+                // 点关闭按钮后若仍可见（有些面板没有关闭按钮），兜底直接隐藏
+                setTimeout(function () {
+                    try { if (_vis(target)) target.style.display = 'none'; } catch (e) {}
+                }, 80);
+                return target;
+            }
+
+            function _backOrTop() {
+                if (window.history && window.history.length > 1) {
+                    try { window.history.back(); return; } catch (e) {}
+                }
+                try { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+                catch (e) { window.scrollTo(0, 0); }
+            }
+
+            function _createFab() {
+                if (document.getElementById('mobileEscapeFab')) return;
+                var fab = document.createElement('div');
+                fab.id = 'mobileEscapeFab';
+                fab.setAttribute('title', '关闭当前窗口（长按可一次关闭全部）');
+                fab.innerHTML = '<span style="font-size:1.2rem;line-height:1;">✕</span>';
+                document.body.appendChild(fab);
+
+                fab.addEventListener('click', function () {
+                    var t = _closeTopLayer();
+                    if (t) {
+                        if (typeof showToast === 'function') showToast('已关闭当前窗口', 'success');
+                    } else {
+                        if (typeof showToast === 'function') showToast('没有可关闭的窗口，已返回', 'info');
+                        _backOrTop();
+                    }
+                });
+
+                // 长按 0.6s：一次性关闭所有浮层
+                var t0 = 0;
+                fab.addEventListener('touchstart', function () { t0 = Date.now(); }, { passive: true });
+                fab.addEventListener('touchend', function (e) {
+                    if (t0 && Date.now() - t0 > 600) {
+                        var n = 0;
+                        while (_closeTopLayer() && n < 8) { n++; }
+                        if (typeof showToast === 'function') {
+                            showToast(n ? ('已关闭 ' + n + ' 个窗口') : '没有可关闭的窗口', n ? 'success' : 'info');
+                        }
+                        try { e.preventDefault(); } catch (err) {}
+                    }
+                    t0 = 0;
+                });
+            }
+
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _createFab);
+            else _createFab();
+        })();
     

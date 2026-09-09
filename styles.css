@@ -2766,6 +2766,33 @@
             h1 { font-size: 1.25rem !important; }
         }
 
+        /* ---- 手机端「悬浮退出」按钮：关不掉的浮层靠它兜底（JS 见 app-core.js 末尾）---- */
+        #mobileEscapeFab { display: none; }   /* 桌面不显示 */
+        @media (max-width: 768px) {
+            #mobileEscapeFab {
+                display: flex !important;
+                position: fixed !important;
+                left: 12px;
+                bottom: calc(56px + env(safe-area-inset-bottom, 0px));  /* 让开底部状态栏 */
+                width: 52px;
+                height: 52px;
+                border-radius: 50%;
+                background: rgba(30, 38, 66, 0.92);
+                border: 2px solid rgba(255, 215, 0, 0.55);
+                color: #ffd700;
+                align-items: center;
+                justify-content: center;
+                z-index: 2147483000;      /* 高于所有浮层（最高 200000+） */
+                box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55);
+                user-select: none;
+                cursor: pointer;
+                -webkit-tap-highlight-color: transparent;
+            }
+            #mobileEscapeFab:active { filter: brightness(1.35); }
+            /* 客服悬浮按钮（右下）与它错开，避免重叠误触 */
+            #feedbackFab { left: auto !important; right: 12px !important; bottom: calc(56px + env(safe-area-inset-bottom, 0px)) !important; opacity: 1 !important; }
+        }
+
         /* 无 hover 设备（手机）：补按压反馈，并让原本靠 hover 才可见的元素常显 */
         @media (hover: none) {
             button:active, .card-item:active, .battle-slot:active, .admin-menu-item:active, .rep-tab:active {
