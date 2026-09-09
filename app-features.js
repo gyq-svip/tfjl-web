@@ -6623,10 +6623,13 @@
                 output += `02:31,下小野,上${firstCardName}满${jlStr},\n`;
             }
 
-            // 02:36 下凤凰上小野（情况3：小野没上阵 + 凤凰携带且已上阵）
+            // 情况3：小野没上阵 + 凤凰携带且已上阵（凤凰被手动写进前6，开局就在阵上）
+            // 🔴 2026-09-09 规则：小野优先上（扛 02:30），凤凰只在 02:50 用——凤凰开局在阵也要先换下给小野
             const needFengHuangToXiaoYe = xiaoYeNotInBattle && fengHuangCarried && fengHuangDeployed;
             if (needFengHuangToXiaoYe) {
-                output += `02:36,下凤凰,上小野满${jlStr},\n`;
+                output += `02:26,下凤凰,上小野满${jlStr},\n`;   // 小野优先上，扛 02:30
+                output += `02:31,下小野,上凤凰满${jlStr},\n`;   // 换回凤凰，满级待命 02:50
+                output += `02:50,下凤凰,上小野满${jlStr},\n`;   // 扛完 02:50，凤凰下场，小野补位
             }
 
             // 凤凰上下（情况1/情况2/情况4）
