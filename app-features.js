@@ -6629,19 +6629,23 @@
                 output += `02:36,下凤凰,上小野满${jlStr},\n`;
             }
 
-            // 02:38 上下凤凰（情况1/情况2/情况4）
-            // 情况1：小野没上阵+凤凰没上阵+卡>6 → 02:38用{第一张卡}上下凤凰
-            // 情况2：只有凤凰没有小野（凤凰没上阵，小野未携带）→ 02:26上凤凰，02:31下凤凰接精灵
-            // 情况4：小野已上阵+凤凰没上阵 → 02:38用小野上下凤凰（切回小野接精灵）
+            // 凤凰上下（情况1/情况2/情况4）
+            // 情况1：小野没上阵+凤凰没上阵+卡>6 → 02:44下{第一张卡}上凤凰3级 → 02:49上凤凰满 → 02:50下凤凰上{第一张卡}满接精灵
+            // 情况2：只有凤凰没有小野（凤凰没上阵，小野未携带）→ 02:26上凤凰，02:31下凤凰接精灵（不变）
+            // 情况4：小野已上阵+凤凰没上阵 → 同上三段，用「小野」做切换卡（最后切回小野接精灵）
             const needFengHuangOnlySwitch = fengHuangNotInBattle && !xiaoYeCarried;  // 情况2：只有凤凰没有小野
             const needFengHuangSwitch = fengHuangNotInBattle && (needXiaoYeSwitch || xiaoYeDeployed || needFengHuangOnlySwitch);
             if (needFengHuangSwitch) {
                 if (needXiaoYeSwitch) {
-                    // 情况1：小野是切换进来的，02:31已下小野并接了精灵，02:38再切凤凰也接精灵
-                    output += `02:38,下${firstCardName},上凤凰4级,时钟秒0.5,下凤凰,上${firstCardName}满${jlStr},\n`;
+                    // 情况1：小野是切换进来的，02:31已下小野并接了精灵；🔴 2026-09-09 凤凰改为三段（02:44/02:49/02:50，先3级后满）
+                    output += `02:44,下${firstCardName},上凤凰3级,\n`;
+                    output += `02:49,上凤凰满,\n`;
+                    output += `02:50,下凤凰,上${firstCardName}满${jlStr},\n`;
                 } else if (xiaoYeDeployed) {
-                    // 情况4：小野本来在阵容，02:38用小野上下凤凰，最后切回小野接精灵
-                    output += `02:38,下小野,上凤凰4级,时钟秒0.5,下凤凰,上小野满${jlStr},\n`;
+                    // 情况4：小野本来在阵容，用小野上下凤凰，最后切回小野接精灵（同样改三段）
+                    output += `02:44,下小野,上凤凰3级,\n`;
+                    output += `02:49,上凤凰满,\n`;
+                    output += `02:50,下凤凰,上小野满${jlStr},\n`;
                 } else if (needFengHuangOnlySwitch) {
                     // 情况2：只有凤凰没有小野，02:26上凤凰扛02:30 boss，02:31下凤凰接精灵
                     output += `02:26,下${firstCardName},上凤凰4级,\n`;
