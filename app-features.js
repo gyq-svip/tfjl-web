@@ -6473,11 +6473,11 @@
             }
 
             // 生成上卡字符串
-            // 隐藏榜：魔化的卡固定上4级（魔化栏已自动填全部非精灵卡，所以基本都是4级）
-            // 活动：有光精灵→魔化4级/其他3级；无光精灵→全满
+            // 隐藏榜：🔴 2026-09-09 起开局上卡统一「上XX满」（原：魔化的卡上4级、不魔化上3级）
+            // 活动（不变）：有光精灵→魔化4级/其他3级；无光精灵→全满
             arrangedCards.forEach(name => {
-                if (isHidden && isMoHua(name)) {
-                    shangKaStr += `上${name}4级,`;
+                if (isHidden) {
+                    shangKaStr += `上${name}满,`;
                 } else if (hasGuangJingLing) {
                     const level = isMoHua(name) ? '4级' : '3级';
                     shangKaStr += `上${name}${level},`;
@@ -6489,8 +6489,9 @@
             // 工程卡加在最后（第7位）
             if (hasGongCheng) {
                 gongChengCards.forEach(name => {
-                    if (isHidden && isMoHua(name)) {
-                        shangKaStr += `上${name}4级,`;
+                    // 隐藏榜同样统一「上XX满」
+                    if (isHidden) {
+                        shangKaStr += `上${name}满,`;
                     } else if (hasGuangJingLing) {
                         const level = isMoHua(name) ? '4级' : '3级';
                         shangKaStr += `上${name}${level},`;
