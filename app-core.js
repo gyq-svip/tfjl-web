@@ -23015,6 +23015,19 @@ ${maSection}
         // 从需求墙导入备份
         async function importBackupFromWall(url, isEncrypted = false, passwordHash = '') {
             try {
+                // 🔴 2026-09-09 修复：先核对密码，再弹「正在导入」提示。
+                //    否则用户在密码框点「取消」时直接 return，不进 catch，toast 会永远卡在「正在导入备份...」
+                //    （与 importScriptToTxtFiles 的处理保持一致）
+                let verifiedPwd = null;
+                if (isEncrypted) {
+                    const decPwd = await askDecryptPasswordAsync('该备份已加密，请输入密码或恢复密钥：');
+                    if (!decPwd) return;   // 用户取消：此时尚未创建 toast，不会残留提示
+                    verifiedPwd = decPwd;
+                }
+                // 清理可能残留的同名提示（防止叠加多个）
+                const _oldToast = document.getElementById('importLoadingToast');
+                if (_oldToast) _oldToast.remove();
+
                 // 显示加载提示
                 const toast = document.createElement('div');
                 toast.id = 'importLoadingToast';
@@ -23123,11 +23136,13 @@ ${maSection}
                     }
                 }
                 
-                if (isEncrypted) {
-                    const decPwd = await askDecryptPasswordAsync('该备份已加密，请输入密码或恢复密钥：');
-                    if (!decPwd) return;
-                    const decrypted = await decryptContent(backupContent, decPwd);
-                    if (decrypted === null) { alert('❌ 解密失败，可能密码/密钥不正确或文件已损坏'); return; }
+                if (isEncrypted && verifiedPwd) {
+                    const decrypted = await decryptContent(backupContent, verifiedPwd);
+                    if (decrypted === null) {
+                        toast.remove();   // 🔴 解密失败同样要移除提示，否则一直卡在「正在导入备份...」
+                        alert('❌ 解密失败，可能密码/密钥不正确或文件已损坏');
+                        return;
+                    }
                     backupContent = decrypted;
                 }
 
