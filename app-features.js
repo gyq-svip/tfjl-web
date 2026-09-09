@@ -6005,13 +6005,24 @@
             const parserTab = document.getElementById('txtTabParser');
             if (!parserTab || parserTab.style.display === 'none') return;
 
-            // 如果焦点已经在输入框内，让浏览器默认行为处理
+            // 🔴 2026-09-09 修复：焦点在「其它可编辑元素」时（快速输入卡名框 quickCardInput、脚本编辑器
+            //    scriptEditorTextarea、搜索框、记事本等），不劫持粘贴，交给浏览器默认行为（粘到当前光标处）。
+            //    否则会出现「在别处粘贴却跑到上阵输入框、且生成结果被清空（parserResult 被覆盖）」的问题。
+            const _ae = event.target || document.activeElement;
+            const _isEditable = el => !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable === true);
+            if (_isEditable(_ae) && _ae.id !== 'parserInput') return;
+
+            // 如果焦点已经在输入框内，让浏览器默认行为处理（插入到光标处）
             if (document.activeElement && document.activeElement.id === 'parserInput') return;
 
             const text = event.clipboardData?.getData('text');
             if (text && text.trim().length > 0) {
-                event.preventDefault();
                 const input = document.getElementById('parserInput');
+                // 只有「整段脚本/阵容」（含「上阵：」或多行）才覆盖输入框；
+                // 单个卡名等短片段在输入框已有内容时不接管，避免微调时被整框覆盖、生成结果被清空
+                const _looksLikeScript = /上阵[：:]/.test(text) || text.trim().split(/\r?\n/).length > 1;
+                if (!_looksLikeScript && input.value.trim()) return;
+                event.preventDefault();
                 input.value = text;
                 input.focus();
                 document.getElementById('parserResult').innerHTML = '<span style="color:#4caf50;">✅ 已粘贴文本，点击解析或生成</span>';
