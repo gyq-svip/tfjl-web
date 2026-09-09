@@ -2707,11 +2707,13 @@
             /* ---- 4. 浮动面板 / 浮窗：全部收进视口（原 width 350~1100px 在 360px 屏必然溢出）---- */
             #activityCalcPanel, #referencePanel, #notepadPanel, #txtFilesPanel,
             #messageWall, #reputationPanel, #chatRoomPanel, #floatConsole {
-                left: 8px !important;
-                right: 8px !important;
+                /* ⚠️ left/right 不能加 !important：面板拖动靠 JS 写内联 left/top，
+                   加了 !important 会锁死位置导致手机端拖不动。改用 max-width 保证不溢出。 */
+                left: 8px;
+                right: 8px;
                 width: auto !important;
                 min-width: 0 !important;
-                max-width: none !important;
+                max-width: calc(100vw - 16px) !important;
                 resize: none !important;          /* 触屏 resize 无效，去掉避免占位 */
                 box-sizing: border-box !important;
             }
@@ -2755,6 +2757,16 @@
             .admin-panel { width: 94% !important; padding: 16px !important; }
             #fileListHint { white-space: normal !important; }
             #scriptEditorFindInput, #scriptEditorReplaceInput { width: auto !important; flex: 1 1 100px !important; min-width: 0 !important; }
+
+            /* ---- 文本查看/编辑弹窗（previewTxtFile 生成）：手机上收紧内边距、解除 400px 死高 ---- */
+            #txtPreviewModal { padding: 8px !important; }
+            #txtPreviewCard { padding: 12px !important; max-height: 94vh !important; max-width: 100% !important; }
+            #txtEditArea {
+                min-height: 0 !important;
+                font-size: 16px !important;   /* 防 iOS 聚焦时自动放大 */
+                padding: 8px !important;
+            }
+            #txtPreviewHeader h3 { font-size: 0.95rem !important; }
         }
 
         /* 超小屏（≤480px）进一步压缩 */
