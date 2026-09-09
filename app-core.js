@@ -30045,12 +30045,15 @@ ${maSection}
             }
 
             // 找出当前可见的"浮层"：fixed/absolute + z-index 够高 + 尺寸够大 + 可交互
-            function _collectLayers() {
+            function _collectLayers(exclude) {
                 var out = [];
-                var all = document.querySelectorAll('body > div, body > section, body > aside');
+                // ⚠️ 不能只扫 body 直接子元素：计算器/脚本管理/记事本/参考图 等面板都嵌在容器里，
+                //    只扫 body>div 会漏掉它们（表现为"关不掉"）。改为全量扫描，靠下面条件过滤。
+                var all = document.querySelectorAll('div, section, aside');
                 for (var i = 0; i < all.length; i++) {
                     var el = all[i];
                     if (el.id && ESC_IGNORE[el.id]) continue;
+                    if (exclude && exclude.indexOf(el) >= 0) continue;
                     if (el.classList && el.classList.contains('password-overlay')) continue; // 登录门禁不可关
                     var s = getComputedStyle(el);
                     if (s.pointerEvents === 'none') continue;
@@ -30069,7 +30072,8 @@ ${maSection}
             // 在浮层内找"关闭 / 取消 / ×"控件
             function _findCloseBtn(layer) {
                 var all = layer.querySelectorAll('button, span, div, a, i');
-                var fallback = null;
+                var lr = layer.getBoundingClientRect();
+                var best = null, bestScore = 0, bestDist = Infinity;
                 for (var i = 0; i < all.length; i++) {
                     var c = all[i];
                     var r = c.getBoundingClientRect();
@@ -30078,15 +30082,24 @@ ${maSection}
                     var oc = c.getAttribute('onclick') || '';
                     var cls = (typeof c.className === 'string') ? c.className : '';
                     var key = (c.id || '') + ' ' + cls;
-                    if (/close|关闭|取消|cancel/i.test(key) || /close|关闭|取消|cancel/i.test(oc)) return c;
+                    // 打分：× 最可靠；close/关闭 次之；cancel/取消 最后（可能是面板内"取消选择"之类，不是关闭）
+                    var score = 0;
                     var isX = (txt === '×' || txt === '✕' || txt === '✖' || txt === '✗' || txt === 'X');
-                    if (isX && !fallback) fallback = c;
+                    if (isX) score = 3;
+                    else if (/close|关闭|hide/i.test(key) || /close|关闭|hide/i.test(oc)) score = 2;
+                    else if (/cancel|取消/i.test(key) || /cancel|取消/i.test(oc)) score = 1;
+                    if (!score) continue;
+                    // 同分时取更靠近面板右上角的（关闭按钮通常在标题栏右上）
+                    var d = Math.abs(r.top - lr.top) + Math.abs(r.right - lr.right);
+                    if (score > bestScore || (score === bestScore && d < bestDist)) {
+                        best = c; bestScore = score; bestDist = d;
+                    }
                 }
-                return fallback;
+                return best;
             }
 
-            function _closeTopLayer() {
-                var layers = _collectLayers();
+            function _closeTopLayer(exclude) {
+                var layers = _collectLayers(exclude);
                 if (!layers.length) return null;
                 var target = layers[0].el;
                 var btn = _findCloseBtn(target);
@@ -30129,8 +30142,13 @@ ${maSection}
                 fab.addEventListener('touchstart', function () { t0 = Date.now(); }, { passive: true });
                 fab.addEventListener('touchend', function (e) {
                     if (t0 && Date.now() - t0 > 600) {
-                        var n = 0;
-                        while (_closeTopLayer() && n < 8) { n++; }
+                        var n = 0, seen = [];
+                        while (n < 8) {
+                            var t = _closeTopLayer(seen);
+                            if (!t) break;
+                            seen.push(t);      // 已处理过的跳过，避免同一个面板被重复计数
+                            n++;
+                        }
                         if (typeof showToast === 'function') {
                             showToast(n ? ('已关闭 ' + n + ' 个窗口') : '没有可关闭的窗口', n ? 'success' : 'info');
                         }
