@@ -9979,6 +9979,13 @@
 
         // 🔴 2026-09-03 小卡片画廊（增强）：悬浮窗（拖拽标题栏 + 右下角缩放），工具栏含上传/备份/恢复，区分生成/上传
         async function _cardGallery() {
+            // 🔴 2026-09-10：打开画廊先清理「云端已彻底删除/失效」的卡片（远程删了 → 本机下次打开自动消失）
+            try {
+                const pruned = await _cardPruneInvalid();
+                if (pruned > 0 && typeof showToast === 'function') {
+                    showToast('🧹 已自动清理 ' + pruned + ' 张云端已失效的卡片', 'info');
+                }
+            } catch (e) {}
             const cards = await _cardList();
             const old = document.getElementById('lineupCardGallery');
             if (old) old.remove();
@@ -10210,12 +10217,32 @@
                 if (box.querySelector('#cpShort')) box.querySelector('#cpShort').onclick = function () { copyText(cur.code, '📋 短码 ' + cur.code + ' 已复制：在软件「从短码导入」输入即可', this); };
                 box.querySelector('#cpDel').onclick = async function () {
                     try {
+                        // ① 第一次确认：删本机（原来没有确认，容易误删且不可恢复）
+                        if (!window.confirm('确定删除这张卡片吗？\n\n⚠️ 本机记录将被永久删除，不可恢复。')) return;
+                        // ② 第二次确认：是否连远程分享一起彻底删除（仅「生成」的卡片带短码）
+                        let delRemote = false;
+                        if (cur.code) {
+                            delRemote = window.confirm(
+                                '是否同时删除远程分享？\n\n短码：' + cur.code + '\n\n' +
+                                '【确定】= 连远程一起删：\n' +
+                                '  · 云端 Gist 数据彻底删除\n' +
+                                '  · 对方用此短码/链接将提示已失效\n' +
+                                '  · 其他人本机的该卡片，下次打开会自动消失\n\n' +
+                                '【取消】= 只删本机这张卡片（云端分享仍然有效）');
+                        }
                         const db = await _cardDbOpen();
                         if (db) { await new Promise(function (res) { try { const tx = db.transaction(_CARD_STORE, 'readwrite'); tx.objectStore(_CARD_STORE).delete(cur.id); tx.oncomplete = res; tx.onerror = res; tx.onabort = res; } catch (e) { res(); } }); }
+                        let remoteMsg = '';
+                        if (delRemote && cur.code) {
+                            const r = await _shareHardDelete(cur.code);
+                            remoteMsg = (r.gist || r.index)
+                                ? ('（远程已删 Gist:' + (r.gist ? '✓' : '✗') + ' 索引:' + (r.index ? '✓' : '✗') + '）')
+                                : '（⚠️ 远程删除失败，仅本机已删）';
+                        }
                         m.remove();
                         const gal = document.getElementById('lineupCardGallery'); if (gal) gal.remove();
                         _cardGallery();
-                        if (typeof showToast === 'function') showToast('🗑 已删除该卡片', 'success');
+                        if (typeof showToast === 'function') showToast('🗑 已删除该卡片' + remoteMsg, 'success');
                     } catch (e) {}
                 };
                 const parseEl = box.querySelector('#cpParse');
@@ -10613,18 +10640,136 @@
         }
         window.adminLoadShareManager = adminLoadShareManager;
 
+        // ==================== 删除联动（2026-09-10）====================
+        // 需求：一边删除 → 两边都清；Gist 上的数据也真删；本机卡片在下次打开时自动消失。
+
+        // ① 彻底删除远程分享：删承载内容的 Gist + 从 share_index.json 移除条目（不再是软删除标记）
+        async function _shareHardDelete(code) {
+            const out = { gist: false, index: false };
+            try {
+                const idx = await _shareIndexLoad(true);
+                const e = idx && idx[code];
+                const gid = e && (e.id || e.gistId || e.g);
+                if (gid) {
+                    try {
+                        const res = await fetch('https://api.github.com/gists/' + encodeURIComponent(gid), {
+                            method: 'DELETE', headers: _lineupGistHeaders()
+                        });
+                        out.gist = !!(res && res.ok);
+                    } catch (err) { /* 删 Gist 失败不阻断索引清理 */ }
+                }
+                if (idx && idx[code]) {
+                    delete idx[code];
+                    try {
+                        const files = {};
+                        files[SHARE_INDEX_FILE] = { content: JSON.stringify(idx) };
+                        const res = await fetch('https://api.github.com/gists/' + encodeURIComponent(SHARE_INDEX_GIST_ID), {
+                            method: 'PATCH',
+                            headers: Object.assign({ 'Content-Type': 'application/json' }, _lineupGistHeaders()),
+                            body: JSON.stringify({ files: files })
+                        });
+                        out.index = !!(res && res.ok);
+                        if (out.index) { _shareIndexCache = { data: idx, ts: Date.now() }; _shareCacheWrite(idx); }
+                    } catch (err) {}
+                }
+            } catch (err) {}
+            return out;
+        }
+
+        // ② 删除本机中某短码对应的卡片（远程删了 → 本机这条也跟着清）
+        async function _cardDeleteByCode(code) {
+            if (!code) return 0;
+            try {
+                const db = await _cardDbOpen();
+                if (!db) return 0;
+                const all = await new Promise(function (res) {
+                    try {
+                        const tx = db.transaction(_CARD_STORE, 'readonly');
+                        const rq = tx.objectStore(_CARD_STORE).getAll();
+                        rq.onsuccess = function () { res(rq.result || []); };
+                        rq.onerror = function () { res([]); };
+                    } catch (e) { res([]); }
+                });
+                const hits = (all || []).filter(function (c) { return c && c.code === code; });
+                if (!hits.length) return 0;
+                await new Promise(function (res) {
+                    try {
+                        const tx = db.transaction(_CARD_STORE, 'readwrite');
+                        const st = tx.objectStore(_CARD_STORE);
+                        hits.forEach(function (c) { st.delete(c.id); });
+                        tx.oncomplete = res; tx.onerror = res; tx.onabort = res;
+                    } catch (e) { res(); }
+                });
+                return hits.length;
+            } catch (e) { return 0; }
+        }
+
+        // ③ 打开画廊时校验：云端已彻底删除/标记失效的短码 → 本机卡片自动消失
+        //    （网络失败或索引拿不到时不删，避免误删本地数据）
+        async function _cardPruneInvalid() {
+            try {
+                const cards = await _cardList();
+                const coded = (cards || []).filter(function (c) { return c && c.code; });
+                if (!coded.length) return 0;
+                const idx = await _shareIndexLoad(true);
+                if (!idx) return 0;
+                const db = await _cardDbOpen();
+                if (!db) return 0;
+                let n = 0;
+                for (let i = 0; i < coded.length; i++) {
+                    const e = idx[coded[i].code];
+                    if (!e || e.del === 1) {
+                        await new Promise(function (res) {
+                            try {
+                                const tx = db.transaction(_CARD_STORE, 'readwrite');
+                                tx.objectStore(_CARD_STORE).delete(coded[i].id);
+                                tx.oncomplete = res; tx.onerror = res; tx.onabort = res;
+                            } catch (err) { res(); }
+                        });
+                        n++;
+                    }
+                }
+                return n;
+            } catch (e) { return 0; }
+        }
+        window._cardPruneInvalid = _cardPruneInvalid;
+
         // 删除分享 = 软删除（保留条目并标记 del=1）：既留下审计信息（谁分享的、何时），
         // 又保证查询命中索引即判失效，不会退化成翻页把已删分享翻出来。
         async function adminDeleteShare(code) {
             if (!code) return;
-            if (!window.confirm('确定删除分享「' + code + '」？\n\n删除后，对方用这个短码拉取会提示「已失效」。\n（记录会保留在列表中，标记为已删除）')) return;
+            // ① 第一次确认
+            if (!window.confirm('确定删除分享「' + code + '」？\n\n删除后对方用这个短码拉取会提示「已失效」。')) return;
+            // ② 第二次确认：是否连云端 Gist 数据一起彻底删除
+            const hard = window.confirm(
+                '是否同时彻底删除远程数据？\n\n' +
+                '【确定】= 连远程一起删：\n' +
+                '  · 云端 Gist 数据被彻底删除（不可恢复）\n' +
+                '  · 短码从分享索引中移除\n' +
+                '  · 本机保存的该卡片会同步删除\n' +
+                '  · 其他人本机的该卡片，下次打开会自动消失\n\n' +
+                '【取消】= 仅标记失效（保留审计记录，不删 Gist）');
             try {
-                const idx = await _shareIndexLoad(true);
-                if (!idx[code]) { if (typeof showToast === 'function') showToast('索引中已无该分享', 'info'); return; }
-                idx[code].del = 1;
-                idx[code].delTs = Date.now();
-                const ok = await _shareIndexPut(code, idx[code]);
-                if (typeof showToast === 'function') showToast(ok ? ('✅ 已删除分享 ' + code) : '⚠️ 删除失败，请重试', ok ? 'success' : 'error');
+                if (hard) {
+                    const r = await _shareHardDelete(code);
+                    if (typeof showToast === 'function') {
+                        showToast((r.gist || r.index)
+                            ? ('✅ 已彻底删除 ' + code + '（Gist:' + (r.gist ? '✓' : '✗') + ' 索引:' + (r.index ? '✓' : '✗') + '）')
+                            : '⚠️ 远程删除失败，请重试', (r.gist || r.index) ? 'success' : 'error');
+                    }
+                } else {
+                    const idx = await _shareIndexLoad(true);
+                    if (!idx[code]) { if (typeof showToast === 'function') showToast('索引中已无该分享', 'info'); return; }
+                    idx[code].del = 1;
+                    idx[code].delTs = Date.now();
+                    const ok = await _shareIndexPut(code, idx[code]);
+                    if (typeof showToast === 'function') showToast(ok ? ('✅ 已标记失效 ' + code) : '⚠️ 删除失败，请重试', ok ? 'success' : 'error');
+                }
+                // 联动：本机同短码的卡片一并删除
+                try {
+                    const n = await _cardDeleteByCode(code);
+                    if (n > 0 && typeof showToast === 'function') showToast('🗑 已同步删除本机 ' + n + ' 张对应卡片', 'success');
+                } catch (e) {}
                 await adminLoadShareManager();
             } catch (e) {
                 if (typeof showToast === 'function') showToast('❌ 删除失败：' + ((e && e.message) || e), 'error');
