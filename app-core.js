@@ -2447,6 +2447,7 @@
         }
 
         // 共享只读态下锁住编辑控件并显示横幅；退出只读时恢复
+        // 横幅放在「出战选择」标题与卡组区域之间（#sharedReadOnlyBannerSlot），更醒目
         function _applyReadOnlyUI(isReadOnly) {
             try {
                 const ed = document.getElementById('notepadEditable');
@@ -2455,17 +2456,20 @@
                     const el = document.getElementById(id);
                     if (el) el.readOnly = isReadOnly;
                 });
+                const slot = document.getElementById('sharedReadOnlyBannerSlot');
                 let banner = document.getElementById('sharedReadOnlyBanner');
                 if (isReadOnly) {
                     if (!banner) {
                         banner = document.createElement('div');
                         banner.id = 'sharedReadOnlyBanner';
-                        banner.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:99990;background:rgba(255,152,0,0.95);color:#1a1a2e;font-size:0.78rem;font-weight:700;padding:6px 16px;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.4);pointer-events:none;';
+                        banner.style.cssText = 'width:100%;box-sizing:border-box;background:linear-gradient(90deg,#ff9800,#ffc107);color:#1a1a2e;font-size:0.85rem;font-weight:700;padding:9px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.35);text-align:center;pointer-events:none;';
                         banner.textContent = '📖 共享资源只读 · 不能直接修改，请点「📥 导入到本地」后再编辑';
-                        document.body.appendChild(banner);
                     }
-                } else if (banner && banner.parentNode) {
-                    banner.parentNode.removeChild(banner);
+                    if (slot) { slot.style.display = 'block'; slot.innerHTML = ''; slot.appendChild(banner); }
+                    else if (banner.parentNode !== document.body) { document.body.appendChild(banner); }
+                } else {
+                    if (banner && banner.parentNode) banner.parentNode.removeChild(banner);
+                    if (slot) slot.style.display = 'none';
                 }
             } catch (e) {}
         }
@@ -2533,12 +2537,86 @@
             });
         }
 
-        // ==================== 共享内容本地缓存（IndexedDB）===================
-        // 痛点：每次打开共享项目都实时 fetch 整个 gist（project.json + 参考图），频繁拉取、断网打不开。
-        // 策略：按 gistId 存完整已解析内容；用索引里的分享 ts 比对——
-        //   作者没重新分享过(ts 一致) → 命中本地秒开；ts 变(作者更新)或缓存缺失 → 重新拉；拉取失败(断网) → 用本地缓存兜底。
+        // ==================== 共享内容本地缓存（APP 磁盘优先，网页 IndexedDB 兜底）===================
+        // 痛点：每次打开共享项目都实时 fetch 整个 gist（project.json + 参考图），频繁拉取、断网打不开；
+        // 且用户希望缓存落到独立磁盘目录，不要和浏览器数据混在一起。
+        // 策略：
+        //   1. APP 版：用 Tauri 文件命令写到 %LOCALAPPDATA%/com.gyq.tfjl/cache/tfjl_cache/shared/{gistId}.json
+        //      + _manifest.json 维护索引（用于容量清理）。按 gistId 存完整已解析内容。
+        //   2. 网页版/Tauri 旧版（无 get_app_cache_dir 命令）：回退 IndexedDB。
+        //   3. 用分享索引里的 ts 比对新鲜度：作者没重新分享过(ts 一致) → 命中本地秒开；
+        //      ts 变(作者更新)或缓存缺失 → 重新拉；拉取失败(断网) → 用本地缓存兜底。
         const SHARED_CONTENT_DB = 'tfjl-shared-hub';
         const SHARED_CONTENT_CAP = 100;   // 最多缓存 100 个项目，超出删最旧
+
+        // ---------- Tauri APP 磁盘缓存 ----------
+        function _isTauriApp() {
+            return !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
+        }
+        function _tauriInvoke(cmd, args) {
+            const inv = (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke) ||
+                        (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke);
+            if (!inv) return Promise.reject(new Error('not tauri'));
+            return inv(cmd, args);
+        }
+        let _sharedCacheDirPromise = null;
+        async function _sharedDiskCacheDir() {
+            if (_sharedCacheDirPromise) return _sharedCacheDirPromise;
+            _sharedCacheDirPromise = (async function () {
+                try {
+                    const base = await _tauriInvoke('get_app_cache_dir', {});
+                    if (!base) throw new Error('no cache dir');
+                    const dir = base.replace(/[\\/]$/, '') + '/tfjl_cache/shared';
+                    await _tauriInvoke('create_dir', { dirPath: dir });
+                    return dir;
+                } catch (e) { return null; }
+            })();
+            return _sharedCacheDirPromise;
+        }
+        function _sharedDiskFilePath(dir, gistId) { return dir.replace(/[\\/]$/, '') + '/' + gistId + '.json'; }
+        function _sharedDiskManifestPath(dir) { return dir.replace(/[\\/]$/, '') + '/_manifest.json'; }
+        async function _sharedDiskManifestRead(dir) {
+            try {
+                const txt = await _tauriInvoke('read_text_file_auto', { filePath: _sharedDiskManifestPath(dir) });
+                if (!txt) return [];
+                const arr = JSON.parse(txt);
+                return Array.isArray(arr) ? arr : [];
+            } catch (e) { return []; }
+        }
+        async function _sharedDiskManifestWrite(dir, list) {
+            try {
+                await _tauriInvoke('write_text_file', { filePath: _sharedDiskManifestPath(dir), content: JSON.stringify(list) });
+            } catch (e) {}
+        }
+        async function _sharedDiskContentGet(gistId) {
+            const dir = await _sharedDiskCacheDir();
+            if (!dir) return null;
+            try {
+                const txt = await _tauriInvoke('read_text_file_auto', { filePath: _sharedDiskFilePath(dir, gistId) });
+                if (!txt) return null;
+                return JSON.parse(txt);
+            } catch (e) { return null; }
+        }
+        async function _sharedDiskContentPut(rec) {
+            const dir = await _sharedDiskCacheDir();
+            if (!dir) throw new Error('no disk cache dir');
+            await _tauriInvoke('write_text_file', { filePath: _sharedDiskFilePath(dir, rec.gistId), content: JSON.stringify(rec) });
+            // 更新 manifest 并做容量维护
+            let list = await _sharedDiskManifestRead(dir);
+            list = list.filter(function (x) { return x.gistId !== rec.gistId; });
+            list.push({ gistId: rec.gistId, tsCached: rec.tsCached || Date.now() });
+            if (list.length > SHARED_CONTENT_CAP) {
+                list.sort(function (a, b) { return (a.tsCached || 0) - (b.tsCached || 0); });
+                const del = list.slice(0, list.length - SHARED_CONTENT_CAP);
+                list = list.slice(list.length - SHARED_CONTENT_CAP);
+                for (let i = 0; i < del.length; i++) {
+                    try { await _tauriInvoke('delete_file', { filePath: _sharedDiskFilePath(dir, del[i].gistId) }); } catch (e) {}
+                }
+            }
+            await _sharedDiskManifestWrite(dir, list);
+        }
+
+        // ---------- IndexedDB 缓存（网页/降级） ----------
         function _sharedContentDB() {
             return new Promise(function (resolve, reject) {
                 try {
@@ -2552,7 +2630,7 @@
                 } catch (e) { reject(e); }
             });
         }
-        async function _sharedContentGet(gistId) {
+        async function _idbContentGet(gistId) {
             try {
                 const db = await _sharedContentDB();
                 return await new Promise(function (resolve) {
@@ -2563,7 +2641,7 @@
                 });
             } catch (e) { return null; }
         }
-        async function _sharedContentAll() {
+        async function _idbContentAll() {
             try {
                 const db = await _sharedContentDB();
                 return await new Promise(function (resolve) {
@@ -2574,7 +2652,7 @@
                 });
             } catch (e) { return []; }
         }
-        async function _sharedContentDel(ids) {
+        async function _idbContentDel(ids) {
             if (!ids || !ids.length) return;
             try {
                 const db = await _sharedContentDB();
@@ -2585,7 +2663,7 @@
                 });
             } catch (e) {}
         }
-        async function _sharedContentPut(rec) {
+        async function _idbContentPut(rec) {
             try {
                 const db = await _sharedContentDB();
                 await new Promise(function (resolve, reject) {
@@ -2594,12 +2672,27 @@
                     tx.oncomplete = resolve; tx.onerror = function () { reject(tx.error); };
                 });
                 // 容量维护：超过上限删除 tsCached 最旧的
-                const all = await _sharedContentAll();
+                const all = await _idbContentAll();
                 if (all.length > SHARED_CONTENT_CAP) {
                     all.sort(function (a, b) { return (a.tsCached || 0) - (b.tsCached || 0); });
-                    await _sharedContentDel(all.slice(0, all.length - SHARED_CONTENT_CAP).map(function (r) { return r.gistId; }));
+                    await _idbContentDel(all.slice(0, all.length - SHARED_CONTENT_CAP).map(function (r) { return r.gistId; }));
                 }
             } catch (e) {}
+        }
+
+        // ---------- 统一入口 ----------
+        async function _sharedContentGet(gistId) {
+            if (_isTauriApp()) {
+                try { const r = await _sharedDiskContentGet(gistId); if (r) return r; } catch (e) {}
+            }
+            return await _idbContentGet(gistId);
+        }
+        async function _sharedContentPut(rec) {
+            let ok = false;
+            if (_isTauriApp()) {
+                try { await _sharedDiskContentPut(rec); ok = true; } catch (e) {}
+            }
+            if (!ok) await _idbContentPut(rec);
         }
 
         // 把已解析的共享内容渲染到只读 UI（统一入口，缓存命中/远程/离线兜底共用）

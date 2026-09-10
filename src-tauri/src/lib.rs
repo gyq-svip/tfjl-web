@@ -586,6 +586,18 @@ fn get_diag_log_dir(app: tauri::AppHandle) -> Result<String, String> {
     Ok(dir.to_string_lossy().to_string())
 }
 
+/// 返回应用缓存目录根路径（供前端做磁盘缓存，与浏览器数据隔离）。
+/// Windows: %LOCALAPPDATA%\<app-cache>\  ；macOS/Linux: 对应 cache dir\
+#[tauri::command]
+fn get_app_cache_dir(app: tauri::AppHandle) -> Result<String, String> {
+    let dir = app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| format!("无法获取应用缓存目录: {}", e))?;
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir.to_string_lossy().to_string())
+}
+
 /// 执行 git 命令（在指定仓库目录），返回 stdout；非零退出码返回 stderr 文本
 fn run_git(repo: &str, args: &[&str]) -> Result<String, String> {
     let out = Command::new("git")
@@ -2802,6 +2814,7 @@ pub fn run() {
             write_text_file,
             append_text_file,
             get_diag_log_dir,
+            get_app_cache_dir,
             git_push_fusions,
             git_push_skins,
             flash_tray_icon,
