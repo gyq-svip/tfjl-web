@@ -2900,18 +2900,25 @@
             const defaultLocal = (sharedCat && categories.indexOf(sharedCat) >= 0 && sharedCat !== SHARED_HUB_ALL) ? sharedCat : '默认分类';
             const targetCat = await pickLocalCategoryAsync('导入到本地 · 选择分类', '该项目共享时属于「' + (sharedCat || '未分类') + '」，请选择存入的本地分类', defaultLocal);
             if (!targetCat) return;
+            const nameTrimmed = localName.trim();
+            // 同名覆盖确认：projects 主键就是 name（跨分类同名会被直接覆盖）
+            try {
+                const all = await loadProjectListFromDB();
+                const clash = (all || []).find(function (p) { return p && p.name === nameTrimmed; });
+                if (clash && !confirm('本地已存在同名项目「' + nameTrimmed + '」（当前位于「' + (clash.category || '默认分类') + '」）。\n项目主键是项目名，导入会覆盖它，确定继续？')) return;
+            } catch (e) {}
             try {
                 window.__sharedProjectReadOnly = false;  // 导入动作本身允许写本地
                 const data = collectCurrentProjectData();
-                await saveProjectToDB(localName.trim(), targetCat, data);
+                await saveProjectToDB(nameTrimmed, targetCat, data);
                 window.__projectScope = 'local';
                 const scopeSel = document.getElementById('projectScopeSelector');
                 if (scopeSel) scopeSel.value = 'local';
                 const imp = document.getElementById('hubImportToLocalBtn');
                 if (imp) imp.style.display = 'none';
-                await loadProjectFromDB(localName.trim());
+                await loadProjectFromDB(nameTrimmed);
                 refreshProjectSelectors();
-                if (typeof showToast === 'function') showToast('✅ 已导入到本地：' + localName.trim(), 'success');
+                if (typeof showToast === 'function') showToast('✅ 已导入到本地：' + nameTrimmed, 'success');
                 if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('导入共享到本地');
             } catch (e) {
                 alert('导入失败：' + ((e && e.message) || e));
