@@ -1546,8 +1546,10 @@
                 const overlay = document.createElement('div');
                 // z-index 必须高于所有既有弹窗（askTextInput=100005、toast=100000），否则会被盖住点不动
                 overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.62);z-index:100010;display:flex;align-items:center;justify-content:center;';
+                // 分类名是用户输入，必须转义：含引号/尖括号会打乱 HTML 结构，导致按钮渲染异常、点不动
+                const esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
                 const btns = categories.map(function (c) {
-                    return '<button data-cat="' + c + '" style="margin:5px;padding:10px 16px;border-radius:10px;color:#fff;font-size:0.95rem;cursor:pointer;background:rgba(40,40,70,0.92);border:1px solid rgba(255,255,255,0.25);">' + c + '</button>';
+                    return '<button data-cat="' + esc(c) + '" style="margin:5px;padding:10px 16px;border-radius:10px;color:#fff;font-size:0.95rem;cursor:pointer;background:rgba(40,40,70,0.92);border:1px solid rgba(255,255,255,0.25);">' + esc(c) + '</button>';
                 }).join('');
                 overlay.innerHTML = '<div style="background:#1a1a2e;border-radius:14px;padding:20px 24px;max-width:460px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.5);">'
                     + '<div style="color:#ffd700;font-size:1.02rem;font-weight:700;margin-bottom:6px;">' + (title || '选择分类') + '</div>'
@@ -1561,29 +1563,35 @@
                 // 保证始终有预选：默认分类若不在列表里（例如被改名）则回退第一个，避免点「确定」无效
                 const preset = (defaultCat && categories.indexOf(defaultCat) >= 0) ? defaultCat : categories[0];
                 if (preset) {
-                    const db0 = overlay.querySelector('button[data-cat="' + preset.replace(/"/g, '\\"') + '"]');
+                    let db0 = null;
+                    Array.prototype.forEach.call(overlay.querySelectorAll('button[data-cat]'), function (x) {
+                        if (x.getAttribute('data-cat') === preset) db0 = x;
+                    });
                     if (db0) { db0.style.border = '2px solid #ffd700'; db0.style.background = 'rgba(255,215,0,0.18)'; overlay._picked = preset; }
                 }
                 overlay.addEventListener('click', function (e) {
-                    if (e.target === overlay) { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); resolve(null); return; }
-                    const b = e.target.closest('button[data-cat]');
-                    if (b) {
-                        Array.prototype.forEach.call(overlay.querySelectorAll('button[data-cat]'), function (x) {
-                            x.style.border = '1px solid rgba(255,255,255,0.25)';
-                            x.style.background = 'rgba(40,40,70,0.92)';
-                        });
-                        b.style.border = '2px solid #ffd700';
-                        b.style.background = 'rgba(255,215,0,0.18)';
-                        overlay._picked = b.getAttribute('data-cat');
-                        return;
-                    }
-                    if (e.target.id === 'catPickOk') {
-                        const picked = overlay._picked;
-                        if (!picked) { if (typeof showToast === 'function') showToast('请先选择一个分类', 'info'); return; }
-                        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-                        resolve(picked); return;
-                    }
-                    if (e.target.id === 'catPickCancel') { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); resolve(null); }
+                    try {
+                        const t = e.target;
+                        // 确定/取消放在 closest 之前：避免 closest 异常时连「取消」都失效（整个弹窗点不动）
+                        if (t && t.id === 'catPickOk') {
+                            const picked = overlay._picked;
+                            if (!picked) { if (typeof showToast === 'function') showToast('请先选择一个分类', 'info'); return; }
+                            if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                            resolve(picked); return;
+                        }
+                        if (t && t.id === 'catPickCancel') { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); resolve(null); return; }
+                        if (t === overlay) { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); resolve(null); return; }
+                        const b = (t && t.closest) ? t.closest('button[data-cat]') : null;
+                        if (b) {
+                            Array.prototype.forEach.call(overlay.querySelectorAll('button[data-cat]'), function (x) {
+                                x.style.border = '1px solid rgba(255,255,255,0.25)';
+                                x.style.background = 'rgba(40,40,70,0.92)';
+                            });
+                            b.style.border = '2px solid #ffd700';
+                            b.style.background = 'rgba(255,215,0,0.18)';
+                            overlay._picked = b.getAttribute('data-cat');
+                        }
+                    } catch (err) { console.warn('[分类选择] 点击处理异常:', err); }
                 });
             });
         }
@@ -2900,9 +2908,18 @@
             if (!window.__sharedProjectReadOnly || !currentProjectName) return;
             const localName = await askTextInputAsync({ title: '导入到本地', label: '本地项目名：', defaultValue: currentProjectName });
             if (!localName || !localName.trim()) return;
-            // 选本地分类：默认选中该共享项目原本的分类（本地没有则默认「默认分类」）
+            // 选本地分类：共享分类若本地没有（如「合作」「隐藏」）则自动补进本地，保证两边一致、可直接选中
+            // 注：两边默认清单本就不一致——本地=默认分类/暗月/寒冰/漩涡/深海/临时，共享=寒冰/暗月/漩涡/深海/隐藏/合作
             const sharedCat = currentProjectCategory;
-            const defaultLocal = (sharedCat && categories.indexOf(sharedCat) >= 0 && sharedCat !== SHARED_HUB_ALL) ? sharedCat : '默认分类';
+            let defaultLocal = '默认分类';
+            if (sharedCat && sharedCat !== SHARED_HUB_ALL) {
+                if (categories.indexOf(sharedCat) < 0) {
+                    categories.push(sharedCat);
+                    window.categories = categories;
+                    try { await saveCategories(); } catch (e) {}
+                }
+                defaultLocal = sharedCat;
+            }
             const targetCat = await pickLocalCategoryAsync('导入到本地 · 选择分类', '该项目共享时属于「' + (sharedCat || '未分类') + '」，请选择存入的本地分类', defaultLocal);
             if (!targetCat) return;
             const nameTrimmed = localName.trim();
