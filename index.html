@@ -1568,6 +1568,8 @@
                     <div class="admin-menu-item" data-key="feedback" onclick="adminShowPage('feedback')">
                         <span class="mi-emoji">🎧</span>
                         <div class="mi-text"><div class="mi-title">用户反馈</div><div class="mi-sub">问题/建议(私有)</div></div>
+                        <!-- 🔴 2026-09-10：有新反馈时显示红点（数量=未处理且晚于上次查看的条数），由 updateFeedbackBadge() 控制 -->
+                        <span id="fbAdminDot" style="display:none;margin-left:auto;flex-shrink:0;min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;background:#ff3b3b;color:#fff;font-size:0.62rem;font-weight:700;line-height:18px;text-align:center;border:1px solid #fff;box-shadow:0 0 8px rgba(255,59,59,0.9);">0</span>
                     </div>
                     <div class="admin-menu-item" data-key="oldItems" onclick="adminShowPage('oldItems')">
                         <span class="mi-emoji">🎪</span>

@@ -24519,7 +24519,32 @@ ${maSection}
         }
         window.adminMenuDragInit = adminMenuDragInit;
 
+        // ==================== 管理员菜单「用户反馈」红点（2026-09-10）====================
+        // 规则：存在「未处理 且 提交时间晚于上次查看时间」的反馈 → 菜单项显示红点(数字)；打开反馈页即视为已读并清除。
+        window.updateFeedbackBadge = async function () {
+            try {
+                const dot = document.getElementById('fbAdminDot');
+                if (!dot) return;
+                if (typeof window.renderFeedbackAdmin !== 'function') return;
+                await window.renderFeedbackAdmin();                 // 内部会把全量反馈写入 window.__fbAdminEntries
+                const entries = window.__fbAdminEntries || [];
+                const lastSeen = Number(localStorage.getItem('tdjl_fb_admin_seen') || 0);
+                const fresh = entries.filter(function (e) {
+                    return (e.status || 'pending') !== 'done' && (e.ts || 0) > lastSeen;
+                }).length;
+                if (fresh > 0) { dot.textContent = fresh > 99 ? '99+' : String(fresh); dot.style.display = 'block'; }
+                else dot.style.display = 'none';
+            } catch (e) { /* 红点失败不影响主流程 */ }
+        };
+        window.markFeedbackSeen = function () {
+            try { localStorage.setItem('tdjl_fb_admin_seen', String(Date.now())); } catch (e) {}
+            const dot = document.getElementById('fbAdminDot');
+            if (dot) dot.style.display = 'none';
+        };
+
         function adminShowPage(page) {
+            // 打开任意管理员页面时刷新「用户反馈」红点（异步，不阻塞渲染）
+            if (typeof window.updateFeedbackBadge === 'function') { try { window.updateFeedbackBadge(); } catch (e) {} }
             adminHideAllPages();
             document.getElementById('adminMenuSection').style.display = 'none';
 
@@ -24620,6 +24645,8 @@ ${maSection}
                 if (pageEl) {
                     pageEl.style.display = 'block';
                     if (typeof window.renderFeedbackAdmin === 'function') window.renderFeedbackAdmin();
+                    // 打开反馈页 = 已读 → 清红点
+                    if (typeof window.markFeedbackSeen === 'function') window.markFeedbackSeen();
                 }
             } else if (page === 'oldItems') {
                 const pageEl = document.getElementById('adminPageOldItems');
