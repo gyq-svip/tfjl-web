@@ -25463,7 +25463,8 @@ ${maSection}
                                 }
                             });
                             const _days = Object.keys(_dayMap).sort().reverse();
-                            let dayHtml = '<div style="margin-bottom:16px;"><div style="color:#fbbf24;margin-bottom:6px;font-weight:700;">📅 按天统计 <span style="color:#94a3b8;font-size:0.7rem;font-weight:400;">（每天每人的上传/写入/操作次数 + 客户端 + 大小版本）</span></div>';
+                            // 🔴 2026-09-10：按天统计整体再包一层总折叠（默认收起），避免天数多时版面过长
+                            let dayHtml = '<details style="margin-bottom:16px;border:1px solid rgba(251,191,36,0.3);border-radius:10px;background:rgba(251,191,36,0.04);overflow:hidden;"><summary style="cursor:pointer;padding:9px 12px;font-size:0.85rem;color:#fbbf24;font-weight:700;">📅 按天统计 <span style="color:#94a3b8;font-size:0.7rem;font-weight:400;">（每天每人的上传/写入/操作次数 + 客户端 + 大小版本 · 共 ' + _days.length + ' 天 · 点此展开/收起）</span></summary><div style="padding:8px 12px;">';
                             if (!_days.length) {
                                 dayHtml += '<div style="color:#94a3b8;font-size:0.74rem;">暂无数据</div>';
                             } else {
@@ -25495,7 +25496,7 @@ ${maSection}
                                     dayHtml += '</table></div></details>';
                                 });
                             }
-                            dayHtml += '</div>';
+                            dayHtml += '</div></details>';
                             html += dayHtml;
                         })();
                         // ============ 🏆 按功能使用排行榜（2026-09-09 新增）============
