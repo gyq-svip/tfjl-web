@@ -1548,69 +1548,38 @@
             document.querySelector('#selectCategoryModal button:last-child').onclick = confirmSelectCategory;
         }
 
-        // 点选本地分类（不再需要填数字）
-        function pickLocalCategoryAsync(title, promptText) {
+        // 点选本地分类：原生 <select> 下拉（与项目/分类下拉一致），读取本地分类后点选。
+        // 🔴 弹窗结构与 askTextInput 完全一致——该弹窗在共享只读态下可正常点击，照搬最稳。
+        // 🔴 此前「点了没反应（连取消也点不了）」的真正根因：函数体用了 defaultCat，
+        //    但签名没声明该参数 → 抛 ReferenceError，中断在绑定 onclick 之前，
+        //    弹窗虽已显示却一个事件都没绑上。故此处签名必须显式带上 defaultCat。
+        function pickLocalCategoryAsync(title, promptText, defaultCat) {
             return new Promise(function (resolve) {
                 if (!categories || categories.length === 0) { resolve(null); return; }
-                const overlay = document.createElement('div');
-                // z-index 必须高于所有既有弹窗（askTextInput=100005、toast=100000），否则会被盖住点不动
-                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.62);z-index:100010;display:flex;align-items:center;justify-content:center;';
-                // 分类名是用户输入，必须转义：含引号/尖括号会打乱 HTML 结构，导致按钮渲染异常、点不动
+                // 分类名是用户输入，必须转义：含引号/尖括号会打乱 HTML 结构
                 const esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
-                const btns = categories.map(function (c) {
-                    return '<button data-cat="' + esc(c) + '" style="margin:5px;padding:10px 16px;border-radius:10px;color:#fff;font-size:0.95rem;cursor:pointer;background:rgba(40,40,70,0.92);border:1px solid rgba(255,255,255,0.25);">' + esc(c) + '</button>';
-                }).join('');
-                overlay.innerHTML = '<div style="background:#1a1a2e;border-radius:14px;padding:20px 24px;max-width:460px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.5);">'
-                    + '<div style="color:#ffd700;font-size:1.02rem;font-weight:700;margin-bottom:6px;">' + (title || '选择分类') + '</div>'
-                    + '<div style="color:rgba(255,255,255,0.6);font-size:0.74rem;margin-bottom:14px;">' + (promptText || '点选分类后按「确定」') + '</div>'
-                    + '<div style="display:flex;flex-wrap:wrap;justify-content:center;max-height:50vh;overflow:auto;">' + btns + '</div>'
-                    + '<div style="margin-top:16px;">'
-                    + '<button id="catPickOk" style="margin:0 6px;padding:7px 22px;border-radius:8px;border:none;background:#ffd700;color:#1a1a2e;font-weight:700;cursor:pointer;">确定</button>'
-                    + '<button id="catPickCancel" style="margin:0 6px;padding:7px 20px;border-radius:8px;border:1px solid rgba(255,255,255,0.3);background:transparent;color:#fff;cursor:pointer;">取消</button>'
-                    + '</div></div>';
-                document.body.appendChild(overlay);
-                // 保证始终有预选：默认分类若不在列表里（例如被改名）则回退第一个，避免点「确定」无效
+                // 默认选中：默认分类不在列表里（例如被改名）则回退第一个
                 const preset = (defaultCat && categories.indexOf(defaultCat) >= 0) ? defaultCat : categories[0];
-                if (preset) {
-                    let db0 = null;
-                    Array.prototype.forEach.call(overlay.querySelectorAll('button[data-cat]'), function (x) {
-                        if (x.getAttribute('data-cat') === preset) db0 = x;
-                    });
-                    if (db0) { db0.style.border = '2px solid #ffd700'; db0.style.background = 'rgba(255,215,0,0.18)'; overlay._picked = preset; }
-                }
-                // 🔴 不用事件委托，直接给每个按钮绑 onclick：事件委托依赖冒泡，
-                //    只要链路中有一处 stopPropagation/异常，就会导致「整个弹窗点不动」。
-                //    直接绑定与本项目内可正常工作的 askTextInput 一致，最稳。
-                const catBtns = overlay.querySelectorAll('button[data-cat]');
-                Array.prototype.forEach.call(catBtns, function (btn) {
-                    btn.onclick = function () {
-                        Array.prototype.forEach.call(catBtns, function (x) {
-                            x.style.border = '1px solid rgba(255,255,255,0.25)';
-                            x.style.background = 'rgba(40,40,70,0.92)';
-                        });
-                        btn.style.border = '2px solid #ffd700';
-                        btn.style.background = 'rgba(255,215,0,0.18)';
-                        overlay._picked = btn.getAttribute('data-cat');
-                    };
-                });
-                const okBtn = overlay.querySelector('#catPickOk');
-                if (okBtn) okBtn.onclick = function () {
-                    const picked = overlay._picked;
-                    if (!picked) { if (typeof showToast === 'function') showToast('请先选择一个分类', 'info'); return; }
-                    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-                    resolve(picked);
-                };
-                const cancelBtn = overlay.querySelector('#catPickCancel');
-                if (cancelBtn) cancelBtn.onclick = function () {
-                    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-                    resolve(null);
-                };
-                overlay.onclick = function (e) {
-                    if (e.target === overlay) {
-                        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-                        resolve(null);
-                    }
-                };
+                const opts = categories.map(function (c) {
+                    return '<option value="' + esc(c) + '"' + (c === preset ? ' selected' : '') + '>' + esc(c) + '</option>';
+                }).join('');
+                const m = document.createElement('div');
+                m.id = 'catPickModal';
+                m.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:100005;display:flex;align-items:center;justify-content:center;padding:20px;';
+                m.innerHTML = '<div style="background:#1a1a2e;border:2px solid rgba(255,215,0,0.5);border-radius:16px;padding:28px;max-width:480px;width:100%;">'
+                    + '<h3 style="margin:0 0 14px 0;color:#ffd700;text-align:center;">' + esc(title || '选择分类') + '</h3>'
+                    + (promptText ? '<label style="color:#fff;display:block;margin-bottom:8px;font-size:0.9rem;">' + esc(promptText) + '</label>' : '')
+                    + '<select id="catPickSelect" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:#2a2a4a;color:#fff;box-sizing:border-box;font-size:1rem;">' + opts + '</select>'
+                    + '<div style="display:flex;gap:10px;margin-top:18px;">'
+                    + '<button id="catPickOk2" style="flex:1;padding:12px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;border-radius:8px;cursor:pointer;font-size:1rem;">确认</button>'
+                    + '<button id="catPickCancel2" style="flex:1;padding:12px;background:#666;color:white;border:none;border-radius:8px;cursor:pointer;font-size:1rem;">取消</button>'
+                    + '</div></div>';
+                document.body.appendChild(m);
+                const sel = m.querySelector('#catPickSelect');
+                const done = function (v) { m.remove(); resolve(v); };
+                m.querySelector('#catPickOk2').onclick = function () { done(sel ? sel.value : null); };
+                m.querySelector('#catPickCancel2').onclick = function () { done(null); };
+                if (sel) sel.focus();
             });
         }
 
