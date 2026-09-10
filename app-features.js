@@ -10048,6 +10048,45 @@
                     document.onmouseup = function () { rz = false; document.onmousemove = null; document.onmouseup = null; };
                 };
             })();
+            // 🔴 2026-09-10：小卡片「悬停放大预览」——鼠标移到卡片上即放大，移开收起；
+            //    手机没有 hover，用「长按 400ms」触发，点任意处关闭。
+            (function () {
+                let pv = document.getElementById('cardHoverPreview');
+                if (!pv) {
+                    pv = document.createElement('div');
+                    pv.id = 'cardHoverPreview';
+                    pv.style.cssText = 'display:none;position:fixed;inset:0;z-index:2147483646;background:rgba(0,0,0,0.82);align-items:center;justify-content:center;padding:16px;';
+                    pv.innerHTML = '<img id="cardHoverPreviewImg" src="" style="max-width:92vw;max-height:88vh;border-radius:12px;border:2px solid rgba(255,215,0,0.5);box-shadow:0 10px 40px rgba(0,0,0,0.7);background:#111;">';
+                    pv.onclick = function () { pv.style.display = 'none'; };
+                    document.body.appendChild(pv);
+                }
+                const show = function (src) {
+                    const im = pv.querySelector('#cardHoverPreviewImg');
+                    if (!im || !src) return;
+                    im.src = src;
+                    pv.style.display = 'flex';
+                };
+                const hide = function () { if (pv.style.display === 'flex') pv.style.display = 'none'; };
+                const cellOf = function (t) { return (t && t.closest) ? t.closest('[data-cid]') : null; };
+                modal.addEventListener('mouseover', function (e) {
+                    const cell = cellOf(e.target);
+                    if (!cell) return;
+                    const im = cell.querySelector('img');
+                    if (im && im.src) show(im.src);
+                });
+                modal.addEventListener('mouseout', function (e) { if (cellOf(e.target)) hide(); });
+                // 手机：长按 400ms 放大（移动手指取消）
+                let lp = null;
+                const clearLp = function () { if (lp) { clearTimeout(lp); lp = null; } };
+                modal.addEventListener('touchstart', function (e) {
+                    const cell = cellOf(e.target);
+                    if (!cell) return;
+                    const im = cell.querySelector('img');
+                    if (im && im.src) lp = setTimeout(function () { show(im.src); }, 400);
+                }, { passive: true });
+                modal.addEventListener('touchend', clearLp);
+                modal.addEventListener('touchmove', clearLp, { passive: true });
+            })();
             modal.querySelector('#lineupCardGalleryClose').onclick = function () { modal.remove(); };
             modal.querySelector('#cardGalUpload').onclick = function () { _cardUpload(); };
             modal.querySelector('#cardGalExport').onclick = function () { _cardExportBackup(); };
