@@ -2707,9 +2707,6 @@
             //    表现就是「切到共享再切回本地」后本地项目个别融合卡丢皮肤（点「皮肤异常修复」才恢复）。
             //    所以渲染前必须确认当前仍在共享作用域，否则丢弃这次迟到结果。
             if (window.__projectScope !== 'shared') return;
-            // 🔴 2026-09-11：把"打开/拉取共享 gist 项目"计入总下载数（之前 total_downloads 只统计脚本下载，
-            //    导致数字长期停在 470 不动）。只要从云端拉到共享项目内容就记一次下载，脚本下载仍照常计数。
-            if (typeof recordDownload === 'function') recordDownload();
             window.__sharedProjectReadOnly = true;
             _hubApplyProjectDataToUI(project, name, category);
             _applyReadOnlyUI(true);
@@ -2736,6 +2733,8 @@
             // 2. 拉远程（缓存缺失或作者已更新）
             try {
                 const raw = await _projShareFetchById(hit.id);
+                // 🔴 2026-09-11：只有真正从 gist 拉取共享项目才计一次下载（缓存命中/离线兜底不计，避免切一次+1）
+                if (typeof recordDownload === 'function') recordDownload();
                 if (!raw || !raw.project) { alert('项目内容为空或已失效'); return; }
                 try {
                     await _sharedContentPut({
@@ -15716,8 +15715,15 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             (async () => {
                 try {
                     const fresh = await fetchCounterFromGist();
-                    if (fresh) { counterData = fresh; saveCounterToCache(counterData); }
-                    else { counterData = loadCounterFromCache() || getDefaultCounter(); }
+                    const localCache = loadCounterFromCache();
+                    if (fresh) {
+                        counterData = fresh;
+                        // 🔴 2026-09-11：合并本地缓存（各字段取最大值），避免刷新前未 flush 的增量（如下载数）
+                        //    被 Gist 旧值覆盖 → 表现为"刷新后下载数又掉回 470"。心跳保活会周期把本地增量写回 Gist。
+                        if (localCache) mergeCounters(counterData, localCache);
+                        saveCounterToCache(counterData);
+                    }
+                    else { counterData = localCache || getDefaultCounter(); }
                 } catch (error) {
                     console.warn('从Gist获取失败，尝试使用缓存:', error);
                     counterData = loadCounterFromCache() || getDefaultCounter();
