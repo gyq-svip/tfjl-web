@@ -379,6 +379,11 @@
         <!-- 项目管理器 -->
         <div id="scheme1">
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(255,255,255,0.05);border-radius:10px;padding:12px;margin-bottom:10px;">
+                <!-- 🔴 2026-09-10：本地/共享资源库切换（用户要求放在项目分类前面） -->
+                <select id="projectScopeSelector" onchange="handleProjectScopeChange()" data-tip="本地/共享：默认显示本地项目；切换到共享可浏览资源库项目（只读）" style="background:#2a2a4a;color:#fff;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);font-size:0.9rem;min-width:80px;cursor:pointer;">
+                    <option value="local">本地</option>
+                    <option value="shared">共享</option>
+                </select>
                 <span style="color:#ffd700;font-weight:bold;">📁</span>
                 <select id="categorySelector1" onchange="handleCategoryChange()" data-tip="项目分类：按分类筛选项目列表，新建项目时也可在此快速归类" style="background:#2a2a4a;color:#fff;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);font-size:0.9rem;min-width:120px;cursor:pointer;">
                     <option value="">-- 选择分类 --</option>
@@ -386,6 +391,7 @@
                 <select id="projectSelector1" onchange="loadProjectByName(this.value)" data-tip="项目列表：切换到其他阵容项目（手牌/卡组/记事本/脚本/参考图都随项目走）" style="background:#2a2a4a;color:#fff;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);font-size:0.9rem;min-width:150px;cursor:pointer;">
                     <option value="">-- 选择项目 --</option>
                 </select>
+                <button id="hubImportToLocalBtn" onclick="hubImportSharedToLocal()" data-tip="把当前共享资源（只读）复制到本地成为可编辑项目：自定项目名，不影响原共享资源" style="display:none;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.95rem;line-height:1;">📥 导入到本地</button>
                 <button onclick="toggleProjectMenu(this)" data-tip="项目菜单：新建项目 / 新建分类 / 重命名 / 删除项目等管理操作" style="background:#444;color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:1rem;line-height:1;">⋮</button>
                 <button onclick="showProjectSearchPanel()" title="搜索项目" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🔍</button>
                 <button onclick="toggleNotepadPanel()" title="记事本" data-tip="记事本：记录当前项目的笔记（随项目走，不同项目互不干扰；自动保存仅在该项目已打开时生效）" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📝</button>
@@ -763,6 +769,7 @@
             <button onclick="shareProjectToWall()" title="把当前阵容项目分享到需求墙：对方只能智能导入或下载，不支持预览/导入到老马" style="display:block;width:100%;background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:#fff;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">📢 分享阵容到需求墙</button>
             <button onclick="shareLineupImage()" title="生成阵容分享图：当前阵容（含皮肤/等级/魔化/融合副卡/减伤）绘成图片，同时把整个项目（阵容+脚本+记事本）上传云端生成 8 位短码和二维码，可设有效期与密码——对方扫码、报短码或点链接即可导入完整项目" style="display:block;width:100%;background:linear-gradient(135deg,#00bcd4,#0097a7);color:#fff;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">📸 生成阵容分享图</button>
             <button onclick="shareProjectViaCode()" title="把当前项目整体打包分享（阵容+脚本+记事本+参考图全部带上）上传云端，生成 8 位短码和链接，可设有效期和密码——对方在软件里输短码或点链接即可导入成新项目（自选名称和分类，不影响你的当前项目）" style="display:block;width:100%;background:linear-gradient(135deg,#9c27b0,#6a1b9a);color:#fff;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">📦 分享整个项目</button>
+            <button onclick="shareCurrentProjectToHub()" title="把当前项目共享到资源库（公开、无审核）：会上传到云端并登记到资源库，其他人可在「共享」分类下浏览和导入（建议只共享你自己的项目）" style="display:block;width:100%;background:linear-gradient(135deg,#ff9800,#e65100);color:#fff;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">🌐 共享到资源库</button>
             <button onclick="importProjectViaCode()" title="输入对方分享的 8 位项目短码，或粘贴含 #pg= 的分享链接——拉取完整项目（阵容+脚本+记事本+参考图），自选项目名称和分类导入，不会覆盖你当前打开的项目" style="display:block;width:100%;background:linear-gradient(135deg,#7e57c2,#4527a0);color:#fff;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">📥 从短码导入</button>
             <button onclick="importSingleProject()" title="从 JSON 文件导入单个项目（别人分享给你的项目文件）" style="display:block;width:100%;background:linear-gradient(135deg,#66bb6a,#388e3c);color:#fff;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">📥 恢复项目</button>
             <button onclick="renameProject()" title="重命名当前项目" style="display:block;width:100%;background:linear-gradient(135deg,#ff9800,#f57c00);color:white;border:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.82rem;margin-bottom:4px;">✏️ 重命名项目</button>

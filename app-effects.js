@@ -362,6 +362,16 @@
         }
 
         async function handleCategoryChange() {
+            // 🔴 2026-09-10 共享模式：切换分类时只刷新共享项目下拉（不创建/不写本地）
+            if ((window.__projectScope || 'local') === 'shared') {
+                const catSel = document.getElementById('categorySelector1');
+                const cat = catSel ? catSel.value : '';
+                currentProjectCategory = cat || '默认分类';
+                if (typeof _hubFillProjectSelector === 'function') {
+                    _hubFillProjectSelector(window.__sharedProjects || [], currentProjectCategory, document.getElementById('projectSelector1'));
+                }
+                return;
+            }
             const catSel = document.getElementById('categorySelector1');
             const selectedValue = catSel.value;
             
