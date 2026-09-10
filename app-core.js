@@ -2533,22 +2533,119 @@
             });
         }
 
+        // ==================== 共享内容本地缓存（IndexedDB）===================
+        // 痛点：每次打开共享项目都实时 fetch 整个 gist（project.json + 参考图），频繁拉取、断网打不开。
+        // 策略：按 gistId 存完整已解析内容；用索引里的分享 ts 比对——
+        //   作者没重新分享过(ts 一致) → 命中本地秒开；ts 变(作者更新)或缓存缺失 → 重新拉；拉取失败(断网) → 用本地缓存兜底。
+        const SHARED_CONTENT_DB = 'tfjl-shared-hub';
+        const SHARED_CONTENT_CAP = 100;   // 最多缓存 100 个项目，超出删最旧
+        function _sharedContentDB() {
+            return new Promise(function (resolve, reject) {
+                try {
+                    const r = indexedDB.open(SHARED_CONTENT_DB, 1);
+                    r.onupgradeneeded = function () {
+                        const db = r.result;
+                        if (!db.objectStoreNames.contains('projects')) db.createObjectStore('projects', { keyPath: 'gistId' });
+                    };
+                    r.onsuccess = function () { resolve(r.result); };
+                    r.onerror = function () { reject(r.error); };
+                } catch (e) { reject(e); }
+            });
+        }
+        async function _sharedContentGet(gistId) {
+            try {
+                const db = await _sharedContentDB();
+                return await new Promise(function (resolve) {
+                    const tx = db.transaction('projects', 'readonly');
+                    const req = tx.objectStore('projects').get(gistId);
+                    req.onsuccess = function () { resolve(req.result || null); };
+                    req.onerror = function () { resolve(null); };
+                });
+            } catch (e) { return null; }
+        }
+        async function _sharedContentAll() {
+            try {
+                const db = await _sharedContentDB();
+                return await new Promise(function (resolve) {
+                    const tx = db.transaction('projects', 'readonly');
+                    const req = tx.objectStore('projects').getAll();
+                    req.onsuccess = function () { resolve(req.result || []); };
+                    req.onerror = function () { resolve([]); };
+                });
+            } catch (e) { return []; }
+        }
+        async function _sharedContentDel(ids) {
+            if (!ids || !ids.length) return;
+            try {
+                const db = await _sharedContentDB();
+                await new Promise(function (resolve) {
+                    const tx = db.transaction('projects', 'readwrite');
+                    ids.forEach(function (id) { tx.objectStore('projects').delete(id); });
+                    tx.oncomplete = resolve; tx.onerror = resolve;
+                });
+            } catch (e) {}
+        }
+        async function _sharedContentPut(rec) {
+            try {
+                const db = await _sharedContentDB();
+                await new Promise(function (resolve, reject) {
+                    const tx = db.transaction('projects', 'readwrite');
+                    tx.objectStore('projects').put(rec);
+                    tx.oncomplete = resolve; tx.onerror = function () { reject(tx.error); };
+                });
+                // 容量维护：超过上限删除 tsCached 最旧的
+                const all = await _sharedContentAll();
+                if (all.length > SHARED_CONTENT_CAP) {
+                    all.sort(function (a, b) { return (a.tsCached || 0) - (b.tsCached || 0); });
+                    await _sharedContentDel(all.slice(0, all.length - SHARED_CONTENT_CAP).map(function (r) { return r.gistId; }));
+                }
+            } catch (e) {}
+        }
+
+        // 把已解析的共享内容渲染到只读 UI（统一入口，缓存命中/远程/离线兜底共用）
+        function _hubRenderSharedReadOnly(project, name, category, author, sourceLabel) {
+            window.__sharedProjectReadOnly = true;
+            _hubApplyProjectDataToUI(project, name, category);
+            _applyReadOnlyUI(true);
+            const imp = document.getElementById('hubImportToLocalBtn');
+            if (imp) imp.style.display = 'inline-block';
+            if (typeof showToast === 'function') showToast('📖 已打开共享资源（只读' + sourceLabel + '）· 分享者：' + author, 'info');
+        }
+
         async function _hubLoadSharedProjectByName(name) {
             if (!name) return;
             const shared = window.__sharedProjects || [];
             const hit = shared.filter(function (p) { return p.name === name; })
                               .sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); })[0];
             if (!hit || !hit.id) { alert('未找到共享项目：' + name); return; }
+            // 1. 先看本地内容缓存：作者没更新过（索引 ts 一致）即命中秒开
+            try {
+                const rec = await _sharedContentGet(hit.id);
+                if (rec && rec.project && rec.ts === hit.ts) {
+                    _hubRenderSharedReadOnly(rec.project, hit.name, hit.category, hit.author, '·本地缓存');
+                    return;
+                }
+            } catch (e) {}
+            // 2. 拉远程（缓存缺失或作者已更新）
             try {
                 const raw = await _projShareFetchById(hit.id);
                 if (!raw || !raw.project) { alert('项目内容为空或已失效'); return; }
-                window.__sharedProjectReadOnly = true;
-                _hubApplyProjectDataToUI(raw.project, hit.name, hit.category);
-                _applyReadOnlyUI(true);
-                const imp = document.getElementById('hubImportToLocalBtn');
-                if (imp) imp.style.display = 'inline-block';
-                if (typeof showToast === 'function') showToast('📖 已打开共享资源（只读）· 分享者：' + hit.author, 'info');
+                try {
+                    await _sharedContentPut({
+                        gistId: hit.id, name: hit.name, category: hit.category,
+                        author: hit.author, ts: hit.ts, project: raw.project, tsCached: Date.now()
+                    });
+                } catch (e) {}
+                _hubRenderSharedReadOnly(raw.project, hit.name, hit.category, hit.author, '');
             } catch (e) {
+                // 3. 拉取失败（断网等）：用本地缓存兜底查看
+                try {
+                    const rec = await _sharedContentGet(hit.id);
+                    if (rec && rec.project) {
+                        _hubRenderSharedReadOnly(rec.project, hit.name, hit.category, hit.author, '·离线缓存');
+                        return;
+                    }
+                } catch (e2) {}
                 alert('加载共享项目失败：' + ((e && e.message) || e));
             }
         }
