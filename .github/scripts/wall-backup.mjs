@@ -74,12 +74,29 @@ async function readGistFile(gist, fileName) {
 //         ③ 扫「TFJL 需求墙数据备份 #」Gist，找含 content_messages_*.json 的最新一份（真实数据源，历史消息都在这里）
 //         ④ 硬编码兜底（已删，基本不会命中）
 // 注意：标准消息 Gist（b02794a8...）早被删除，真实消息现在在「需求墙数据备份」Gist 里（content_messages_*.json）。
+// 判断 Gist 是否仍然可用（被删除 / 404 / 无权限都视为不可用）
+async function gistExists(id) {
+    if (!id) return false;
+    try {
+        const r = await fetch(`${API}/gists/${id}`, { headers: H });
+        return r.ok;
+    } catch (e) { return false; }
+}
+
 async function resolveMessagesGistId() {
     try {
         const idx = await getGist(INDEX_GIST_ID);
         const c = await readGistFile(idx, 'room_index.json');
         const obj = c ? JSON.parse(c || '{}') : {};
-        if (obj.messages) { log('消息 Gist（来自总表 room_index.messages）:', obj.messages); return obj.messages; }
+        if (obj.messages) {
+            // 🔴 必须先验证指针仍有效：若指针指向已被删除的 Gist 却直接返回，
+            //    main 里 getGist 会 404 抛错 → 每次都失败，且下面的扫描自愈永远不会触发。
+            if (await gistExists(obj.messages)) {
+                log('消息 Gist（来自总表 room_index.messages）:', obj.messages);
+                return obj.messages;
+            }
+            log('⚠️ 总表 messages 指针已失效（Gist 不存在），转扫描自愈:', obj.messages);
+        }
     } catch (e) { log('读总表 messages 失败:', e.message); }
 
     // 总表无指针 → 扫全部 Gist 自愈
@@ -272,6 +289,9 @@ async function main() {
     const keepMs = KEEP_DAYS * 86400 * 1000;
     const sorted = indexArr.slice().sort((a, b) => a.ts - b.ts);
     const keepIds = new Set(sorted.slice(Math.max(0, sorted.length - KEEP_MIN)).map(e => e.id));
+    // 🔴 消息源 Gist 永不清理：真实消息很可能就存在某份「备份 Gist」里（标准消息 Gist 早已删除），
+    //    若把它当超龄备份删掉，总表 messages 指针立刻变死链 → 之后每次备份都 404 失败且无法自愈。
+    if (msgGistId) { keepIds.add(msgGistId); log('🛡️ 消息源 Gist 已加入保留名单（不清理）:', msgGistId); }
     const toDelete = sorted.filter(e => (now - e.ts > keepMs) && !keepIds.has(e.id));
     if (!toDelete.length) {
         log(`✅ 无超龄备份（保留 ${KEEP_DAYS} 天 · 最少 ${KEEP_MIN} 份）`);
