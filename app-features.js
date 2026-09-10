@@ -10073,12 +10073,12 @@
                     pv.style.cssText = 'display:none;position:fixed;left:0;top:0;z-index:2147483646;pointer-events:none;' +
                         'padding:0;background:rgba(10,10,24,0.92);border:2px solid rgba(255,215,0,0.55);border-radius:10px;' +
                         'box-shadow:0 8px 24px rgba(0,0,0,0.6);overflow:hidden;line-height:0;';
-                    pv.innerHTML = '<img id="cardHoverPreviewImg" src="" style="display:block;max-width:300px;max-height:300px;width:auto;height:auto;background:#111;">';
+                    pv.innerHTML = '<img id="cardHoverPreviewImg" src="" style="display:block;max-width:380px;max-height:380px;width:auto;height:auto;background:#111;">';
                     document.body.appendChild(pv);
                 }
                 const pvImg = pv.querySelector('#cardHoverPreviewImg');
                 const move = function (x, y) {
-                    const w = pv.offsetWidth || 300, h = pv.offsetHeight || 300, gap = 18;
+                    const w = pv.offsetWidth || 380, h = pv.offsetHeight || 380, gap = 18;
                     let left = x + gap, top = y + gap;
                     if (left + w > window.innerWidth - 8) left = Math.max(8, x - w - gap);   // 右边放不下 → 翻到左侧
                     if (top + h > window.innerHeight - 8) top = Math.max(8, y - h - gap);    // 下边放不下 → 翻到上方
