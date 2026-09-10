@@ -2699,6 +2699,10 @@
 
         // 把已解析的共享内容渲染到只读 UI（统一入口，缓存命中/远程/离线兜底共用）
         function _hubRenderSharedReadOnly(project, name, category, author, sourceLabel) {
+            // 🔴 防止异步加载期间用户已切回本地：迟到的回调会把本地项目的皮肤/卡牌全局变量覆盖掉，
+            //    表现就是「切到共享再切回本地」后本地项目个别融合卡丢皮肤（点「皮肤异常修复」才恢复）。
+            //    所以渲染前必须确认当前仍在共享作用域，否则丢弃这次迟到结果。
+            if (window.__projectScope !== 'shared') return;
             window.__sharedProjectReadOnly = true;
             _hubApplyProjectDataToUI(project, name, category);
             _applyReadOnlyUI(true);
@@ -2764,7 +2768,7 @@
             if (document.getElementById('myDeckInfo')) document.getElementById('myDeckInfo').value = projectData.myDeckInfo || '';
             if (document.getElementById('teammateDeckInfo')) document.getElementById('teammateDeckInfo').value = projectData.teammateDeckInfo || '';
             currentProjectName = projectName;
-            currentProjectCategory = projectCategory || '默认分类';
+            currentProjectCategory = projectCategory || SHARED_HUB_ALL;
             const notepad = document.getElementById('notepad');
             if (notepad) {
                 notepad.value = projectData.notepad || '';
@@ -26220,7 +26224,7 @@ ${maSection}
                         });
                         html += '</div></details></div>';
                         // 组2：⚪ 功能使用埋点（不写 Gist）
-                        html += '<div style="margin-bottom:16px;"><div style="color:#a78bfa;margin-bottom:4px;font-weight:700;">⚙️⚪ 功能使用 TOP <span style="color:#c4b5fd;font-size:0.7rem;font-weight:400;">（仅埋点统计，不写 Gist）</span></div>';
+                        html += '<details style="margin-bottom:16px;"><summary style="cursor:pointer;color:#a78bfa;font-weight:700;padding:4px 0;">⚙️⚪ 功能使用 TOP <span style="color:#c4b5fd;font-size:0.7rem;font-weight:400;">（仅埋点统计，不写 Gist · 点此展开/收起）</span></summary>';
                         if (!uTop2.length) html += '<div style="color:#94a3b8;font-size:0.74rem;">暂无功能使用记录</div>';
                         uTop2.forEach((x, i) => {
                             const id = 'u2Detail_' + i;
@@ -26247,7 +26251,7 @@ ${maSection}
                             });
                             html += '</div>';
                         });
-                        html += '</div></details>';
+                        html += '</details>';
                         // ============ 全量上报文件（🔴 2026-09-10 改为表格 + 搜索 + 点用户跳转）============
                         const sortedFiles = fileMetas.slice().sort((a, b) => b.last - a.last);
                         html += '<div style="margin-bottom:16px;">';
