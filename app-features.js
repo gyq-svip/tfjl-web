@@ -3225,6 +3225,43 @@
             ]);
 
             const btn = document.getElementById('_forceUpdBtn');
+
+            // 🔴 2026-09-10：低版本门禁「自动弹出 + 倒计时自动下载安装」
+            //   默认 15 秒倒计时，到点自动触发「立即更新」（原生升级 → 免选目录自动下载安装）；
+            //   用户可点「稍后提醒」取消自动更新（门禁页保留，仍可手动点按钮/复制链接）。
+            (function () {
+                if (!btn) return;
+                let left = 15, timer = null, cancelled = false;
+                const later = document.createElement('button');
+                later.id = '_forceUpdLaterBtn';
+                later.textContent = '⏸ 稍后提醒（' + left + 's）';
+                later.style.cssText = 'width:100%;margin-top:8px;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:10px;border-radius:10px;cursor:pointer;font-size:0.85rem;';
+                btn.insertAdjacentElement('afterend', later);
+                const tick = function () {
+                    if (cancelled) return;
+                    if (left <= 0) {
+                        later.textContent = '⏳ 正在自动更新…';
+                        later.disabled = true;
+                        later.style.opacity = '0.7';
+                        try { btn.click(); } catch (e) { console.warn('[gate] 自动更新触发失败', e); }
+                        return;
+                    }
+                    later.textContent = '⏸ 稍后提醒（' + left + 's）';
+                    if (tipEl) tipEl.textContent = '⏳ ' + left + ' 秒后自动开始下载安装更新包（无需操作）…';
+                    left--;
+                    timer = setTimeout(tick, 1000);
+                };
+                later.onclick = function () {
+                    cancelled = true;
+                    if (timer) clearTimeout(timer);
+                    later.textContent = '✅ 已暂停自动更新（可点上方按钮或下方链接手动更新）';
+                    later.disabled = true;
+                    later.style.opacity = '0.7';
+                    if (tipEl) tipEl.textContent = '';
+                };
+                timer = setTimeout(tick, 1000);
+            })();
+
             if (btn) btn.onclick = async () => {
                 const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
                 btn.disabled = true; btn.style.opacity = '0.65'; btn.style.pointerEvents = 'none';
