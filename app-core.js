@@ -2771,6 +2771,9 @@
             if (typeof showToast === 'function') showToast('📖 已打开共享资源（只读' + sourceLabel + '）· 分享者：' + author, 'info');
         }
 
+        // 本次会话已计过下载数的共享项目 gistId：同一项目一次会话只计 1 次（避免反复切换重复累加）
+        const __hubDownloadCounted = new Set();
+
         async function _hubLoadSharedProjectByName(name) {
             if (!name) return;
             if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('打开共享项目');
@@ -2789,8 +2792,12 @@
             // 2. 拉远程（缓存缺失或作者已更新）
             try {
                 const raw = await _projShareFetchById(hit.id);
-                // 🔴 2026-09-11：只有真正从 gist 拉取共享项目才计一次下载（缓存命中/离线兜底不计，避免切一次+1）
-                if (typeof recordDownload === 'function') recordDownload();
+                // 🔴 2026-09-11：只有真正从 gist 拉取共享项目才计一次下载（缓存命中/离线兜底不计，避免切一次+1）；
+                //    且同一项目一次会话只计 1 次，反复切换不再重复累加（刷新页面后重新计）
+                if (typeof recordDownload === 'function' && !__hubDownloadCounted.has(hit.id)) {
+                    __hubDownloadCounted.add(hit.id);
+                    recordDownload();
+                }
                 if (!raw || !raw.project) { alert('项目内容为空或已失效'); return; }
                 try {
                     await _sharedContentPut({
