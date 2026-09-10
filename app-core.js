@@ -1539,38 +1539,98 @@
             document.querySelector('#selectCategoryModal button:last-child').onclick = confirmSelectCategory;
         }
 
-        // 重命名分类（弹出模态框）
+        // 点选本地分类（不再需要填数字）
+        function pickLocalCategoryAsync(title, promptText) {
+            return new Promise(function (resolve) {
+                if (!categories || categories.length === 0) { resolve(null); return; }
+                const overlay = document.createElement('div');
+                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.62);z-index:99999;display:flex;align-items:center;justify-content:center;';
+                const btns = categories.map(function (c) {
+                    return '<button data-cat="' + c + '" style="margin:5px;padding:10px 16px;border-radius:10px;color:#fff;font-size:0.95rem;cursor:pointer;background:rgba(40,40,70,0.92);border:1px solid rgba(255,255,255,0.25);">' + c + '</button>';
+                }).join('');
+                overlay.innerHTML = '<div style="background:#1a1a2e;border-radius:14px;padding:20px 24px;max-width:460px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.5);">'
+                    + '<div style="color:#ffd700;font-size:1.02rem;font-weight:700;margin-bottom:6px;">' + (title || '选择分类') + '</div>'
+                    + '<div style="color:rgba(255,255,255,0.6);font-size:0.74rem;margin-bottom:14px;">' + (promptText || '点选分类后按「确定」') + '</div>'
+                    + '<div style="display:flex;flex-wrap:wrap;justify-content:center;max-height:50vh;overflow:auto;">' + btns + '</div>'
+                    + '<div style="margin-top:16px;">'
+                    + '<button id="catPickOk" style="margin:0 6px;padding:7px 22px;border-radius:8px;border:none;background:#ffd700;color:#1a1a2e;font-weight:700;cursor:pointer;">确定</button>'
+                    + '<button id="catPickCancel" style="margin:0 6px;padding:7px 20px;border-radius:8px;border:1px solid rgba(255,255,255,0.3);background:transparent;color:#fff;cursor:pointer;">取消</button>'
+                    + '</div></div>';
+                document.body.appendChild(overlay);
+                overlay.addEventListener('click', function (e) {
+                    const b = e.target.closest('button[data-cat]');
+                    if (b) {
+                        Array.prototype.forEach.call(overlay.querySelectorAll('button[data-cat]'), function (x) {
+                            x.style.border = '1px solid rgba(255,255,255,0.25)';
+                            x.style.background = 'rgba(40,40,70,0.92)';
+                        });
+                        b.style.border = '2px solid #ffd700';
+                        b.style.background = 'rgba(255,215,0,0.18)';
+                        overlay._picked = b.getAttribute('data-cat');
+                        return;
+                    }
+                    if (e.target.id === 'catPickOk') {
+                        const picked = overlay._picked;
+                        if (!picked) { if (typeof showToast === 'function') showToast('请先选择一个分类', 'info'); return; }
+                        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                        resolve(picked); return;
+                    }
+                    if (e.target.id === 'catPickCancel') { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); resolve(null); }
+                });
+            });
+        }
+
+        // 重命名分类：点选 + 级联更新该分类下所有项目的 category 字段（避免项目丢失/变幽灵分类）
         async function renameCategory() {
             if (categories.length <= 1) {
                 alert('只有一个分类，无法重命名！');
                 return;
             }
 
-            const selected = await askTextInputAsync({ title: '重命名分类', label: `请选择要重命名的分类：\n\n${categories.map((c,i) => `${i+1}. ${c}`).join('\n')}\n\n请输入分类前的数字：`, defaultValue: '' });
+            const oldName = await pickLocalCategoryAsync('重命名分类', '点选要重命名的分类，再输入新名称');
+            if (!oldName) return;
 
-            if (!selected) return;
+            const newName = await askTextInputAsync({ title: '重命名分类', label: '「' + oldName + '」→ 请输入新分类名称：', defaultValue: oldName });
+            if (!newName || !newName.trim()) return;
+            const trimmed = newName.trim();
+            if (trimmed === oldName) { alert('新名称与原名称相同，已取消。'); return; }
+            if (categories.includes(trimmed)) { alert('分类名称已存在！'); return; }
 
-            const idx = parseInt(selected) - 1;
-            if (isNaN(idx) || idx < 0 || idx >= categories.length) {
-                alert('选择无效！');
-                return;
-            }
-
-            const newName = await askTextInputAsync({ title: '重命名分类', label: '请输入新分类名称：', defaultValue: categories[idx] });
-            if (newName && newName.trim()) {
-                const trimmed = newName.trim();
-                if (categories.includes(trimmed)) {
-                    alert('分类名称已存在！');
-                    return;
+            // 1) 级联更新该分类下所有项目的 category 字段（与删除分类同样的范式）
+            let moved = 0;
+            try {
+                const projects = await loadProjectListFromDB();
+                const all = projects || [];
+                const affected = all.filter(function (p) { return p && p.category === oldName; });
+                if (affected.length) {
+                    // 同名冲突：目标分类已存在同名项目，移动（put 同名键）会覆盖
+                    const otherNames = new Set(all.filter(function (p) { return p && p.category !== oldName; }).map(function (p) { return p.name; }));
+                    const clashes = affected.filter(function (p) { return otherNames.has(p.name); });
+                    if (clashes.length > 0 && !confirm('目标分类下已存在同名项目（' + clashes.map(function (p) { return p.name; }).join('、') + '），重命名后这些项目将被覆盖，确定继续？')) {
+                        return;
+                    }
+                    await new Promise(function (res) {
+                        const t = db.transaction([STORE_NAME], 'readwrite');
+                        const s = t.objectStore(STORE_NAME);
+                        affected.forEach(function (p) { p.category = trimmed; try { s.put(p); } catch (e) {} });
+                        t.oncomplete = function () { persistProjectsToDisk().finally(function () { res(affected.length); }); };
+                        t.onerror = function () { res(affected.length); };
+                        t.onabort = function () { res(affected.length); };
+                    });
+                    moved = affected.length;
                 }
-                categories[idx] = trimmed;
-                saveCategories().then(() => {
-                    refreshProjectSelectors();
-                    alert('✅ 分类已重命名！');
-                }).catch(e => {
-                    alert('❌ 重命名失败：' + e);
-                });
-            }
+            } catch (e) { /* 级联失败也继续改分类名 */ }
+
+            // 2) 改分类名本身（级联已先把项目搬到新名，这里只改分类表）
+            const idx = categories.indexOf(oldName);
+            if (idx > -1) categories[idx] = trimmed;
+            if (currentProjectCategory === oldName) currentProjectCategory = trimmed;
+            saveCategories().then(function () {
+                refreshProjectSelectors();
+                alert('✅ 分类已重命名为「' + trimmed + '」' + (moved > 0 ? '，该分类下 ' + moved + ' 个项目已同步更新。' : ''));
+            }).catch(function (e) {
+                alert('❌ 重命名失败：' + e);
+            });
         }
 
         // 更新分类按钮
