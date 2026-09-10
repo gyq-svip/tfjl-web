@@ -2400,9 +2400,11 @@
         }
 
         // 分享到资源库前选择固定分类（寒冰/暗月/漩涡/深海/隐藏/默认分类）；取消返回 null
+        // 交互：先点分类高亮选中，再按「确定」确认（默认已预选当前分类），不再单击即走
         function askCategoryChoiceAsync(defaultCat) {
             return new Promise(function (resolve) {
                 defaultCat = _hubNormalizeCat(defaultCat);
+                let picked = defaultCat;
                 const overlay = document.createElement('div');
                 overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.62);z-index:99999;display:flex;align-items:center;justify-content:center;';
                 const btns = SHARED_HUB_CATEGORIES.map(function (c) {
@@ -2411,14 +2413,34 @@
                 }).join('');
                 overlay.innerHTML = '<div style="background:#1a1a2e;border-radius:14px;padding:20px 24px;max-width:440px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.5);">'
                     + '<div style="color:#ffd700;font-size:1.02rem;font-weight:700;margin-bottom:6px;">选择共享分类</div>'
-                    + '<div style="color:rgba(255,255,255,0.6);font-size:0.74rem;margin-bottom:14px;">分享将归入该固定分类（分类固定，不可随意新增）</div>'
-                    + '<div style="display:flex;flex-wrap:wrap;justify-content:center;">' + btns + '</div>'
-                    + '<button id="catPickCancel" style="margin-top:16px;padding:7px 20px;border-radius:8px;border:1px solid rgba(255,255,255,0.3);background:transparent;color:#fff;cursor:pointer;">取消</button>'
+                    + '<div style="color:rgba(255,255,255,0.6);font-size:0.74rem;margin-bottom:14px;">点选分类后按「确定」（默认已选 ' + defaultCat + '）</div>'
+                    + '<div id="catPickWrap" style="display:flex;flex-wrap:wrap;justify-content:center;">' + btns + '</div>'
+                    + '<div style="margin-top:16px;">'
+                    + '<button id="catPickOk" style="margin:0 6px;padding:7px 22px;border-radius:8px;border:none;background:#ffd700;color:#1a1a2e;font-weight:700;cursor:pointer;">确定</button>'
+                    + '<button id="catPickCancel" style="margin:0 6px;padding:7px 20px;border-radius:8px;border:1px solid rgba(255,255,255,0.3);background:transparent;color:#fff;cursor:pointer;">取消</button>'
+                    + '</div>'
                     + '</div>';
                 document.body.appendChild(overlay);
+                function refreshHighlight() {
+                    const wrap = overlay.querySelector('#catPickWrap');
+                    if (!wrap) return;
+                    Array.prototype.forEach.call(wrap.querySelectorAll('button[data-cat]'), function (b) {
+                        const c = b.getAttribute('data-cat');
+                        if (c === picked) {
+                            b.style.border = '2px solid #ffd700';
+                            b.style.background = 'rgba(255,215,0,0.18)';
+                            if (b.textContent.indexOf(' ✔') < 0) b.textContent = c + ' ✔';
+                        } else {
+                            b.style.border = '1px solid rgba(255,255,255,0.25)';
+                            b.style.background = 'rgba(40,40,70,0.92)';
+                            b.textContent = c;
+                        }
+                    });
+                }
                 overlay.addEventListener('click', function (e) {
                     const b = e.target.closest('button[data-cat]');
-                    if (b) { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); resolve(b.getAttribute('data-cat')); return; }
+                    if (b) { picked = b.getAttribute('data-cat'); refreshHighlight(); return; }
+                    if (e.target.id === 'catPickOk') { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); resolve(picked); return; }
                     if (e.target.id === 'catPickCancel') { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); resolve(null); }
                 });
             });
