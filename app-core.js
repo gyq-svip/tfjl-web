@@ -2312,13 +2312,13 @@
             attachSelectWheel(document.getElementById('projectSelector1'));
 
             if (scope === 'shared') {
-                // 共享资源库：从分享索引读取 hub=true 的项目；分类下拉与本地一致（默认分类+寒冰/暗月/漩涡…），
-                // 并补上数据里出现但本地没有的分类，保证按分类筛选共享项目时不会漏项
+                // 共享资源库：从分享索引读取 hub=true 的项目；分类下拉用全站固定分类（寒冰/暗月/漩涡/深海+默认分类兜底）
+                // 项目分类在加载时经 _hubNormalizeCat 折算进固定分类，保证共享库分类统一不乱
                 _hubLoadSharedProjects().then(function (shared) {
                     window.__sharedProjects = shared;
-                    const cats = categories.slice();
+                    const cats = SHARED_HUB_CATEGORIES.slice();
                     (shared || []).forEach(function (p) {
-                        const c = p.category || '默认分类';
+                        const c = _hubNormalizeCat(p.category);
                         if (cats.indexOf(c) < 0) cats.push(c);
                     });
                     if (!currentProjectCategory || cats.indexOf(currentProjectCategory) < 0) currentProjectCategory = '默认分类';
@@ -2387,6 +2387,16 @@
         window.__sharedProjects = [];
         window.__sharedProjectReadOnly = false;
 
+        // 共享资源库固定分类：与每个人本地分类脱钩，全站统一（游戏四大标准元素 + 默认分类兜底）。
+        // 本地非元素类项目（合作/活动/日志/临时…）分享后一律归入「默认分类」，避免分类失控变乱。
+        const SHARED_HUB_CATEGORIES = ['默认分类', '寒冰', '暗月', '漩涡', '深海'];
+        function _hubNormalizeCat(cat) {
+            cat = (typeof cat === 'string') ? cat.trim() : '';
+            if (!cat) return '默认分类';
+            if (SHARED_HUB_CATEGORIES.indexOf(cat) >= 0) return cat;
+            return '默认分类';
+        }
+
         function handleProjectScopeChange() {
             const sel = document.getElementById('projectScopeSelector');
             window.__projectScope = (sel && sel.value) || 'local';
@@ -2411,7 +2421,7 @@
                     out.push({
                         code: code,
                         name: String(it.n || '未命名'),
-                        category: String(it.cat || '默认分类'),
+                        category: _hubNormalizeCat(it.cat),
                         author: String(it.by || '匿名'),
                         ts: it.ts || 0,
                         id: String(it.id)
@@ -2531,7 +2541,7 @@
             const by = (await ensureNickname()) || localStorage.getItem('TFJL_UserName') || '匿名用户';
             try {
                 if (typeof showToast === 'function') showToast('⏳ 正在上传到共享资源库…', 'info');
-                const out = await _projShareCreate(payload, { by: by, days: 0, hub: true, hubCat: currentProjectCategory });
+                const out = await _projShareCreate(payload, { by: by, days: 0, hub: true, hubCat: _hubNormalizeCat(currentProjectCategory) });
                 if (out && out.code) {
                     if (typeof showToast === 'function') showToast('✅ 已共享到资源库：' + out.code, 'success');
                     if ((window.__projectScope || 'local') === 'shared') refreshProjectSelectors();
@@ -2592,7 +2602,7 @@
                 const it = idx[code] || {};
                 const name = String(it.n || '').replace(/</g, '&lt;') || '（未命名）';
                 const by = String(it.by || '').replace(/</g, '&lt;') || '匿名';
-                const cat = String(it.cat || '默认分类').replace(/</g, '&lt;');
+                const cat = _hubNormalizeCat(it.cat).replace(/</g, '&lt;');
                 return '<div style="display:flex;align-items:center;gap:8px;padding:7px 9px;background:rgba(255,255,255,0.04);border-radius:7px;margin-bottom:5px;font-size:0.76rem;flex-wrap:wrap;">'
                     + '<span style="color:#ffd700;font-family:Consolas,monospace;font-weight:bold;letter-spacing:1px;">' + code + '</span>'
                     + '<span style="color:#fff;flex:1;min-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + name + '</span>'
