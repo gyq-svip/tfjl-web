@@ -1544,7 +1544,8 @@
             return new Promise(function (resolve) {
                 if (!categories || categories.length === 0) { resolve(null); return; }
                 const overlay = document.createElement('div');
-                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.62);z-index:99999;display:flex;align-items:center;justify-content:center;';
+                // z-index 必须高于所有既有弹窗（askTextInput=100005、toast=100000），否则会被盖住点不动
+                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.62);z-index:100010;display:flex;align-items:center;justify-content:center;';
                 const btns = categories.map(function (c) {
                     return '<button data-cat="' + c + '" style="margin:5px;padding:10px 16px;border-radius:10px;color:#fff;font-size:0.95rem;cursor:pointer;background:rgba(40,40,70,0.92);border:1px solid rgba(255,255,255,0.25);">' + c + '</button>';
                 }).join('');
@@ -1557,11 +1558,14 @@
                     + '<button id="catPickCancel" style="margin:0 6px;padding:7px 20px;border-radius:8px;border:1px solid rgba(255,255,255,0.3);background:transparent;color:#fff;cursor:pointer;">取消</button>'
                     + '</div></div>';
                 document.body.appendChild(overlay);
-                if (defaultCat && categories.indexOf(defaultCat) >= 0) {
-                    const db0 = overlay.querySelector('button[data-cat="' + defaultCat.replace(/"/g, '\\"') + '"]');
-                    if (db0) { db0.style.border = '2px solid #ffd700'; db0.style.background = 'rgba(255,215,0,0.18)'; overlay._picked = defaultCat; }
+                // 保证始终有预选：默认分类若不在列表里（例如被改名）则回退第一个，避免点「确定」无效
+                const preset = (defaultCat && categories.indexOf(defaultCat) >= 0) ? defaultCat : categories[0];
+                if (preset) {
+                    const db0 = overlay.querySelector('button[data-cat="' + preset.replace(/"/g, '\\"') + '"]');
+                    if (db0) { db0.style.border = '2px solid #ffd700'; db0.style.background = 'rgba(255,215,0,0.18)'; overlay._picked = preset; }
                 }
                 overlay.addEventListener('click', function (e) {
+                    if (e.target === overlay) { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); resolve(null); return; }
                     const b = e.target.closest('button[data-cat]');
                     if (b) {
                         Array.prototype.forEach.call(overlay.querySelectorAll('button[data-cat]'), function (x) {
@@ -2472,7 +2476,8 @@
                 defaultCat = _hubNormalizeCat(defaultCat);
                 let picked = defaultCat;
                 const overlay = document.createElement('div');
-                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.62);z-index:99999;display:flex;align-items:center;justify-content:center;';
+                // z-index 高于 askTextInput(100005)/toast(100000)，避免被遮挡导致点不动
+                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.62);z-index:100010;display:flex;align-items:center;justify-content:center;';
                 const btns = SHARED_HUB_CATEGORIES.map(function (c) {
                     const sel = (c === defaultCat) ? 'border:2px solid #ffd700;background:rgba(255,215,0,0.18);' : 'border:1px solid rgba(255,255,255,0.25);';
                     return '<button data-cat="' + c + '" style="margin:5px;padding:10px 16px;border-radius:10px;color:#fff;font-size:0.95rem;cursor:pointer;background:rgba(40,40,70,0.92);' + sel + '">' + c + (c === defaultCat ? ' ✔' : '') + '</button>';
