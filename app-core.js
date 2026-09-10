@@ -2389,12 +2389,37 @@
 
         // 共享资源库固定分类：与每个人本地分类脱钩，全站统一（游戏四大标准元素 + 默认分类兜底）。
         // 本地非元素类项目（合作/活动/日志/临时…）分享后一律归入「默认分类」，避免分类失控变乱。
-        const SHARED_HUB_CATEGORIES = ['默认分类', '寒冰', '暗月', '漩涡', '深海'];
+        const SHARED_HUB_CATEGORIES = ['默认分类', '寒冰', '暗月', '漩涡', '深海', '隐藏'];
         function _hubNormalizeCat(cat) {
             cat = (typeof cat === 'string') ? cat.trim() : '';
             if (!cat) return '默认分类';
             if (SHARED_HUB_CATEGORIES.indexOf(cat) >= 0) return cat;
             return '默认分类';
+        }
+
+        // 分享到资源库前选择固定分类（寒冰/暗月/漩涡/深海/隐藏/默认分类）；取消返回 null
+        function askCategoryChoiceAsync(defaultCat) {
+            return new Promise(function (resolve) {
+                defaultCat = _hubNormalizeCat(defaultCat);
+                const overlay = document.createElement('div');
+                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.62);z-index:99999;display:flex;align-items:center;justify-content:center;';
+                const btns = SHARED_HUB_CATEGORIES.map(function (c) {
+                    const sel = (c === defaultCat) ? 'border:2px solid #ffd700;background:rgba(255,215,0,0.18);' : 'border:1px solid rgba(255,255,255,0.25);';
+                    return '<button data-cat="' + c + '" style="margin:5px;padding:10px 16px;border-radius:10px;color:#fff;font-size:0.95rem;cursor:pointer;background:rgba(40,40,70,0.92);' + sel + '">' + c + (c === defaultCat ? ' ✔' : '') + '</button>';
+                }).join('');
+                overlay.innerHTML = '<div style="background:#1a1a2e;border-radius:14px;padding:20px 24px;max-width:440px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.5);">'
+                    + '<div style="color:#ffd700;font-size:1.02rem;font-weight:700;margin-bottom:6px;">选择共享分类</div>'
+                    + '<div style="color:rgba(255,255,255,0.6);font-size:0.74rem;margin-bottom:14px;">分享将归入该固定分类（分类固定，不可随意新增）</div>'
+                    + '<div style="display:flex;flex-wrap:wrap;justify-content:center;">' + btns + '</div>'
+                    + '<button id="catPickCancel" style="margin-top:16px;padding:7px 20px;border-radius:8px;border:1px solid rgba(255,255,255,0.3);background:transparent;color:#fff;cursor:pointer;">取消</button>'
+                    + '</div>';
+                document.body.appendChild(overlay);
+                overlay.addEventListener('click', function (e) {
+                    const b = e.target.closest('button[data-cat]');
+                    if (b) { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); resolve(b.getAttribute('data-cat')); return; }
+                    if (e.target.id === 'catPickCancel') { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); resolve(null); }
+                });
+            });
         }
 
         function handleProjectScopeChange() {
@@ -2536,12 +2561,15 @@
         async function shareCurrentProjectToHub() {
             if (window.__sharedProjectReadOnly) { alert('共享资源为只读，不能再次共享，请先导入到本地。'); return; }
             if (!currentProjectName) { alert('请先打开一个本地项目再共享。'); return; }
+            // 分享前先选固定分类（寒冰/暗月/漩涡/深海/隐藏/默认分类），默认按当前项目分类折算；取消则放弃
+            const chosenCat = await askCategoryChoiceAsync(currentProjectCategory);
+            if (!chosenCat) { if (typeof showToast === 'function') showToast('已取消共享', 'info'); return; }
             const payload = _projShareBuildPayload();
             // 🔴 2026-09-10：用真实昵称（与需求墙/分享一致），否则共享者永远显示「匿名」
             const by = (await ensureNickname()) || localStorage.getItem('TFJL_UserName') || '匿名用户';
             try {
                 if (typeof showToast === 'function') showToast('⏳ 正在上传到共享资源库…', 'info');
-                const out = await _projShareCreate(payload, { by: by, days: 0, hub: true, hubCat: _hubNormalizeCat(currentProjectCategory) });
+                const out = await _projShareCreate(payload, { by: by, days: 0, hub: true, hubCat: chosenCat });
                 if (out && out.code) {
                     if (typeof showToast === 'function') showToast('✅ 已共享到资源库：' + out.code, 'success');
                     if ((window.__projectScope || 'local') === 'shared') refreshProjectSelectors();
@@ -25889,7 +25917,7 @@ ${maSection}
                             html += '</div>';
                         });
                         html += '</div></details></div>';
-                        html += '<div style="margin-bottom:16px;"><div style="color:#60a5fa;margin-bottom:4px;font-weight:700;">📄 按 Gist 文件 TOP <span style="color:#94a3b8;font-size:0.7rem;font-weight:400;">（点行展开）</span></div>';
+                        html += '<details style="margin-bottom:16px;border:1px solid rgba(96,165,250,0.35);border-radius:10px;background:rgba(96,165,250,0.04);overflow:hidden;"><summary style="cursor:pointer;padding:9px 12px;font-size:0.85rem;color:#60a5fa;font-weight:700;">📄 按 Gist 文件 TOP <span style="color:#94a3b8;font-size:0.72rem;font-weight:400;">（共 ' + gTop.length + ' 个 · 点此展开/收起，点每行看写入详情）</span></summary><div style="padding:6px 12px 10px 12px;">';
                         gTop.forEach((x, i) => {
                             const id = 'gDetail_' + i;
                             html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, gMax) + ' ' + x.v + '　' + (x.k.substring(0, 16) + '…') + ' <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
@@ -25901,7 +25929,7 @@ ${maSection}
                             });
                             html += '</div>';
                         });
-                        html += '</div>';
+                        html += '</div></details>';
                         // 按 Gist×功能 TOP 拆成两组：🟥 真实写 Gist 操作 / ⚪ 功能使用埋点（不写 Gist）
                         const fnKeys = Object.keys(detailByFn);
                         const writeKeys = fnKeys.filter(k => k.indexOf('WRITE|') === 0);
@@ -25976,7 +26004,7 @@ ${maSection}
                             });
                             html += '</div>';
                         });
-                        html += '</div>';
+                        html += '</div></details>';
                         // ============ 全量上报文件（🔴 2026-09-10 改为表格 + 搜索 + 点用户跳转）============
                         const sortedFiles = fileMetas.slice().sort((a, b) => b.last - a.last);
                         html += '<div style="margin-bottom:16px;">';
