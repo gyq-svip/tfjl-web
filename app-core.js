@@ -2315,11 +2315,16 @@
                 // 共享资源库：从分享索引读取 hub=true 的项目
                 _hubLoadSharedProjects().then(function (shared) {
                     window.__sharedProjects = shared;
+                    // 共享库分类来自数据；默认选中第一个真实分类（「默认分类」只是占位基线，无项目归属它），避免项目列表为空
+                    const __cats = _hubSharedCategories(shared);
+                    if (!currentProjectCategory || currentProjectCategory === '默认分类' || __cats.indexOf(currentProjectCategory) < 0) {
+                        currentProjectCategory = (__cats.filter(function (c) { return c !== '默认分类'; })[0]) || '默认分类';
+                    }
                     const catSel = document.getElementById('categorySelector1');
                     const projSel = document.getElementById('projectSelector1');
                     if (catSel) {
                         catSel.innerHTML = '<option value="">-- 选择分类 --</option>';
-                        _hubSharedCategories(shared).forEach(function (cat) {
+                        __cats.forEach(function (cat) {
                             const opt = document.createElement('option');
                             opt.value = cat;
                             opt.textContent = cat;
@@ -2386,8 +2391,6 @@
             window.__sharedProjectReadOnly = false;
             const imp = document.getElementById('hubImportToLocalBtn');
             if (imp) imp.style.display = 'none';
-            // 进入共享库时分类锚定「默认分类」，避免沿用本地分类导致下拉为空/不匹配
-            if (window.__projectScope === 'shared') currentProjectCategory = '默认分类';
             refreshProjectSelectors();
         }
         window.handleProjectScopeChange = handleProjectScopeChange;
@@ -2434,8 +2437,9 @@
             if (!projSel) return;
             projSel.innerHTML = '<option value="">-- 选择项目 --</option>';
             const cat = category || '';
-            if (!cat) return;
-            shared.filter(function (p) { return p.category === cat; }).forEach(function (p) {
+            // 共享库中「默认分类」仅为占位基线（无项目归属它）；选它或留空时展示全部项目
+            const list = (!cat || cat === '默认分类') ? (shared || []) : (shared || []).filter(function (p) { return p.category === cat; });
+            list.forEach(function (p) {
                 const opt = document.createElement('option');
                 opt.value = p.name;
                 opt.textContent = p.name + ' · ' + p.author;
