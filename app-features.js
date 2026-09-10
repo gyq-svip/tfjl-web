@@ -9160,6 +9160,7 @@
         // 对方扫码 / 报短码 / 点链接 → 与「分享整个项目」同款导入（完整项目，非纯阵容）。
         // 上传失败自动降级为纯图片（无短码，图上有重试提示），分享功能不受影响。
         async function shareLineupImage(skipPrecheck) {
+            if (window.__sharedProjectReadOnly) { alert('当前是共享资源（只读），不能生成分享图/上传云端。请先「📥 导入到本地」后再分享。'); return; }
             if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('分享阵容图');
             // 🔴 分享前检测：这套阵容之前分享过 → 直接弹「查看卡片」，不重新上传（省云端、不重复生成）
             if (!skipPrecheck) {
@@ -10885,6 +10886,7 @@
 
         // 📦 分享整个项目：选项窗（有效期+密码）→ 打包上传 → 短码+链接结果弹窗
         async function shareProjectViaCode(skipPrecheck) {
+            if (window.__sharedProjectReadOnly) { alert('当前是共享资源（只读），不能把整个项目上传云端。请先「📥 导入到本地」后再分享。'); return; }
             if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('分享整个项目');
             // 🔴 分享前检测：此项目之前分享过 → 直接弹「查看卡片」，不重新打包上传（王城低配版等 9M 大项目尤其省）
             if (!skipPrecheck) {

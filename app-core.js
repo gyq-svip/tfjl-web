@@ -2529,6 +2529,13 @@
                 if (badge) badge.style.display = isReadOnly ? 'inline-block' : 'none';
                 const slot = document.getElementById('sharedReadOnlyBannerSlot');
                 if (slot) slot.style.display = 'none';
+                // 只读态下禁用所有「分享/上传云端」入口（云端项目不应再被分享到云端）
+                const shareBtns = document.querySelectorAll('button[onclick*="shareLineupImage"],button[onclick*="shareProjectViaCode"],button[onclick*="shareProjectToWall"],button[onclick*="shareCurrentProjectToHub"]');
+                Array.prototype.forEach.call(shareBtns, function (b) { b.disabled = isReadOnly; b.style.opacity = isReadOnly ? '0.45' : ''; });
+                ['battleShareBtn', 'promoShareHint'].forEach(function (id) {
+                    const e = document.getElementById(id);
+                    if (e) { e.style.pointerEvents = isReadOnly ? 'none' : ''; e.style.opacity = isReadOnly ? '0.45' : ''; }
+                });
             } catch (e) {}
         }
 
