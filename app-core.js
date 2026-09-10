@@ -2386,6 +2386,8 @@
             window.__sharedProjectReadOnly = false;
             const imp = document.getElementById('hubImportToLocalBtn');
             if (imp) imp.style.display = 'none';
+            // 进入共享库时分类锚定「默认分类」，避免沿用本地分类导致下拉为空/不匹配
+            if (window.__projectScope === 'shared') currentProjectCategory = '默认分类';
             refreshProjectSelectors();
         }
         window.handleProjectScopeChange = handleProjectScopeChange;
@@ -2415,21 +2417,16 @@
             } catch (e) { return []; }
         }
 
-        // 分类列表：按全局 categories 顺序，未分类（默认分类）放最后
+        // 分类列表：固定基线「默认分类」永远存在（共享库不会空），其余按出现的共享项目分类聚合，默认分类置底
         function _hubSharedCategories(shared) {
-            const cats = new Set();
+            const cats = new Set(['默认分类']);
             shared.forEach(function (p) { cats.add(p.category || '默认分类'); });
             let arr = Array.from(cats);
-            const order = {};
-            (window.categories || []).forEach(function (c, i) { order[c] = i; });
             arr.sort(function (a, b) {
-                const ia = order[a] !== undefined ? order[a] : 9998;
-                const ib = order[b] !== undefined ? order[b] : 9998;
-                if (ia !== ib) return ia - ib;
-                return String(a).localeCompare(String(b));
+                if (a === '默认分类') return 1;
+                if (b === '默认分类') return -1;
+                return String(a).localeCompare(String(b), 'zh');
             });
-            const defIdx = arr.indexOf('默认分类');
-            if (defIdx > -1) { arr.splice(defIdx, 1); arr.push('默认分类'); }
             return arr;
         }
 
@@ -2459,7 +2456,7 @@
                 window.__sharedProjectReadOnly = true;
                 const imp = document.getElementById('hubImportToLocalBtn');
                 if (imp) imp.style.display = 'inline-block';
-                if (typeof showToast === 'function') showToast('📖 已打开共享资源（只读）', 'info');
+                if (typeof showToast === 'function') showToast('📖 已打开共享资源（只读）· 分享者：' + hit.author, 'info');
             } catch (e) {
                 alert('加载共享项目失败：' + ((e && e.message) || e));
             }
@@ -2524,7 +2521,8 @@
             if (window.__sharedProjectReadOnly) { alert('共享资源为只读，不能再次共享，请先导入到本地。'); return; }
             if (!currentProjectName) { alert('请先打开一个本地项目再共享。'); return; }
             const payload = _projShareBuildPayload();
-            const by = (window.TFJL_NICKNAME) || '匿名';
+            // 🔴 2026-09-10：用真实昵称（与需求墙/分享一致），否则共享者永远显示「匿名」
+            const by = (await ensureNickname()) || localStorage.getItem('TFJL_UserName') || '匿名用户';
             try {
                 if (typeof showToast === 'function') showToast('⏳ 正在上传到共享资源库…', 'info');
                 const out = await _projShareCreate(payload, { by: by, days: 0, hub: true, hubCat: currentProjectCategory });
@@ -2559,6 +2557,63 @@
             }
         }
         window.hubImportSharedToLocal = hubImportSharedToLocal;
+
+        // ==================== 共享资源管理（管理员）====================
+        // 列出资源库里所有 hub 公开项目，支持「下架」（软删 del:true，对所有人失效）
+        async function adminLoadHubManager() {
+            const box = document.getElementById('adminHubManagerBody');
+            if (!box) return;
+            box.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;">⏳ 正在读取资源库索引…</div>';
+            let idx = {};
+            try { idx = await _shareIndexLoad(true); } catch (e) {
+                box.innerHTML = '<div style="color:#ff8a80;font-size:0.8rem;">❌ 读取失败：' + ((e && e.message) || e) + '</div>';
+                return;
+            }
+            const now = Date.now();
+            const codes = Object.keys(idx || {}).filter(function (c) {
+                const it = idx[c] || {};
+                return it && it.hub && !it.del && (!it.exp || it.exp > now);
+            });
+            if (!codes.length) {
+                box.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;">资源库暂无公开项目</div>';
+                return;
+            }
+            const fmt = function (t) {
+                if (!t) return '—';
+                try { const d = new Date(t); return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); } catch (e) { return '—'; }
+            };
+            const rows = codes.map(function (code) {
+                const it = idx[code] || {};
+                const name = String(it.n || '').replace(/</g, '&lt;') || '（未命名）';
+                const by = String(it.by || '').replace(/</g, '&lt;') || '匿名';
+                const cat = String(it.cat || '默认分类').replace(/</g, '&lt;');
+                return '<div style="display:flex;align-items:center;gap:8px;padding:7px 9px;background:rgba(255,255,255,0.04);border-radius:7px;margin-bottom:5px;font-size:0.76rem;flex-wrap:wrap;">'
+                    + '<span style="color:#ffd700;font-family:Consolas,monospace;font-weight:bold;letter-spacing:1px;">' + code + '</span>'
+                    + '<span style="color:#fff;flex:1;min-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + name + '</span>'
+                    + '<span style="color:rgba(255,255,255,0.6);">👤 ' + by + '</span>'
+                    + '<span style="color:rgba(255,255,255,0.5);">📁 ' + cat + '</span>'
+                    + '<span style="color:rgba(255,255,255,0.45);">分享 ' + fmt(it.ts) + '</span>'
+                    + '<button onclick="adminHubDelete(\'' + code + '\')" style="background:rgba(244,67,54,0.15);color:#ff8a80;border:1px solid rgba(244,67,54,0.35);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:0.72rem;">🚫 下架</button>'
+                    + '</div>';
+            }).join('');
+            box.innerHTML = '<div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-bottom:8px;">资源库共 ' + codes.length + ' 个公开项目</div>' + rows;
+        }
+        window.adminLoadHubManager = adminLoadHubManager;
+
+        async function adminHubDelete(code) {
+            if (!confirm('确认下架共享项目 ' + code + '？下架后对所有人失效（可在「分享管理」里查看/彻底移除）。')) return;
+            try {
+                const idx = await _shareIndexLoad(true);
+                const it = idx[code];
+                if (!it) { alert('该项目已不存在'); return; }
+                it.del = true;
+                await _shareIndexPut(code, it);
+                if (typeof showToast === 'function') showToast('🚫 已下架 ' + code, 'info');
+                adminLoadHubManager();
+                if ((window.__projectScope || 'local') === 'shared') refreshProjectSelectors();
+            } catch (e) { alert('下架失败：' + ((e && e.message) || e)); }
+        }
+        window.adminHubDelete = adminHubDelete;
 
         // 自动保存记事本到当前项目（防抖）
         let notepadSaveTimer = null;
@@ -24868,6 +24923,12 @@ ${maSection}
                 if (pageEl) {
                     pageEl.style.display = 'block';
                     if (typeof window.renderOldItemsAdmin === 'function') window.renderOldItemsAdmin();
+                }
+            } else if (page === 'hubManage') {
+                const pageEl = document.getElementById('adminPageHubManage');
+                if (pageEl) {
+                    pageEl.style.display = 'block';
+                    if (typeof window.adminLoadHubManager === 'function') window.adminLoadHubManager();
                 }
             }
         }
