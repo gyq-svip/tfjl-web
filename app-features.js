@@ -10050,14 +10050,18 @@
             })();
             // 🔴 2026-09-10：小卡片「悬停放大预览」——鼠标移到卡片上即放大，移开收起；
             //    手机没有 hover，用「长按 400ms」触发，点任意处关闭。
+            //    ⚠️ 防闪烁两个关键点（2026-09-10 修复「一直闪」）：
+            //      ① 预览层必须 pointer-events:none —— 否则它一出现就盖住鼠标，
+            //         触发 mouseleave 隐藏 → 鼠标又回到卡片 → 再显示，无限循环闪烁；
+            //      ② 用 mouseenter/mouseleave 直接绑在每张卡上（不冒泡），
+            //         避免鼠标在卡片内部子元素（img / 文字 / 标签）之间移动时反复触发。
             (function () {
                 let pv = document.getElementById('cardHoverPreview');
                 if (!pv) {
                     pv = document.createElement('div');
                     pv.id = 'cardHoverPreview';
-                    pv.style.cssText = 'display:none;position:fixed;inset:0;z-index:2147483646;background:rgba(0,0,0,0.82);align-items:center;justify-content:center;padding:16px;';
+                    pv.style.cssText = 'display:none;position:fixed;inset:0;z-index:2147483646;background:rgba(0,0,0,0.82);align-items:center;justify-content:center;padding:16px;pointer-events:none;';
                     pv.innerHTML = '<img id="cardHoverPreviewImg" src="" style="max-width:92vw;max-height:88vh;border-radius:12px;border:2px solid rgba(255,215,0,0.5);box-shadow:0 10px 40px rgba(0,0,0,0.7);background:#111;">';
-                    pv.onclick = function () { pv.style.display = 'none'; };
                     document.body.appendChild(pv);
                 }
                 const show = function (src) {
@@ -10067,27 +10071,43 @@
                     pv.style.display = 'flex';
                 };
                 const hide = function () { if (pv.style.display === 'flex') pv.style.display = 'none'; };
-                const cellOf = function (t) { return (t && t.closest) ? t.closest('[data-cid]') : null; };
-                modal.addEventListener('mouseover', function (e) {
-                    const cell = cellOf(e.target);
-                    if (!cell) return;
-                    const im = cell.querySelector('img');
-                    if (im && im.src) show(im.src);
+                let showT = null, hideT = null;
+                Array.prototype.forEach.call(modal.querySelectorAll('[data-cid]'), function (cell) {
+                    cell.addEventListener('mouseenter', function () {
+                        if (hideT) { clearTimeout(hideT); hideT = null; }
+                        const im = cell.querySelector('img');
+                        if (!im || !im.src) return;
+                        if (showT) clearTimeout(showT);
+                        showT = setTimeout(function () { show(im.src); }, 180);   // 轻微延迟：快速划过不弹
+                    });
+                    cell.addEventListener('mouseleave', function () {
+                        if (showT) { clearTimeout(showT); showT = null; }
+                        if (hideT) clearTimeout(hideT);
+                        hideT = setTimeout(hide, 120);
+                    });
                 });
-                modal.addEventListener('mouseout', function (e) { if (cellOf(e.target)) hide(); });
-                // 手机：长按 400ms 放大（移动手指取消）
+                // 手机：长按 400ms 放大（移动手指取消）；显示后点任意处关闭
                 let lp = null;
                 const clearLp = function () { if (lp) { clearTimeout(lp); lp = null; } };
                 modal.addEventListener('touchstart', function (e) {
-                    const cell = cellOf(e.target);
+                    const cell = (e.target && e.target.closest) ? e.target.closest('[data-cid]') : null;
                     if (!cell) return;
                     const im = cell.querySelector('img');
                     if (im && im.src) lp = setTimeout(function () { show(im.src); }, 400);
                 }, { passive: true });
                 modal.addEventListener('touchend', clearLp);
                 modal.addEventListener('touchmove', clearLp, { passive: true });
+                // 全局关闭（只绑一次，避免重复打开画廊累积监听）：点任意处 / Esc
+                if (!pv.__bound) {
+                    pv.__bound = true;
+                    document.addEventListener('touchstart', function () { hide(); }, { passive: true });
+                    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
+                }
             })();
-            modal.querySelector('#lineupCardGalleryClose').onclick = function () { modal.remove(); };
+            modal.querySelector('#lineupCardGalleryClose').onclick = function () {
+                const _pv = document.getElementById('cardHoverPreview'); if (_pv) _pv.remove();   // 关画廊时清掉预览层，避免残留
+                modal.remove();
+            };
             modal.querySelector('#cardGalUpload').onclick = function () { _cardUpload(); };
             modal.querySelector('#cardGalExport').onclick = function () { _cardExportBackup(); };
             modal.querySelector('#cardGalImport').onclick = function () { _cardImportBackup(); };
