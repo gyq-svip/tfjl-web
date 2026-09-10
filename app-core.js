@@ -18678,6 +18678,19 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         // 兼容别名（旧代码有调用 wallGetOrCreateBackupGist 的地方改为用索引，这里保留避免断链）
         async function wallGetOrCreateBackupGist() { return ''; }
 
+        // 判断 Gist 是否仍然存在（被删除 / 404 / 无权限都视为不存在）。
+        // 🔴 2026-09-11：总表 room_index.messages 指针可能指向已被清理的备份 Gist（死链），
+        //    拿到死 id 会一路 404，且自愈扫描永远不会触发（因为指针"有值"就直接返回了）。
+        async function wallGistExists(id, token) {
+            if (!id) return false;
+            try {
+                const r = await fetch(`https://api.github.com/gists/${id}`, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) }
+                });
+                return r.ok;
+            } catch (e) { return false; }
+        }
+
         async function wallResolveMessagesGistId() {
             const gistDeleted = localStorage.getItem('messages_gist_deleted') === 'true';
             let id = (!gistDeleted && MESSAGES_GIST_ID) ? MESSAGES_GIST_ID : (localStorage.getItem('messages_gist_id') || '');
@@ -18686,7 +18699,22 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 try {
                     const token = getGistToken();
                     const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) } });
-                    if (idxResp.ok) { const idxData = await idxResp.json(); const ri = idxData.files && idxData.files['room_index.json']; if (ri && ri.content) { const idx = JSON.parse(ri.content); if (idx.messages) { id = idx.messages; localStorage.setItem('messages_gist_id', id); resolvedFromIndex = true; } } }
+                    if (idxResp.ok) {
+                        const idxData = await idxResp.json(); const ri = idxData.files && idxData.files['room_index.json'];
+                        if (ri && ri.content) {
+                            const idx = JSON.parse(ri.content);
+                            if (idx.messages) {
+                                // 🔴 必须验证指针仍有效：失效则放弃并转扫描自愈，不能拿死 id 去请求
+                                if (await wallGistExists(idx.messages, token)) {
+                                    id = idx.messages;
+                                    localStorage.setItem('messages_gist_id', id);
+                                    resolvedFromIndex = true;
+                                } else {
+                                    console.warn('[消息Gist] 总表 messages 指针已失效（Gist 不存在），转扫描自愈:', idx.messages);
+                                }
+                            }
+                        }
+                    }
                 } catch (e) {}
                 // 自愈：索引/常量都失效 → 扫账号下最近创建的「需求墙消息」Gist
                 if (!resolvedFromIndex && (!id || id === MESSAGES_GIST_ID)) {
@@ -18881,6 +18909,12 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             const removable = expired.slice(0, Math.max(0, expired.length - (sorted.length - Math.min(sorted.length, keepMin + (sorted.length - expired.length)))));
             // 简化：保留最新 keepMin 份不删；其余超龄的可删
             const keepIds = new Set(sorted.slice(sorted.length - keepMin).map(function (e) { return e.id; }));
+            // 🔴 消息源 Gist 永不清理：真实消息很可能就存在某份备份 Gist 里（标准消息 Gist 早已删除），
+            //    若被当超龄备份删掉 → 总表 messages 指针变死链，之后备份/读消息全 404 且无法自愈。
+            try {
+                const msgId = await wallResolveMessagesGistId();
+                if (msgId) { keepIds.add(msgId); console.log('[备份清理] 🛡️ 消息源 Gist 已加入保留名单（不清理）:', msgId); }
+            } catch (e) {}
             const toDelete = expired.filter(function (e) { return !keepIds.has(e.id); });
             if (dryRun) return { deleted: toDelete.length, kept: indexArr.length - toDelete.length };
             let deleted = 0;
@@ -19779,7 +19813,11 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                             const ri = idxData.files && idxData.files['room_index.json'];
                             if (ri && ri.content) {
                                 const idx = JSON.parse(ri.content);
-                                if (idx.messages) { messagesGistId = idx.messages; localStorage.setItem('messages_gist_id', messagesGistId); }
+                                if (idx.messages) {
+                                    // 🔴 同样要验证，避免死链（与 wallResolveMessagesGistId 一致）
+                                    if (await wallGistExists(idx.messages, token)) { messagesGistId = idx.messages; localStorage.setItem('messages_gist_id', messagesGistId); }
+                                    else console.warn('[消息] 总表 messages 指针已失效，忽略:', idx.messages);
+                                }
                             }
                         }
                     } catch (e) { console.warn('[消息] 索引解析失败，用硬编码兜底:', e); }
