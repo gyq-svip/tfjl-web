@@ -5405,11 +5405,11 @@
             panel.style.cssText = 'position:fixed;top:80px;right:20px;width:420px;height:500px;background:rgba(26,26,46,0.95);border:2px solid rgba(0,188,212,0.5);border-radius:12px;z-index:9997;box-shadow:0 4px 20px rgba(0,0,0,0.5);flex-direction:column;resize:both;min-width:320px;min-height:350px;overflow:hidden;';
             panel.innerHTML = `
                 <div id="projectSearchPanelHeader" style="background:linear-gradient(135deg,#00bcd4,#00838f);padding:10px 15px;cursor:move;display:flex;justify-content:space-between;align-items:center;">
-                    <span style="color:white;font-weight:bold;">🔍 搜索项目</span>
+                    <span style="color:white;font-weight:bold;">🔍 搜索项目（本地+共享）</span>
                     <button onclick="document.getElementById('projectSearchPanel').style.display='none'" style="background:transparent;border:none;color:white;font-size:1.2rem;cursor:pointer;padding:0 5px;">×</button>
                 </div>
                 <div style="padding:12px;flex:1;overflow:auto;display:flex;flex-direction:column;">
-                    <input id="projectSearchInput" type="text" placeholder="输入关键字搜索所有项目..." oninput="searchAllProjects()" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(0,188,212,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;margin-bottom:10px;">
+                    <input id="projectSearchInput" type="text" placeholder="输入关键字搜索项目/共享库（项目名·分类·卡牌·分享者…）" oninput="searchAllProjects()" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(0,188,212,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;margin-bottom:10px;">
                     <div id="projectSearchResults" style="flex:1;overflow:auto;display:flex;flex-direction:column;gap:8px;">
                         <div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;">输入关键字开始搜索</div>
                     </div>
@@ -5434,10 +5434,14 @@
                     return;
                 }
 
-                loadProjectListFromDB().then(projects => {
+                Promise.all([
+                    loadProjectListFromDB().catch(function () { return []; }),
+                    (typeof _hubLoadSharedProjects === 'function' ? _hubLoadSharedProjects() : Promise.resolve([])).catch(function () { return []; })
+                ]).then(function (resArr) {
+                    const projects = resArr[0] || [];
+                    const __shared = resArr[1] || [];
                     if (!projects || projects.length === 0) {
-                        resultsEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;">暂无项目</div>';
-                        return;
+                        // 本地无项目不提前返回：共享库可能仍有匹配
                     }
 
                     let html = '';
@@ -5506,6 +5510,34 @@
                         `;
                     });
 
+                    // ---- 共享库项目（按 名称/分类/分享者 匹配）----
+                    const sh = function (text) {
+                        if (!text) return '';
+                        const escaped = String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                        const regex = new RegExp('(' + keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+                        return escaped.replace(regex, '<span style="background:#ff9800;color:#000;padding:0 2px;border-radius:2px;">$1</span>');
+                    };
+                    __shared.forEach(function (s) {
+                        const nameMatch = (s.name || '').toLowerCase().includes(keyword);
+                        const catMatch = (s.category || '').toLowerCase().includes(keyword);
+                        const authorMatch = (s.author || '').toLowerCase().includes(keyword);
+                        if (!nameMatch && !catMatch && !authorMatch) return;
+                        const matchInfo = [];
+                        if (nameMatch) matchInfo.push('项目名');
+                        if (catMatch) matchInfo.push('分类');
+                        if (authorMatch) matchInfo.push('分享者');
+                        const sname = (s.name || '').replace(/'/g, "\\'");
+                        html += '<div style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.25);border-radius:8px;padding:10px;cursor:pointer;" onclick="_searchOpenShared(\'' + sname + '\')">'
+                            + '<div style="display:flex;justify-content:space-between;align-items:center;">'
+                            + '<div style="flex:1;overflow:hidden;">'
+                            + '<div style="color:#ffd700;font-weight:bold;margin-bottom:4px;">🌐 ' + sh(s.name) + '</div>'
+                            + '<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;">分类：' + sh(s.category || '默认分类') + ' · 👤 ' + sh(s.author || '匿名') + '</div>'
+                            + '<div style="color:rgba(255,255,255,0.4);font-size:0.75rem;margin-top:2px;">匹配：' + matchInfo.join('、') + '（共享资源·只读）</div>'
+                            + '</div>'
+                            + '<button onclick="event.stopPropagation();_searchOpenShared(\'' + sname + '\')" style="background:linear-gradient(135deg,#ff9800,#e65100);color:white;border:none;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;flex-shrink:0;">打开</button>'
+                            + '</div></div>';
+                    });
+
                     if (!html) {
                         html = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;">未找到匹配的项目</div>';
                     }
@@ -5513,6 +5545,22 @@
                 });
             }, 300);
         }
+
+        // 从搜索结果打开共享库项目（只读）：切到共享模式并加载
+        function _searchOpenShared(name) {
+            if (typeof _hubLoadSharedProjects !== 'function') return;
+            _hubLoadSharedProjects().then(function (shared) {
+                window.__sharedProjects = shared || [];
+                window.__projectScope = 'shared';
+                const scopeSel = document.getElementById('projectScopeSelector');
+                if (scopeSel) scopeSel.value = 'shared';
+                if (typeof refreshProjectSelectors === 'function') refreshProjectSelectors();
+                if (typeof _hubLoadSharedProjectByName === 'function') _hubLoadSharedProjectByName(name);
+                const panel = document.getElementById('projectSearchPanel');
+                if (panel) panel.style.display = 'none';
+            });
+        }
+        window._searchOpenShared = _searchOpenShared;
 
         // 清空解析输入
         function clearParserInput() {
