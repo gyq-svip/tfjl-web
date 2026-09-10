@@ -2707,6 +2707,9 @@
             //    表现就是「切到共享再切回本地」后本地项目个别融合卡丢皮肤（点「皮肤异常修复」才恢复）。
             //    所以渲染前必须确认当前仍在共享作用域，否则丢弃这次迟到结果。
             if (window.__projectScope !== 'shared') return;
+            // 🔴 2026-09-11：把"打开/拉取共享 gist 项目"计入总下载数（之前 total_downloads 只统计脚本下载，
+            //    导致数字长期停在 470 不动）。只要从云端拉到共享项目内容就记一次下载，脚本下载仍照常计数。
+            if (typeof recordDownload === 'function') recordDownload();
             window.__sharedProjectReadOnly = true;
             _hubApplyProjectDataToUI(project, name, category);
             _applyReadOnlyUI(true);
