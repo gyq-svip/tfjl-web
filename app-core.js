@@ -2478,12 +2478,16 @@
 
         function handleProjectScopeChange() {
             const sel = document.getElementById('projectScopeSelector');
-            window.__projectScope = (sel && sel.value) || 'local';
+            const scope = (sel && sel.value) || 'local';
+            window.__projectScope = scope;
             window.__sharedProjectReadOnly = false;
             _applyReadOnlyUI(false);
             const imp = document.getElementById('hubImportToLocalBtn');
             if (imp) imp.style.display = 'none';
             refreshProjectSelectors();
+            if (typeof window.__recordFeatureUse === 'function') {
+                window.__recordFeatureUse(scope === 'shared' ? '切到共享资源库' : '切回本地项目');
+            }
         }
         window.handleProjectScopeChange = handleProjectScopeChange;
 
@@ -2713,6 +2717,7 @@
 
         async function _hubLoadSharedProjectByName(name) {
             if (!name) return;
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('打开共享项目');
             const shared = window.__sharedProjects || [];
             const hit = shared.filter(function (p) { return p.name === name; })
                               .sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); })[0];
@@ -2819,6 +2824,7 @@
                 const out = await _projShareCreate(payload, { by: by, days: 0, hub: true, hubCat: chosenCat });
                 if (out && out.code) {
                     if (typeof showToast === 'function') showToast('✅ 已共享到资源库：' + out.code, 'success');
+                    if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('分享到资源库');
                     if ((window.__projectScope || 'local') === 'shared') refreshProjectSelectors();
                 }
             } catch (e) {
@@ -2843,6 +2849,7 @@
                 await loadProjectFromDB(localName.trim());
                 refreshProjectSelectors();
                 if (typeof showToast === 'function') showToast('✅ 已导入到本地：' + localName.trim(), 'success');
+                if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('导入共享到本地');
             } catch (e) {
                 alert('导入失败：' + ((e && e.message) || e));
             }

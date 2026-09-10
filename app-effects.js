@@ -370,6 +370,7 @@
                 if (typeof _hubFillProjectSelector === 'function') {
                     _hubFillProjectSelector(window.__sharedProjects || [], currentProjectCategory, document.getElementById('projectSelector1'));
                 }
+                if (cat && typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('切换合作分类:' + cat);
                 return;
             }
             const catSel = document.getElementById('categorySelector1');
