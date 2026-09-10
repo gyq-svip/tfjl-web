@@ -2089,6 +2089,8 @@
             if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('打开/切换项目');
             if (!name) return;
             if (name === '-- 选择项目 --' || name === '') return;
+            // 切换/打开项目先退出只读态（共享只读由 _hubLoadSharedProjectByName 另行置位）
+            if (window.__sharedProjectReadOnly) { window.__sharedProjectReadOnly = false; _applyReadOnlyUI(false); }
             // 已是当前项目：不重载，避免丢失未保存修改
             if (name === currentProjectName) { const dlg = document.getElementById('projectDialog'); if (dlg) dlg.style.display = 'none'; return; }
 
@@ -2422,10 +2424,35 @@
             });
         }
 
+        // 共享只读态下锁住编辑控件并显示横幅；退出只读时恢复
+        function _applyReadOnlyUI(isReadOnly) {
+            try {
+                const ed = document.getElementById('notepadEditable');
+                if (ed) ed.setAttribute('contenteditable', isReadOnly ? 'false' : 'true');
+                ['myDeckInfo', 'teammateDeckInfo', 'notepad'].forEach(function (id) {
+                    const el = document.getElementById(id);
+                    if (el) el.readOnly = isReadOnly;
+                });
+                let banner = document.getElementById('sharedReadOnlyBanner');
+                if (isReadOnly) {
+                    if (!banner) {
+                        banner = document.createElement('div');
+                        banner.id = 'sharedReadOnlyBanner';
+                        banner.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:99990;background:rgba(255,152,0,0.95);color:#1a1a2e;font-size:0.78rem;font-weight:700;padding:6px 16px;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.4);pointer-events:none;';
+                        banner.textContent = '📖 共享资源只读 · 不能直接修改，请点「📥 导入到本地」后再编辑';
+                        document.body.appendChild(banner);
+                    }
+                } else if (banner && banner.parentNode) {
+                    banner.parentNode.removeChild(banner);
+                }
+            } catch (e) {}
+        }
+
         function handleProjectScopeChange() {
             const sel = document.getElementById('projectScopeSelector');
             window.__projectScope = (sel && sel.value) || 'local';
             window.__sharedProjectReadOnly = false;
+            _applyReadOnlyUI(false);
             const imp = document.getElementById('hubImportToLocalBtn');
             if (imp) imp.style.display = 'none';
             refreshProjectSelectors();
@@ -2493,8 +2520,9 @@
             try {
                 const raw = await _projShareFetchById(hit.id);
                 if (!raw || !raw.project) { alert('项目内容为空或已失效'); return; }
-                _hubApplyProjectDataToUI(raw.project, hit.name, hit.category);
                 window.__sharedProjectReadOnly = true;
+                _hubApplyProjectDataToUI(raw.project, hit.name, hit.category);
+                _applyReadOnlyUI(true);
                 const imp = document.getElementById('hubImportToLocalBtn');
                 if (imp) imp.style.display = 'inline-block';
                 if (typeof showToast === 'function') showToast('📖 已打开共享资源（只读）· 分享者：' + hit.author, 'info');
@@ -2514,7 +2542,8 @@
             cardSkins = projectData.cardSkins || {};
             window.fusionSkins = projectData.fusionSkins || {};
             cardMoHua = projectData.cardMoHua || {};
-            saveCardSkins();
+            // 共享资源只读：不要把共享项目的皮肤写回本地全局皮肤
+            if (!window.__sharedProjectReadOnly) saveCardSkins();
             _savedCardSkinsSnapshot = JSON.parse(JSON.stringify(cardSkins || {}));
             _savedFusionSkinsSnapshot = JSON.parse(JSON.stringify(window.fusionSkins || {}));
             _savedCardMoHuaSnapshot = JSON.parse(JSON.stringify(cardMoHua || {}));
