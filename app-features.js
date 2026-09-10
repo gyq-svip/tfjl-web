@@ -9717,10 +9717,9 @@
             if (overwrite && overwrite.id) {
                 try {
                     await _shareOverwriteGist(overwrite.id, files);
-                    _shareIndexPut(overwrite.code, {
-                        id: overwrite.id, n: String(proj.name || '').slice(0, 40), by: String(opts.by || '').slice(0, 24),
-                        exp: body.exp || 0, ts: Date.now(), fp: fp
-                    }).catch(function (e) { console.warn('[分享索引] 覆盖后写索引失败:', e); });
+                    const _idx1 = { id: overwrite.id, n: String(proj.name || '').slice(0, 40), by: String(opts.by || '').slice(0, 24), exp: body.exp || 0, ts: Date.now(), fp: fp };
+                    if (opts.hub) { _idx1.hub = true; _idx1.cat = String(opts.hubCat || (typeof currentProjectCategory !== 'undefined' ? currentProjectCategory : '默认分类')); }
+                    _shareIndexPut(overwrite.code, _idx1).catch(function (e) { console.warn('[分享索引] 覆盖后写索引失败:', e); });
                     return { id: overwrite.id, code: overwrite.code, updated: true, dropped: dropped, imgs: refList.length, fp: fp };
                 } catch (e) {
                     console.warn('[分享覆盖] 更新旧分享失败，改为新建一份:', e);
@@ -9750,10 +9749,9 @@
             const data = await res.json();
             if (!data || !data.id) throw new Error('创建项目分享失败（未返回 gist id）');
             // 🔴 写短码索引：对方查询从「翻 Gist 列表」变「查目录」（写入失败不阻断分享，仅查询慢一点）
-            _shareIndexPut(sc, {
-                id: data.id, n: String(proj.name || '').slice(0, 40), by: String(opts.by || '').slice(0, 24),
-                exp: body.exp || 0, ts: Date.now(), fp: fp   // 🔴 fp=内容指纹，供以后「内容相同直接复用」识别
-            }).catch(function (e) { console.warn('[分享索引] 写入失败（不影响本次分享）:', e); });
+            const _idx2 = { id: data.id, n: String(proj.name || '').slice(0, 40), by: String(opts.by || '').slice(0, 24), exp: body.exp || 0, ts: Date.now(), fp: fp };
+            if (opts.hub) { _idx2.hub = true; _idx2.cat = String(opts.hubCat || (typeof currentProjectCategory !== 'undefined' ? currentProjectCategory : '默认分类')); }
+            _shareIndexPut(sc, _idx2).catch(function (e) { console.warn('[分享索引] 写入失败（不影响本次分享）:', e); });
             return { id: data.id, code: sc, dropped: dropped, imgs: refList.length, fp: fp };
         }
 

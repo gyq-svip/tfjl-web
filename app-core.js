@@ -1595,6 +1595,10 @@
         // persistNow=false：自动保存（记事本防抖）——IndexedDB 照常即时写，tfjl.dat 只做脏标记（5分钟安全网兜底）
         function saveProjectToDB(projectName, category, currentData, persistNow) {
             if (persistNow !== false && typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('保存项目');
+            // 🔴 2026-09-10 共享资源只读：静默跳过所有写入（自动保存/手动保存都不落盘），由 saveCurrentProject 单独提示用户
+            if (window.__sharedProjectReadOnly) {
+                return Promise.resolve(false);
+            }
             return new Promise((resolve, reject) => {
                 if (!db) {
                     alert('数据库未初始化');
@@ -2088,6 +2092,12 @@
             // 已是当前项目：不重载，避免丢失未保存修改
             if (name === currentProjectName) { const dlg = document.getElementById('projectDialog'); if (dlg) dlg.style.display = 'none'; return; }
 
+            // 🔴 2026-09-10 共享资源库：共享模式下从 Gist 加载只读项目
+            if ((window.__projectScope || 'local') === 'shared') {
+                await _hubLoadSharedProjectByName(name);
+                return;
+            }
+
             // 处理"新建项目"选项
             if (name === '__NEW__') {
                 // 获取当前选中的分类
@@ -2297,15 +2307,34 @@
         }
 
         function refreshProjectSelectors() {
-            // 先加载项目列表
+            const scope = (window.__projectScope || 'local');
+            attachSelectWheel(document.getElementById('categorySelector1'));
+            attachSelectWheel(document.getElementById('projectSelector1'));
+
+            if (scope === 'shared') {
+                // 共享资源库：从分享索引读取 hub=true 的项目
+                _hubLoadSharedProjects().then(function (shared) {
+                    window.__sharedProjects = shared;
+                    const catSel = document.getElementById('categorySelector1');
+                    const projSel = document.getElementById('projectSelector1');
+                    if (catSel) {
+                        catSel.innerHTML = '<option value="">-- 选择分类 --</option>';
+                        _hubSharedCategories(shared).forEach(function (cat) {
+                            const opt = document.createElement('option');
+                            opt.value = cat;
+                            opt.textContent = cat;
+                            if (cat === currentProjectCategory) opt.selected = true;
+                            catSel.appendChild(opt);
+                        });
+                    }
+                    _hubFillProjectSelector(shared, currentProjectCategory, projSel);
+                }).catch(function (e) { console.error('[共享资源库] 刷新分类失败:', e); });
+                return;
+            }
+
+            // 本地模式（原逻辑）
             loadProjectListFromDB().then(allProjects => {
                 window.projects = allProjects;
-
-                // 🔴 2026-08-31 滚轮切换：悬停在下拉框上滚动滚轮即可换选项（幂等绑定，重建选项不影响）
-                attachSelectWheel(document.getElementById('categorySelector1'));
-                attachSelectWheel(document.getElementById('projectSelector1'));
-
-                // 刷新分类下拉框
                 const catSel = document.getElementById('categorySelector1');
                 if (catSel) {
                     catSel.innerHTML = '<option value="">-- 选择分类 --</option>';
@@ -2316,7 +2345,6 @@
                         if (cat === currentProjectCategory) opt.selected = true;
                         catSel.appendChild(opt);
                     });
-                    // 添加创建分类选项
                     const newCatOpt = document.createElement('option');
                     newCatOpt.value = '__NEW_CAT__';
                     newCatOpt.textContent = '➕ 创建分类';
@@ -2324,12 +2352,9 @@
                     newCatOpt.style.fontWeight = 'bold';
                     catSel.appendChild(newCatOpt);
                 }
-
-                // 刷新项目下拉框（只显示选中分类的项目）
                 const projSel = document.getElementById('projectSelector1');
                 if (projSel) {
                     projSel.innerHTML = '<option value="">-- 选择项目 --</option>';
-                    // 添加"新增项目"选项
                     const newOpt = document.createElement('option');
                     newOpt.value = '__NEW__';
                     newOpt.textContent = '➕ 新建项目';
@@ -2347,6 +2372,193 @@
                 }
             }).catch(e => console.error('刷新项目选择器失败:', e));
         }
+
+        // ==================== 共享资源库（2026-09-10）====================
+        // 复用分享索引 Gist（SHARE_INDEX_GIST_ID），条目加 hub:true 标记即视为资源库项目。
+        // 无审核：任何登录用户都能上传；只读：打开后不能保存/删除/改名。
+        window.__projectScope = window.__projectScope || 'local';
+        window.__sharedProjects = [];
+        window.__sharedProjectReadOnly = false;
+
+        function handleProjectScopeChange() {
+            const sel = document.getElementById('projectScopeSelector');
+            window.__projectScope = (sel && sel.value) || 'local';
+            window.__sharedProjectReadOnly = false;
+            const imp = document.getElementById('hubImportToLocalBtn');
+            if (imp) imp.style.display = 'none';
+            refreshProjectSelectors();
+        }
+        window.handleProjectScopeChange = handleProjectScopeChange;
+
+        // 从分享索引读取所有 hub 项目
+        async function _hubLoadSharedProjects() {
+            try {
+                const idx = await _shareIndexLoad();
+                const out = [];
+                const now = Date.now();
+                Object.keys(idx || {}).forEach(function (code) {
+                    const it = idx[code];
+                    if (!it || !it.hub || !it.id) return;
+                    if (it.del) return;
+                    if (it.exp && it.exp < now) return;
+                    out.push({
+                        code: code,
+                        name: String(it.n || '未命名'),
+                        category: String(it.cat || '默认分类'),
+                        author: String(it.by || '匿名'),
+                        ts: it.ts || 0,
+                        id: String(it.id)
+                    });
+                });
+                out.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
+                return out;
+            } catch (e) { return []; }
+        }
+
+        // 分类列表：按全局 categories 顺序，未分类（默认分类）放最后
+        function _hubSharedCategories(shared) {
+            const cats = new Set();
+            shared.forEach(function (p) { cats.add(p.category || '默认分类'); });
+            let arr = Array.from(cats);
+            const order = {};
+            (window.categories || []).forEach(function (c, i) { order[c] = i; });
+            arr.sort(function (a, b) {
+                const ia = order[a] !== undefined ? order[a] : 9998;
+                const ib = order[b] !== undefined ? order[b] : 9998;
+                if (ia !== ib) return ia - ib;
+                return String(a).localeCompare(String(b));
+            });
+            const defIdx = arr.indexOf('默认分类');
+            if (defIdx > -1) { arr.splice(defIdx, 1); arr.push('默认分类'); }
+            return arr;
+        }
+
+        function _hubFillProjectSelector(shared, category, projSel) {
+            if (!projSel) return;
+            projSel.innerHTML = '<option value="">-- 选择项目 --</option>';
+            const cat = category || '';
+            if (!cat) return;
+            shared.filter(function (p) { return p.category === cat; }).forEach(function (p) {
+                const opt = document.createElement('option');
+                opt.value = p.name;
+                opt.textContent = p.name + ' · ' + p.author;
+                projSel.appendChild(opt);
+            });
+        }
+
+        async function _hubLoadSharedProjectByName(name) {
+            if (!name) return;
+            const shared = window.__sharedProjects || [];
+            const hit = shared.filter(function (p) { return p.name === name; })
+                              .sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); })[0];
+            if (!hit || !hit.id) { alert('未找到共享项目：' + name); return; }
+            try {
+                const raw = await _projShareFetchById(hit.id);
+                if (!raw || !raw.project) { alert('项目内容为空或已失效'); return; }
+                _hubApplyProjectDataToUI(raw.project, hit.name, hit.category);
+                window.__sharedProjectReadOnly = true;
+                const imp = document.getElementById('hubImportToLocalBtn');
+                if (imp) imp.style.display = 'inline-block';
+                if (typeof showToast === 'function') showToast('📖 已打开共享资源（只读）', 'info');
+            } catch (e) {
+                alert('加载共享项目失败：' + ((e && e.message) || e));
+            }
+        }
+
+        // 把共享项目数据渲染到 UI（不写 IndexedDB）
+        function _hubApplyProjectDataToUI(projectData, projectName, projectCategory) {
+            clearCurrentData();
+            myHandCards = Array.isArray(projectData.myHandCards) ? projectData.myHandCards : [];
+            teammateHandCards = Array.isArray(projectData.teammateHandCards) ? projectData.teammateHandCards : [];
+            myPlacedCards = Array.isArray(projectData.myPlacedCards) ? projectData.myPlacedCards : [];
+            teammatePlacedCards = Array.isArray(projectData.teammatePlacedCards) ? projectData.teammatePlacedCards : [];
+            cardLevels = projectData.cardLevels || {};
+            cardSkins = projectData.cardSkins || {};
+            window.fusionSkins = projectData.fusionSkins || {};
+            cardMoHua = projectData.cardMoHua || {};
+            saveCardSkins();
+            _savedCardSkinsSnapshot = JSON.parse(JSON.stringify(cardSkins || {}));
+            _savedFusionSkinsSnapshot = JSON.parse(JSON.stringify(window.fusionSkins || {}));
+            _savedCardMoHuaSnapshot = JSON.parse(JSON.stringify(cardMoHua || {}));
+            if (document.getElementById('myDeckInfo')) document.getElementById('myDeckInfo').value = projectData.myDeckInfo || '';
+            if (document.getElementById('teammateDeckInfo')) document.getElementById('teammateDeckInfo').value = projectData.teammateDeckInfo || '';
+            currentProjectName = projectName;
+            currentProjectCategory = projectCategory || '默认分类';
+            const notepad = document.getElementById('notepad');
+            if (notepad) {
+                notepad.value = projectData.notepad || '';
+                const projColor = projectData.notebookColor || DEFAULT_NOTEBOOK_COLOR;
+                notebookColorCfg.color = projColor;
+                notepad.style.color = projColor;
+                const ed0 = getNotepadEditable();
+                if (ed0) ed0.style.color = projColor;
+                try {
+                    if (!getNotebookMainMarks().length && Array.isArray(projectData.notepadMarks) && projectData.notepadMarks.length) {
+                        persistNotebookMainMarks(projectData.notepadMarks);
+                    }
+                } catch (e) {}
+                refreshNotepadEditable();
+            }
+            loadTxtFilesFromProject(projectData);
+            window.__tfjlProjectDirty = false;
+            if (typeof updateSaveIndicator === 'function') updateSaveIndicator();
+            loadReferenceImagesFromProject(projectData);
+            updateHandDisplay('my');
+            updateHandDisplay('teammate');
+            restoreBattleSlots();
+            if (typeof refreshAllFusionSkins === 'function') setTimeout(function () { refreshAllFusionSkins().catch(function(){}); }, 0);
+            updateFavoritesDisplay();
+            updateAllCardLevelDisplays();
+            updateDamageReductionDisplay();
+            updateAllCardLevelBadges();
+            document.querySelectorAll('.card-item').forEach(function (card) {
+                const cardId = card.dataset.id;
+                const isFav = favoriteCards.some(function (f) { return f.id === cardId; });
+                if (isFav) card.classList.add('favorite-card'); else card.classList.remove('favorite-card');
+            });
+            if (cardLevels['my']) updateDeckLevelDisplay('my', cardLevels['my']);
+            if (cardLevels['teammate']) updateDeckLevelDisplay('teammate', cardLevels['teammate']);
+        }
+
+        async function shareCurrentProjectToHub() {
+            if (window.__sharedProjectReadOnly) { alert('共享资源为只读，不能再次共享，请先导入到本地。'); return; }
+            if (!currentProjectName) { alert('请先打开一个本地项目再共享。'); return; }
+            const payload = _projShareBuildPayload();
+            const by = (window.TFJL_NICKNAME) || '匿名';
+            try {
+                if (typeof showToast === 'function') showToast('⏳ 正在上传到共享资源库…', 'info');
+                const out = await _projShareCreate(payload, { by: by, days: 0, hub: true, hubCat: currentProjectCategory });
+                if (out && out.code) {
+                    if (typeof showToast === 'function') showToast('✅ 已共享到资源库：' + out.code, 'success');
+                    if ((window.__projectScope || 'local') === 'shared') refreshProjectSelectors();
+                }
+            } catch (e) {
+                alert('共享失败：' + ((e && e.message) || e));
+            }
+        }
+        window.shareCurrentProjectToHub = shareCurrentProjectToHub;
+
+        async function hubImportSharedToLocal() {
+            if (!window.__sharedProjectReadOnly || !currentProjectName) return;
+            const localName = await askTextInputAsync({ title: '导入到本地', label: '本地项目名：', defaultValue: currentProjectName });
+            if (!localName || !localName.trim()) return;
+            try {
+                window.__sharedProjectReadOnly = false;  // 导入动作本身允许写本地
+                const data = collectCurrentProjectData();
+                await saveProjectToDB(localName.trim(), currentProjectCategory, data);
+                window.__projectScope = 'local';
+                const scopeSel = document.getElementById('projectScopeSelector');
+                if (scopeSel) scopeSel.value = 'local';
+                const imp = document.getElementById('hubImportToLocalBtn');
+                if (imp) imp.style.display = 'none';
+                await loadProjectFromDB(localName.trim());
+                refreshProjectSelectors();
+                if (typeof showToast === 'function') showToast('✅ 已导入到本地：' + localName.trim(), 'success');
+            } catch (e) {
+                alert('导入失败：' + ((e && e.message) || e));
+            }
+        }
+        window.hubImportSharedToLocal = hubImportSharedToLocal;
 
         // 自动保存记事本到当前项目（防抖）
         let notepadSaveTimer = null;
@@ -6147,6 +6359,7 @@
         // 删除当前选中的项目
         // 重命名项目
         async function renameProject() {
+            if (window.__sharedProjectReadOnly) { alert('当前是共享资源（只读），不能重命名。请先「导入到本地」。'); return; }
             const selector = document.getElementById('projectSelector1');
             if (!selector || !selector.value) {
                 alert('请先选择一个项目');
@@ -6222,6 +6435,7 @@
 
         // 移动项目到其他分类
         function moveProjectToCategory() {
+            if (window.__sharedProjectReadOnly) { alert('当前是共享资源（只读），不能移动分类。请先「导入到本地」。'); return; }
             const selector = document.getElementById('projectSelector1');
             if (!selector || !selector.value) {
                 alert('请先选择一个项目');
@@ -6458,6 +6672,7 @@
         let pendingSaveProjectName = '';
 
         async function saveCurrentProject() {
+            if (window.__sharedProjectReadOnly) { alert('当前是共享资源（只读），不能保存。请先点「📥 导入到本地」再修改。'); return; }
             const _skinCfg = (typeof materializeProjectSkinConfig === 'function')
                 ? materializeProjectSkinConfig({ cardSkins: cardSkins, fusionSkins: window.fusionSkins, myHandCards: myHandCards, teammateHandCards: teammateHandCards, myPlacedCards: myPlacedCards, teammatePlacedCards: teammatePlacedCards })
                 : { cardSkins: cardSkins, fusionSkins: window.fusionSkins || {} };
