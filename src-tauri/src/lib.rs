@@ -572,28 +572,20 @@ fn append_text_file(file_path: String, content: String) -> Result<(), String> {
     Ok(())
 }
 
-/// 返回诊断日志落盘目录（置于 OS 应用缓存目录内，避免污染软件数据根目录）。
-/// Windows: %LOCALAPPDATA%\<app-cache>\tfjl_diag\  ；macOS/Linux: 对应 cache dir 下 tfjl_diag\
+/// 返回诊断日志落盘目录。
+/// 统一放在软件数据根目录下：D:\withfriends\塔防精灵助手数据\tfjl_diag\ （与浏览器/系统缓存隔离，便于管理）
 #[tauri::command]
 fn get_diag_log_dir(app: tauri::AppHandle) -> Result<String, String> {
-    // Tauri v2 移除了 tauri::api::path，统一走 app.path()（Manager trait 已在文件顶部导入）
-    let dir = app
-        .path()
-        .app_cache_dir()
-        .map_err(|e| format!("无法获取应用缓存目录: {}", e))?
-        .join("tfjl_diag");
+    let dir = std::path::PathBuf::from(r"D:\withfriends\塔防精灵助手数据\tfjl_diag");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir.to_string_lossy().to_string())
 }
 
 /// 返回应用缓存目录根路径（供前端做磁盘缓存，与浏览器数据隔离）。
-/// Windows: %LOCALAPPDATA%\<app-cache>\  ；macOS/Linux: 对应 cache dir\
+/// 统一放在软件数据根目录下：D:\withfriends\塔防精灵助手数据\tfjl_cache\
 #[tauri::command]
 fn get_app_cache_dir(app: tauri::AppHandle) -> Result<String, String> {
-    let dir = app
-        .path()
-        .app_cache_dir()
-        .map_err(|e| format!("无法获取应用缓存目录: {}", e))?;
+    let dir = std::path::PathBuf::from(r"D:\withfriends\塔防精灵助手数据\tfjl_cache");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir.to_string_lossy().to_string())
 }

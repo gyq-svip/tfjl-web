@@ -2543,8 +2543,8 @@
         // 痛点：每次打开共享项目都实时 fetch 整个 gist（project.json + 参考图），频繁拉取、断网打不开；
         // 且用户希望缓存落到独立磁盘目录，不要和浏览器数据混在一起。
         // 策略：
-        //   1. APP 版：用 Tauri 文件命令写到 %LOCALAPPDATA%/com.gyq.tfjl/cache/tfjl_cache/shared/{gistId}.json
-        //      + _manifest.json 维护索引（用于容量清理）。按 gistId 存完整已解析内容。
+        //   1. APP 版：用 Tauri 文件命令写到 D:\withfriends\塔防精灵助手数据\tfjl_cache\shared/{gistId}.json
+        //      （get_app_cache_dir 命令返回该根，与浏览器/系统缓存隔离）+ _manifest.json 维护索引（容量清理）。按 gistId 存完整已解析内容。
         //   2. 网页版/Tauri 旧版（无 get_app_cache_dir 命令）：回退 IndexedDB。
         //   3. 用分享索引里的 ts 比对新鲜度：作者没重新分享过(ts 一致) → 命中本地秒开；
         //      ts 变(作者更新)或缓存缺失 → 重新拉；拉取失败(断网) → 用本地缓存兜底。
@@ -2568,7 +2568,7 @@
                 try {
                     const base = await _tauriInvoke('get_app_cache_dir', {});
                     if (!base) throw new Error('no cache dir');
-                    const dir = base.replace(/[\\/]$/, '') + '/tfjl_cache/shared';
+                    const dir = base.replace(/[\\/]$/, '') + '/shared';
                     await _tauriInvoke('create_dir', { dirPath: dir });
                     return dir;
                 } catch (e) { return null; }
