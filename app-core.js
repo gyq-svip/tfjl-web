@@ -1372,6 +1372,15 @@
                                 categories.push(cat);
                             }
                         });
+                        // 与共享资源分类对齐（以共享为准）：本地缺失的直接补上。
+                        // 否则导入「合作/隐藏」这类共享项目时，本地没有对应分类可选。
+                        try {
+                            let added = false;
+                            SHARED_HUB_CATEGORIES.forEach(function (c) {
+                                if (c && !categories.includes(c)) { categories.push(c); added = true; }
+                            });
+                            if (added) saveCategories();
+                        } catch (e) {}
                     } else {
                         categories = defaultCategories.slice();
                         // 兜底：IndexedDB 无分类时，从 localStorage 恢复用户自建分类（防止刷新后丢失）
@@ -1569,30 +1578,39 @@
                     });
                     if (db0) { db0.style.border = '2px solid #ffd700'; db0.style.background = 'rgba(255,215,0,0.18)'; overlay._picked = preset; }
                 }
-                overlay.addEventListener('click', function (e) {
-                    try {
-                        const t = e.target;
-                        // 确定/取消放在 closest 之前：避免 closest 异常时连「取消」都失效（整个弹窗点不动）
-                        if (t && t.id === 'catPickOk') {
-                            const picked = overlay._picked;
-                            if (!picked) { if (typeof showToast === 'function') showToast('请先选择一个分类', 'info'); return; }
-                            if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-                            resolve(picked); return;
-                        }
-                        if (t && t.id === 'catPickCancel') { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); resolve(null); return; }
-                        if (t === overlay) { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); resolve(null); return; }
-                        const b = (t && t.closest) ? t.closest('button[data-cat]') : null;
-                        if (b) {
-                            Array.prototype.forEach.call(overlay.querySelectorAll('button[data-cat]'), function (x) {
-                                x.style.border = '1px solid rgba(255,255,255,0.25)';
-                                x.style.background = 'rgba(40,40,70,0.92)';
-                            });
-                            b.style.border = '2px solid #ffd700';
-                            b.style.background = 'rgba(255,215,0,0.18)';
-                            overlay._picked = b.getAttribute('data-cat');
-                        }
-                    } catch (err) { console.warn('[分类选择] 点击处理异常:', err); }
+                // 🔴 不用事件委托，直接给每个按钮绑 onclick：事件委托依赖冒泡，
+                //    只要链路中有一处 stopPropagation/异常，就会导致「整个弹窗点不动」。
+                //    直接绑定与本项目内可正常工作的 askTextInput 一致，最稳。
+                const catBtns = overlay.querySelectorAll('button[data-cat]');
+                Array.prototype.forEach.call(catBtns, function (btn) {
+                    btn.onclick = function () {
+                        Array.prototype.forEach.call(catBtns, function (x) {
+                            x.style.border = '1px solid rgba(255,255,255,0.25)';
+                            x.style.background = 'rgba(40,40,70,0.92)';
+                        });
+                        btn.style.border = '2px solid #ffd700';
+                        btn.style.background = 'rgba(255,215,0,0.18)';
+                        overlay._picked = btn.getAttribute('data-cat');
+                    };
                 });
+                const okBtn = overlay.querySelector('#catPickOk');
+                if (okBtn) okBtn.onclick = function () {
+                    const picked = overlay._picked;
+                    if (!picked) { if (typeof showToast === 'function') showToast('请先选择一个分类', 'info'); return; }
+                    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                    resolve(picked);
+                };
+                const cancelBtn = overlay.querySelector('#catPickCancel');
+                if (cancelBtn) cancelBtn.onclick = function () {
+                    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                    resolve(null);
+                };
+                overlay.onclick = function (e) {
+                    if (e.target === overlay) {
+                        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                        resolve(null);
+                    }
+                };
             });
         }
 
