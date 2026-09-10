@@ -1106,6 +1106,7 @@
         //   - 文件名自动生成；有效期取 autoOpts.days（默认 30 天）；不加密
         //   - 失败只 toast 不 alert，绝不打断主分享流程；返回 true/false 供调用方提示
         async function shareProjectToWall(autoOpts) {
+            if (window.__sharedProjectReadOnly) { alert('当前是共享资源（只读），不能分享到需求墙。请先「📥 导入到本地」后再分享。'); return false; }
             const auto = !!(autoOpts && autoOpts.auto);
             const projectName = (document.getElementById('projectSelector1') && document.getElementById('projectSelector1').value) || currentProjectName;
             if (!projectName) { if (auto) { showToast('⚠️ 未找到当前项目，跳过需求墙同步', 'info'); return false; } alert('请先选择一个项目！'); return false; }
