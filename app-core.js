@@ -25392,7 +25392,8 @@ ${maSection}
                         // 🔴 2026-08-29 诊断面板统一配色常量（同类参数同色，便于一眼分辨）
                         const C_NICK = '#4ade80', C_ID = '#64748b', C_TIME = '#94a3b8', C_NUM = '#fbbf24', C_FRONTV = '#60a5fa', C_DESKV = '#a78bfa', C_OK = '#4ade80', C_BAD = '#f87171', C_BUF = '#a78bfa';
                         const _colorWho = (who) => who.replace(/^([^(（]+)[(（]([^)）]+)[)）]?$/, '<b style="color:' + C_NICK + ';">$1</b><span style="color:' + C_ID + ';">($2)</span>');
-                        const uTop = sortBy(perUser).slice(0, 10), gTop = sortBy(perGist).slice(0, 10), fTop = sortBy(perFn).slice(0, 10);
+                        // 🔴 2026-09-10：按用户 TOP 展示「全部用户」（原来只取前 10）
+                        const uTop = sortBy(perUser), gTop = sortBy(perGist).slice(0, 10), fTop = sortBy(perFn).slice(0, 10);
                         const uMax = uTop.length ? uTop[0].v : 1, gMax = gTop.length ? gTop[0].v : 1, fMax = fTop.length ? fTop[0].v : 1;
                         let html = '<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:8px 12px;margin-bottom:12px;">';
                         html += '📁 诊断 Gist: <code style="color:#60a5fa;">' + gid + '</code> ｜ 上报文件数: <b>' + diagFiles.length + '</b> ｜ 累计写入: <b>' + totalWrites + '</b> 次</div>';
@@ -25430,7 +25431,8 @@ ${maSection}
                                     const totalUploads = users.reduce(function (s, u) { return s + u.uploads; }, 0);
                                     const totalWrites = users.reduce(function (s, u) { return s + u.writes; }, 0);
                                     const totalOps = users.reduce(function (s, u) { return s + u.ops; }, 0);
-                                    dayHtml += '<details' + (d === _today ? ' open' : '') + ' style="margin-bottom:8px;border:1px solid rgba(255,255,255,0.12);border-radius:8px;">';
+                                    // 🔴 2026-09-10：按天统计默认全部折叠（原来「今天」会默认展开）
+                                    dayHtml += '<details style="margin-bottom:8px;border:1px solid rgba(255,255,255,0.12);border-radius:8px;">';
                                     dayHtml += '<summary style="cursor:pointer;background:rgba(251,191,36,0.08);padding:8px 12px;font-size:0.78rem;color:#cbd5e1;">';
                                     dayHtml += '<span style="font-weight:700;color:#fbbf24;">📆 ' + d + (d === _today ? ' <span style="color:#4ade80;">(今天)</span>' : '') + '</span>';
                                     dayHtml += ' ｜ 👥 上传 ' + users.length + ' 人 ｜ 📤 上传 ' + totalUploads + ' 次 ｜ ✍️ 写入 ' + totalWrites + ' 次 ｜ 🖱️ 操作 ' + totalOps + ' 次';
@@ -25495,7 +25497,11 @@ ${maSection}
                             rkHtml += '</div></details></div>';
                             html += rkHtml;
                         })();
-                        html += '<div style="margin-bottom:16px;"><div style="color:#4ade80;margin-bottom:4px;font-weight:700;">👤 按用户 TOP <span style="color:#94a3b8;font-size:0.7rem;font-weight:400;">（点行展开该用户的上报详情）</span></div>';
+                        // 🔴 2026-09-10：整块包一层折叠（默认不展开），内部展示全部用户
+                        html += '<div style="margin-bottom:16px;">';
+                        html += '<details style="border:1px solid rgba(74,222,128,0.35);border-radius:10px;background:rgba(74,222,128,0.04);overflow:hidden;">';
+                        html += '<summary style="cursor:pointer;padding:9px 12px;font-size:0.85rem;color:#4ade80;font-weight:700;">👤 按用户 TOP <span style="color:#94a3b8;font-size:0.72rem;font-weight:400;">（共 ' + uTop.length + ' 人 · 点此展开/收起全部，点每行看该用户上报详情）</span></summary>';
+                        html += '<div style="padding:6px 12px 10px 12px;">';
                         uTop.forEach((x, i) => {
                             const id = 'uDetail_' + i;
                             html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, uMax) + ' <b style="color:' + C_NUM + ';">' + x.v + '</b>　<b style="color:' + C_NICK + ';">' + x.k + '</b> <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
@@ -25545,7 +25551,7 @@ ${maSection}
                             });
                             html += '</div>';
                         });
-                        html += '</div>';
+                        html += '</div></details></div>';
                         html += '<div style="margin-bottom:16px;"><div style="color:#60a5fa;margin-bottom:4px;font-weight:700;">📄 按 Gist 文件 TOP <span style="color:#94a3b8;font-size:0.7rem;font-weight:400;">（点行展开）</span></div>';
                         gTop.forEach((x, i) => {
                             const id = 'gDetail_' + i;
@@ -25566,10 +25572,14 @@ ${maSection}
                         const writeAgg = {}, useAgg = {};
                         writeKeys.forEach(k => { const base = k.substring(6); writeAgg[base] = (writeAgg[base] || 0) + detailByFn[k].reduce((s, r) => s + r.entry.count, 0); });
                         useKeys.forEach(k => { const base = k.substring(4); useAgg[base] = (useAgg[base] || 0) + detailByFn[k].reduce((s, r) => s + r.entry.count, 0); });
-                        const wTop = sortBy(writeAgg).slice(0, 10), uTop2 = sortBy(useAgg).slice(0, 10);
+                        const wTop = sortBy(writeAgg), uTop2 = sortBy(useAgg).slice(0, 10);   // 🔴 2026-09-10：真实写 Gist 展示全部
                         const wMax = wTop.length ? wTop[0].v : 1, uMax2 = uTop2.length ? uTop2[0].v : 1;
                         // 组1：🟥 真实写 Gist
-                        html += '<div style="margin-bottom:16px;"><div style="color:#f87171;margin-bottom:4px;font-weight:700;">⚙️🟥 真实写 Gist 操作 TOP <span style="color:#fca5a5;font-size:0.7rem;font-weight:400;">（PATCH/POST 到 Gist，消耗 API 配额）</span></div>';
+                        // 🔴 2026-09-10：整块包一层折叠（默认不展开），内部展示全部写操作
+                        html += '<div style="margin-bottom:16px;">';
+                        html += '<details style="border:1px solid rgba(248,113,113,0.35);border-radius:10px;background:rgba(248,113,113,0.04);overflow:hidden;">';
+                        html += '<summary style="cursor:pointer;padding:9px 12px;font-size:0.85rem;color:#f87171;font-weight:700;">⚙️🟥 真实写 Gist 操作 TOP <span style="color:#fca5a5;font-size:0.72rem;font-weight:400;">（共 ' + wTop.length + ' 项 · PATCH/POST 到 Gist，消耗 API 配额 · 点此展开/收起）</span></summary>';
+                        html += '<div style="padding:6px 12px 10px 12px;">';
                         if (!wTop.length) html += '<div style="color:#94a3b8;font-size:0.74rem;">暂无写 Gist 记录</div>';
                         wTop.forEach((x, i) => {
                             const id = 'wDetail_' + i;
@@ -25600,7 +25610,7 @@ ${maSection}
                             });
                             html += '</div>';
                         });
-                        html += '</div>';
+                        html += '</div></details></div>';
                         // 组2：⚪ 功能使用埋点（不写 Gist）
                         html += '<div style="margin-bottom:16px;"><div style="color:#a78bfa;margin-bottom:4px;font-weight:700;">⚙️⚪ 功能使用 TOP <span style="color:#c4b5fd;font-size:0.7rem;font-weight:400;">（仅埋点统计，不写 Gist）</span></div>';
                         if (!uTop2.length) html += '<div style="color:#94a3b8;font-size:0.74rem;">暂无功能使用记录</div>';
