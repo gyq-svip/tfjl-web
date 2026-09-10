@@ -2318,12 +2318,12 @@
                 // 项目分类在加载时经 _hubNormalizeCat 折算进固定分类，保证共享库分类统一不乱
                 _hubLoadSharedProjects().then(function (shared) {
                     window.__sharedProjects = shared;
-                    const cats = SHARED_HUB_CATEGORIES.slice();
+                    const cats = [SHARED_HUB_ALL].concat(SHARED_HUB_CATEGORIES);
                     (shared || []).forEach(function (p) {
                         const c = _hubNormalizeCat(p.category);
-                        if (cats.indexOf(c) < 0) cats.push(c);
+                        if (c && cats.indexOf(c) < 0) cats.push(c);
                     });
-                    if (!currentProjectCategory || cats.indexOf(currentProjectCategory) < 0) currentProjectCategory = '默认分类';
+                    if (!currentProjectCategory || cats.indexOf(currentProjectCategory) < 0) currentProjectCategory = SHARED_HUB_ALL;
                     const catSel = document.getElementById('categorySelector1');
                     const projSel = document.getElementById('projectSelector1');
                     if (catSel) {
@@ -2389,14 +2389,16 @@
         window.__sharedProjects = [];
         window.__sharedProjectReadOnly = false;
 
-        // 共享资源库固定分类：与每个人本地分类脱钩，全站统一（游戏四大标准元素 + 默认分类兜底）。
-        // 本地非元素类项目（合作/活动/日志/临时…）分享后一律归入「默认分类」，避免分类失控变乱。
-        const SHARED_HUB_CATEGORIES = ['默认分类', '寒冰', '暗月', '漩涡', '深海', '隐藏'];
+        // 共享资源库固定分类：与每个人本地分类脱钩，全站统一（游戏四大标准元素 + 合作 + 隐藏）。
+        // 不再有「默认分类」这一存储分类；无法归入以上任一类的项目（合作/活动/日志/临时…）视为未分类，
+        // 在「全部」虚拟视图里统一展示，避免分类失控变乱。
+        const SHARED_HUB_CATEGORIES = ['寒冰', '暗月', '漩涡', '深海', '隐藏', '合作'];
+        const SHARED_HUB_ALL = '全部';   // 虚拟「全部」视图（非存储分类），展示所有项目
         function _hubNormalizeCat(cat) {
             cat = (typeof cat === 'string') ? cat.trim() : '';
-            if (!cat) return '默认分类';
+            if (!cat) return '';
             if (SHARED_HUB_CATEGORIES.indexOf(cat) >= 0) return cat;
-            return '默认分类';
+            return '';   // 未分类 → 归入「全部」
         }
 
         // 分享到资源库前选择固定分类（寒冰/暗月/漩涡/深海/隐藏/默认分类）；取消返回 null
@@ -2413,7 +2415,7 @@
                 }).join('');
                 overlay.innerHTML = '<div style="background:#1a1a2e;border-radius:14px;padding:20px 24px;max-width:440px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.5);">'
                     + '<div style="color:#ffd700;font-size:1.02rem;font-weight:700;margin-bottom:6px;">选择共享分类</div>'
-                    + '<div style="color:rgba(255,255,255,0.6);font-size:0.74rem;margin-bottom:14px;">点选分类后按「确定」（默认已选 ' + defaultCat + '）</div>'
+                    + '<div style="color:rgba(255,255,255,0.6);font-size:0.74rem;margin-bottom:14px;">点选分类后按「确定」' + (defaultCat ? '（已选 ' + defaultCat + '）' : '（请先选一个分类）') + '</div>'
                     + '<div id="catPickWrap" style="display:flex;flex-wrap:wrap;justify-content:center;">' + btns + '</div>'
                     + '<div style="margin-top:16px;">'
                     + '<button id="catPickOk" style="margin:0 6px;padding:7px 22px;border-radius:8px;border:none;background:#ffd700;color:#1a1a2e;font-weight:700;cursor:pointer;">确定</button>'
@@ -2440,7 +2442,7 @@
                 overlay.addEventListener('click', function (e) {
                     const b = e.target.closest('button[data-cat]');
                     if (b) { picked = b.getAttribute('data-cat'); refreshHighlight(); return; }
-                    if (e.target.id === 'catPickOk') { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); resolve(picked); return; }
+                    if (e.target.id === 'catPickOk') { if (!picked) { if (typeof showToast === 'function') showToast('请先选择一个分类', 'info'); return; } if (overlay.parentNode) overlay.parentNode.removeChild(overlay); resolve(picked); return; }
                     if (e.target.id === 'catPickCancel') { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); resolve(null); }
                 });
             });
@@ -2510,14 +2512,14 @@
             } catch (e) { return []; }
         }
 
-        // 分类列表：固定基线「默认分类」永远存在（共享库不会空），其余按出现的共享项目分类聚合，默认分类置底
+        // 分类列表：固定基线「全部」虚拟视图永远存在（共享库不会空），其余按出现的共享项目分类聚合
         function _hubSharedCategories(shared) {
-            const cats = new Set(['默认分类']);
-            shared.forEach(function (p) { cats.add(p.category || '默认分类'); });
+            const cats = new Set([SHARED_HUB_ALL]);
+            shared.forEach(function (p) { const c = _hubNormalizeCat(p.category); if (c) cats.add(c); });
             let arr = Array.from(cats);
             arr.sort(function (a, b) {
-                if (a === '默认分类') return 1;
-                if (b === '默认分类') return -1;
+                if (a === SHARED_HUB_ALL) return -1;
+                if (b === SHARED_HUB_ALL) return 1;
                 return String(a).localeCompare(String(b), 'zh');
             });
             return arr;
@@ -2527,8 +2529,8 @@
             if (!projSel) return;
             projSel.innerHTML = '<option value="">-- 选择项目 --</option>';
             const cat = category || '';
-            // 共享库中「默认分类」仅为占位基线（无项目归属它）；选它或留空时展示全部项目
-            const list = (!cat || cat === '默认分类') ? (shared || []) : (shared || []).filter(function (p) { return p.category === cat; });
+            // 共享库中「全部」为虚拟视图（非存储分类）；选它或留空时展示全部项目
+            const list = (!cat || cat === SHARED_HUB_ALL) ? (shared || []) : (shared || []).filter(function (p) { return p.category === cat; });
             list.forEach(function (p) {
                 const opt = document.createElement('option');
                 opt.value = p.name;
@@ -2871,7 +2873,7 @@
                 const it = idx[code] || {};
                 const name = String(it.n || '').replace(/</g, '&lt;') || '（未命名）';
                 const by = String(it.by || '').replace(/</g, '&lt;') || '匿名';
-                const cat = _hubNormalizeCat(it.cat).replace(/</g, '&lt;');
+                const cat = (_hubNormalizeCat(it.cat) || SHARED_HUB_ALL).replace(/</g, '&lt;');
                 return '<div style="display:flex;align-items:center;gap:8px;padding:7px 9px;background:rgba(255,255,255,0.04);border-radius:7px;margin-bottom:5px;font-size:0.76rem;flex-wrap:wrap;">'
                     + '<span style="color:#ffd700;font-family:Consolas,monospace;font-weight:bold;letter-spacing:1px;">' + code + '</span>'
                     + '<span style="color:#fff;flex:1;min-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + name + '</span>'
