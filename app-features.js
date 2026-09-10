@@ -10644,10 +10644,16 @@
                 const isDel = !!it.del;
                 const isExp = !isDel && it.exp && now > it.exp;
                 if (isDel) deleted++; else if (isExp) expired++; else alive++;
+                // 🔴 2026-09-10：已软删除的条目默认隐藏（避免「删了还在」的观感），勾选「显示已删除」才出现
+                if (isDel && !(window.__shareShowDel)) return '';
                 const st = isDel ? '<span style="color:#ff8a80;">已删除</span>'
                     : (isExp ? '<span style="color:#ffb74d;">已过期</span>' : '<span style="color:#81c784;">有效</span>');
                 const name = String(it.n || '').replace(/</g, '&lt;') || '（未命名）';
                 const by = String(it.by || '').replace(/</g, '&lt;') || '匿名';
+                // 已删除条目：提供「彻底移除」按钮（从索引删除审计记录，远程 Gist 若还在一并删）；其余提供「删除」
+                const delBtn = isDel
+                    ? '<button onclick="adminHardRemoveShare(\'' + code + '\')" style="background:rgba(120,120,140,0.18);color:#cfd8dc;border:1px solid rgba(120,120,140,0.4);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:0.72rem;">🧹 彻底移除</button>'
+                    : '<button onclick="adminDeleteShare(\'' + code + '\')" style="background:rgba(244,67,54,0.15);color:#ff8a80;border:1px solid rgba(244,67,54,0.35);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:0.72rem;">🗑 删除</button>';
                 return '<div style="display:flex;align-items:center;gap:8px;padding:7px 9px;background:rgba(255,255,255,0.04);border-radius:7px;margin-bottom:5px;font-size:0.76rem;flex-wrap:wrap;">'
                     + '<span style="color:#ffd700;font-family:Consolas,monospace;font-weight:bold;letter-spacing:1px;">' + code + '</span>'
                     + '<span style="color:#fff;flex:1;min-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + name + '</span>'
@@ -10655,13 +10661,15 @@
                     + '<span style="color:rgba(255,255,255,0.45);">分享 ' + fmt(it.ts) + '</span>'
                     + '<span style="color:rgba(255,255,255,0.45);">⏰ ' + (it.exp ? fmt(it.exp) : '永久') + '</span>'
                     + st
-                    + (isDel ? '' : '<button onclick="adminDeleteShare(\'' + code + '\')" style="background:rgba(244,67,54,0.15);color:#ff8a80;border:1px solid rgba(244,67,54,0.35);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:0.72rem;">🗑 删除</button>')
+                    + delBtn
                     + '</div>';
             }).join('');
             box.innerHTML =
                 '<div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-bottom:8px;line-height:1.6;">'
-                + '共 ' + codes.length + ' 条 · 有效 <b style="color:#81c784;">' + alive + '</b> · 过期 <b style="color:#ffb74d;">' + expired + '</b> · 已删除 <b style="color:#ff8a80;">' + deleted + '</b><br>'
-                + '<span style="color:rgba(255,255,255,0.35);">索引只存短码/项目名/分享者/时间/地址，不含项目内容与密码；删除后对方拉取直接提示「已失效」，不会再去翻页查找。</span>'
+                + '共 ' + codes.length + ' 条 · 有效 <b style="color:#81c784;">' + alive + '</b> · 过期 <b style="color:#ffb74d;">' + expired + '</b> · 已删除 <b style="color:#ff8a80;">' + deleted + '</b>'
+                + (deleted ? ' <label style="margin-left:6px;cursor:pointer;color:rgba(255,255,255,0.7);"><input type="checkbox" ' + (window.__shareShowDel ? 'checked ' : '') + 'onchange="window.__shareShowDel=this.checked;adminLoadShareManager();"> 显示已删除</label>' : '')
+                + '<br>'
+                + '<span style="color:rgba(255,255,255,0.35);">索引只存短码/项目名/分享者/时间/地址，不含项目内容与密码；删除后对方拉取直接提示「已失效」。</span>'
                 + '</div>' + rows;
         }
         window.adminLoadShareManager = adminLoadShareManager;
@@ -10802,6 +10810,23 @@
             }
         }
         window.adminDeleteShare = adminDeleteShare;
+
+        // 彻底移除「已删除」的分享条目：直接删索引里的审计记录（远程 Gist 若还在会被一并删除）。
+        // 🔴 2026-09-10：解决软删除残留「删不掉」——软删除后条目无删除按钮，这里给它们一个真正清空入口。
+        async function adminHardRemoveShare(code) {
+            if (!code) return;
+            if (!window.confirm('彻底从分享台账移除「' + code + '」？\n\n这会从索引删除该条审计记录（不可恢复）；若远程 Gist 还在将一并删除。')) return;
+            try {
+                const out = await _shareHardDelete(code);
+                if (typeof showToast === 'function') {
+                    showToast(out.index ? ('✅ 已彻底移除 ' + code) : '⚠️ 移除失败，请重试', out.index ? 'success' : 'error');
+                }
+                await adminLoadShareManager();
+            } catch (e) {
+                if (typeof showToast === 'function') showToast('❌ ' + ((e && e.message) || e), 'error');
+            }
+        }
+        window.adminHardRemoveShare = adminHardRemoveShare;
 
         // 拉取到的项目 → 复用「恢复项目」同款导入弹窗（选名称+分类 → 新建/覆盖同名 → 落库不串当前项目）
         function _projShareImportBody(body) {
