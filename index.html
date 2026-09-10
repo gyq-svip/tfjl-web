@@ -1024,7 +1024,10 @@
 
         <div class="selection-area">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                <h2 style="margin:0;display:flex;align-items:center;gap:8px;">⚔️ 出战选择<span style="font-size:0.65rem;color:rgba(255,255,255,0.45);font-weight:normal;">鼠标悬停有功能简介</span></h2>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <h2 style="margin:0;display:flex;align-items:center;gap:8px;">⚔️ 出战选择<span style="font-size:0.65rem;color:rgba(255,255,255,0.45);font-weight:normal;">鼠标悬停有功能简介</span></h2>
+                    <span id="sharedReadOnlyBadge" style="display:none;background:linear-gradient(90deg,#ff9800,#ffc107);color:#1a1a2e;font-size:0.7rem;font-weight:700;padding:3px 10px;border-radius:10px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.25);">📖 只读 · 导入本地可编辑</span>
+                </div>
                 <div style="display:flex;gap:8px;align-items:center;">
                     <label style="font-size:0.7rem;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;">
                         <input type="checkbox" id="fusionSkinSplitToggle" checked onchange="toggleFusionSkinSplit(this.checked)" title="勾选：融合卡显示完整融合皮肤（主卡整皮 + 被融合卡右下角小图）；不勾：只显示主卡（单卡）整张皮肤。卡名始终按现状显示。"> 显示融合
@@ -1041,9 +1044,6 @@
                     <button onclick="if(typeof shareLineupImage==='function')shareLineupImage();else showToast('分享功能加载中，请稍候...','info');" data-tip="生成阵容分享图：双方卡组+手牌（每人最多10张，职业渐变+真实皮肤+等级/魔化/融合副卡），可设有效期/密码，对方扫码、报 8 位短码或点链接一键复刻" style="background:linear-gradient(135deg,#f093fb,#f5576c);border:none;color:#fff;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:bold;box-shadow:0 2px 8px rgba(240,147,251,0.3);">📸 分享</button>
                 </div>
             </div>
-
-            <!-- 共享资源只读提示插槽（由 _applyReadOnlyUI 控制显示/隐藏） -->
-            <div id="sharedReadOnlyBannerSlot" style="display:none;width:100%;margin-bottom:10px;"></div>
 
             <div class="battle-field">
                 <div class="battle-column user-column">

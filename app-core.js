@@ -2458,21 +2458,13 @@
                     const el = document.getElementById(id);
                     if (el) el.readOnly = isReadOnly;
                 });
+                // 只读短条：复用标题行内的 sharedReadOnlyBadge（短条，不独占一行）
+                const oldBanner = document.getElementById('sharedReadOnlyBanner');
+                if (oldBanner && oldBanner.parentNode) oldBanner.parentNode.removeChild(oldBanner);
+                const badge = document.getElementById('sharedReadOnlyBadge');
+                if (badge) badge.style.display = isReadOnly ? 'inline-block' : 'none';
                 const slot = document.getElementById('sharedReadOnlyBannerSlot');
-                let banner = document.getElementById('sharedReadOnlyBanner');
-                if (isReadOnly) {
-                    if (!banner) {
-                        banner = document.createElement('div');
-                        banner.id = 'sharedReadOnlyBanner';
-                        banner.style.cssText = 'width:100%;box-sizing:border-box;background:linear-gradient(90deg,#ff9800,#ffc107);color:#1a1a2e;font-size:0.85rem;font-weight:700;padding:9px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.35);text-align:center;pointer-events:none;';
-                        banner.textContent = '📖 共享资源只读 · 不能直接修改，请点「📥 导入到本地」后再编辑';
-                    }
-                    if (slot) { slot.style.display = 'block'; slot.innerHTML = ''; slot.appendChild(banner); }
-                    else if (banner.parentNode !== document.body) { document.body.appendChild(banner); }
-                } else {
-                    if (banner && banner.parentNode) banner.parentNode.removeChild(banner);
-                    if (slot) slot.style.display = 'none';
-                }
+                if (slot) slot.style.display = 'none';
             } catch (e) {}
         }
 
