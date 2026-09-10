@@ -20616,6 +20616,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                     if (gistId && typeof _projShareFetchById === 'function' && typeof _lineupBuildCanvas === 'function' && typeof _buildWorkCardsFromProject === 'function') {
                         try {
                             const fetched = await _projShareFetchById(gistId);
+                            if (typeof recordDownload === 'function') recordDownload();  // 拉取阵容/作品 gist 也算一次下载
                             const project = fetched && fetched.project ? fetched.project : (fetched && fetched.myPlacedCards ? fetched : null);
                             if (project && (project.myPlacedCards || project.teammatePlacedCards || project.myHandCards || project.teammateHandCards)) {
                                 const cards = await _buildWorkCardsFromProject(project);
