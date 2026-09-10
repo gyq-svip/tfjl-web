@@ -2312,19 +2312,21 @@
             attachSelectWheel(document.getElementById('projectSelector1'));
 
             if (scope === 'shared') {
-                // 共享资源库：从分享索引读取 hub=true 的项目
+                // 共享资源库：从分享索引读取 hub=true 的项目；分类下拉与本地一致（默认分类+寒冰/暗月/漩涡…），
+                // 并补上数据里出现但本地没有的分类，保证按分类筛选共享项目时不会漏项
                 _hubLoadSharedProjects().then(function (shared) {
                     window.__sharedProjects = shared;
-                    // 共享库分类来自数据；默认选中第一个真实分类（「默认分类」只是占位基线，无项目归属它），避免项目列表为空
-                    const __cats = _hubSharedCategories(shared);
-                    if (!currentProjectCategory || currentProjectCategory === '默认分类' || __cats.indexOf(currentProjectCategory) < 0) {
-                        currentProjectCategory = (__cats.filter(function (c) { return c !== '默认分类'; })[0]) || '默认分类';
-                    }
+                    const cats = categories.slice();
+                    (shared || []).forEach(function (p) {
+                        const c = p.category || '默认分类';
+                        if (cats.indexOf(c) < 0) cats.push(c);
+                    });
+                    if (!currentProjectCategory || cats.indexOf(currentProjectCategory) < 0) currentProjectCategory = '默认分类';
                     const catSel = document.getElementById('categorySelector1');
                     const projSel = document.getElementById('projectSelector1');
                     if (catSel) {
                         catSel.innerHTML = '<option value="">-- 选择分类 --</option>';
-                        __cats.forEach(function (cat) {
+                        cats.forEach(function (cat) {
                             const opt = document.createElement('option');
                             opt.value = cat;
                             opt.textContent = cat;
