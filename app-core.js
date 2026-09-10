@@ -1041,12 +1041,24 @@
             // 待 _idxCfg 到位后，若远程 interval 与当前不同，则清掉旧定时器、用新间隔重启，使远程调频真正生效。
             let _idxCfg = null;
             let _hbTimer = null;
+            let _firstHbDone = false;   // 🔴 2026-09-10：首次心跳是否已补发（避免重启定时器时重复补发）
             const _HB_DEF_BASE = 15, _HB_DEF_JITTER = 5; // 分钟（事故后默认 15/5，原 45/10）
             function _startHeartbeat(baseMin, jitterMin) {
                 if (_hbTimer) clearInterval(_hbTimer);
                 const base = (baseMin > 0 ? baseMin : _HB_DEF_BASE) * 60 * 1000;
                 const jitter = (jitterMin >= 0 ? jitterMin : _HB_DEF_JITTER) * 60 * 1000;
                 _hbTimer = setInterval(_heartbeatOnce, base + Math.random() * jitter);
+                // 🔴 2026-09-10：首次登录「秒级」上报心跳（原来第一拍要等 15±5 分钟，新设备很久才出现在诊断面板）。
+                //    只补第一拍，后续仍按远程配置的间隔（写操作本来就跟心跳一起走，不需要额外提速）。
+                if (!_firstHbDone) {
+                    _firstHbDone = true;
+                    setTimeout(function () {
+                        try {
+                            const r = _heartbeatOnce();
+                            if (r && typeof r.catch === 'function') r.catch(function (e) { console.warn('[DIAG] 首次心跳失败', e); });
+                        } catch (e) { console.warn('[DIAG] 首次心跳异常', e); }
+                    }, 6000);
+                }
             }
             getRoomIndexConfig().then(c => {
                 _idxCfg = c || null;
@@ -24917,6 +24929,8 @@ ${maSection}
                 try {
                     const cg = await _toolboxGistGet(TOOLBOX_GIST_ID);
                     const cf = cg && cg.files && cg.files[TOOLBOX_FILE];
+                    // 🔴 2026-09-10：缓存黑名单供「全量上报」表格的「封禁」列使用
+                    try { window.__diagBlacklist = (JSON.parse(cf.content).blacklist) || {}; } catch (e) {}
                     const cdata = cf && cf.content ? JSON.parse(cf.content) : {};
                     const bl = cdata.blacklist || {};
                     users.forEach(u => { if (bl[u.dev]) u.blacklisted = true; });
@@ -25503,7 +25517,10 @@ ${maSection}
                         html += '<summary style="cursor:pointer;padding:9px 12px;font-size:0.85rem;color:#4ade80;font-weight:700;">👤 按用户 TOP <span style="color:#94a3b8;font-size:0.72rem;font-weight:400;">（共 ' + uTop.length + ' 人 · 点此展开/收起全部，点每行看该用户上报详情）</span></summary>';
                         html += '<div style="padding:6px 12px 10px 12px;">';
                         uTop.forEach((x, i) => {
-                            const id = 'uDetail_' + i;
+                            // 🔴 2026-09-10：详情 id 用 anonId（全量上报里点用户可跳过来），取不到则退回索引
+                            const _aidM = /[（(]([^）)]+)[）)]?\s*$/.exec(x.k);
+                            const _aidU = _aidM ? String(_aidM[1]).replace(/[^a-zA-Z0-9_-]/g, '') : '';
+                            const id = 'uDetailBox_' + (_aidU || ('idx' + i));
                             html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, uMax) + ' <b style="color:' + C_NUM + ';">' + x.v + '</b>　<b style="color:' + C_NICK + ';">' + x.k + '</b> <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
                             html += '<div id="' + id + '" style="display:none;background:rgba(0,0,0,0.25);border-left:2px solid #60a5fa;padding:6px 10px;margin:4px 0 8px 12px;font-size:0.75rem;">';
                             (detailByUser[x.k] || []).forEach(m => {
@@ -25640,27 +25657,50 @@ ${maSection}
                             html += '</div>';
                         });
                         html += '</div>';
-                        // 全量上报文件列表（按最后上报时间倒序）
+                        // ============ 全量上报文件（🔴 2026-09-10 改为表格 + 搜索 + 点用户跳转）============
                         const sortedFiles = fileMetas.slice().sort((a, b) => b.last - a.last);
-                        html += '<div style="margin-bottom:16px;"><div style="color:#ffd700;margin-bottom:4px;">📋 全量上报文件 <span style="color:#94a3b8;font-size:0.7rem;">（按最后上报时间倒序）</span></div>';
-                        sortedFiles.forEach(m => {
+                        html += '<div style="margin-bottom:16px;">';
+                        html += '<div style="color:#ffd700;margin-bottom:6px;font-weight:700;">📋 全量上报文件 <span style="color:#94a3b8;font-size:0.7rem;font-weight:400;">（按最后上报时间倒序 · 点用户名跳到该用户详情）</span></div>';
+                        html += '<input id="diagFileSearch" type="text" placeholder="🔍 搜索用户 / 昵称 / ID / 版本 / 平台…" oninput="diagFilterFiles(this.value)" style="width:100%;box-sizing:border-box;margin-bottom:6px;padding:6px 10px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.78rem;outline:none;">';
+                        html += '<div style="overflow-x:auto;"><table id="diagFileTable" style="border-collapse:collapse;width:100%;font-size:0.74rem;">';
+                        html += '<tr style="font-size:0.68rem;color:#94a3b8;background:rgba(255,215,0,0.08);">'
+                            + '<th style="text-align:left;padding:4px 6px;">#</th>'
+                            + '<th style="text-align:left;padding:4px 6px;">用户</th>'
+                            + '<th style="text-align:left;padding:4px 6px;">状态</th>'
+                            + '<th style="text-align:left;padding:4px 6px;color:#60a5fa;">小版本(前端)</th>'
+                            + '<th style="text-align:left;padding:4px 6px;color:#a78bfa;">大版本(桌面)</th>'
+                            + '<th style="text-align:left;padding:4px 6px;">平台</th>'
+                            + '<th style="text-align:right;padding:4px 6px;color:#fbbf24;">写入</th>'
+                            + '<th style="text-align:left;padding:4px 6px;">最后上报</th>'
+                            + '<th style="text-align:left;padding:4px 6px;">封禁</th>'
+                            + '</tr>';
+                        sortedFiles.forEach(function (m, i) {
                             const ts = m.last ? new Date(m.last).toLocaleString('zh-CN') : '?';
                             const min = m.last ? Math.max(0, Math.round((Date.now() - m.last) / 60000)) : -1;
-                            // 🔴 2026-08-29 可读性修复：统一配色常量（与上方各区块一致）
                             const _hb = m.heartbeat ? '<span style="color:' + C_OK + ';">🟢心跳</span>' : '<span style="color:' + C_BUF + ';">📦缓冲</span>';
                             const _wk = m.writeOk ? '<span style="color:' + C_OK + ';">✓盘</span>' : (m.writeOk === false ? '<span style="color:' + C_BAD + ';">✗盘</span>' : '<span style="color:' + C_TIME + ';">?盘</span>');
-                            const _fv = '<span style="color:' + C_FRONTV + ';">v' + (m.ver || '?') + '</span>';
-                            const _ev = m.payload && m.payload.appExeVersion ? '<span style="color:' + C_DESKV + ';">桌面v' + m.payload.appExeVersion + '</span>' : ((m.plat === 'app') ? '<span style="color:#f97316;">桌面v未知(旧包)</span>' : '');
-                            const _pt = '<span style="color:' + C_TIME + ';">' + (m.plat || '?') + '</span>';
-                            const _cnt = '<span style="color:' + C_NUM + ';">' + m.count + '写</span>';
-                            const _flagColored = _hb + '｜' + _wk + '｜' + _fv + '｜' + _ev + '｜' + _pt + '｜' + _cnt;
-                            html += '<div style="font-size:0.74rem;color:#cbd5e1;padding:3px 0;border-bottom:1px dashed rgba(255,255,255,0.06);">';
-                            html += '<b style="color:' + C_FRONTV + ';">' + m.fn + '</b><br>';
-                            html += _colorWho(m.who) + ' ｜ ' + _flagColored + ' ｜ <span style="color:' + C_TIME + ';">' + ts + ' (' + min + '分钟前)</span>';
-                            if (m.err) html += '<br><span style="color:#f87171;">err: ' + m.err + '</span>';
-                            html += '</div>';
+                            const _fv = (m.ver || '?');
+                            const _ev = (m.payload && m.payload.appExeVersion) ? m.payload.appExeVersion : ((m.plat === 'app') ? '未知(旧包)' : '—');
+                            const _aid = String(m.anonId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+                            const _devKey = (m.payload && m.payload.deviceId) || m.anonId || '';
+                            const _bl = (window.__diagBlacklist && window.__diagBlacklist[_devKey]) ? '<span style="color:#f87171;">🔒已拉黑</span>' : '<span style="color:#94a3b8;">—</span>';
+                            const _kw = (m.who + ' ' + m.anonId + ' ' + (m.ver || '') + ' ' + (m.plat || '') + ' ' + ((m.payload && m.payload.appExeVersion) || '') + ' ' + m.fn).toLowerCase().replace(/"/g, '');
+                            html += '<tr class="diagFileRow" data-kw="' + _kw + '" style="border-top:1px dashed rgba(255,255,255,0.08);">'
+                                + '<td style="padding:3px 6px;color:#64748b;">' + (i + 1) + '</td>'
+                                + '<td style="padding:3px 6px;cursor:pointer;" onclick="diagJumpToUser(\'' + _aid + '\')" title="点击跳到该用户详情">' + _colorWho(m.who) + ' <span style="color:#60a5fa;font-size:0.68rem;">▶</span></td>'
+                                + '<td style="padding:3px 6px;">' + _hb + ' ' + _wk + '</td>'
+                                + '<td style="padding:3px 6px;color:#60a5fa;">' + _fv + '</td>'
+                                + '<td style="padding:3px 6px;color:#a78bfa;">' + _ev + '</td>'
+                                + '<td style="padding:3px 6px;color:#94a3b8;">' + (m.plat || '?') + '</td>'
+                                + '<td style="padding:3px 6px;text-align:right;color:#fbbf24;font-weight:700;">' + m.count + '</td>'
+                                + '<td style="padding:3px 6px;color:#94a3b8;">' + ts + ' <span style="color:#64748b;">(' + min + '分钟前)</span></td>'
+                                + '<td style="padding:3px 6px;">' + _bl + '</td>'
+                                + '</tr>';
+                            if (m.err) {
+                                html += '<tr class="diagFileRow" data-kw="' + _kw + '"><td></td><td colspan="8" style="padding:2px 6px;color:#f87171;font-size:0.7rem;">err: ' + String(m.err).replace(/</g, '&lt;') + '</td></tr>';
+                            }
                         });
-                        html += '</div>';
+                        html += '</table></div></div>';
                         // ==================== 📈 API 消耗分析与趋势预判（2026-08-30 新增） =====================
                         // 数据源全部来自各上报文件的 entries（first/last/samples 均为真实发生时间戳，
                         // count 为该操作累计次数）。目的：看清 API 配额到底被哪些操作吃掉、趋势是升是降、
@@ -30096,6 +30136,33 @@ ${maSection}
                 if (window._hideLoadingScreen) window._hideLoadingScreen('app-core就绪');
             }, 3000);
         })();
+
+        // ==================== 诊断面板：全量上报表格的搜索 / 跳转（2026-09-10）====================
+        window.diagFilterFiles = function (kw) {
+            const q = String(kw || '').trim().toLowerCase();
+            const rows = document.querySelectorAll('#diagFileTable tr.diagFileRow');
+            for (let i = 0; i < rows.length; i++) {
+                const tr = rows[i];
+                const hit = !q || ((tr.getAttribute('data-kw') || '').indexOf(q) >= 0);
+                tr.style.display = hit ? '' : 'none';
+            }
+        };
+        // 从「全量上报」点用户名 → 跳到「按用户 TOP」里该用户的详情（自动展开各级折叠）
+        window.diagJumpToUser = function (aid) {
+            if (!aid) return;
+            const box = document.getElementById('uDetailBox_' + aid);
+            if (!box) {
+                if (typeof showToast === 'function') showToast('该用户在「按用户 TOP」里暂无详情（可能是旧数据无 anonId）', 'info');
+                return;
+            }
+            let p = box;
+            while (p && p !== document.body) { if (p.tagName === 'DETAILS') p.open = true; p = p.parentElement; }
+            box.style.display = 'block';
+            try { box.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { box.scrollIntoView(); }
+            const oldBg = box.style.background;
+            box.style.background = 'rgba(96,165,250,0.28)';
+            setTimeout(function () { box.style.background = oldBg || 'rgba(0,0,0,0.25)'; }, 1400);
+        };
 
         // ==================== 手机端「悬浮退出」按钮（2026-09-10）====================
         // 背景：手机上浮动面板/弹窗经常关不掉（关闭按钮太小、被挤出视口），
