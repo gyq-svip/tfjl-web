@@ -819,13 +819,39 @@ window.addEventListener('beforeunload',()=>clearInterval(timer));
 /* 启动                                                                */
 /* ------------------------------------------------------------------ */
 
+/* 运行时文件：把端口 + 一次性 token 落到本地文件，供 AI / CLI（release_cli.js）调用。
+ * 已被 .gitignore 忽略（/.release-server.json），不会入库、不会泄露到仓库。 */
+const RUNTIME_FILE = path.join(ROOT, '.release-server.json');
+function writeRuntime() {
+  try {
+    fs.writeFileSync(RUNTIME_FILE, JSON.stringify({
+      port: PORT, token: TOKEN, pid: process.pid, starteAt: Date.now(),
+      url: 'http://127.0.0.1:' + PORT + '/', root: ROOT
+    }, null, 2), 'utf8');
+  } catch (e) { console.log('WARN: 运行时文件写入失败（AI/CLI 接口将不可用）: ' + e.message); }
+}
+function clearRuntime() {
+  try {
+    const cur = JSON.parse(fs.readFileSync(RUNTIME_FILE, 'utf8'));
+    if (cur && cur.pid === process.pid) fs.unlinkSync(RUNTIME_FILE);   // 只删自己写的，别误删别的实例
+  } catch (e) {}
+}
+process.on('exit', clearRuntime);
+['SIGINT', 'SIGTERM'].forEach(function (sig) {
+  try { process.on(sig, function () { clearRuntime(); process.exit(0); }); } catch (e) {}
+});
+
 server.listen(PORT, '127.0.0.1', function () {
   const url = 'http://127.0.0.1:' + PORT + '/';
+  writeRuntime();
+  pushLog('server', '服务启动 · 端口 ' + PORT + ' · PID ' + process.pid + ' · 仓库根 ' + ROOT);
   console.log('=========================================');
   console.log(' tfjl 本地发布工具已启动');
   console.log('   浏览器打开: ' + url);
   console.log('   仓库根目录: ' + ROOT);
   console.log('   仅本机可用（127.0.0.1），关闭本窗口即停止');
+  console.log('   🤖 AI/命令行接口: node release_cli.js <status|preflight|build|sign|publish|verify|logs|cancel|stop>');
+  console.log('      （端口与 token 已写入 .release-server.json，git 已忽略）');
   console.log('=========================================');
   // TFJL_NO_OPEN=1 时不自动开浏览器（供自动化测试用）
   if (!process.env.TFJL_NO_OPEN) {
@@ -834,8 +860,20 @@ server.listen(PORT, '127.0.0.1', function () {
 });
 server.on('error', function (e) {
   if (e.code === 'EADDRINUSE') {
-    console.log('端口 ' + PORT + ' 已被占用：可能本工具已在运行。直接打开 http://127.0.0.1:' + PORT + '/');
-    console.log('（想换端口：set TFJL_RELEASE_PORT=8800 && node release_server.js）');
+    // 先看运行时文件：若确实是「本工具的另一个实例」在跑，那不是错误，直接告知地址
+    let rt = null;
+    try { rt = JSON.parse(fs.readFileSync(RUNTIME_FILE, 'utf8')); } catch (e2) {}
+    let alive = false;
+    if (rt && rt.pid) { try { process.kill(rt.pid, 0); alive = true; } catch (e2) { alive = false; } }
+    if (rt && alive && rt.port === PORT) {
+      console.log('本工具已在运行中 → 直接打开 ' + (rt.url || ('http://127.0.0.1:' + PORT + '/')));
+      console.log('（网页 UI 与命令行接口均为这个实例服务；无需重复启动）');
+      process.exit(0);
+    }
+    console.log('❌ 端口 ' + PORT + ' 被其他程序占用（多为上次没关干净的旧实例）。');
+    console.log('   · 换端口：set TFJL_RELEASE_PORT=8800 && node release_server.js');
+    console.log('   · 或找占用者：netstat -ano | findstr :' + PORT + '   →   taskkill /PID <那行的PID> /F');
+    console.log('   · 用命令行接口最省事（自动挑空闲端口）：node release_cli.js status');
   } else {
     console.log('启动失败: ' + e.message);
   }
