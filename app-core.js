@@ -5825,18 +5825,32 @@
             const pop = document.createElement('div');
             pop.id = 'nbMarkColorPopup';
             pop.dataset.win = windowId;
-            pop.style.cssText = 'position:fixed;z-index:200050;width:240px;background:linear-gradient(160deg,rgba(40,40,68,0.99),rgba(26,26,48,0.99));border:1px solid rgba(255,215,0,0.4);border-radius:12px;padding:11px 12px;box-shadow:0 10px 34px rgba(0,0,0,0.65);';
+            pop.style.cssText = 'position:fixed;z-index:200050;width:264px;background:linear-gradient(160deg,rgba(40,40,68,0.99),rgba(26,26,48,0.99));border:1px solid rgba(255,215,0,0.4);border-radius:12px;padding:11px 12px;box-shadow:0 10px 34px rgba(0,0,0,0.65);';
             pop.innerHTML =
                 '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">' +
                     '<span style="color:#ffd700;font-size:0.78rem;font-weight:bold;">🎨 标色颜色</span>' +
                     '<button type="button" id="nbMarkColorClose" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.25);color:#c9c9dd;padding:0 7px;border-radius:5px;cursor:pointer;font-size:0.72rem;line-height:1.5;">✕</button>' +
                 '</div>' +
-                '<div style="color:rgba(255,255,255,0.55);font-size:0.68rem;margin-bottom:7px;">点颜色 = 立即标色，共 <b style="color:#fff;">' + info.found.length + '</b> 处匹配（标色不改正文颜色）</div>' +
+                '<div style="color:rgba(255,255,255,0.55);font-size:0.68rem;margin-bottom:7px;">点色块 = 立即标色，共 <b style="color:#fff;">' + info.found.length + '</b> 处匹配（标色不改正文颜色）</div>' +
                 '<div style="display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-bottom:9px;">' + sw + '</div>' +
-                '<div style="display:flex;align-items:center;gap:7px;margin-bottom:9px;">' +
-                    '<span style="font-size:0.68rem;color:#9a9ab0;">自定义</span>' +
-                    '<input type="color" id="nbMarkColorCustom" value="' + esc(cur) + '" style="width:36px;height:24px;border:none;background:transparent;cursor:pointer;padding:0;">' +
-                    '<label style="display:flex;align-items:center;gap:4px;font-size:0.68rem;color:#c9c9dd;cursor:pointer;margin-left:auto;"><input type="checkbox" id="nbMarkColorGlow"> 发光</label>' +
+                // 🎨 与「字体颜色」同款 NBPC 圆盘色轮（拖动实时显示颜色，松开即把全部匹配标成该色）
+                '<div style="border-top:1px solid rgba(255,255,255,0.12);padding-top:9px;">' +
+                    '<div style="color:rgba(255,255,255,0.55);font-size:0.68rem;margin-bottom:7px;text-align:center;">🎨 圆盘选色（拖动选色，松开即标色）</div>' +
+                    '<div style="position:relative;width:132px;height:132px;margin:0 auto 9px;">' +
+                        '<canvas id="nbMarkWheel_wheel" style="width:132px;height:132px;border-radius:50%;display:block;cursor:crosshair;box-shadow:0 0 0 1px rgba(255,255,255,0.28),0 4px 14px rgba(0,0,0,0.55);"></canvas>' +
+                        '<div id="nbMarkWheel_wheelDot" style="position:absolute;left:66px;top:66px;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 5px rgba(0,0,0,0.9);transform:translate(-50%,-50%);pointer-events:none;"></div>' +
+                    '</div>' +
+                    '<div style="display:flex;align-items:center;gap:6px;margin-bottom:9px;">' +
+                        '<span style="font-size:0.58rem;color:#9a9ab0;flex-shrink:0;">亮度</span>' +
+                        '<div id="nbMarkWheel_vBar" style="position:relative;flex:1;height:12px;border-radius:6px;cursor:pointer;border:1px solid rgba(255,255,255,0.25);background:linear-gradient(to right,#000,#fff);">' +
+                            '<div id="nbMarkWheel_vDot" style="position:absolute;left:100%;top:50%;width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid rgba(0,0,0,0.5);box-shadow:0 1px 4px rgba(0,0,0,0.7);transform:translate(-50%,-50%);pointer-events:none;"></div>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div style="display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:9px;">' +
+                        '<span id="nbMarkWheel_preview" style="width:20px;height:20px;border-radius:50%;background:#e0e0e0;border:1px solid rgba(255,255,255,0.6);flex-shrink:0;"></span>' +
+                        '<span id="nbMarkWheel_hexTxt" style="font-size:0.66rem;color:#c9c9dd;font-family:Consolas,monospace;">#e0e0e0</span>' +
+                        '<label style="display:flex;align-items:center;gap:4px;font-size:0.68rem;color:#c9c9dd;cursor:pointer;margin-left:auto;"><input type="checkbox" id="nbMarkColorGlow"> 发光</label>' +
+                    '</div>' +
                 '</div>' +
                 '<div style="display:flex;gap:6px;">' +
                     '<button type="button" id="nbMarkColorApply" style="flex:1;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:none;padding:7px;border-radius:7px;cursor:pointer;font-size:0.76rem;font-weight:bold;">✅ 用当前色标色</button>' +
@@ -5846,7 +5860,7 @@
             // 定位：贴「全部标色」按钮右下，越界自动回收
             try {
                 const r = btn ? btn.getBoundingClientRect() : null;
-                const pw = pop.offsetWidth || 240, ph = pop.offsetHeight || 210;
+                const pw = pop.offsetWidth || 264, ph = pop.offsetHeight || 210;
                 let left = r ? (r.right - pw) : 40;
                 let top = r ? (r.bottom + 6) : 80;
                 left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
@@ -5865,8 +5879,17 @@
             if (applyBtn) applyBtn.onclick = function () { applyMarkAllMatches(windowId, getMarkColor()); closeMarkColorPopup(); };
             const clearBtn = pop.querySelector('#nbMarkColorClear');
             if (clearBtn) clearBtn.onclick = function () { clearMarkMatches(windowId); closeMarkColorPopup(); };
-            const custom = pop.querySelector('#nbMarkColorCustom');
-            if (custom) custom.onchange = function () { applyMarkAllMatches(windowId, custom.value); closeMarkColorPopup(); };
+            // 🎨 复用「字体颜色」同款 NBPC 色轮：拖动实时显示颜色，松开即把全部匹配标成该色。
+            //    弹窗保持打开，方便连续微调；点色块/✕/遮罩照常关闭。
+            try {
+                if (window.NBPC && NBPC.Wheel) {
+                    if (NBPC.Wheel.injectStyles) NBPC.Wheel.injectStyles();
+                    NBPC.Wheel.init('nbMarkWheel', {
+                        onApply: function (hex) { applyMarkAllMatches(windowId, hex); }
+                    });
+                    NBPC.Wheel.sync('nbMarkWheel', getMarkColor());
+                }
+            } catch (e) { console.warn('[标色圆盘] 初始化失败:', e); }
             // 发光开关：与记事本既有 _glowChk 同源，避免两处状态打架
             const glowChk = pop.querySelector('#nbMarkColorGlow');
             const existGlow = document.getElementById(windowId + '_glowChk');
