@@ -1194,7 +1194,7 @@
             const T = window.__TAURI__ || window.__TAURI_INTERNALS__;
             if (!T) return;
             try {
-                _tauriInvoke('write_text_file', {
+                _tauriInvokeSafe('write_text_file', {
                     filePath: AUTH_DISK_PATH,
                     content: JSON.stringify({ loggedIn: !!loggedIn, at: new Date().toISOString() })
                 });
@@ -1205,7 +1205,7 @@
             const T = window.__TAURI__ || window.__TAURI_INTERNALS__;
             if (!T) return false;
             try {
-                const txt = await _tauriInvoke('read_text_file_auto', { filePath: AUTH_DISK_PATH });
+                const txt = await _tauriInvokeSafe('read_text_file_auto', { filePath: AUTH_DISK_PATH });
                 if (txt) { const o = JSON.parse(txt); return !!(o && o.loggedIn); }
             } catch (e) {}
             return false;
@@ -1214,13 +1214,13 @@
         function clearAuthOnDisk() {
             const T = window.__TAURI__ || window.__TAURI_INTERNALS__;
             if (!T) return;
-            try { _tauriInvoke('delete_file', { filePath: AUTH_DISK_PATH }); } catch (e) {}
+            try { _tauriInvokeSafe('delete_file', { filePath: AUTH_DISK_PATH }); } catch (e) {}
         }
 
         // ========== 昵称本地磁盘持久化（独立于安装目录，重启/更新/卸载重装都不丢） ==========
         const NICK_DISK_PATH = 'D:\\withfriends\\塔防精灵助手数据\\data\\nickname.json';
 
-        async function _tauriInvoke(name, args) {
+        async function _tauriInvokeSafe(name, args) {
             const fn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
             if (!fn) return null;
             try { return await fn(name, args); } catch (e) { return null; }
@@ -1233,10 +1233,10 @@
             const hasSet = localStorage.getItem('TFJL_HasSetNick') === 'true';
             try {
                 if (!nick) {
-                    await _tauriInvoke('delete_file', { filePath: NICK_DISK_PATH }); // 昵称被清空则一并删除磁盘记录
+                    await _tauriInvokeSafe('delete_file', { filePath: NICK_DISK_PATH }); // 昵称被清空则一并删除磁盘记录
                     return;
                 }
-                await _tauriInvoke('write_text_file', {
+                await _tauriInvokeSafe('write_text_file', {
                     filePath: NICK_DISK_PATH,
                     content: JSON.stringify({ nick: nick, hasSet: hasSet, savedAt: new Date().toISOString() })
                 });
@@ -1247,7 +1247,7 @@
         async function restoreNicknameFromDisk() {
             if (!(window.__TAURI__ || window.__TAURI_INTERNALS__)) return;
             try {
-                const txt = await _tauriInvoke('read_text_file_auto', { filePath: NICK_DISK_PATH });
+                const txt = await _tauriInvokeSafe('read_text_file_auto', { filePath: NICK_DISK_PATH });
                 if (txt) {
                     const obj = JSON.parse(txt);
                     if (obj && obj.nick) {
@@ -2468,7 +2468,7 @@
                 } else if (isRecallable) {
                     actionBtn = `<span onclick="recallMessage('${msg.id}')" title="撤回" style="color:#fbbf24;font-size:0.7rem;cursor:pointer;margin-left:6px;padding:2px 4px;border-radius:3px;background:rgba(251,191,36,0.15);">撤回</span>`;
                 } else if (isDeletable) {
-                    actionBtn = `<span onclick="deleteMessage('${msg.id}')" title="删除" style="color:#ef4444;font-size:0.7rem;cursor:pointer;margin-left:6px;padding:2px 4px;border-radius:3px;background:rgba(239,68,68,0.15);">删除</span>`;
+                    actionBtn = `<span onclick="deleteChatMessage('${msg.id}')" title="删除" style="color:#ef4444;font-size:0.7rem;cursor:pointer;margin-left:6px;padding:2px 4px;border-radius:3px;background:rgba(239,68,68,0.15);">删除</span>`;
                 }
 
                 return `
@@ -2531,7 +2531,13 @@
         }
 
         // 删除消息（自己）
-        async function deleteMessage(msgId) {
+        // 🔴 2026-09-12 改名 deleteMessage → deleteChatMessage：
+        //    本项目顶层函数都是全局的，app-core.js 里另有同名 deleteMessage(index)（需求墙，按数组下标删），
+        //    且 app-core 在 index.html 里**后加载**→ 全局 deleteMessage 最终是需求墙那版。
+        //    结果：聊天室消息渲染出的 onclick="deleteMessage('<msgId>')" 实际调到需求墙版，
+        //    wallMessages['<msgId>'] 取不到 → 静默 return → **点删除没任何反应**（真 bug）。
+        //    改名后聊天室删除走自己的实现；需求墙那版名字不变、行为不变。
+        async function deleteChatMessage(msgId) {
             if (!confirm('确定要删除这条消息吗？')) return;
             
             try {
