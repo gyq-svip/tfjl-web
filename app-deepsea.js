@@ -229,15 +229,10 @@
             window.dsClosePanel = dsClosePanel;
             window.dsOpenPanel = dsOpenPanel;
             // 阶段2.5：空闲预载后 DOMContentLoaded 可能已错过，用 readyState 双分支兜底
+            // 2026-09-12：主站浮窗 #deepseaFloatPanel 已移除（仅在管理员菜单经 openSubpage 打开 deepsea.html）。
+            // 原拖拽/缩放/迷你面板/状态记忆逻辑依赖已删除的 DOM，这里不再初始化，避免无谓定时器与潜在报错。
             function initDeepseaPanel() {
-                dsRestorePanelState();
-                dsInitDrag();
-                dsInitResize();
-                setTimeout(initDeepseaMiniPanel, 300);
-                // 离开页面前存状态
-                window.addEventListener('beforeunload', dsSavePanelState);
-                // 定期存（拖拽/缩放后）
-                setInterval(dsSavePanelState, 4000);
+                // 浮窗已删除：无面板可初始化（dsInitDrag/dsInitResize/initDeepseaMiniPanel 均依赖已移除的 DOM）。
             }
             if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initDeepseaPanel);
             else initDeepseaPanel();

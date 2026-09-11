@@ -2868,28 +2868,7 @@
   })();
   </script>
 
-    <!-- ==================== 深海统计 浮窗（右边缘 · 可拖拽/缩放/最小化）====================
-         ⚠️ 此标记曾于某次改动中丢失，导致 initDeepseaMiniPanel() 找不到 #dsmpBody 而直接返回 =「深海统计打不开」。
-         2026-09-12 已按 git 5b2a20d 原样恢复，请勿删除（app-deepsea.js 依赖以下 id：
-         deepseaFloatPanel / dfpHeader / dfpResizer / dsmpBody / dsmpSeasonTag / deepseaToggle） -->
-<div class="deepsea-float-panel" id="deepseaFloatPanel">
-        <div class="dfp-header" id="dfpHeader">
-            <span class="dfp-title">🌊 深海统计 <span class="dfp-tag" id="dsmpSeasonTag">未开始</span></span>
-            <span class="dfp-actions">
-                <button class="dfp-btn" onclick="dsToggleMinimize()" title="最小化/展开">—</button>
-                <button class="dfp-btn" onclick="dsClosePanel()" title="关闭">×</button>
-            </span>
-        </div>
-        <div class="dfp-body" id="dsmpBody">
-            <div class="dfp-empty">暂无数据<br><span style="font-size:0.7rem;">点下方「完整统计」录入</span></div>
-        </div>
-        <div class="dfp-footer">
-            <button onclick="openDeepseaStats()">📊 完整统计</button>
-            <button class="ghost" onclick="initDeepseaMiniPanel()" title="刷新">🔄</button>
-        </div>
-        <div class="dfp-resizer" id="dfpResizer"></div>
-    </div>
-    <button class="deepsea-toggle" id="deepseaToggle" style="display:none;" onclick="dsOpenPanel()" title="打开深海统计">🌊</button>
+    <!-- 2026-09-12：主站「深海统计」浮窗（#deepseaFloatPanel）已移除 —— 它会在 APP 启动首帧闪一下再被 JS 隐藏，且现已仅由管理员菜单入口打开（openSubpage 加载 deepsea.html，依赖下方 #subpageModal），不再需要。如需恢复见 git 历史 5b2a20d。 -->
 
     <!-- ==================== 子页内嵌弹窗（深海统计 deepsea.html / 联盟 alliance.html）====================
          APP 内 window.open 会被 WebView 吞掉，故改用同域 iframe 覆盖层；子页可复用 window.parent.getGistToken()，
