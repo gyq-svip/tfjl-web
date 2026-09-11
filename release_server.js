@@ -239,23 +239,105 @@ function runPreflight() {
         '同一文件内重复声明通常是改代码时误插入，建议只保留一份；历史上这类重复曾让整个 JS 文件静默失效')
     : mk('dupFunc', 'ok', '同一文件内无顶层重名函数', '已扫描 ' + dupFiles.length + ' 个主 JS 文件（仅顶层）'));
 
-  // 9b) 跨文件同名（信息性）：本项目无模块系统，顶层函数都是全局的 —— 谁后加载谁生效。
-  //     ⚠️ 不同入口页面加载组合不同（gist-health.html 只 load app-core、auction.html 只 load app-features），
-  //        所以"跨文件同名"多数是各页面自带的必要副本，不能盲删。
-  const crossMap = {};
+  // 9b) 跨文件同名：本项目无模块系统，顶层函数都是全局的 —— **谁后加载谁生效**。
+  //     🔴 真正危险的不是"同名"，而是「同名但实现不同」：后加载者会静默顶掉前者的语义。
+  //        实例（2026-09-12 实测）：app-core 的 deleteMessage(index)（需求墙）顶掉了 app-features 的
+  //        deleteMessage(msgId)（聊天室）→ 聊天室点删除静默无反应。所以这里要逐对比较实现是否一致。
+  const LOAD_ORDER = ['app-boot.js', 'app-effects.js', 'app-features.js', 'app-local2.js', 'skins-web.js', 'app-picker.js',
+    'color-picker.js', 'app-damagecalc.js', 'gh-gist.js', 'app-core.js', 'app-feedback.js', 'admin-ctl.js', 'loader.js'];
+  const loadIdx = function (f) { const i = LOAD_ORDER.indexOf(f); return i < 0 ? 999 : i; };
+  // 截出顶层函数的完整函数体（括号配平，跳过字符串/注释），用于比较两份实现是否真的等价
+  function extractTopFuncs(text) {
+    const res = {};
+    const re = /^ {8}(?:async\s+)?function\s+([A-Za-z0-9_$]+)\s*\(/gm;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      const start = m.index, name = m[1];
+      const b = text.indexOf('{', start);
+      if (b < 0) continue;
+      let depth = 0, j = b, str = null, lc = false, bc = false, lastSig = '';
+      for (; j < text.length; j++) {
+        const c = text[j], n2 = text[j + 1];
+        if (lc) { if (c === '\n') lc = false; continue; }
+        if (bc) { if (c === '*' && n2 === '/') { bc = false; j++; } continue; }
+        if (str) { if (c === '\\') { j++; continue; } if (c === str) str = null; continue; }
+        if (c === '/' && n2 === '/') { lc = true; j++; continue; }
+        if (c === '/' && n2 === '*') { bc = true; j++; continue; }
+        // 🔴 正则字面量：若 `/` 前一个有效字符是运算符/括号等，按正则处理并跳过整段。
+        //    不处理会踩坑：replace(/'/g) 里的 ' 会被误判成"字符串开始"→ 函数体截错 → 实现比对误报。
+        if (c === '/' && /[([,=:!&|?{};+\-*%<>~^]/.test(lastSig || ';')) {
+          j++;
+          let cls = false;
+          for (; j < text.length; j++) {
+            const d = text[j];
+            if (d === '\\') { j++; continue; }
+            if (d === '[') { cls = true; continue; }
+            if (d === ']') { cls = false; continue; }
+            if (d === '/' && !cls) break;
+            if (d === '\n') break;        // 正则不跨行
+          }
+          lastSig = '/';
+          continue;
+        }
+        if (c === '"' || c === "'" || c === '`') { str = c; lastSig = c; continue; }
+        if (c === '{') depth++;
+        else if (c === '}') { depth--; if (depth === 0) { j++; break; } }
+        if (!/\s/.test(c)) lastSig = c;
+      }
+      const body = String(text.slice(start, j)).replace(/\s+/g, ' ').trim();
+      (res[name] = res[name] || []).push(body);
+    }
+    return res;
+  }
+  const fnMap = {};
   dupFiles.forEach(function (f) {
     const t = readText(path.join(ROOT, f));
     if (!t) return;
-    let r;
-    const re = /^ {8}(?:async\s+)?function\s+([A-Za-z0-9_$]+)\s*\(/gm;
-    while ((r = re.exec(t)) !== null) { (crossMap[r[1]] = crossMap[r[1]] || []).push(f); }
+    const funcs = extractTopFuncs(t);
+    Object.keys(funcs).forEach(function (name) {
+      funcs[name].forEach(function (body) { (fnMap[name] = fnMap[name] || []).push({ file: f, body: body }); });
+    });
   });
-  const crossHits = Object.keys(crossMap).filter(function (k) { return crossMap[k].length > 1; });
-  if (crossHits.length) {
-    out.push(mk('dupFuncCross', 'info', '跨文件顶层同名函数（按加载顺序后者生效）',
-      crossHits.slice(0, 6).map(function (k) { return k + ' ← ' + crossMap[k].join(' > '); }).join(' | '),
-      'index.html 加载顺序 app-boot→effects→features→local2→picker→damagecalc→core→feedback，最后定义者生效；' +
-      '但 gist-health.html 只加载 app-core、auction.html 只加载 app-features —— 各页面需要的那份必须保留，删前先确认该页面仍拿得到定义'));
+  const crossHits = Object.keys(fnMap).filter(function (k) { return fnMap[k].length > 1; });
+  const crossSame = [], crossRisky = [], crossSafeDiff = [];
+  crossHits.forEach(function (name) {
+    const list = fnMap[name].slice().sort(function (a, b) { return loadIdx(a.file) - loadIdx(b.file); });
+    const short = function (f) { return f.replace(/\.js$/, ''); };
+    // 按实现分组：几种实现、谁和谁一样
+    const groups = [];
+    list.forEach(function (o) {
+      const g = groups.find(function (x) { return x.body === o.body; });
+      if (g) g.files.push(o.file); else groups.push({ body: o.body, files: [o.file] });
+    });
+    const winner = list[list.length - 1].file;                                  // 最后加载者生效
+    const winnerGroup = groups.find(function (g) { return g.files.indexOf(winner) >= 0; }) || { files: [] };
+    const desc = name + ' ← ' + list.map(function (o) { return short(o.file); }).join(' > ') + '（左先加载，最右生效）';
+    if (groups.length === 1) { crossSame.push(desc); return; }
+    const detail = groups.length + ' 种实现（' + groups.map(function (g) { return g.files.map(short).join('+'); }).join(' / ') + '）';
+    if (winnerGroup.files.length > 1) {
+      // 生效的那份与另一个文件完全相同 → 不同那份是死代码，风险低
+      crossSafeDiff.push(desc + '｜' + detail);
+    } else {
+      // 生效那份是独一份实现 → 与其它文件语义真的不同，有风险
+      crossRisky.push(desc + '｜' + detail);
+    }
+  });
+  if (crossRisky.length) {
+    out.push(mk('dupFuncCrossDiff', 'warn', '跨文件同名且【生效那份与其它实现不同】→ 可能已顶掉原语义',
+      crossRisky.slice(0, 6).join(' | '),
+      '真 bug 温床（实测案例：app-core 的 deleteMessage(index)（需求墙）顶掉 app-features 的 deleteMessage(msgId)（聊天室）→ 点删除静默无反应）。'
+      + '处理：把语义不同的那个**改名**，并同步它的调用点（含内联 onclick 字符串），别靠加载顺序碰运气'));
+  }
+  if (crossSafeDiff.length) {
+    out.push(mk('dupFuncCrossInfo', 'info', '跨文件同名、实现有差异但生效那份与另一份相同（差异份是死代码）',
+      crossSafeDiff.slice(0, 6).join(' | '),
+      '按现状无害：生效的是最后加载那份，它与前一个文件实现一致，多余那份从未执行。若将来删掉生效那份，行为会变，需重新确认'));
+  }
+  if (crossSame.length) {
+    out.push(mk('dupFuncCross', 'info', '跨文件同名但实现完全一致（历史冗余，无害）',
+      crossSame.slice(0, 6).join(' | '),
+      '加载顺序：' + LOAD_ORDER.slice(0, 10).join(' → ') + ' → …，最后定义者生效。实现一致=谁生效都一样。'
+      + '（注：唯一加载全部 app-*.js 的页面是 index.html；auction.html / stats.html 用各自 HTML 内联的同名函数）'));
   }
 
   // 10) exe 绝不能进 git（历史事故：6 个安装包入库导致 Pages 部署超时）
