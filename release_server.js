@@ -866,8 +866,13 @@ server.on('error', function (e) {
     let alive = false;
     if (rt && rt.pid) { try { process.kill(rt.pid, 0); alive = true; } catch (e2) { alive = false; } }
     if (rt && alive && rt.port === PORT) {
-      console.log('本工具已在运行中 → 直接打开 ' + (rt.url || ('http://127.0.0.1:' + PORT + '/')));
+      const u = rt.url || ('http://127.0.0.1:' + PORT + '/');
+      console.log('本工具已在运行中 → 直接打开 ' + u);
       console.log('（网页 UI 与命令行接口均为这个实例服务；无需重复启动）');
+      // 双击 .bat 时也应有反馈：把浏览器开到这个已在运行的实例
+      if (!process.env.TFJL_NO_OPEN) {
+        try { spawn('cmd', ['/c', 'start', '', u], { shell: true, detached: true, windowsHide: true }).unref(); } catch (e2) {}
+      }
       process.exit(0);
     }
     console.log('❌ 端口 ' + PORT + ' 被其他程序占用（多为上次没关干净的旧实例）。');
