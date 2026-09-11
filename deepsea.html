@@ -1073,6 +1073,14 @@ function deepseaSliceImage(file, maxH) {
         img.src = URL.createObjectURL(file);
     });
 }
+function deepseaFileImageSize(file){
+    return new Promise(res=>{
+        const img=new Image(), url=URL.createObjectURL(file);
+        img.onload=()=>{ URL.revokeObjectURL(url); res({w:img.naturalWidth||0, h:img.naturalHeight||0}); };
+        img.onerror=()=>{ URL.revokeObjectURL(url); res({w:0,h:0}); };
+        img.src=url;
+    });
+}
 // opts.append = true → 追加模式（自动连拍专用）：保留已有切片/原文，只追加本次；不重置势力选择。
 // opts.quiet  = true → 不弹 toast（连拍循环里靠状态行反馈，避免几十条弹窗）。
 // opts.throwOnError = true → 出错时抛出，供连拍循环统计失败张数。
@@ -1091,7 +1099,11 @@ async function deepseaRunOcr(files, opts){
         const invoke=deepseaGetInvoke(); if(!invoke) throw new Error('未找到 Tauri invoke');
         // 先把每张大图切成小块，扁平化成待识别队列（4 张势力图各自切片）
         const allSlices=[];
+        let skipNarrow=0;
+        const MIN_IMG_W=180, MIN_IMG_H=60;
         for(const file of files){
+            const sz=await deepseaFileImageSize(file);
+            if(sz.w<MIN_IMG_W || sz.h<MIN_IMG_H){ skipNarrow++; continue; }
             const s=await deepseaSliceImage(file, 900);
             allSlices.push(...s);
         }
@@ -1124,21 +1136,21 @@ async function deepseaRunOcr(files, opts){
             const cmp=document.getElementById('deepseaOcrCompare'); if(cmp) cmp.classList.remove('hidden');
         }
         // 追加模式（连拍循环）不渲染对比/不落 sessionStorage：切片可能上千块，等停止时一次性处理
-        doneImg=files.length;
+        doneImg=files.length-skipNarrow;
         if(status && !append){
             const totalLines = raw ? raw.value.split(/\r?\n/).filter(Boolean).length : 0;
-            status.textContent = '已识别 '+doneImg+' 张图（切 '+doneSlice+' 块），共 '+totalLines+' 行（已拼接）';
+            status.textContent = '已识别 '+doneImg+' 张图（跳过 '+skipNarrow+' 张过窄，切 '+doneSlice+' 块），共 '+totalLines+' 行（已拼接）';
         }
-        if(!quiet) toast('✅ 已识别 '+doneImg+' 张，点「解析并填入表格」导入');
+        if(!quiet) toast('✅ 已识别 '+doneImg+' 张'+(skipNarrow?('，跳过 '+skipNarrow+' 张太窄的截图'):'')+'，点「解析并填入表格」导入');
     }catch(err){
         if(status) status.textContent='识别失败：'+err.message+'（已识别 '+doneSlice+'/'+totalSlice+' 块）';
         if(!quiet) toast('OCR 失败：'+err.message);
         if(opts.throwOnError) throw err;
     }
 }
-// 按「联盟ID」去重（无 ID 时退化为 势力+联盟名）。用于：自动连拍逐帧累积、多张重叠截图——
+// 按「联盟ID」去重。用于：自动连拍逐帧累积、多张重叠截图——
 // 同一条联盟会被反复识别，不去重就会重复入库。保留字段更全的那条，缺失字段从另一条补齐。
-// 注意：既无 ID 又无名称的“半截行”（解析器可能产出的 等级/战力 配对）不参与去重，原样保留。
+// 注意：无联盟ID 的半截行（如只识别出"SP / 84/84"）直接丢弃，避免太窄截图/边缘切片的废数据入库。
 function deepseaDedupeRows(rows){
     const out=[]; const seen=new Map();
     const has=v=> v!==undefined && v!==null && String(v).trim()!=='';
@@ -1147,7 +1159,7 @@ function deepseaDedupeRows(rows){
         if(!r) return;
         const id = has(r['联盟ID']) ? String(r['联盟ID']).trim() : '';
         const nm = String(r['联盟名称']||'').trim();
-        if(!id && !nm){ out.push(r); return; }   // 无身份 → 不参与去重
+        if(!id){ return; }   // 无联盟ID → 丢弃（截图太窄/边缘切片会只识别出"SP/84"等废品，必须ID才能入库）
         const key = id ? ('id:'+id) : ('nm:'+(r['所属阵营']||'')+'|'+nm);
         const prev = seen.get(key);
         if(!prev){ seen.set(key, r); out.push(r); return; }
@@ -1185,6 +1197,9 @@ function deepseaParseAndImport(){
     const _rawCount=rows.length;
     rows=deepseaDedupeRows(rows);
     const _dupCount=_rawCount-rows.length;
+    // 必须有联盟ID 才入库；边缘/太窄截图常只识出等级/人数/战力，缺ID则无法定位联盟
+    rows=rows.filter(r=>r && r['联盟ID'] && String(r['联盟ID']).trim()!=='');
+    if(!rows.length){ toast('⚠️ 识别到文字但未解析出 联盟ID（截图可能太窄或只截到卡片边缘），请检查'); return; }
     // 上传前若识别出势力（自动或手动），覆盖所有行的 所属阵营
     if(fac) rows.forEach(r=>{ r['所属阵营']=fac; });
     // 按势力合并：若新数据带了某势力，先移除旧表中该势力的行，再追加（分势力上传不互相覆盖）
@@ -1208,7 +1223,7 @@ function deepseaParseAndImport(){
 const DEEPSEA_FACTION_LIST=['暗月地精','人类联盟','天灾亡灵','兽人部落','HE'];
 let deepseaTabOrder=null;       // tab 栏里按出现顺序排列的势力名数组
 let deepseaCurrentFaction='';   // 用户点选的当前高亮势力
-// 在一批切片里找到“势力分类 tab 栏”切片（含多个势力名），返回其中势力名按出现顺序排列的数组。
+// 在一批切片里找到"势力分类 tab 栏"切片（含多个势力名），返回其中势力名按出现顺序排列的数组。
 // 游戏 tab 栏顺序固定：暗月地精→人类联盟→天灾亡灵→兽人部落（→HE），但 OCR 不识别颜色，无法直接知道哪个高亮，
 // 故只返回顺序，由用户点选（见 deepseaPickFaction）。
 function deepseaGetTabOrder(slices){
@@ -1259,7 +1274,7 @@ function parseDeepseaOcrText(text){
     let cur=null, pendingName=null, pendingLv=null, pendingNum=null, pendingChair=null;
     const push=(r)=>{ if(cur) r['所属阵营']=cur; rows.push(r); };
     for(const line of lines){
-        // 单卡切片(tab 栏)里整串势力名只作“当前势力”推断，不再用扁平策略逐行打标
+        // 单卡切片(tab 栏)里整串势力名只作"当前势力"推断，不再用扁平策略逐行打标
         if(FACTION_LIST.some(f=>line.includes(f)) && line.length<=8){
             line.split(/(?=[暗月地精人类联盟天灾亡灵兽人部落])/).forEach(seg=>{
                 if(FACTION_LIST.includes(seg.trim())) cur=seg.trim();
@@ -1414,7 +1429,7 @@ function toggleDeepseaOcrCompare(){
     c.classList.toggle('hidden');
     if(!c.classList.contains('hidden')) renderDeepseaOcrCompare();
 }
-// 用户在对比视图点选 tab 栏里“当前高亮”的势力（OCR 不识别颜色，只能靠点选）
+// 用户在对比视图点选 tab 栏里"当前高亮"的势力（OCR 不识别颜色，只能靠点选）
 function deepseaPickFaction(f){
     deepseaCurrentFaction=f;
     const sel=document.getElementById('deepseaOcrFaction');
@@ -1584,13 +1599,13 @@ function deepseaCapRegionModal(dataUrl){
     m.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.82);z-index:200060;display:flex;align-items:center;justify-content:center;padding:14px;';
     m.innerHTML='<div style="background:linear-gradient(160deg,rgba(40,40,68,0.99),rgba(26,26,48,0.99));border:1px solid rgba(255,215,0,0.4);border-radius:12px;padding:12px;max-width:96vw;max-height:94vh;display:flex;flex-direction:column;">'
         +'<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px;">'
-        +'<span style="color:#ffd700;font-size:0.82rem;font-weight:bold;">🎯 框选「联盟列表」区域（拖拽画框；不框=识别整窗）</span>'
+        +'<span style="color:#ffd700;font-size:0.82rem;font-weight:bold;">🎯 框选「联盟列表」区域（建议宽度≥200px，只框到边缘会识别不全）</span>'
         +'<button type="button" id="dsCapRegionClose" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.25);color:#c9c9dd;padding:0 8px;border-radius:5px;cursor:pointer;font-size:0.8rem;line-height:1.7;">✕</button></div>'
         +'<div id="dsCapRegionBox" style="position:relative;overflow:hidden;border:1px solid rgba(255,255,255,0.2);border-radius:6px;cursor:crosshair;user-select:none;">'
         +'<img id="dsCapRegionImg" src="'+dataUrl+'" style="display:block;max-width:88vw;max-height:70vh;" draggable="false">'
         +'<div id="dsCapRegionRect" style="position:absolute;border:2px solid #ffd700;background:rgba(255,215,0,0.16);display:none;pointer-events:none;"></div></div>'
         +'<div style="display:flex;gap:8px;align-items:center;margin-top:9px;flex-wrap:wrap;">'
-        +'<span id="dsCapRegionInfo" style="font-size:0.72rem;color:#cfe;">当前：'+(_dsAutoCap.region?('已框选 '+_dsAutoCap.region.w+'×'+_dsAutoCap.region.h):'整窗')+'（拖拽可重选）</span>'
+        +'<span id="dsCapRegionInfo" style="font-size:0.72rem;color:#cfe;">当前：'+(_dsAutoCap.region?('已框选 '+_dsAutoCap.region.w+'×'+_dsAutoCap.region.h):'整窗')+'（太窄会自动按整窗处理）</span>'
         +'<button type="button" id="dsCapRegionReset" style="margin-left:auto;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#cfe;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:0.74rem;">用整窗</button>'
         +'<button type="button" id="dsCapRegionOk" style="background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.76rem;font-weight:bold;">✅ 用框选区域</button></div></div>';
     document.body.appendChild(m);
@@ -1614,19 +1629,22 @@ function deepseaCapRegionModal(dataUrl){
         sel={ x:Math.min(sx,p.x), y:Math.min(sy,p.y), w:Math.abs(p.x-sx), h:Math.abs(p.y-sy) };
         paint();
     };
+    const MIN_W=200, MIN_H=60;
     const finish=()=>{
         drawing=false;
         if(!sel || sel.w<8 || sel.h<8){ sel=null; paint(); info.textContent='框太小已忽略 → 识别整窗'; return; }
-        info.textContent='已框选 '+Math.round(sel.w*scale())+'×'+Math.round(sel.h*scale())+' 像素';
+        const realW=Math.round(sel.w*scale()), realH=Math.round(sel.h*scale());
+        if(realW<MIN_W || realH<MIN_H){ sel=null; paint(); info.textContent='区域太窄('+realW+'×'+realH+')，已忽略 → 识别整窗（建议≥'+MIN_W+'×'+MIN_H+'）'; return; }
+        info.textContent='已框选 '+realW+'×'+realH+' 像素';
     };
     box.onmouseup=finish; box.onmouseleave=finish;
     m.querySelector('#dsCapRegionClose').onclick=close;
     m.querySelector('#dsCapRegionReset').onclick=()=>{ _dsAutoCap.region=null; toast('已设为：识别整窗'); close(); };
     m.querySelector('#dsCapRegionOk').onclick=()=>{
         if(!sel || sel.w<8 || sel.h<8){ _dsAutoCap.region=null; toast('未框选 → 识别整窗'); close(); return; }
-        const sc=scale();
-        _dsAutoCap.region={ x:Math.round(sel.x*sc), y:Math.round(sel.y*sc),
-                            w:Math.max(8,Math.round(sel.w*sc)), h:Math.max(8,Math.round(sel.h*sc)) };
+        const sc=scale(); const rw=Math.max(8,Math.round(sel.w*sc)), rh=Math.max(8,Math.round(sel.h*sc));
+        if(rw<MIN_W || rh<MIN_H){ _dsAutoCap.region=null; toast('区域太窄('+rw+'×'+rh+')，建议≥'+MIN_W+'×'+MIN_H+'，已改为识别整窗'); close(); return; }
+        _dsAutoCap.region={ x:Math.round(sel.x*sc), y:Math.round(sel.y*sc), w:rw, h:rh };
         toast('✅ 已框选识别区域 '+_dsAutoCap.region.w+'×'+_dsAutoCap.region.h+' 像素（只识别这一块，更快更准）');
         close();
     };
@@ -1674,7 +1692,10 @@ function renderDeepseaOcrCompare(){
         let parsed = parseDeepseaOcrText(it.text||'');
         if(!parsed.length){ parsed = parseDeepseaCardText(it.text||'', deepseaCurrentFaction||''); }
         const names = parsed.slice(0,6).map(r=>r['联盟名称']||'?').join('、');
-        const parsedTag = parsed.length ? ('✅ 解析出 '+parsed.length+' 条：'+names) : '⚠️ 未解析出联盟（可能切错/识错/表头不全）';
+        const hasId = parsed.some(r=>r['联盟ID']);
+        const parsedTag = parsed.length
+            ? (hasId ? '✅ 解析出 '+parsed.length+' 条：'+names : '🟠 解析出 '+parsed.length+' 条，但无 联盟ID（截图可能太窄，只截到卡片边缘）')
+            : '⚠️ 未解析出联盟（可能切错/识错/表头不全）';
         const FACTION_LIST=DEEPSEA_FACTION_LIST;
         const foundFactions = FACTION_LIST.filter(f=>(it.text||'').includes(f));
         const factionTag = foundFactions.length ? ('🏷 含势力：'+foundFactions.join('、')) : '🏷 不含势力名';
