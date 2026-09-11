@@ -1632,6 +1632,16 @@ if (true) {
         return '其他';
     }
 
+    // 🔴 2026-09-12：扫描脚本剔除「日志」类 —— 日志文件数量巨大且对脚本整理无用（用户要求）。
+    //    注意：对战统计（calcLogBattleStats）走的是独立的 maDirs.logs 扫描通道，不受此影响。
+    function _isLogScannedFile(f) {
+        if (!f) return true;
+        return f.dirKey === 'logs' || (f.category || '') === '日志';
+    }
+    function _stripLogScannedFiles(files) {
+        return Array.isArray(files) ? files.filter(f => !_isLogScannedFile(f)) : [];
+    }
+
     async function scanAllFiles(force = false) {
         const listEl = document.getElementById('scannedFileList');
         const statsEl = document.getElementById('fuzzyStatsArea');
@@ -1639,7 +1649,8 @@ if (true) {
         if (!listEl) return;
 
         const dirLabels = { coop: '合作', activity: '活动', battle: '对战', battleMax: '对战MAX', screenshot: '截图', logs: '日志', temp: '临时' };
-        const allDirs = Object.entries(maDirs).filter(([k, v]) => v && k !== 'screenshot');
+        // 🔴 2026-09-12 排除 logs 目录：日志文件量大且无用，扫描脚本不再收录（对战统计独立扫描日志，不受影响）
+        const allDirs = Object.entries(maDirs).filter(([k, v]) => v && k !== 'screenshot' && k !== 'logs');
 
         if (allDirs.length === 0) {
             listEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-size:0.85rem;">请先配置老马目录</div>';
@@ -1651,7 +1662,10 @@ if (true) {
         if (!force) {
             const cache = loadScanCache();
             if (cache && cache.files && cache.files.length > 0) {
-                scannedFiles = cache.files;
+                // 🔴 2026-09-12 旧缓存可能仍含「日志」类 → 清洗后回写，避免剔除了却还从缓存里冒出来
+                const cleaned = _stripLogScannedFiles(cache.files);
+                scannedFiles = cleaned;
+                if (cleaned.length !== cache.files.length) saveScanCache(cleaned);
                 renderScannedFiles();
                 return;
             }
@@ -1703,7 +1717,9 @@ if (true) {
     function renderScannedToolbar() {
         const catsEl = document.getElementById('scannedFileCats');
         if (!catsEl) return;
-        const cats = ['全部', '寒冰', '暗月', '漩涡', '合作', '深海', '活动', '日志', '临时', '其他'];
+        // 🔴 2026-09-12 移除「日志」筛选按钮（扫描已不收录日志类；若上次筛选停在日志需回退，否则列表会空且无从切换）
+        if (_scannedFilterCategory === '日志') _scannedFilterCategory = '全部';
+        const cats = ['全部', '寒冰', '暗月', '漩涡', '合作', '深海', '活动', '临时', '其他'];
         const colorMap = getScannedCategoryColor ? null : null; // 占位，避免未定义告警
         const cmap = {
             '全部': '#ffffff', '寒冰': '#64b5f6', '暗月': '#ce93d8', '漩涡': '#4fc3f7',
@@ -1960,15 +1976,19 @@ if (true) {
     async function silentScanFiles() {
         if (!maDirs) return;
         const dirLabels = { coop: '合作', activity: '活动', battle: '对战', battleMax: '对战MAX', screenshot: '截图', logs: '日志', temp: '临时' };
-        const allDirs = Object.entries(maDirs).filter(([k, v]) => v && k !== 'screenshot');
+        // 🔴 2026-09-12 与 scanAllFiles 保持一致：排除 logs 目录（两处共用同一缓存，必须同步）
+        const allDirs = Object.entries(maDirs).filter(([k, v]) => v && k !== 'screenshot' && k !== 'logs');
         if (allDirs.length === 0) return;
 
         // 优先使用今日缓存（与 scanAllFiles 共享同一缓存 key）
         // 避免每次切"脚本文件"标签都做全量 IPC 扫描导致卡顿
         const cache = loadScanCache();
         if (cache && cache.files && cache.files.length > 0) {
-            scannedFiles = cache.files;
+            // 🔴 2026-09-12 清洗旧缓存中的「日志」类
+            const cleaned = _stripLogScannedFiles(cache.files);
+            scannedFiles = cleaned;
             window.scannedFiles = scannedFiles;
+            if (cleaned.length !== cache.files.length) saveScanCache(cleaned);
             return;
         }
         // 兜底：缓存还没写完时（延迟写入 500ms），用内存中的 scannedFiles
