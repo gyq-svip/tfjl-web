@@ -6978,13 +6978,20 @@
             autoSaveProject();
         }
 
-        // HTML转义防XSS
-        function escapeHtml(text) {
-            if (!text) return '';
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
+        // 🔴 2026-09-12 已删除此处重复的「DOM 版」escapeHtml：
+        //    ① 它不转义引号（" / '），弱于本文件下方那份 regex 版；
+        //    ② 同一作用域内重复声明、后者覆盖前者 → 它从未生效过，是纯死代码。
+        //    本文件真正的定义在下方（搜「function escapeHtml(text)」），转义 & < > " ' 。
+        //    ⚠️ 关于全项目「同名函数」的实测事实（2026-09-12 已用运行时探针核实，勿凭猜改）：
+        //      · 这些文件的顶层函数都是**全局的**（本项目无模块系统）→ 同名者**按加载顺序后者覆盖前者**。
+        //        index.html 实际加载顺序：app-boot → app-effects → app-features → app-local2 → skins-web →
+        //        app-picker → color-picker → app-damagecalc → gh-gist → **app-core** → app-feedback →
+        //        admin-ctl → loader。所以 index.html 上 escapeHtml 生效的一直是**本文件下方这份**。
+        //      · app-features.js / app-picker.js 里各有一份**逻辑等价**的 regex 版（同样转义 & < > " '），
+        //        在 index.html 上属冗余；但它们都在本文件**之前**加载，删掉会让这两个文件在"自身加载期"
+        //        拿不到 escapeHtml（实测当前无加载期调用，但保留更稳，且若将来有页面只加载其一也不受影响）。
+        //      · auction.html / stats.html 用的是**各自 HTML 内联**的 escapeHtml（并不加载本文件）。
+        //      · 结论：删同名函数前必须先确认「哪些页面加载它、谁最后加载、是否有加载期调用」。
 
         // 加载项目时恢复TXT文件
         function loadTxtFilesFromProject(project) {
