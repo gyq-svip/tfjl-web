@@ -2536,6 +2536,9 @@
                     const e = document.getElementById(id);
                     if (e) { e.style.pointerEvents = isReadOnly ? 'none' : ''; e.style.opacity = isReadOnly ? '0.45' : ''; }
                 });
+                // 转发入口：仅在查看云端/共享项目（只读）时显示
+                const fwd = document.getElementById('forwardSharedBtn');
+                if (fwd) fwd.style.display = isReadOnly ? '' : 'none';
             } catch (e) {}
         }
 
@@ -2788,6 +2791,8 @@
             const hit = shared.filter(function (p) { return p.name === name; })
                               .sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); })[0];
             if (!hit || !hit.id) { alert('未找到共享项目：' + name); return; }
+            // 🔴 2026-09-11 记录当前共享项目信息，供「转发」入口零上传复用其现有 8 位短码 + 深链
+            window.__currentSharedProj = { id: hit.id, code: hit.code, name: hit.name, author: hit.author, category: hit.category };
             // 1. 先看本地内容缓存：作者没更新过（索引 ts 一致）即命中秒开
             try {
                 const rec = await _sharedContentGet(hit.id);
@@ -16295,6 +16300,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             // 🔴 累计总访问按设备汇总（求和），避免多端 Math.max 把跨设备访问数压成单端最大值
             mergeDeviceVisits(target, src); ensureDeviceVisitsBaseline(target); recomputeTotalVisits(target);
             target.total_downloads = Math.max(target.total_downloads || 0, src.total_downloads || 0);
+            target.total_forwards = Math.max(target.total_forwards || 0, src.total_forwards || 0);
             target.total_users = Math.max(target.total_users || 0, src.total_users || 0);
             // unique_users / active_today_users：取并集
             if (Array.isArray(src.unique_users)) {
@@ -16324,6 +16330,13 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                     target.script_downloads[k] = Math.max(target.script_downloads[k] || 0, src.script_downloads[k] || 0);
                 }
             }
+            // forward_projects：并集 key + 每 key 取最大值
+            if (src.forward_projects && typeof src.forward_projects === 'object') {
+                if (!target.forward_projects || typeof target.forward_projects !== 'object') target.forward_projects = {};
+                for (const k in src.forward_projects) {
+                    target.forward_projects[k] = Math.max(target.forward_projects[k] || 0, src.forward_projects[k] || 0);
+                }
+            }
             // sources：逐字段最大值
             if (src.sources && typeof src.sources === 'object') {
                 if (!target.sources) target.sources = {};
@@ -16346,6 +16359,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                         const td = target.daily_stats[date];
                         td.visits = Math.max(td.visits || 0, sd.visits || 0);
                         td.downloads = Math.max(td.downloads || 0, sd.downloads || 0);
+                        td.forwards = Math.max(td.forwards || 0, sd.forwards || 0);
                         td.new_users = Math.max(td.new_users || 0, sd.new_users || 0);
                         td.app_visits = Math.max(td.app_visits || 0, sd.app_visits || 0);
                         td.web_visits = Math.max(td.web_visits || 0, sd.web_visits || 0);
@@ -16397,6 +16411,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                 total_users: 0,
                 unique_users: [],
                 total_downloads: 0,
+                total_forwards: 0,
                 active_today: 0,
                 active_today_users: [],
                 active_today_app: 0,
@@ -16415,12 +16430,14 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                         app_visits: 0,
                         web_visits: 0,
                         downloads: 0,
+                        forwards: 0,
                         new_users: 0,
                         new_app_users: 0,
                         new_web_users: 0
                     }
                 },
                 script_downloads: {},  // { "脚本名": 次数, ... }
+                forward_projects: {},  // { "项目名": 转发次数, ... }
                 daily_device_visits: {},  // { [date]: { [deviceId]: { v: 访问数, a: APP访问, w: 网页访问 } } }，用于跨设备访问数求和
                 last_updated: getCurrentTimeString()
             };
@@ -16815,6 +16832,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                         app_visits: 0,
                         web_visits: 0,
                         downloads: 0,
+                        forwards: 0,
                         new_users: 0,
                         hourly_visits: new Array(24).fill(0)
                     };
@@ -16952,6 +16970,15 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                         if (scriptName) {
                             if (!counterData.script_downloads) counterData.script_downloads = {};
                             counterData.script_downloads[scriptName] = (counterData.script_downloads[scriptName] || 0) + 1;
+                        }
+                        break;
+                    case 'forward':
+                        // 🔴 2026-09-11 转发计数：转发不重新上传，只把现有共享短码/链接转交他人，每次点击计 1 次
+                        counterData.total_forwards = (counterData.total_forwards || 0) + 1;
+                        counterData.daily_stats[today].forwards = (counterData.daily_stats[today].forwards || 0) + 1;
+                        if (scriptName) {
+                            if (!counterData.forward_projects) counterData.forward_projects = {};
+                            counterData.forward_projects[scriptName] = (counterData.forward_projects[scriptName] || 0) + 1;
                         }
                         break;
                 }
@@ -24809,6 +24836,74 @@ ${maSection}
         function recordDownload(scriptName = null) {
             updateCounter('download', scriptName);
         }
+
+        function recordForward(projectName = null) {
+            // 🔴 2026-09-11 转发计数（仅云端/共享项目触发），与下载计数同口径走 updateCounter('forward')
+            updateCounter('forward', projectName);
+        }
+
+        // 🔴 2026-09-11 转发：仅云端/共享项目可用。不重新上传，直接读取项目自带的 8 位共享短码 + 深链，
+        // 生成一张含短码/链接/二维码的卡片，对方凭短码（「📥 从短码导入」）或链接即可获取本项目。
+        function forwardSharedProject() {
+            try {
+                if (!window.__sharedProjectReadOnly) {
+                    alert('转发仅支持共享（云端）项目。本地项目请使用「📦 分享整个项目 / 📸 生成阵容分享图」生成新的分享。');
+                    return;
+                }
+                const sp = window.__currentSharedProj;
+                if (!sp || !sp.id) { alert('未找到当前共享项目信息，请先重新在「共享」里打开该项目。'); return; }
+                const code = sp.code || '';
+                const name = sp.name || currentProjectName || '未命名';
+                const author = sp.author || '匿名';
+                const linkBase = (typeof PROJECT_SHARE_LINK_BASE !== 'undefined' && PROJECT_SHARE_LINK_BASE) ? PROJECT_SHARE_LINK_BASE : (location.origin + location.pathname + '#pg=');
+                const link = linkBase + sp.id;
+                let qrHtml = '';
+                if (typeof window.qrcode === 'function') {
+                    try {
+                        const qr = window.qrcode(0, 'M'); qr.addData(link); qr.make();
+                        const mod = qr.getModuleCount(); const px = 5; let cells = '';
+                        for (let r = 0; r < mod; r++) { for (let c = 0; c < mod; c++) { if (qr.isDark(r, c)) cells += '<rect x="' + (c * px) + '" y="' + (r * px) + '" width="' + px + '" height="' + px + '" fill="#1a1a2e"/>'; } }
+                        qrHtml = '<svg width="' + (mod * px) + '" height="' + (mod * px) + '" viewBox="0 0 ' + (mod * px) + ' ' + (mod * px) + '" style="background:#fff;border-radius:8px;">' + cells + '</svg>';
+                    } catch (e) { qrHtml = '<div style="color:#ff9800;font-size:0.72rem;">（二维码生成失败，请用上方短码/链接）</div>'; }
+                } else {
+                    qrHtml = '<div style="color:#ff9800;font-size:0.72rem;">（二维码库未加载，请用上方短码/链接）</div>';
+                }
+                const esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+                const modal = document.createElement('div');
+                modal.id = 'forwardShareModal';
+                modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.72);z-index:200020;display:flex;align-items:center;justify-content:center;padding:16px;';
+                modal.innerHTML =
+                    '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.45);border-radius:16px;padding:18px 20px;max-width:480px;width:96%;box-shadow:0 10px 40px rgba(0,0,0,0.6);">' +
+                      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+                        '<span style="color:#ffd700;font-size:1.05rem;font-weight:bold;">🔁 转发这个项目</span>' +
+                        '<span id="forwardShareClose" style="cursor:pointer;color:rgba(255,255,255,0.4);font-size:1.5rem;">×</span>' +
+                      '</div>' +
+                      '<div style="color:rgba(255,255,255,0.7);font-size:0.82rem;margin-bottom:10px;">不重新上传云端，只把现有分享信息转交他人</div>' +
+                      '<div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:12px;margin-bottom:12px;">' +
+                        '<div style="color:#fff;font-size:1rem;font-weight:bold;">' + esc(name) + '</div>' +
+                        '<div style="color:rgba(255,255,255,0.5);font-size:0.74rem;margin-top:4px;">作者：' + esc(author) + '</div>' +
+                      '</div>' +
+                      (code ? '<div style="background:linear-gradient(135deg,rgba(255,215,0,0.12),rgba(255,152,0,0.10));border:2px solid rgba(255,215,0,0.5);border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:12px;margin-bottom:12px;">' +
+                        '<div style="flex:1;min-width:0;"><div style="color:rgba(255,255,255,0.55);font-size:0.72rem;">分享短码（软件「📥 从短码导入」输入这 8 位）：</div>' +
+                        '<div style="color:#ffd700;font-size:1.8rem;font-weight:bold;letter-spacing:0.2em;font-family:Consolas,monospace;">' + esc(code) + '</div></div>' +
+                        '<button id="forwardCopyCode" style="flex-shrink:0;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:none;padding:10px 14px;border-radius:10px;cursor:pointer;font-size:0.9rem;font-weight:bold;">📋 复制</button></div>' : '') +
+                      '<div style="margin-bottom:10px;"><div style="color:rgba(255,255,255,0.55);font-size:0.72rem;margin-bottom:4px;">深链（扫码/点开直达）：</div>' +
+                        '<div style="display:flex;gap:8px;"><input id="forwardLinkInput" readonly value="' + esc(link) + '" style="flex:1;min-width:0;background:rgba(0,0,0,0.35);color:#cfd8dc;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px 8px;font-size:0.7rem;font-family:Consolas,monospace;">' +
+                        '<button id="forwardCopyLink" style="flex-shrink:0;background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.25);color:#fff;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;">📋 复制</button></div></div>' +
+                      '<div style="display:flex;justify-content:center;margin:8px 0 4px;">' + qrHtml + '</div>' +
+                      '<div style="color:rgba(255,255,255,0.4);font-size:0.68rem;text-align:center;">对方扫码或输短码 → 从短码导入即可获取本项目</div>' +
+                    '</div>';
+                document.body.appendChild(modal);
+                const close = function () { if (modal.parentNode) modal.parentNode.removeChild(modal); };
+                modal.querySelector('#forwardShareClose').onclick = close;
+                modal.onclick = function (e) { if (e.target === modal) close(); };
+                if (code) modal.querySelector('#forwardCopyCode').onclick = function () { if (typeof copyText === 'function') copyText(code, '📋 短码 ' + code + ' 已复制', this); };
+                modal.querySelector('#forwardCopyLink').onclick = function () { if (typeof copyText === 'function') copyText(link, '📋 链接已复制', this); };
+                // 🔴 计数一次转发（每次点击计 1 次，与下载计数同口径；整个流程不重新上传）
+                try { if (typeof recordForward === 'function') recordForward(name); } catch (e) {}
+            } catch (e) { console.warn('[转发] 异常:', e); }
+        }
+        window.forwardSharedProject = forwardSharedProject;
 
         // ==================== 分享图水印工具（s1.0.83）====================
         // 给导出/分享图在右下角盖半透明网址（仅用于"分享图"，不污染皮肤素材；想关改 WATERMARK_ENABLED=false）
