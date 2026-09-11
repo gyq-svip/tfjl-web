@@ -5750,6 +5750,9 @@
 
         // 执行标色：传 color 则同时记住该颜色
         function applyMarkAllMatches(windowId, color) {
+            // 🔴 先记住用户点的颜色（即使本次没匹配/没标成，下次仍用这个色，按钮色点也同步）
+            if (color) setMarkColor(color);
+            refreshMarkColorDot(windowId);
             const info = _markMatchesOf(windowId);
             if (!info) { if (window.showToast) showToast('请先输入查找内容', 'info'); return 0; }
             const win = txtFileWindows.find(function (w) { return w.id === windowId; });
@@ -5760,7 +5763,6 @@
                 if (window.showToast) showToast('无匹配项，无法标色');
                 return 0;
             }
-            if (color) setMarkColor(color);
             const useColor = getMarkColor();
             const glow = !!(document.getElementById(windowId + '_glowChk') || {}).checked;
             if (!win.marks) win.marks = [];
