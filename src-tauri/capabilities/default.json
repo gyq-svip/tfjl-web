@@ -54,6 +54,7 @@
     "allow-game-monitor-stop",
     "allow-game-monitor-status",
     "allow-gm-click",
+    "allow-gm-wheel",
     "dialog:default",
     "dialog:allow-open",
     "dialog:allow-save",

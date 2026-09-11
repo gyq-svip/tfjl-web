@@ -192,3 +192,8 @@ commands.allow = ["game_monitor_status"]
 identifier = "allow-gm-click"
 description = "Allow frontend-driven mouse click primitive at a window ratio point (Rust = click executor, frontend decides where/when; also used by panel test-click)"
 commands.allow = ["gm_click"]
+
+[[permission]]
+identifier = "allow-gm-wheel"
+description = "Allow frontend-driven mouse wheel primitive at a window-frame pixel point (used by deepsea auto-capture auto-scroll; bg=PostMessage to window, real=SetCursorPos+mouse_event)"
+commands.allow = ["gm_wheel"]

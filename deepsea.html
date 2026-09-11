@@ -213,6 +213,21 @@ tr.rk-weak:hover td{opacity:1}
                 <input type="file" id="deepseaOcrFile" accept="image/*" multiple style="display:none" onchange="deepseaOcrFileChanged(event)">
                 <span id="deepseaOcrStatus" style="font-size:0.72rem;color:rgba(255,255,255,0.6);"></span>
             </div>
+            <!-- 🖱️ 自动连拍（2026-09-12）：自动截游戏窗口 → OCR → 跨帧去重累积。用现有截图/OCR 能力，无需重打包。 -->
+            <div class="row" style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <button id="deepseaAutoCapBtn" class="ghost small" onclick="deepseaAutoCapToggle()" style="background:rgba(255,152,0,0.18);border:1px solid rgba(255,152,0,0.5);padding:3px 10px;border-radius:6px;font-size:0.74rem;font-weight:bold;cursor:pointer;" title="自动连拍游戏窗口并 OCR：你只需滚动游戏里的联盟列表，识别结果自动累积去重；停止后点「解析并填入表格」导入">🖱️ 自动连拍识别</button>
+                <select id="deepseaCapWin" onchange="_dsAutoCap.hwnd=Number(this.value)||_dsAutoCap.hwnd" style="max-width:190px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:3px 6px;font-size:0.72rem;" title="要截图的游戏窗口（启动时会自动找，优先标题含「塔防/精灵」的）">
+                    <option value="">— 启动时自动找游戏窗口 —</option>
+                </select>
+                <button class="ghost small" onclick="deepseaAutoCapPickRegion()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:3px 8px;border-radius:6px;font-size:0.72rem;" title="在窗口截图上拖拽框出「联盟列表」区域，只识别这一块（更快、更准、少干扰）；不框则识别整窗">🎯 框选区域</button>
+                <select id="deepseaCapInterval" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:3px 6px;font-size:0.72rem;" title="每隔多久抓一张（抓太快 OCR 会排队，2.5 秒比较稳）">
+                    <option value="1500">1.5 秒/张</option>
+                    <option value="2500" selected>2.5 秒/张</option>
+                    <option value="4000">4 秒/张</option>
+                </select>
+                <label style="display:flex;align-items:center;gap:4px;font-size:0.72rem;color:#cfe;cursor:pointer;" title="连拍时自动向下滚动列表（需要更新软件后才可用；不支持时会提示一次，请改用手动滚轮）"><input type="checkbox" id="deepseaCapAutoScroll"> ⤓ 自动下滑</label>
+                <span id="deepseaCapStatus" style="font-size:0.72rem;color:rgba(255,255,255,0.6);"></span>
+            </div>
             <div id="deepseaOcrPanel" class="hidden" style="border:1px dashed rgba(77,182,172,0.4);border-radius:8px;padding:8px;margin-bottom:8px;">
                 <div style="font-size:0.72rem;color:rgba(255,255,255,0.7);margin-bottom:6px;">识别原文（可全选复制发给我整理）：</div>
                 <textarea id="deepseaOcrRaw" style="width:100%;height:120px;background:rgba(0,0,0,0.3);color:#cfe;font-size:0.72rem;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px;" placeholder="OCR 结果将显示在这里"></textarea>
@@ -1058,8 +1073,14 @@ function deepseaSliceImage(file, maxH) {
         img.src = URL.createObjectURL(file);
     });
 }
-async function deepseaRunOcr(files){
+// opts.append = true → 追加模式（自动连拍专用）：保留已有切片/原文，只追加本次；不重置势力选择。
+// opts.quiet  = true → 不弹 toast（连拍循环里靠状态行反馈，避免几十条弹窗）。
+// opts.throwOnError = true → 出错时抛出，供连拍循环统计失败张数。
+async function deepseaRunOcr(files, opts){
     if(!Array.isArray(files)) files=[files];
+    opts = opts || {};
+    const append = !!opts.append;
+    const quiet = !!opts.quiet;
     const status=document.getElementById('deepseaOcrStatus');
     const panel=document.getElementById('deepseaOcrPanel');
     const raw=document.getElementById('deepseaOcrRaw');
@@ -1075,10 +1096,12 @@ async function deepseaRunOcr(files){
             allSlices.push(...s);
         }
         totalSlice=allSlices.length;
-        deepseaSliceResults=[];
-        deepseaRunCounter++; // 新一次 OCR，保证切片 key 唯一
-        deepseaTabOrder=null; deepseaCurrentFaction=''; // 每次重新识别，重置势力选择
-        if(raw) raw.value=''; // 每次 OCR 重新拼接，避免跨次污染
+        deepseaRunCounter++; // 每次 OCR（含连拍的每一帧）都自增，保证切片 key 跨次/跨帧全局唯一
+        if(!append){
+            deepseaSliceResults=[];
+            deepseaTabOrder=null; deepseaCurrentFaction=''; // 每次重新识别，重置势力选择
+            if(raw) raw.value=''; // 每次 OCR 重新拼接，避免跨次污染
+        }
         for(let i=0;i<totalSlice;i++){
             if(status) status.textContent='识别中… (块 '+(i+1)+'/'+totalSlice+')';
             const j=await invoke('umi_ocr', { base64:allSlices[i], options:{ data:{format:'text', outputDirName:'', outputFileName:'', outputFileFormat:[]}, ocr:{language:'models/config_chinese.txt', cls:true} } });
@@ -1095,19 +1118,45 @@ async function deepseaRunOcr(files){
             deepseaSliceResults.push({ img:'data:image/png;base64,'+allSlices[i], text, metaKey:_metaKey });
             doneSlice++;
         }
-        renderDeepseaOcrCompare();
-        persistDeepseaSliceMeta(); // 落 sessionStorage，刷新后仍可回显切片
-        const cmp=document.getElementById('deepseaOcrCompare'); if(cmp) cmp.classList.remove('hidden');
+        if(!append){
+            renderDeepseaOcrCompare();
+            persistDeepseaSliceMeta(); // 落 sessionStorage，刷新后仍可回显切片
+            const cmp=document.getElementById('deepseaOcrCompare'); if(cmp) cmp.classList.remove('hidden');
+        }
+        // 追加模式（连拍循环）不渲染对比/不落 sessionStorage：切片可能上千块，等停止时一次性处理
         doneImg=files.length;
-        if(status){
+        if(status && !append){
             const totalLines = raw ? raw.value.split(/\r?\n/).filter(Boolean).length : 0;
             status.textContent = '已识别 '+doneImg+' 张图（切 '+doneSlice+' 块），共 '+totalLines+' 行（已拼接）';
         }
-        toast('✅ 已识别 '+doneImg+' 张，点「解析并填入表格」导入');
+        if(!quiet) toast('✅ 已识别 '+doneImg+' 张，点「解析并填入表格」导入');
     }catch(err){
         if(status) status.textContent='识别失败：'+err.message+'（已识别 '+doneSlice+'/'+totalSlice+' 块）';
-        toast('OCR 失败：'+err.message);
+        if(!quiet) toast('OCR 失败：'+err.message);
+        if(opts.throwOnError) throw err;
     }
+}
+// 按「联盟ID」去重（无 ID 时退化为 势力+联盟名）。用于：自动连拍逐帧累积、多张重叠截图——
+// 同一条联盟会被反复识别，不去重就会重复入库。保留字段更全的那条，缺失字段从另一条补齐。
+// 注意：既无 ID 又无名称的“半截行”（解析器可能产出的 等级/战力 配对）不参与去重，原样保留。
+function deepseaDedupeRows(rows){
+    const out=[]; const seen=new Map();
+    const has=v=> v!==undefined && v!==null && String(v).trim()!=='';
+    const score=x=>['联盟名称','联盟ID','会长','人数','联盟等级','联盟战力','所属阵营'].filter(k=>has(x[k])).length;
+    (rows||[]).forEach(r=>{
+        if(!r) return;
+        const id = has(r['联盟ID']) ? String(r['联盟ID']).trim() : '';
+        const nm = String(r['联盟名称']||'').trim();
+        if(!id && !nm){ out.push(r); return; }   // 无身份 → 不参与去重
+        const key = id ? ('id:'+id) : ('nm:'+(r['所属阵营']||'')+'|'+nm);
+        const prev = seen.get(key);
+        if(!prev){ seen.set(key, r); out.push(r); return; }
+        const keep = score(r)>score(prev) ? r : prev;
+        const other = keep===r ? prev : r;
+        for(const k in other){ if(!has(keep[k])) keep[k]=other[k]; }
+        if(keep===r){ const i=out.indexOf(prev); if(i>=0) out[i]=r; seen.set(key, r); }
+    });
+    return out;
 }
 function deepseaParseAndImport(){
     if(!deepseaCanImport()){ toast('⛔ 仅管理员可导入数据'); return; }
@@ -1132,6 +1181,10 @@ function deepseaParseAndImport(){
         rows=parseDeepseaOcrText(raw?raw.value:'');
     }
     if(!rows.length){ toast('未能从原文解析出联盟数据，请把原文复制发给我'); return; }
+    // 🔴 2026-09-12 去重：自动连拍/多张重叠截图会把同一个联盟识别多次，同一个 ID 只应入库一条
+    const _rawCount=rows.length;
+    rows=deepseaDedupeRows(rows);
+    const _dupCount=_rawCount-rows.length;
     // 上传前若识别出势力（自动或手动），覆盖所有行的 所属阵营
     if(fac) rows.forEach(r=>{ r['所属阵营']=fac; });
     // 按势力合并：若新数据带了某势力，先移除旧表中该势力的行，再追加（分势力上传不互相覆盖）
@@ -1143,7 +1196,7 @@ function deepseaParseAndImport(){
     }
     saveRankings();
     renderRankings();  populateCalcAlliance();
-    toast('✅ 已从 OCR 导入 '+rows.length+' 条（'+(fac?('势力：'+fac):'未识别势力')+'，共 '+state.rankings.length+' 条）');
+    toast('✅ 已从 OCR 导入 '+rows.length+' 条'+(fac?('（势力：'+fac+'）'):'')+(_dupCount?('，已自动去重 '+_dupCount+' 条'):'')+'，共 '+state.rankings.length+' 条');
 }
 // 从 OCR 纯文本解析排行。两种格式都兼容（自动判断用哪种）：
 //   策略一【表格式】：截图切片是带表头的干净表格（如 排名 联盟 会长 人数 联盟ID 联盟战力），
@@ -1368,6 +1421,237 @@ function deepseaPickFaction(f){
     if(sel) sel.value=f;
     renderDeepseaOcrCompare();
     toast('已选当前势力：'+f);
+}
+
+// ===================== 🖱️ 自动连拍：截图 → OCR → 跨帧去重累积（2026-09-12） =====================
+// 用**现有能力**就能做到，不需要重新打包 exe：
+//   find_game_windows（枚举可见窗口）→ capture_window_region（PrintWindow 后台截图，不抢焦点、不影响你操作）
+//   → 直接喂 deepseaRunOcr（追加模式）→ 每帧统计「去重后的联盟数」，滚到哪记到哪。
+// 滚动：优先调 gm_wheel（见 lib.rs，**新版 exe 才有**）；旧版拿不到就提示一次、由你手动滚轮，连拍照常累积。
+let _dsAutoCap = { on:false, hwnd:0, winTitle:'', region:null, winW:0, winH:0,
+                   timer:null, frame:0, baseCount:0, err:0, busy:false, warned:false, wheelOk:null };
+
+function deepseaCapB64ToFile(b64, name){
+    const bin=atob(b64), n=bin.length, u8=new Uint8Array(n);
+    for(let i=0;i<n;i++) u8[i]=bin.charCodeAt(i);
+    return new File([u8], name||('dscap-'+Date.now()+'.bmp'), {type:'image/bmp'});
+}
+function deepseaCapBmpSize(b64){
+    return new Promise(res=>{
+        const im=new Image();
+        im.onload=()=>res({w:im.naturalWidth||0, h:im.naturalHeight||0});
+        im.onerror=()=>res({w:0,h:0});
+        im.src='data:image/bmp;base64,'+b64;
+    });
+}
+function deepseaCapStatus(msg, color){
+    const s=document.getElementById('deepseaCapStatus');
+    if(s){ s.textContent=msg||''; s.style.color=color||'rgba(255,255,255,0.6)'; }
+}
+function deepseaCapBtnText(){
+    const b=document.getElementById('deepseaAutoCapBtn');
+    if(b) b.textContent = _dsAutoCap.on ? '⏹ 停止连拍' : '🖱️ 自动连拍识别';
+}
+async function deepseaCapEnsureWindows(){
+    const invoke=deepseaGetInvoke();
+    if(!invoke) throw new Error('自动连拍需在桌面 App 内运行（要用 PrintWindow 截图）');
+    let list=[];
+    try{ list=await invoke('find_game_windows',{}); }catch(e){}
+    if(!list || !list.length){ try{ list=await invoke('find_game_windows',{deep:true}); }catch(e){} }
+    if(!list || !list.length) throw new Error('没找到游戏窗口：请先打开游戏、保证窗口可见且未最小化后重试');
+    const sel=document.getElementById('deepseaCapWin');
+    if(sel){
+        const cur=sel.value;
+        sel.innerHTML=list.map(w=>'<option value="'+w.hwnd+'">'+dsEscapeHtml(w.title||'(无标题)')+'</option>').join('');
+        const keep=list.some(w=>String(w.hwnd)===cur);
+        const pref=list.find(w=>/塔防|精灵/.test(w.title||''));
+        sel.value = keep ? cur : String((pref||list[0]).hwnd);
+    }
+    return list;
+}
+async function deepseaCapResolveWin(){
+    if(!_dsAutoCap.hwnd){ await deepseaCapEnsureWindows(); }
+    const sel=document.getElementById('deepseaCapWin');
+    const hwnd = (sel && sel.value) ? Number(sel.value) : _dsAutoCap.hwnd;
+    if(!hwnd) throw new Error('未选择游戏窗口');
+    _dsAutoCap.hwnd=hwnd;
+    const opt = sel && sel.selectedOptions && sel.selectedOptions[0];
+    _dsAutoCap.winTitle = opt ? (opt.textContent||'') : (_dsAutoCap.winTitle||'');
+    return hwnd;
+}
+async function deepseaCapGrab(full){
+    const invoke=deepseaGetInvoke();
+    const r=_dsAutoCap.region;
+    if(!full && r) return await invoke('capture_window_region', {hwnd:_dsAutoCap.hwnd, x:r.x, y:r.y, w:r.w, h:r.h});
+    return await invoke('capture_window_region', {hwnd:_dsAutoCap.hwnd, x:0, y:0, w:1, h:1, full:true});
+}
+// 把当前所有切片文本解析出来（逐块：先表格式 → 再单卡式），返回去重后的统计
+function deepseaCapCountUnique(){
+    const all=[];
+    deepseaSliceResults.forEach(it=>{
+        let r=parseDeepseaOcrText(it.text||'');
+        if(!r.length) r=parseDeepseaCardText(it.text||'', deepseaCurrentFaction||'');
+        all.push.apply(all, r);
+    });
+    const ded=deepseaDedupeRows(all);
+    return { total:all.length, uniq:ded.length, rows:ded };
+}
+async function deepseaCapProbeSize(){
+    const b64=await deepseaCapGrab(true);
+    const sz=await deepseaCapBmpSize(b64);
+    if(!sz.w) throw new Error('截图失败：窗口可能已最小化，或被其他窗口完全遮挡');
+    _dsAutoCap.winW=sz.w; _dsAutoCap.winH=sz.h;
+    return sz;
+}
+async function deepseaCapFrame(){
+    if(!_dsAutoCap.on || _dsAutoCap.busy) return;
+    _dsAutoCap.busy=true;
+    try{
+        // 允许连拍中途换窗口
+        const sel=document.getElementById('deepseaCapWin');
+        if(sel && sel.value && Number(sel.value)!==_dsAutoCap.hwnd){
+            _dsAutoCap.hwnd=Number(sel.value);
+            const o=sel.selectedOptions && sel.selectedOptions[0];
+            _dsAutoCap.winTitle=o?(o.textContent||''):'';
+        }
+        const b64=await deepseaCapGrab(false);
+        _dsAutoCap.frame++;
+        const append = (_dsAutoCap.baseCount>0) || (_dsAutoCap.frame>1);
+        await deepseaRunOcr([deepseaCapB64ToFile(b64,'dscap-'+Date.now()+'.bmp')],
+                            {append:append, quiet:true, throwOnError:true});
+        const st=deepseaCapCountUnique();
+        const dup=st.total-st.uniq;
+        deepseaCapStatus('📸 已拍 '+_dsAutoCap.frame+' 张 → 识别出 '+st.uniq+' 个联盟'
+            +(dup?('（重复 '+dup+' 条已自动过滤）'):'')+'，继续滚…', '#7CFC9B');
+        const cb=document.getElementById('deepseaCapAutoScroll');
+        if(cb && cb.checked) await deepseaCapWheel();
+    }catch(e){
+        _dsAutoCap.err++;
+        deepseaCapStatus('⚠️ 第 '+_dsAutoCap.frame+' 张失败：'+((e&&e.message)||e)+'（继续尝试）', '#ffb84d');
+    }finally{ _dsAutoCap.busy=false; }
+}
+async function deepseaAutoCapStart(){
+    try{
+        await deepseaCapResolveWin();
+        await deepseaCapProbeSize();
+    }catch(e){
+        const m=(e&&e.message)||String(e);
+        toast('❌ '+m);
+        deepseaCapStatus('❌ '+m, '#ff8a80');
+        return;
+    }
+    _dsAutoCap.on=true; _dsAutoCap.frame=0; _dsAutoCap.err=0; _dsAutoCap.warned=false; _dsAutoCap.wheelOk=null;
+    _dsAutoCap.baseCount=deepseaSliceResults.length;   // 已有结果则追加，不清空（想清空先点「清空重来」）
+    deepseaCapBtnText();
+    const panel=document.getElementById('deepseaOcrPanel'); if(panel) panel.classList.remove('hidden');
+    const iv=Math.max(800, Number((document.getElementById('deepseaCapInterval')||{}).value)||2500);
+    await deepseaCapFrame();
+    if(!_dsAutoCap.on) return;
+    _dsAutoCap.timer=setInterval(deepseaCapFrame, iv);
+    const cb=document.getElementById('deepseaCapAutoScroll');
+    toast('▶️ 自动连拍已开始（每 '+(iv/1000)+' 秒一张）——滚动游戏列表即可'+(cb&&cb.checked?'（自动下滑中）':'')+'，全程自动去重累积');
+    deepseaCapStatus('▶️ 连拍中：'+(_dsAutoCap.winTitle||'游戏窗口')+'（每 '+(iv/1000)+'s 一张）'
+        +(_dsAutoCap.baseCount>0?('，追加在已有 '+_dsAutoCap.baseCount+' 块之后'):''), '#7CFC9B');
+}
+function deepseaAutoCapStop(){
+    _dsAutoCap.on=false;
+    if(_dsAutoCap.timer){ clearInterval(_dsAutoCap.timer); _dsAutoCap.timer=null; }
+    deepseaCapBtnText();
+    let st={total:0,uniq:0};
+    try{ renderDeepseaOcrCompare(); persistDeepseaSliceMeta(); }catch(e){}
+    try{ st=deepseaCapCountUnique(); }catch(e){}
+    const msg='⏹ 已停止：共 '+_dsAutoCap.frame+' 张，识别出 '+st.uniq+' 个联盟（去重前 '+st.total+' 条）'
+        +(_dsAutoCap.err?('，失败 '+_dsAutoCap.err+' 张'):'');
+    deepseaCapStatus(msg, _dsAutoCap.err?'#ffb84d':'#7CFC9B');
+    toast(msg+'。点「解析并填入表格」导入');
+}
+async function deepseaAutoCapToggle(){
+    if(_dsAutoCap.on){ deepseaAutoCapStop(); return; }
+    await deepseaAutoCapStart();
+}
+async function deepseaAutoCapPickRegion(){
+    try{
+        await deepseaCapResolveWin();
+        await deepseaCapProbeSize();
+        const b64=await deepseaCapGrab(true);
+        deepseaCapRegionModal('data:image/bmp;base64,'+b64);
+    }catch(e){ toast('❌ '+((e&&e.message)||e)); }
+}
+function deepseaCapRegionModal(dataUrl){
+    const old=document.getElementById('dsCapRegionModal'); if(old && old.parentNode) old.parentNode.removeChild(old);
+    const m=document.createElement('div');
+    m.id='dsCapRegionModal';
+    m.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.82);z-index:200060;display:flex;align-items:center;justify-content:center;padding:14px;';
+    m.innerHTML='<div style="background:linear-gradient(160deg,rgba(40,40,68,0.99),rgba(26,26,48,0.99));border:1px solid rgba(255,215,0,0.4);border-radius:12px;padding:12px;max-width:96vw;max-height:94vh;display:flex;flex-direction:column;">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px;">'
+        +'<span style="color:#ffd700;font-size:0.82rem;font-weight:bold;">🎯 框选「联盟列表」区域（拖拽画框；不框=识别整窗）</span>'
+        +'<button type="button" id="dsCapRegionClose" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.25);color:#c9c9dd;padding:0 8px;border-radius:5px;cursor:pointer;font-size:0.8rem;line-height:1.7;">✕</button></div>'
+        +'<div id="dsCapRegionBox" style="position:relative;overflow:hidden;border:1px solid rgba(255,255,255,0.2);border-radius:6px;cursor:crosshair;user-select:none;">'
+        +'<img id="dsCapRegionImg" src="'+dataUrl+'" style="display:block;max-width:88vw;max-height:70vh;" draggable="false">'
+        +'<div id="dsCapRegionRect" style="position:absolute;border:2px solid #ffd700;background:rgba(255,215,0,0.16);display:none;pointer-events:none;"></div></div>'
+        +'<div style="display:flex;gap:8px;align-items:center;margin-top:9px;flex-wrap:wrap;">'
+        +'<span id="dsCapRegionInfo" style="font-size:0.72rem;color:#cfe;">当前：'+(_dsAutoCap.region?('已框选 '+_dsAutoCap.region.w+'×'+_dsAutoCap.region.h):'整窗')+'（拖拽可重选）</span>'
+        +'<button type="button" id="dsCapRegionReset" style="margin-left:auto;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#cfe;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:0.74rem;">用整窗</button>'
+        +'<button type="button" id="dsCapRegionOk" style="background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.76rem;font-weight:bold;">✅ 用框选区域</button></div></div>';
+    document.body.appendChild(m);
+    const box=m.querySelector('#dsCapRegionBox'), rectEl=m.querySelector('#dsCapRegionRect'), info=m.querySelector('#dsCapRegionInfo');
+    const img=m.querySelector('#dsCapRegionImg');
+    const close=()=>{ if(m.parentNode) m.parentNode.removeChild(m); };
+    let sx=0, sy=0, drawing=false, sel=null;
+    const rel=e=>{ const r=box.getBoundingClientRect();
+        return { x:Math.max(0,Math.min(e.clientX-r.left, r.width)), y:Math.max(0,Math.min(e.clientY-r.top, r.height)) }; };
+    const paint=()=>{
+        if(!sel){ rectEl.style.display='none'; return; }
+        rectEl.style.display='block';
+        rectEl.style.left=sel.x+'px'; rectEl.style.top=sel.y+'px';
+        rectEl.style.width=sel.w+'px'; rectEl.style.height=sel.h+'px';
+    };
+    const scale=()=> (img.clientWidth ? (img.naturalWidth/img.clientWidth) : 1);
+    box.onmousedown=e=>{ e.preventDefault(); const p=rel(e); sx=p.x; sy=p.y; drawing=true; sel={x:sx,y:sy,w:0,h:0}; paint(); };
+    box.onmousemove=e=>{
+        if(!drawing) return;
+        const p=rel(e);
+        sel={ x:Math.min(sx,p.x), y:Math.min(sy,p.y), w:Math.abs(p.x-sx), h:Math.abs(p.y-sy) };
+        paint();
+    };
+    const finish=()=>{
+        drawing=false;
+        if(!sel || sel.w<8 || sel.h<8){ sel=null; paint(); info.textContent='框太小已忽略 → 识别整窗'; return; }
+        info.textContent='已框选 '+Math.round(sel.w*scale())+'×'+Math.round(sel.h*scale())+' 像素';
+    };
+    box.onmouseup=finish; box.onmouseleave=finish;
+    m.querySelector('#dsCapRegionClose').onclick=close;
+    m.querySelector('#dsCapRegionReset').onclick=()=>{ _dsAutoCap.region=null; toast('已设为：识别整窗'); close(); };
+    m.querySelector('#dsCapRegionOk').onclick=()=>{
+        if(!sel || sel.w<8 || sel.h<8){ _dsAutoCap.region=null; toast('未框选 → 识别整窗'); close(); return; }
+        const sc=scale();
+        _dsAutoCap.region={ x:Math.round(sel.x*sc), y:Math.round(sel.y*sc),
+                            w:Math.max(8,Math.round(sel.w*sc)), h:Math.max(8,Math.round(sel.h*sc)) };
+        toast('✅ 已框选识别区域 '+_dsAutoCap.region.w+'×'+_dsAutoCap.region.h+' 像素（只识别这一块，更快更准）');
+        close();
+    };
+    m.onclick=e=>{ if(e.target===m) close(); };
+}
+// 自动下滑：调 gm_wheel（参数用「窗口外框内像素坐标」，与截图同一基准）。
+// 旧版 exe 没有该命令 → 捕获失败后提示一次并自动取消勾选，改由用户手动滚轮，连拍照常累积。
+async function deepseaCapWheel(){
+    if(_dsAutoCap.wheelOk===false) return;
+    const invoke=deepseaGetInvoke();
+    const r=_dsAutoCap.region;
+    const px = r ? Math.round(r.x + r.w/2) : Math.round((_dsAutoCap.winW||600)/2);
+    const py = r ? Math.round(r.y + r.h/2) : Math.round((_dsAutoCap.winH||400)*0.7);
+    try{
+        await invoke('gm_wheel', { hwnd:_dsAutoCap.hwnd, x:px, y:py, delta:-360, times:1 });
+        _dsAutoCap.wheelOk=true;
+    }catch(e){
+        _dsAutoCap.wheelOk=false;
+        const cb=document.getElementById('deepseaCapAutoScroll'); if(cb) cb.checked=false;
+        if(!_dsAutoCap.warned){
+            _dsAutoCap.warned=true;
+            toast('⚠️ 自动下滑需要更新软件后才能用（当前版本还没有滚轮命令）——请手动滚动列表，连拍照常记录');
+        }
+        deepseaCapStatus('💡 自动下滑不可用：请手动滚动列表，连拍继续记录中…', '#ffb84d');
+    }
 }
 function renderDeepseaOcrCompare(){
     const list=document.getElementById('deepseaOcrCompareList'); if(!list) return;
