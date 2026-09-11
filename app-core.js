@@ -10241,6 +10241,17 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     showToast('⚡ 性能模式：' + getPerfModeLabel().replace('⚡ 性能模式：', '') + '（' + desc + '）');
                 }
             } catch (e) {}
+            // 🔴 2026-09-12 低内存优化：切到更省的档位时，**当场释放**已预热的皮肤 blob URL 与 LRU 缓存，
+            //    让内存立即回落（否则要等空闲修剪，用户会以为「切了没用」）。
+            //    顺序很关键：先清 → 再重渲染，这样只有新模式真正需要的皮肤会被重新加载。
+            try {
+                if (next === 'optimized' || next === 'lite') {
+                    if (typeof window.clearSkinUrlCache === 'function') window.clearSkinUrlCache();
+                    if (typeof window.sweepSkinOrphanBlobs === 'function') window.sweepSkinOrphanBlobs();
+                    if (typeof window.__tfjlTrimSkinCache === 'function') window.__tfjlTrimSkinCache(0.3);
+                    console.log('[性能模式] 已释放皮肤 blob 缓存与 LRU（切到 ' + next + '）');
+                }
+            } catch (e) {}
             // 立即按新模式重渲染卡池皮肤
             if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(() => {});
             if (typeof reapplyAllSkins === 'function') reapplyAllSkins().catch(() => {});

@@ -176,8 +176,17 @@
     heroNames.sort(function (a, b) {
       return (PRIORITY_HEROES.has(a) ? 0 : 1) - (PRIORITY_HEROES.has(b) ? 0 : 1);
     });
+    // 🔴 2026-09-12 低内存优化：按性能模式决定预热范围。
+    //    极速版完全不显示皮肤 → 不预热；优化版不铺卡池/收藏的皮 → 只预热主阵容英雄。
+    //    （原来无差别预热 421 张 → 400+ 次请求 + 400+ 个永不 revoke 的 blob URL，白占内存与带宽）
+    var _pmOpt = false, _pmLite = false;
+    try { _pmOpt = !!(window.isPerfOptimized && window.isPerfOptimized()); } catch (e) {}
+    try { _pmLite = !!(window.isPerfLite && window.isPerfLite()); } catch (e) {}
+    if (_pmLite) { console.log('[SKIN-WEB] 极速模式：跳过皮肤预热'); return; }
+    if (_pmOpt) console.log('[SKIN-WEB] 优化模式：仅预热主阵容英雄皮肤（要全量请切「高性能」）');
     var queue = [];
     heroNames.forEach(function (heroName) {
+      if (_pmOpt && !PRIORITY_HEROES.has(heroName)) return;   // 优化版：只留主阵容英雄
       var skinList = heroes[heroName];
       if (!Array.isArray(skinList)) return;
       skinList.forEach(function (s) {
