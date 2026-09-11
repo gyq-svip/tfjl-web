@@ -669,6 +669,10 @@
         // 设置 window.__diagForceReload 并触发一次启动期版本检查（仅在开关开 + SW 已有 waiting 版本时，由 notifyNewVersion 在闲置时静默强刷）。
         // 🔴 2026-08-31 离线判定阈值：管理员「功能开关面板→离线判定阈值」可调（room_index.json.onlineTimeoutMin，分钟），
         //    启动时读一次缓存到 window.__tfjlOnlineTimeoutMs（0=未配置），由 _applyOnlineTimeoutCfg 覆盖到计数器数据全网生效。
+        // 🔴 2026-09-12 「离线判定阈值」上下限（分钟）：上限由 1440(=1天) 放宽到 10080(=7天)。
+        //    面板配置项 / apply 即时生效 / 启动读取索引 三处统一引用此常量，避免再各自写死 1440 而不一致。
+        const ONLINE_TIMEOUT_MIN_MIN = 1;
+        const ONLINE_TIMEOUT_MIN_MAX = 10080;
         window.__tfjlOnlineTimeoutMs = 0; // 🔴 先声明默认未配置态：即使启动配置请求慢/失败也是明确的 0（与 undefined 行为等价，但语义清晰、便于诊断）
         function _applyOnlineTimeoutCfg(data) {
             try {
@@ -681,7 +685,7 @@
                 const idx = await getRoomIndexConfig();
                 window.__diagForceReload = !!idx.forceReloadEnabled;
                 const _otm = Number(idx.onlineTimeoutMin);
-                window.__tfjlOnlineTimeoutMs = (_otm >= 1 && _otm <= 1440) ? Math.round(_otm * 60000) : 0;
+                window.__tfjlOnlineTimeoutMs = (_otm >= ONLINE_TIMEOUT_MIN_MIN && _otm <= ONLINE_TIMEOUT_MIN_MAX) ? Math.round(_otm * 60000) : 0;
                 if (window.__diagForceReload && 'serviceWorker' in navigator) {
                     setTimeout(() => {
                         // 🔴 2026-09-01 修复「版本已是最新还弹更新气泡」：
@@ -26995,16 +26999,16 @@ ${maSection}
             {
                 key: 'onlineTimeoutMin',
                 label: '🟢 离线判定阈值',
-                desc: '【在线状态】多久没有心跳上报就算「离线」（分钟）。全网所有用户的在线状态展示统一跟随此值：超过该时长未上报的用户会从在线列表移除并计入离线记录。默认 30 分钟。调小=在线数更严格更实时；调大=挂机不易掉线。范围 1~1440 分钟。⚠️ 建议至少设为「诊断心跳间隔+抖动」的 2 倍，否则正常用户会被误判离线。',
+                desc: '【在线状态】多久没有心跳上报就算「离线」（分钟）。全网所有用户的在线状态展示统一跟随此值：超过该时长未上报的用户会从在线列表移除并计入离线记录。默认 30 分钟。调小=在线数更严格更实时；调大=挂机不易掉线。范围 1~10080 分钟（1 分钟~7 天）。⚠️ 建议至少设为「诊断心跳间隔+抖动」的 2 倍，否则正常用户会被误判离线。⚠️ 设得越大，长期没打开软件的用户也会一直显示「在线」。',
                 scope: 'remote',
                 remoteField: 'onlineTimeoutMin',
                 type: 'number',
-                min: 1, max: 1440, step: 1, unit: '分',
+                min: ONLINE_TIMEOUT_MIN_MIN, max: ONLINE_TIMEOUT_MIN_MAX, step: 1, unit: '分',
                 default: 30,
                 apply: (v) => {
                     // 管理员改完立即生效：更新全局缓存 + 覆盖当前内存里的计数器数据
                     const m = Number(v);
-                    window.__tfjlOnlineTimeoutMs = (m >= 1 && m <= 1440) ? Math.round(m * 60000) : 0;
+                    window.__tfjlOnlineTimeoutMs = (m >= ONLINE_TIMEOUT_MIN_MIN && m <= ONLINE_TIMEOUT_MIN_MAX) ? Math.round(m * 60000) : 0;
                     try { if (window._applyOnlineTimeoutCfg && typeof counterData !== 'undefined' && counterData) window._applyOnlineTimeoutCfg(counterData); } catch (e) {}
                 }
             },
@@ -27130,7 +27134,7 @@ ${maSection}
                             '<input type="number" id="ftNum_' + t.key + '" min="' + min + '" max="' + max + '" step="' + step + '" value="' + curVal + '" oninput="setFeatureRangePreview(\'' + t.key + '\', this.value)" onchange="setFeatureRange(\'' + t.key + '\', this.value)" style="width:100%;margin-top:10px;padding:7px 10px;border-radius:8px;border:1px solid rgba(79,195,247,0.5);background:#0f1b33;color:#fff;font-size:0.82rem;">' :
                             '<input type="range" min="' + min + '" max="' + max + '" step="' + step + '" value="' + curVal + '" oninput="setFeatureRangePreview(\'' + t.key + '\', this.value)" onchange="setFeatureRange(\'' + t.key + '\', this.value)" style="width:100%;margin-top:10px;accent-color:#4fc3f7;cursor:pointer;">'
                         }
-                        ${isNum ? '' : '<div style="display:flex;justify-content:space-between;font-size:0.62rem;color:rgba(255,255,255,0.3);margin-top:2px;"><span>' + min + unit + '</span><span>' + max + unit + '</span></div>'}
+                        ${isNum ? '<div style="font-size:0.62rem;color:rgba(255,255,255,0.3);margin-top:3px;">可设范围 ' + min + '~' + max + unit + '</div>' : '<div style="display:flex;justify-content:space-between;font-size:0.62rem;color:rgba(255,255,255,0.3);margin-top:2px;"><span>' + min + unit + '</span><span>' + max + unit + '</span></div>'}
                         <div style="font-size:0.64rem;color:${t.scope === 'remote' ? '#4fc3f7' : '#94a3b8'};margin-top:6px;">${t.scope === 'remote' ? '🌐 全网' : '🖥️ 本机'}</div>
                     </div>`;
                     continue;
