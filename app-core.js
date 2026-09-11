@@ -4964,7 +4964,7 @@
                 <div style="display:flex;gap:4px;align-items:center;margin-bottom:5px;">
                     <input id="${windowId}_findInput" placeholder="查找..." oninput="webFind('${windowId}','count')" onkeydown="if(event.key==='Enter')webFind('${windowId}','next')" style="width:150px;flex-shrink:0;background:rgba(0,0,0,0.4);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px 8px;font-size:0.78rem;">
                     <span id="${windowId}_findCount" style="color:rgba(255,255,255,0.55);font-size:0.72rem;min-width:80px;text-align:center;white-space:nowrap;">0个匹配</span>
-                    <button onclick="webColorAllMatches('${windowId}')" style="background:rgba(255,215,0,0.18);color:#ffd700;border:1px solid rgba(255,215,0,0.3);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;white-space:nowrap;" title="把当前查找的所有匹配用色板颜色标色（先点🎨选色，颜色会保存）">🎨 全部标色</button>
+                    <button id="${windowId}_markColorBtn" onclick="webColorAllMatches('${windowId}')" style="display:flex;align-items:center;gap:5px;background:rgba(255,215,0,0.18);color:#ffd700;border:1px solid rgba(255,215,0,0.3);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;white-space:nowrap;" title="点开就地选颜色，点哪个色立刻标哪个色（标色色独立于整篇文字颜色，不会改正文颜色）"><span id="${windowId}_markColorDot" style="width:10px;height:10px;border-radius:50%;background:#ffeb3b;border:1px solid rgba(255,255,255,0.6);display:inline-block;flex-shrink:0;"></span>🎨 全部标色</button>
                     <button onclick="webFind('${windowId}','prev')" style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.15);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:0.82rem;white-space:nowrap;" title="上一个 (Shift+Enter)">◀ 上一个</button>
                     <button onclick="webFind('${windowId}','next')" style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.15);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:0.82rem;white-space:nowrap;" title="下一个 (Enter)">下一个 ▶</button>
                     <span id="${windowId}_cycleHint" style="display:none;color:#ffeb3b;font-size:0.65rem;white-space:nowrap;animation:fadeOut 2s forwards;">↻ 已循环</span>
@@ -5674,6 +5674,7 @@
         function webToggleFindReplace(windowId, forceOpen) {
             const bar = document.getElementById(windowId + '_findReplace');
             if (!bar) return;
+            refreshMarkColorDot(windowId);   // 打开查找栏时同步「全部标色」按钮上的色点
             if (forceOpen === true) {
                 bar.style.display = 'block';
                 const findInput = document.getElementById(windowId + '_findInput');
@@ -5703,36 +5704,175 @@
             }
         }
 
-        // 把当前查找的所有匹配用色板颜色标色（复用通用组件 NBPC.Marks，落盘 + overlay 渲染）
-        function webColorAllMatches(windowId) {
+        // ========== 「全部标色」优化（2026-09-12）==========
+        // 旧实现的问题：直接借用「整篇文字颜色」当标色 → 整篇色是默认灰时"标了跟没标一样"（同色看不出）；
+        // 想换色还得另开 🎨 大色轮（那按钮是改整篇文字色的）→ 用户反馈"点标记后颜色很难设置"。
+        // 现改为：标色色**独立于整篇文字色** + 点按钮就地弹小色板，点哪个颜色立刻标哪个（一键完成）。
+        const MARK_COLOR_KEY = 'tfjl_mark_color';
+        const MARK_COLOR_PRESETS = ['#ffeb3b', '#ff9800', '#ff5252', '#4caf50', '#00e5ff', '#40c4ff', '#e040fb', '#ff80ab', '#b2ff59', '#ffffff'];
+        let _markColor = (function () {
+            try {
+                const v = (window.NBPC && NBPC.toHex(localStorage.getItem(MARK_COLOR_KEY))) || '';
+                return v || '#ffeb3b';
+            } catch (e) { return '#ffeb3b'; }
+        })();
+        function getMarkColor() { return _markColor; }
+        function setMarkColor(hex) {
+            const c = (window.NBPC && NBPC.toHex(hex)) || '';
+            if (!c) return _markColor;
+            _markColor = c;
+            try { localStorage.setItem(MARK_COLOR_KEY, c); } catch (e) {}
+            // 顺手记进色板「自选槽」，下次在 🎨 大色轮里也能直接点到（只动 slots，绝不动整篇色）
+            try {
+                if (window.NBPC && NBPC.cfg) {
+                    const slots = (NBPC.cfg.slots || []).filter(function (x) { return x !== c; });
+                    slots.unshift(c);
+                    NBPC.cfg.slots = slots.slice(0, 2);
+                    if (NBPC.saveCfg) NBPC.saveCfg();
+                }
+            } catch (e) {}
+            return _markColor;
+        }
+        // 把当前标色色画到「全部标色」按钮的小圆点上，随时看得见用的是哪个色
+        function refreshMarkColorDot(windowId) {
+            const dot = document.getElementById(windowId + '_markColorDot');
+            if (dot) dot.style.background = getMarkColor();
+        }
+
+        // 取该窗口的查找匹配（统一校验查找框与大小写选项）
+        function _markMatchesOf(windowId) {
             const ta = document.getElementById(windowId + '_content');
             const input = document.getElementById(windowId + '_findInput');
-            if (!ta || !input || !input.value) return;
-            const caseSensitive = document.getElementById(windowId + '_caseSensitive')?.checked || false;
-            const text = ta.value;
-            const found = NBPC.Marks.matches(text, input.value, caseSensitive);
-            if (found.length === 0) {
-                const countEl = document.getElementById(windowId + '_findCount');
-                if (countEl) countEl.textContent = '无匹配';
+            if (!ta || !input || !input.value) return null;
+            const caseSensitive = (document.getElementById(windowId + '_caseSensitive') || {}).checked || false;
+            return { text: ta.value, found: NBPC.Marks.matches(ta.value, input.value, caseSensitive) };
+        }
+
+        // 执行标色：传 color 则同时记住该颜色
+        function applyMarkAllMatches(windowId, color) {
+            const info = _markMatchesOf(windowId);
+            if (!info) { if (window.showToast) showToast('请先输入查找内容', 'info'); return 0; }
+            const win = txtFileWindows.find(function (w) { return w.id === windowId; });
+            if (!win) return 0;
+            if (!info.found.length) {
+                const c0 = document.getElementById(windowId + '_findCount');
+                if (c0) c0.textContent = '无匹配';
                 if (window.showToast) showToast('无匹配项，无法标色');
-                return;
+                return 0;
             }
-            const win = txtFileWindows.find(w => w.id === windowId);
-            if (!win) return;
-            getNotebookColorAsync().then(color => {
-                if (!win.marks) win.marks = [];
-                const glow = !!document.getElementById(windowId + '_glowChk')?.checked;
-                let marks = win.marks;
-                found.forEach(m => {
-                    marks = NBPC.Marks.clipInsert(text, marks, { s: m.start, e: m.end, color: color, glow: glow });
-                });
-                win.marks = marks;
-                persistNotebookMarks(win.marksKey, marks);
-                renderNotebookOverlay(windowId);
-                const countEl = document.getElementById(windowId + '_findCount');
-                if (countEl) countEl.textContent = '已标色 ' + found.length + ' 处';
-                if (window.showToast) showToast('已将 ' + found.length + ' 处匹配标色');
+            if (color) setMarkColor(color);
+            const useColor = getMarkColor();
+            const glow = !!(document.getElementById(windowId + '_glowChk') || {}).checked;
+            if (!win.marks) win.marks = [];
+            let marks = win.marks;
+            info.found.forEach(function (m) { marks = NBPC.Marks.clipInsert(info.text, marks, { s: m.start, e: m.end, color: useColor, glow: glow }); });
+            win.marks = marks;
+            persistNotebookMarks(win.marksKey, marks);
+            renderNotebookOverlay(windowId);
+            const cEl = document.getElementById(windowId + '_findCount');
+            if (cEl) cEl.textContent = '已标色 ' + info.found.length + ' 处';
+            if (window.showToast) showToast('已把 ' + info.found.length + ' 处匹配标为 ' + useColor);
+            refreshMarkColorDot(windowId);
+            return info.found.length;
+        }
+
+        // 清除「当前查找匹配」上的标色（选错色后一键还原，不用手动擦）
+        function clearMarkMatches(windowId) {
+            const info = _markMatchesOf(windowId);
+            if (!info || !info.found.length) { if (window.showToast) showToast('无匹配项可清除', 'info'); return 0; }
+            const win = txtFileWindows.find(function (w) { return w.id === windowId; });
+            if (!win || !win.marks || !win.marks.length) { if (window.showToast) showToast('这些匹配上没有标色'); return 0; }
+            let marks = win.marks;
+            info.found.forEach(function (m) { marks = NBPC.Marks.clearRange(info.text, marks, m.start, m.end); });
+            win.marks = marks;
+            persistNotebookMarks(win.marksKey, marks);
+            renderNotebookOverlay(windowId);
+            if (window.showToast) showToast('已清除 ' + info.found.length + ' 处匹配的标色');
+            return info.found.length;
+        }
+
+        function closeMarkColorPopup() {
+            const p = document.getElementById('nbMarkColorPopup');
+            if (p && p.parentNode) p.parentNode.removeChild(p);
+            try { document.removeEventListener('mousedown', _markColorDocClose, true); } catch (e) {}
+        }
+        function _markColorDocClose(e) {
+            const p = document.getElementById('nbMarkColorPopup');
+            if (!p) return;
+            if (p.contains(e.target)) return;
+            if (e.target && e.target.id && /_markColorBtn$/.test(e.target.id)) return;
+            closeMarkColorPopup();
+        }
+
+        // 点「🎨 全部标色」→ 就地弹小色板：点颜色即标色（一键），不用再去开大色轮改整篇色
+        function webColorAllMatches(windowId) {
+            const opened = document.getElementById('nbMarkColorPopup');
+            if (opened && opened.dataset.win === windowId) { closeMarkColorPopup(); return; }   // 再点一次=收起
+            closeMarkColorPopup();
+            const info = _markMatchesOf(windowId);
+            if (!info) { if (window.showToast) showToast('请先输入查找内容', 'info'); return; }
+            const btn = document.getElementById(windowId + '_markColorBtn');
+            const cur = getMarkColor();
+            const slots = (window.NBPC && NBPC.cfg && NBPC.cfg.slots) || [];
+            const list = MARK_COLOR_PRESETS.concat(slots.filter(function (c) { return MARK_COLOR_PRESETS.indexOf(c) < 0; }));
+            const esc = function (s) { return String(s).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+            const sw = list.map(function (c) {
+                const on = String(c).toLowerCase() === cur.toLowerCase();
+                return '<button type="button" data-mark-color="' + esc(c) + '" title="' + esc(c) + '" style="width:24px;height:24px;border-radius:50%;background:' + esc(c) + ';border:2px solid ' + (on ? '#fff' : 'rgba(255,255,255,0.35)') + ';cursor:pointer;padding:0;box-shadow:' + (on ? '0 0 9px ' + esc(c) : '0 1px 4px rgba(0,0,0,0.5)') + ';"></button>';
+            }).join('');
+            const pop = document.createElement('div');
+            pop.id = 'nbMarkColorPopup';
+            pop.dataset.win = windowId;
+            pop.style.cssText = 'position:fixed;z-index:200050;width:240px;background:linear-gradient(160deg,rgba(40,40,68,0.99),rgba(26,26,48,0.99));border:1px solid rgba(255,215,0,0.4);border-radius:12px;padding:11px 12px;box-shadow:0 10px 34px rgba(0,0,0,0.65);';
+            pop.innerHTML =
+                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">' +
+                    '<span style="color:#ffd700;font-size:0.78rem;font-weight:bold;">🎨 标色颜色</span>' +
+                    '<button type="button" id="nbMarkColorClose" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.25);color:#c9c9dd;padding:0 7px;border-radius:5px;cursor:pointer;font-size:0.72rem;line-height:1.5;">✕</button>' +
+                '</div>' +
+                '<div style="color:rgba(255,255,255,0.55);font-size:0.68rem;margin-bottom:7px;">点颜色 = 立即标色，共 <b style="color:#fff;">' + info.found.length + '</b> 处匹配（标色不改正文颜色）</div>' +
+                '<div style="display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-bottom:9px;">' + sw + '</div>' +
+                '<div style="display:flex;align-items:center;gap:7px;margin-bottom:9px;">' +
+                    '<span style="font-size:0.68rem;color:#9a9ab0;">自定义</span>' +
+                    '<input type="color" id="nbMarkColorCustom" value="' + esc(cur) + '" style="width:36px;height:24px;border:none;background:transparent;cursor:pointer;padding:0;">' +
+                    '<label style="display:flex;align-items:center;gap:4px;font-size:0.68rem;color:#c9c9dd;cursor:pointer;margin-left:auto;"><input type="checkbox" id="nbMarkColorGlow"> 发光</label>' +
+                '</div>' +
+                '<div style="display:flex;gap:6px;">' +
+                    '<button type="button" id="nbMarkColorApply" style="flex:1;background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:none;padding:7px;border-radius:7px;cursor:pointer;font-size:0.76rem;font-weight:bold;">✅ 用当前色标色</button>' +
+                    '<button type="button" id="nbMarkColorClear" title="清除这些匹配上已标的颜色" style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.22);color:#fff;padding:7px 9px;border-radius:7px;cursor:pointer;font-size:0.74rem;">🧽</button>' +
+                '</div>';
+            document.body.appendChild(pop);
+            // 定位：贴「全部标色」按钮右下，越界自动回收
+            try {
+                const r = btn ? btn.getBoundingClientRect() : null;
+                const pw = pop.offsetWidth || 240, ph = pop.offsetHeight || 210;
+                let left = r ? (r.right - pw) : 40;
+                let top = r ? (r.bottom + 6) : 80;
+                left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
+                top = Math.max(8, Math.min(top, window.innerHeight - ph - 8));
+                pop.style.left = left + 'px';
+                pop.style.top = top + 'px';
+            } catch (e) { pop.style.left = '40px'; pop.style.top = '80px'; }
+            // 🔴 直接 onclick 绑定（本项目约定：自定义弹窗不用事件委托，避免冒泡被拦导致"点不动"）
+            const swBtns = pop.querySelectorAll('button[data-mark-color]');
+            Array.prototype.forEach.call(swBtns, function (b) {
+                b.onclick = function () { applyMarkAllMatches(windowId, b.getAttribute('data-mark-color')); closeMarkColorPopup(); };
             });
+            const closeBtn = pop.querySelector('#nbMarkColorClose');
+            if (closeBtn) closeBtn.onclick = closeMarkColorPopup;
+            const applyBtn = pop.querySelector('#nbMarkColorApply');
+            if (applyBtn) applyBtn.onclick = function () { applyMarkAllMatches(windowId, getMarkColor()); closeMarkColorPopup(); };
+            const clearBtn = pop.querySelector('#nbMarkColorClear');
+            if (clearBtn) clearBtn.onclick = function () { clearMarkMatches(windowId); closeMarkColorPopup(); };
+            const custom = pop.querySelector('#nbMarkColorCustom');
+            if (custom) custom.onchange = function () { applyMarkAllMatches(windowId, custom.value); closeMarkColorPopup(); };
+            // 发光开关：与记事本既有 _glowChk 同源，避免两处状态打架
+            const glowChk = pop.querySelector('#nbMarkColorGlow');
+            const existGlow = document.getElementById(windowId + '_glowChk');
+            if (glowChk) {
+                glowChk.checked = existGlow ? !!existGlow.checked : false;
+                glowChk.onchange = function () { if (existGlow) existGlow.checked = glowChk.checked; };
+            }
+            setTimeout(function () { document.addEventListener('mousedown', _markColorDocClose, true); }, 0);
         }
 
         function webFind(windowId, direction) {
