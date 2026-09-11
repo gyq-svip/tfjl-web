@@ -235,9 +235,28 @@ function runPreflight() {
     Object.keys(m).forEach(function (k) { if (m[k] > 1) dupHits.push(f + ':' + k + '×' + m[k]); });
   });
   out.push(dupHits.length
-    ? mk('dupFunc', 'warn', '顶层有同名函数出现多次（后者覆盖前者）', dupHits.slice(0, 6).join(' | '),
-        'node --check 未报语法冲突（说明可合法重声明），但请确认不是改代码时误重复插入；历史上这类重复曾让整个 JS 文件静默失效')
-    : mk('dupFunc', 'ok', '顶层无同名函数重复', '已扫描 ' + dupFiles.length + ' 个主 JS 文件（仅顶层）'));
+    ? mk('dupFunc', 'warn', '同一文件内顶层函数重名（后者覆盖前者）', dupHits.slice(0, 6).join(' | '),
+        '同一文件内重复声明通常是改代码时误插入，建议只保留一份；历史上这类重复曾让整个 JS 文件静默失效')
+    : mk('dupFunc', 'ok', '同一文件内无顶层重名函数', '已扫描 ' + dupFiles.length + ' 个主 JS 文件（仅顶层）'));
+
+  // 9b) 跨文件同名（信息性）：本项目无模块系统，顶层函数都是全局的 —— 谁后加载谁生效。
+  //     ⚠️ 不同入口页面加载组合不同（gist-health.html 只 load app-core、auction.html 只 load app-features），
+  //        所以"跨文件同名"多数是各页面自带的必要副本，不能盲删。
+  const crossMap = {};
+  dupFiles.forEach(function (f) {
+    const t = readText(path.join(ROOT, f));
+    if (!t) return;
+    let r;
+    const re = /^ {8}(?:async\s+)?function\s+([A-Za-z0-9_$]+)\s*\(/gm;
+    while ((r = re.exec(t)) !== null) { (crossMap[r[1]] = crossMap[r[1]] || []).push(f); }
+  });
+  const crossHits = Object.keys(crossMap).filter(function (k) { return crossMap[k].length > 1; });
+  if (crossHits.length) {
+    out.push(mk('dupFuncCross', 'info', '跨文件顶层同名函数（按加载顺序后者生效）',
+      crossHits.slice(0, 6).map(function (k) { return k + ' ← ' + crossMap[k].join(' > '); }).join(' | '),
+      'index.html 加载顺序 app-boot→effects→features→local2→picker→damagecalc→core→feedback，最后定义者生效；' +
+      '但 gist-health.html 只加载 app-core、auction.html 只加载 app-features —— 各页面需要的那份必须保留，删前先确认该页面仍拿得到定义'));
+  }
 
   // 10) exe 绝不能进 git（历史事故：6 个安装包入库导致 Pages 部署超时）
   const ls = git(['ls-files']);
