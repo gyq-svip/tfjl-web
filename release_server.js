@@ -329,14 +329,16 @@ function runPreflight() {
       + '处理：把语义不同的那个**改名**，并同步它的调用点（含内联 onclick 字符串），别靠加载顺序碰运气'));
   }
   if (crossSafeDiff.length) {
-    out.push(mk('dupFuncCrossInfo', 'info', '跨文件同名、实现有差异但生效那份与另一份相同（差异份是死代码）',
+    out.push(mk('dupFuncCrossInfo', 'info', '参考信息（无需处理）：历史遗留的同名函数，当前不影响运行',
       crossSafeDiff.slice(0, 6).join(' | '),
-      '按现状无害：生效的是最后加载那份，它与前一个文件实现一致，多余那份从未执行。若将来删掉生效那份，行为会变，需重新确认'));
+      '※ 这不是问题，不用管。说明：这类函数在多个文件里各写过一份（历史遗留），生效的是最后加载那份，'
+      + '且它与另一个文件的实现一致 → 差异那份从未执行过，对运行没有任何影响。'
+      + '只在"将来有人删掉当前生效那份"时才需要重新确认——平时无需理会。'));
   }
   if (crossSame.length) {
-    out.push(mk('dupFuncCross', 'info', '跨文件同名但实现完全一致（历史冗余，无害）',
+    out.push(mk('dupFuncCross', 'info', '参考信息（无需处理）：同名函数实现完全一致，纯冗余',
       crossSame.slice(0, 6).join(' | '),
-      '加载顺序：' + LOAD_ORDER.slice(0, 10).join(' → ') + ' → …，最后定义者生效。实现一致=谁生效都一样。'
+      '※ 这不是问题，不用管。加载顺序 ' + LOAD_ORDER.slice(0, 10).join(' → ') + ' → …，最后定义者生效；实现一致=谁生效都一样。'
       + '（注：唯一加载全部 app-*.js 的页面是 index.html；auction.html / stats.html 用各自 HTML 内联的同名函数）'));
   }
 
@@ -852,12 +854,16 @@ async function doPre(){
     preResult=r;
     let h='<table>';
     (r.checks||[]).forEach(c=>{
-      const lv=c.level==='ok'?'✅ ok':c.level==='warn'?'⚠️ warn':c.level==='fail'?'❌ fail':'ℹ️ info';
+      const lv=c.level==='ok'?'✅ ok':c.level==='warn'?'⚠️ warn':c.level==='fail'?'❌ fail':'ℹ️ 参考';
       h+='<tr><td class="lvl '+c.level+'">'+lv+'</td><td><b>'+esc(c.title)+'</b>'+(c.detail?'<div class="sub">'+esc(c.detail)+'</div>':'')+(c.fix?'<div class="fix">→ '+esc(c.fix)+'</div>':'')+'</td></tr>';
     });
     h+='</table>';
     $('preWrap').innerHTML=h;
-    $('preSummary').innerHTML=(r.fail?'<span class="fail">❌ '+r.fail+' 项阻断</span>':'<span class="ok">✅ 无阻断项</span>')+(r.warn?' · <span class="warn">'+r.warn+' 项提醒</span>':'')+' · 耗时 '+r.ms+'ms';
+    const infoN=(r.checks||[]).filter(c=>c.level==='info').length;
+    $('preSummary').innerHTML=(r.fail?'<span class="fail">❌ '+r.fail+' 项阻断（必须先修）</span>':'<span class="ok">✅ 没有阻断项，可以打包/发布</span>')
+      +(r.warn?' · <span class="warn">'+r.warn+' 项 WARN 建议扫一眼</span>':'')
+      +(infoN?' · <span class="info">'+infoN+' 项参考（不是问题，无需处理）</span>':'')
+      +' · 耗时 '+r.ms+'ms';
   }catch(e){$('preSummary').textContent='预检失败：'+e.message;}
   $('btnPre').disabled=false;
 }

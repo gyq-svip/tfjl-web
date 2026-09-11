@@ -143,13 +143,20 @@ async function cmdPreflight(rt) {
   if (r.status !== 200 || !r.json || !r.json.checks) { bad('预检调用失败: ' + JSON.stringify(r.json || r.err)); }
   const d = r.json;
   if (asJson) { console.log(JSON.stringify(d)); return d.fail > 0 ? 1 : 0; }
+  let infoN = 0;
   d.checks.forEach(function (c) {
-    const tag = c.level === 'ok' ? '[OK]  ' : c.level === 'warn' ? '[WARN]' : c.level === 'fail' ? '[FAIL]' : '[INFO]';
+    if (c.level === 'info') infoN++;
+    const tag = c.level === 'ok' ? '[OK]  ' : c.level === 'warn' ? '[WARN]' : c.level === 'fail' ? '[FAIL]' : '[REF ]';
     console.log(tag + ' ' + c.title + (c.detail ? '\n        ' + c.detail : '') + (c.fix ? '\n        → ' + c.fix : ''));
   });
-  console.log('\n预检完成：' + d.checks.length + ' 项，fail=' + d.fail + '，warn=' + d.warn + '，耗时 ' + d.ms + 'ms');
-  if (d.fail > 0) console.log('❌ 有 ' + d.fail + ' 项阻断，先修好再打包发布。');
-  else console.log('✅ 无阻断项，可以进入打包/发布流程。');
+  console.log('\n预检完成：' + d.checks.length + ' 项，fail=' + d.fail + '，warn=' + d.warn + '，info=' + infoN + '，耗时 ' + d.ms + 'ms');
+  if (d.fail > 0) {
+    console.log('❌ 有 ' + d.fail + ' 项阻断，先修好再打包发布。');
+  } else {
+    console.log('✅ 没有阻断项，可以进入打包/发布流程。'
+      + (d.warn ? '（' + d.warn + ' 项 WARN 建议扫一眼）' : '')
+      + (infoN ? '（' + infoN + ' 项 REF 纯参考，不是问题、无需处理）' : ''));
+  }
   return d.fail > 0 ? 1 : 0;
 }
 
