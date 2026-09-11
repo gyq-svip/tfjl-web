@@ -4906,6 +4906,10 @@ if (true) {
 
     async function _preheatSkins(heroes) {
         if (_preheatStarted) return;
+        // 🔴 2026-09-12 低内存优化：极速版完全不显示皮肤 → 整条预热都跳过。
+        //    原来只在 _preheatLocalSkinUrls（本地线）里判了极速，本函数的网页/IndexedDB 线仍全量拉 421 张
+        //    （实测极速档仍创建 444 个 blob / 21.8MB），属漏网。
+        if (window.isPerfLite && window.isPerfLite()) { console.log('[SKIN] 极速模式：跳过皮肤预热（不显示皮肤，无需预热）'); return; }
         _preheatStarted = true;
         if (isTauriApp) {
             // Tauri: 磁盘缓存（一次性全量下载，后续秒开）
@@ -4913,8 +4917,14 @@ if (true) {
             return;
         }
         // 网页版: IndexedDB 预热（王城低配版英雄优先）
+        // 🔴 2026-09-12 低内存优化：优化版只预热主阵容英雄（同 _preheatLocalSkinUrls 的理由：
+        //    不铺卡池皮的档位没必要把 400 张全拉下来并建 blob，白占内存与带宽）
+        const _opt2 = !!(window.isPerfOptimized && window.isPerfOptimized());
+        if (_opt2) console.log('[SKIN] 优化模式：网页端仅预热主阵容英雄皮肤');
         let count = 0;
-        const _phEntries = Object.entries(heroes || {}).sort(([a], [b]) => (PRIORITY_HEROES.has(a) ? 0 : 1) - (PRIORITY_HEROES.has(b) ? 0 : 1));
+        const _phEntries = Object.entries(heroes || {})
+            .filter(([hero]) => !_opt2 || PRIORITY_HEROES.has(hero))
+            .sort(([a], [b]) => (PRIORITY_HEROES.has(a) ? 0 : 1) - (PRIORITY_HEROES.has(b) ? 0 : 1));
         for (const [heroName, skinList] of _phEntries) {
             if (!Array.isArray(skinList)) continue;
             for (const s of skinList) {
@@ -4939,9 +4949,15 @@ if (true) {
         if (window.isPerfLite && window.isPerfLite()) return; // 极速模式不显示皮肤，不预热
         _localUrlPreheatRunning = true;
         try {
-            // 主阵容英雄优先，保证开局 1-2 秒内先热起来
+            // 🔴 2026-09-12 低内存优化：按性能模式决定预热范围。
+            //    「优化版」根本不铺卡池/收藏的皮 → 那 350+ 张的「读盘+createImageBitmap 解码+canvas 缩放」
+            //    纯属浪费，而且会把解码位图塞进 WebView2 原生图片缓存（JS 侧 revoke 也释放不掉，只有重启才回收）。
+            //    故：优化版只预热「主阵容英雄」（开局秒开够用）；「高性能版」保持全量（要的是任何皮首次点击零读盘）。
+            const _opt = !!(window.isPerfOptimized && window.isPerfOptimized());
             const entries = Object.entries(window.skinRegistry || {})
+                .filter(([hero]) => !_opt || PRIORITY_HEROES.has(hero))   // 优化版：只留主阵容英雄
                 .sort(([a], [b]) => (PRIORITY_HEROES.has(a) ? 0 : 1) - (PRIORITY_HEROES.has(b) ? 0 : 1));
+            if (_opt) console.log('[SKIN] 优化模式：仅预热主阵容英雄皮肤（省内存/少解码；要全量预热请切「高性能」）');
             let warmed = 0, skipped = 0;
             for (const [heroName, skinList] of entries) {
                 if (!Array.isArray(skinList)) continue;
