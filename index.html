@@ -2867,5 +2867,28 @@
     } catch(e) { console.error('[admin-fallback] 初始化失败:', e); }
   })();
   </script>
+
+    <!-- ==================== 深海统计 浮窗（右边缘 · 可拖拽/缩放/最小化）====================
+         ⚠️ 此标记曾于某次改动中丢失，导致 initDeepseaMiniPanel() 找不到 #dsmpBody 而直接返回 =「深海统计打不开」。
+         2026-09-12 已按 git 5b2a20d 原样恢复，请勿删除（app-deepsea.js 依赖以下 id：
+         deepseaFloatPanel / dfpHeader / dfpResizer / dsmpBody / dsmpSeasonTag / deepseaToggle） -->
+<div class="deepsea-float-panel" id="deepseaFloatPanel">
+        <div class="dfp-header" id="dfpHeader">
+            <span class="dfp-title">🌊 深海统计 <span class="dfp-tag" id="dsmpSeasonTag">未开始</span></span>
+            <span class="dfp-actions">
+                <button class="dfp-btn" onclick="dsToggleMinimize()" title="最小化/展开">—</button>
+                <button class="dfp-btn" onclick="dsClosePanel()" title="关闭">×</button>
+            </span>
+        </div>
+        <div class="dfp-body" id="dsmpBody">
+            <div class="dfp-empty">暂无数据<br><span style="font-size:0.7rem;">点下方「完整统计」录入</span></div>
+        </div>
+        <div class="dfp-footer">
+            <button onclick="openDeepseaStats()">📊 完整统计</button>
+            <button class="ghost" onclick="initDeepseaMiniPanel()" title="刷新">🔄</button>
+        </div>
+        <div class="dfp-resizer" id="dfpResizer"></div>
+    </div>
+    <button class="deepsea-toggle" id="deepseaToggle" style="display:none;" onclick="dsOpenPanel()" title="打开深海统计">🌊</button>
 </body>
 </html>
