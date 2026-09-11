@@ -187,6 +187,12 @@
                 try {
                     const panel = document.getElementById('deepseaFloatPanel');
                     const toggle = document.getElementById('deepseaToggle');
+                    // 🔴 2026-09-12（用户要求「主页这深海悬浮窗暂时先关闭」）：
+                    //    无条件先隐藏浮窗与重开按钮。原实现把这段"主页面不再显示浮窗"(v260728-20)的强制隐藏
+                    //    写在 `if (!raw) return` 之后 → 从没保存过状态（新用户/清过缓存）时根本不执行，
+                    //    浮窗就一直显示在主页上。现改为无条件隐藏，再恢复位置/尺寸（状态仅备管理员页使用）。
+                    if (panel) panel.style.display = 'none';
+                    if (toggle) toggle.style.display = 'none';
                     const raw = localStorage.getItem('deepsea_panel_state');
                     if (!raw || !panel) return;
                     const st = JSON.parse(raw);
@@ -194,9 +200,6 @@
                     if (st.top) panel.style.top = st.top;
                     if (st.width) panel.style.width = st.width;
                     if (st.height) panel.style.height = st.height;
-                    // v260728-20：主页面不再显示浮窗（仅管理员入口进入），强制隐藏面板与重开按钮
-                    panel.style.display = 'none';
-                    if (toggle) toggle.style.display = 'none';
                 } catch (e) {}
             }
             window.initDeepseaMiniPanel = initDeepseaMiniPanel;
