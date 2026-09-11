@@ -5774,12 +5774,39 @@
             info.found.forEach(function (m) { marks = NBPC.Marks.clipInsert(info.text, marks, { s: m.start, e: m.end, color: useColor, glow: glow }); });
             win.marks = marks;
             persistNotebookMarks(win.marksKey, marks);
+            win._markPreviewDirty = false;           // 已落盘，清掉拖动预览的脏标记
+            delete win.__markPreviewBase;
             renderNotebookOverlay(windowId);
             const cEl = document.getElementById(windowId + '_findCount');
             if (cEl) cEl.textContent = '已标色 ' + info.found.length + ' 处';
             if (window.showToast) showToast('已把 ' + info.found.length + ' 处匹配标为 ' + useColor);
             refreshMarkColorDot(windowId);
             return info.found.length;
+        }
+
+        // 🔴 2026-09-12 拖动圆盘时的实时预览：立刻用新颜色重绘这些匹配的标色，但**不落盘**（松手才落盘）。
+        //    这样拖圆盘时文字颜色跟着手实时变，体验与「字体颜色」色轮一致。
+        function previewMarkAllMatches(windowId, hex) {
+            const info = _markMatchesOf(windowId);
+            if (!info || !info.found.length) return;
+            const win = txtFileWindows.find(function (w) { return w.id === windowId; });
+            if (!win) return;
+            // 首次预览前备份原始 marks：之后每次预览都从备份重算，
+            // 避免连续拖动反复 clipInsert 把标记叠加成多层（颜色会互相盖住）
+            if (!win._markPreviewDirty) {
+                win.__markPreviewBase = (win.marks || []).slice();
+                win._markPreviewDirty = true;
+            }
+            const glow = !!(document.getElementById(windowId + '_glowChk') || {}).checked;
+            let marks = win.__markPreviewBase;
+            info.found.forEach(function (m) { marks = NBPC.Marks.clipInsert(info.text, marks, { s: m.start, e: m.end, color: hex, glow: glow }); });
+            win.marks = marks;
+            setMarkColor(hex);
+            refreshMarkColorDot(windowId);
+            // 拖动会连发大量 mousemove → 合并到一帧最多重绘一次，避免长文档拖动卡顿
+            if (window.__markPreviewRaf) { try { cancelAnimationFrame(window.__markPreviewRaf); } catch (e) {} }
+            const doRender = function () { window.__markPreviewRaf = 0; try { renderNotebookOverlay(windowId); } catch (e) {} };
+            try { window.__markPreviewRaf = requestAnimationFrame(doRender); } catch (e) { doRender(); }
         }
 
         // 清除「当前查找匹配」上的标色（选错色后一键还原，不用手动擦）
@@ -5799,6 +5826,20 @@
 
         function closeMarkColorPopup() {
             const p = document.getElementById('nbMarkColorPopup');
+            const wid = (p && p.dataset && p.dataset.win) || '';
+            // 异常兜底：拖动预览过但没等到松手就关了（如拖到窗口外松开）→ 按你看到的颜色落盘，
+            // 避免"画面变了、重开又变回去"的不一致。
+            if (wid) {
+                try {
+                    const win = txtFileWindows.find(function (w) { return w.id === wid; });
+                    if (win && win._markPreviewDirty) {
+                        persistNotebookMarks(win.marksKey, win.marks);
+                        win._markPreviewDirty = false;
+                        delete win.__markPreviewBase;
+                        renderNotebookOverlay(wid);
+                    }
+                } catch (e) {}
+            }
             if (p && p.parentNode) p.parentNode.removeChild(p);
             try { document.removeEventListener('mousedown', _markColorDocClose, true); } catch (e) {}
         }
@@ -5839,7 +5880,7 @@
                 '<div style="display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-bottom:9px;">' + sw + '</div>' +
                 // 🎨 与「字体颜色」同款 NBPC 圆盘色轮（拖动实时显示颜色，松开即把全部匹配标成该色）
                 '<div style="border-top:1px solid rgba(255,255,255,0.12);padding-top:9px;">' +
-                    '<div style="color:rgba(255,255,255,0.55);font-size:0.68rem;margin-bottom:7px;text-align:center;">🎨 圆盘选色（拖动选色，松开即标色）</div>' +
+                    '<div style="color:rgba(255,255,255,0.55);font-size:0.68rem;margin-bottom:7px;text-align:center;">🎨 圆盘选色（拖动时文字实时变色，松开保存）</div>' +
                     '<div style="position:relative;width:132px;height:132px;margin:0 auto 9px;">' +
                         '<canvas id="nbMarkWheel_wheel" style="width:132px;height:132px;border-radius:50%;display:block;cursor:crosshair;box-shadow:0 0 0 1px rgba(255,255,255,0.28),0 4px 14px rgba(0,0,0,0.55);"></canvas>' +
                         '<div id="nbMarkWheel_wheelDot" style="position:absolute;left:66px;top:66px;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 5px rgba(0,0,0,0.9);transform:translate(-50%,-50%);pointer-events:none;"></div>' +
@@ -5889,7 +5930,9 @@
                 if (window.NBPC && NBPC.Wheel) {
                     if (NBPC.Wheel.injectStyles) NBPC.Wheel.injectStyles();
                     NBPC.Wheel.init('nbMarkWheel', {
-                        onApply: function (hex) { applyMarkAllMatches(windowId, hex); }
+                        onApply: function (hex) { applyMarkAllMatches(windowId, hex); },
+                        // 拖动中（含亮度条）实时预览：文字标记颜色跟着手变，松手才落盘
+                        onPreview: function (hex) { previewMarkAllMatches(windowId, hex); }
                     });
                     NBPC.Wheel.sync('nbMarkWheel', getMarkColor());
                 }
