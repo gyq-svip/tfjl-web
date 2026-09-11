@@ -2699,6 +2699,82 @@ fn gm_click(hwnd: usize, x: f64, y: f64, times: Option<u32>, gap_ms: Option<u64>
     }
 }
 
+/// 鼠标滚轮原语（2026-09-12 新增，用于「深海统计 · 自动连拍」的自动下滑翻页）：
+/// 坐标基准与 capture_window_region **完全一致** —— **窗口外框内的绝对像素**（x,y 从窗口左上角起算），
+/// 便于前端直接把「框选识别区域」的中心当滚轮落点，不用再做比例换算。
+///   mode="bg"（默认）：PostMessageW(WM_MOUSEWHEEL) 投递到窗口 —— 不抢鼠标、不要求前台/可见
+///                     （内部换算成客户区像素，再按 WM_MOUSEWHEEL 规范用屏幕坐标填充 lParam）；
+///                     能否生效取决于目标程序是否处理合成消息，需实测。
+///   mode="real"      ：SetCursorPos + mouse_event(MOUSEEVENTF_WHEEL) 真实滚轮 ——
+///                     窗口需前台/可见/未被遮挡，且会移动用户鼠标（与 gm_click 的 real 模式同限制）。
+/// delta：滚动量，**向下为负**（一格 = -120，前端默认一次滚 3 格 = -360）。
+#[tauri::command]
+fn gm_wheel(hwnd: usize, x: i32, y: i32, delta: Option<i32>, times: Option<u32>, mode: Option<String>) -> Result<String, String> {
+    let delta = delta.unwrap_or(-360);
+    let times = times.unwrap_or(1).clamp(1, 20);
+    let mode = mode.unwrap_or_else(|| "bg".to_string());
+    gm_wheel_impl(hwnd, x, y, delta, times, &mode)?;
+    Ok(format!("滚轮 {} ×{} 次（{} 模式，落点 {}×{}）", delta, times, mode, x, y))
+}
+
+fn gm_wheel_impl(hwnd: usize, x: i32, y: i32, delta: i32, times: u32, mode: &str) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use winapi::shared::windef::{HWND, POINT, RECT};
+        use winapi::um::winuser::{
+            ClientToScreen, GetClientRect, GetWindowRect, PostMessageW, SetCursorPos, mouse_event,
+            MOUSEEVENTF_WHEEL, WM_MOUSEWHEEL,
+        };
+        let hwnd = hwnd as HWND;
+        unsafe {
+            let mut wr: RECT = std::mem::zeroed();
+            if GetWindowRect(hwnd, &mut wr) == 0 {
+                return Err("获取窗口尺寸失败（窗口可能已关闭）".into());
+            }
+            let mut cr: RECT = std::mem::zeroed();
+            if GetClientRect(hwnd, &mut cr) == 0 {
+                return Err("获取窗口客户区失败".into());
+            }
+            let cw = cr.right - cr.left;
+            let ch = cr.bottom - cr.top;
+            if cw <= 0 || ch <= 0 {
+                return Err("窗口尺寸非法（窗口可能已最小化）".into());
+            }
+            // 客户区原点（屏幕坐标）→ 求出「窗口外框坐标 → 客户区坐标」的偏移（含标题栏/边框）
+            let mut org: POINT = std::mem::zeroed();
+            if ClientToScreen(hwnd, &mut org) == 0 {
+                return Err("坐标换算失败".into());
+            }
+            let off_x = org.x - wr.left;
+            let off_y = org.y - wr.top;
+            let cx = (x - off_x).clamp(0, cw - 1);
+            let cy = (y - off_y).clamp(0, ch - 1);
+            let sx = org.x + cx;
+            let sy = org.y + cy;
+            for n in 0..times {
+                if mode == "real" {
+                    SetCursorPos(sx, sy);
+                    mouse_event(MOUSEEVENTF_WHEEL, 0, 0, delta as u32, 0);
+                } else {
+                    // WM_MOUSEWHEEL：lParam = 屏幕坐标(低16位 x / 高16位 y)，wParam 高16位 = 滚动量
+                    let lparam = (((sy as i64) << 16) | ((sx as i64) & 0xFFFF)) as isize;
+                    let wparam = ((delta as u32) << 16) as usize;
+                    PostMessageW(hwnd, WM_MOUSEWHEEL, wparam, lparam);
+                }
+                if n + 1 < times {
+                    std::thread::sleep(std::time::Duration::from_millis(80));
+                }
+            }
+        }
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (hwnd, x, y, delta, times, mode);
+        Err("仅支持 Windows".into())
+    }
+}
+
 /// 查询监控是否运行中（前端打开面板时恢复按钮状态用）
 #[tauri::command]
 fn game_monitor_status() -> bool {
@@ -2837,6 +2913,7 @@ pub fn run() {
             game_monitor_stop,
             game_monitor_status,
             gm_click,
+            gm_wheel,
         ])
         .manage(AppState { umi_pid: std::sync::Mutex::new(None), heartbeat: std::sync::Mutex::new(None), checkin_day: std::sync::Mutex::new(None) })
         .setup(|app| {
