@@ -220,11 +220,6 @@ tr.rk-weak:hover td{opacity:1}
                     <option value="">— 启动时自动找游戏窗口 —</option>
                 </select>
                 <button class="ghost small" onclick="deepseaAutoCapPickRegion()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);padding:3px 8px;border-radius:6px;font-size:0.72rem;" title="在窗口截图上拖拽框出「联盟列表」区域，只识别这一块（更快、更准、少干扰）；不框则识别整窗">🎯 框选区域</button>
-                <select id="deepseaCapInterval" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:3px 6px;font-size:0.72rem;" title="每隔多久抓一张（抓太快 OCR 会排队，2.5 秒比较稳）">
-                    <option value="1500">1.5 秒/张</option>
-                    <option value="2500" selected>2.5 秒/张</option>
-                    <option value="4000">4 秒/张</option>
-                </select>
                 <label style="display:flex;align-items:center;gap:4px;font-size:0.72rem;color:#cfe;cursor:pointer;" title="连拍时自动向下滚动列表（需要更新软件后才可用；不支持时会提示一次，请改用手动滚轮）"><input type="checkbox" id="deepseaCapAutoScroll"> ⤓ 自动下滑</label>
                 <select id="deepseaCapScrollStep" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:3px 6px;font-size:0.72rem;" title="每次自动下滑滚多少：-360≈半条联盟，-1440≈2条联盟（默认），-2160≈3条，-3600≈一页">
                     <option value="-360">半条联盟（微调）</option>
@@ -1525,36 +1520,153 @@ async function deepseaCapProbeSize(){
     _dsAutoCap.winW=sz.w; _dsAutoCap.winH=sz.h;
     return sz;
 }
-async function deepseaCapFrame(){
-    if(!_dsAutoCap.on || _dsAutoCap.busy) return;
-    _dsAutoCap.busy=true;
-    try{
-        // 允许连拍中途换窗口
-        const sel=document.getElementById('deepseaCapWin');
-        if(sel && sel.value && Number(sel.value)!==_dsAutoCap.hwnd){
-            _dsAutoCap.hwnd=Number(sel.value);
-            const o=sel.selectedOptions && sel.selectedOptions[0];
-            _dsAutoCap.winTitle=o?(o.textContent||''):'';
-        }
-        // 自动连拍：强制整窗截图（忽略框选区域）。滚动 delta 与卡片高度非整数倍会导致固定区域错位截到半张卡，
-        // 且游戏平滑滚动有累积抖动；整窗每帧独立、靠 OCR 去重吸收偏移（重叠合并、边缘补切），偏移不再产生漏识别。
-        // 手动滚动（未勾自动下滑）时仍可用框选区域提速。
-        const cbScroll=document.getElementById('deepseaCapAutoScroll');
-        const b64=await deepseaCapGrab(!(cbScroll && cbScroll.checked) ? false : true);
+// ============ 校验驱动连拍：截图 → OCR → 确认本屏数据完整 → 才下滑下一屏 ============
+// 不再用定时器盲拍：每一屏都要"识别到全部信息"才前进；不完整就原地重拍，
+// 仍不行就回退滚动重新对齐，直到截到完整一屏（避免边缘卡被切导致漏识别）。
+const _DS_CAP_SETTLE = 350;        // 滚动/重拍后等待动画停稳的毫秒
+const _DS_CAP_MAX_SAME = 2;        // 同位置最多重拍次数
+const _DS_CAP_MAX_ROLLBACK = 3;    // 最多回退对齐次数（仍不行则保留已识别部分继续）
+const deepseaCapSleep = ms => new Promise(r=>setTimeout(r, ms));
+
+// 只识别当前帧、不立即入库：返回该帧切片与拼接文本；由上层决定要不要保留
+async function deepseaCapOcrFrame(b64){
+    const beforeLen = deepseaSliceResults.length;
+    await deepseaRunOcr([deepseaCapB64ToFile(b64,'dscap-'+Date.now()+'.bmp')],
+                        {append:true, quiet:true, throwOnError:true});
+    const slices = deepseaSliceResults.slice(beforeLen);
+    const text = slices.map(s=>s.text).join('\n');
+    return { text, beforeLen };
+}
+// 撤销上一帧（不完整时回退入库，避免废数据污染去重结果）
+function deepseaCapUndoFrame(beforeLen){ deepseaSliceResults.length = beforeLen; }
+
+// 判定一屏是否"识别到全部信息"：边缘卡未被截断 + 至少解析出卡
+function deepseaCapIsComplete(cards, text){
+    if(!cards || cards.length===0) return false; // 完全没识别出来（动画中/遮挡/空屏）→ 不完整
+    const has=v=>v!==undefined&&v!==null&&String(v).trim()!=='';
+    const first=cards[0], last=cards[cards.length-1];
+    // 顶部卡被切 → 缺 联盟ID（去重入库必要字段）；底部卡被切 → 缺 联盟战力（卡底字段）
+    const topOk = has(first['联盟ID']);
+    const botOk = has(last['联盟战力']);
+    return cards.length>=1 && topOk && botOk;
+}
+
+// 截一帧并验证完整；不完整则同位置重拍，必要时回退滚动重新对齐，直到完整或放弃
+async function deepseaCapGetCompleteFrame(useAutoScroll){
+    let sameTries=0, rollbackTries=0, ocrFail=0;
+    while(_dsAutoCap.on){
+        const b64=await deepseaCapGrab(true); // 强制整窗（宽），杜绝窄条
         _dsAutoCap.frame++;
-        const append = (_dsAutoCap.baseCount>0) || (_dsAutoCap.frame>1);
-        await deepseaRunOcr([deepseaCapB64ToFile(b64,'dscap-'+Date.now()+'.bmp')],
-                            {append:append, quiet:true, throwOnError:true});
+        let frame;
+        try{ frame=await deepseaCapOcrFrame(b64); }
+        catch(e){
+            _dsAutoCap.err++;
+            if(++ocrFail>5){ deepseaCapStatus('⚠️ OCR 连续失败，停止连拍（检查 Umi-OCR 是否在运行）', '#ff8a80'); _dsAutoCap.on=false; break; }
+            deepseaCapStatus('⚠️ 第 '+_dsAutoCap.frame+' 张 OCR 失败：'+((e&&e.message)||e)+'，稍后重拍', '#ffb84d');
+            await deepseaCapSleep(_DS_CAP_SETTLE); continue;
+        }
+        let cards=parseDeepseaOcrText(frame.text);
+        if(!cards.length) cards=parseDeepseaCardText(frame.text, deepseaCurrentFaction||'');
+        if(deepseaCapIsComplete(cards, frame.text)){
+            return { frame, cards, b64 };
+        }
+        deepseaCapUndoFrame(frame.beforeLen); // 不完整 → 先撤销该帧入库
+        if(sameTries<_DS_CAP_MAX_SAME){
+            sameTries++;
+            deepseaCapStatus('📸 第 '+_dsAutoCap.frame+' 张边缘卡被切（不完整），原地重拍…（'+sameTries+'/'+_DS_CAP_MAX_SAME+'）', '#ffb84d');
+            await deepseaCapSleep(_DS_CAP_SETTLE); continue;
+        }
+        rollbackTries++;
+        if(rollbackTries>_DS_CAP_MAX_ROLLBACK){
+            deepseaCapStatus('⚠️ 第 '+_dsAutoCap.frame+' 张多帧仍不完整，保留已识别部分继续', '#ffb84d');
+            return { frame, cards, b64, partial:true };
+        }
+        if(useAutoScroll){
+            await deepseaCapWheelRollback(); // 往回滚一点重新对齐
+            deepseaCapStatus('↩️ 本屏不完整，回退滚动对齐后重拍…（'+rollbackTries+'/'+_DS_CAP_MAX_ROLLBACK+'）', '#ffb84d');
+        }else{
+            deepseaCapStatus('↩️ 本屏不完整，请手动往回滚动一点点对齐后稍候…', '#ffb84d');
+            const ok=await deepseaCapWaitForScrollChange(b64);
+            if(!ok) return { frame, cards, b64, partial:true };
+        }
+        sameTries=0;
+        await deepseaCapSleep(_DS_CAP_SETTLE);
+    }
+    return null; // 已停止
+}
+// 自动下滑时回退滚动（约 1/3 步）重新对齐
+async function deepseaCapWheelRollback(){
+    if(_dsAutoCap.wheelOk===false) return;
+    const invoke=deepseaGetInvoke(); if(!invoke) return;
+    const r=_dsAutoCap.region;
+    const px = r ? Math.round(r.x+r.w/2) : Math.round((_dsAutoCap.winW||600)/2);
+    const py = r ? Math.round(r.y+r.h/2) : Math.round((_dsAutoCap.winH||400)*0.7);
+    const stepSel=document.getElementById('deepseaCapScrollStep');
+    const full=stepSel?Math.min(-120,Number(stepSel.value)||-1440):-1440;
+    const delta=Math.round(-full*0.34); // 回退约 1/3 步
+    try{ await invoke('gm_wheel',{hwnd:_dsAutoCap.hwnd,x:px,y:py,delta:delta,times:1}); _dsAutoCap.wheelOk=true; }
+    catch(e){ _dsAutoCap.wheelOk=false; }
+}
+// 粗粒度指纹：手动模式检测"用户是否滚动了"（忽略小幅动画，捕捉整屏位移）
+function deepseaCapFingerprint(b64){
+    return new Promise(res=>{
+        const im=new Image();
+        im.onload=()=>{ try{
+            const c=document.createElement('canvas'); c.width=48; c.height=48;
+            const ctx=c.getContext('2d'); ctx.drawImage(im,0,0,48,48);
+            const d=ctx.getImageData(0,0,48,48).data; let s='';
+            for(let i=0;i<d.length;i+=4){ s+=(d[i]>>4)+','+(d[i+1]>>4)+','+(d[i+2]>>4)+';'; }
+            res(s);
+        }catch(e){ res('len'+b64.length+':'+b64.slice(0,160)); } };
+        im.onerror=()=>res('len'+b64.length+':'+b64.slice(0,160));
+        im.src='data:image/bmp;base64,'+b64;
+    });
+}
+async function deepseaCapWaitForScrollChange(lastB64, timeoutMs){
+    const timeout=timeoutMs||120000; const start=Date.now();
+    const lastFp=await deepseaCapFingerprint(lastB64);
+    while(_dsAutoCap.on && (Date.now()-start)<timeout){
+        await deepseaCapSleep(450);
+        const b64=await deepseaCapGrab(true);
+        const fp=await deepseaCapFingerprint(b64);
+        if(fp!==lastFp) return true;
+    }
+    return false;
+}
+// 主循环：逐屏校验驱动
+async function deepseaAutoCapRun(){
+    const cb=document.getElementById('deepseaCapAutoScroll');
+    const useAuto=!!(cb&&cb.checked);
+    let noNew=0;
+    while(_dsAutoCap.on){
+        const beforeUniq=deepseaCapCountUnique().uniq;
+        const got=await deepseaCapGetCompleteFrame(useAuto);
+        if(!got) break; // 用户停止
+        const afterUniq=deepseaCapCountUnique().uniq;
+        const added=afterUniq-beforeUniq;
         const st=deepseaCapCountUnique();
         const dup=st.total-st.uniq;
-        deepseaCapStatus('📸 已拍 '+_dsAutoCap.frame+' 张 → 识别出 '+st.uniq+' 个联盟'
-            +(dup?('（重复 '+dup+' 条已自动过滤）'):'')+'，继续滚…', '#7CFC9B');
-        const cb=document.getElementById('deepseaCapAutoScroll');
-        if(cb && cb.checked) await deepseaCapWheel();
-    }catch(e){
-        _dsAutoCap.err++;
-        deepseaCapStatus('⚠️ 第 '+_dsAutoCap.frame+' 张失败：'+((e&&e.message)||e)+'（继续尝试）', '#ffb84d');
-    }finally{ _dsAutoCap.busy=false; }
+        if(got.partial){
+            deepseaCapStatus('📸 第 '+_dsAutoCap.frame+' 张（不完整，已保留部分）→ 共 '+afterUniq+' 个联盟', '#ffb84d');
+        }else{
+            deepseaCapStatus('✅ 第 '+_dsAutoCap.frame+' 张完整（'+got.cards.length+' 张卡，新增 '+added+' 个联盟）'+((dup)?('，重复 '+dup+' 条已过滤'):'')+' → '+(useAuto?'下滑下一屏':'等待你滚动'), '#7CFC9B');
+        }
+        if(useAuto){
+            if(added===0) noNew++; else noNew=0;
+            if(noNew>=4){
+                deepseaCapStatus('🏁 连续多屏无新增联盟，已到列表底部，自动停止。共识别 '+afterUniq+' 个联盟', '#7CFC9B');
+                break;
+            }
+            await deepseaCapWheel();
+            await deepseaCapSleep(_DS_CAP_SETTLE);
+        }else{
+            deepseaCapStatus('✅ 本屏已识别完整（'+got.cards.length+' 张卡），请滚动到下一屏…', '#7CFC9B');
+            const ok=await deepseaCapWaitForScrollChange(got.b64);
+            if(!ok){ deepseaCapStatus('⌛ 等待滚动超时，已暂停。点「自动连拍」可继续。', '#ffb84d'); break; }
+            await deepseaCapSleep(_DS_CAP_SETTLE);
+        }
+    }
+    if(_dsAutoCap.on) deepseaAutoCapStop();
 }
 async function deepseaAutoCapStart(){
     try{
@@ -1562,22 +1674,16 @@ async function deepseaAutoCapStart(){
         await deepseaCapProbeSize();
     }catch(e){
         const m=(e&&e.message)||String(e);
-        toast('❌ '+m);
-        deepseaCapStatus('❌ '+m, '#ff8a80');
-        return;
+        toast('❌ '+m); deepseaCapStatus('❌ '+m, '#ff8a80'); return;
     }
     _dsAutoCap.on=true; _dsAutoCap.frame=0; _dsAutoCap.err=0; _dsAutoCap.warned=false; _dsAutoCap.wheelOk=null;
     _dsAutoCap.baseCount=deepseaSliceResults.length;   // 已有结果则追加，不清空（想清空先点「清空重来」）
     deepseaCapBtnText();
     const panel=document.getElementById('deepseaOcrPanel'); if(panel) panel.classList.remove('hidden');
-    const iv=Math.max(800, Number((document.getElementById('deepseaCapInterval')||{}).value)||2500);
-    await deepseaCapFrame();
-    if(!_dsAutoCap.on) return;
-    _dsAutoCap.timer=setInterval(deepseaCapFrame, iv);
     const cb=document.getElementById('deepseaCapAutoScroll');
-    toast('▶️ 自动连拍已开始（每 '+(iv/1000)+' 秒一张）——滚动游戏列表即可'+(cb&&cb.checked?'（自动下滑中）':'')+'，全程自动去重累积');
-    deepseaCapStatus('▶️ 连拍中：'+(_dsAutoCap.winTitle||'游戏窗口')+'（每 '+(iv/1000)+'s 一张）'
-        +(_dsAutoCap.baseCount>0?('，追加在已有 '+_dsAutoCap.baseCount+' 块之后'):''), '#7CFC9B');
+    toast('▶️ 校验驱动连拍已开始：每屏截图→识别→确认完整才下滑；不完整会原地重拍/回退对齐。'+(cb&&cb.checked?'（自动下滑）':'（手动滚动，滚到下一屏自动续拍）'));
+    deepseaCapStatus('▶️ 校验驱动连拍中：'+(_dsAutoCap.winTitle||'游戏窗口')+(_dsAutoCap.baseCount>0?('，追加在已有 '+_dsAutoCap.baseCount+' 块之后'):''), '#7CFC9B');
+    deepseaAutoCapRun(); // 异步循环，不阻塞按钮
 }
 function deepseaAutoCapStop(){
     _dsAutoCap.on=false;
