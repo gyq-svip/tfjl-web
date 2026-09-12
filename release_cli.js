@@ -184,6 +184,15 @@ async function cmdRun(rt, stepKey, humanLabel) {
   return (lr && lr.ok) ? 0 : 1;
 }
 
+async function cmdRelease(rt) {
+  const order = [['build', '打包'], ['sign', '签名'], ['publish', '发布']];
+  for (let k = 0; k < order.length; k++) {
+    const c = await cmdRun(rt, order[k][0], order[k][1]);
+    if (c !== 0) { console.error('[FAIL] ' + order[k][1] + ' 失败，已中止一条龙'); return 1; }
+  }
+  return await cmdRunVerify(rt);
+}
+
 async function cmdRunVerify(rt) {
   const start = await api(rt, 'POST', '/api/run', { step: 'verify-online' });
   if (start.status !== 202) { console.error('[FAIL] 无法启动线上验证: ' + JSON.stringify(start.json || start.err)); return 1; }
@@ -239,6 +248,7 @@ const HELP = [
   '  node release_cli.js build             打包',
   '  node release_cli.js sign              签名',
   '  node release_cli.js publish --yes     发布（不可逆，必须 --yes）',
+  '  node release_cli.js release --yes     一条龙：打包→签名→发布→线上验证（打包约 3 分钟；不可逆，必须 --yes）',
   '  node release_cli.js verify            线上验证（只读）',
   '  node release_cli.js logs --tail 50    查看最近日志',
   '  node release_cli.js cancel            中止当前步骤',
@@ -265,6 +275,9 @@ const HELP = [
     case 'publish': case 'pub': case 'p':
       if (!yes) { console.error('[FAIL] publish 是不可逆操作（上传 Gitee 发行版 + 推送 Pages）。确认无误请加 --yes。'); process.exit(2); }
       code = await cmdRun(rt, 'publish', '发布'); break;
+    case 'release': case 'r':
+      if (!yes) { console.error('[FAIL] release 含不可逆的发布步骤（打包→签名→发布→验证），必须加 --yes。'); process.exit(2); }
+      code = await cmdRelease(rt); break;
     case 'verify': case 'v': code = await cmdRunVerify(rt); break;
     case 'logs': code = await cmdLogs(rt); break;
     case 'cancel': code = await cmdCancel(rt); break;
