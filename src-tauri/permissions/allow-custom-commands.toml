@@ -197,3 +197,13 @@ commands.allow = ["gm_click"]
 identifier = "allow-gm-wheel"
 description = "Allow frontend-driven mouse wheel primitive at a window-frame pixel point (used by deepsea auto-capture auto-scroll; bg=PostMessage to window, real=SetCursorPos+mouse_event)"
 commands.allow = ["gm_wheel"]
+
+[[permission]]
+identifier = "allow-capture-screen-rect"
+description = "Allow capturing the game window's real on-screen pixels via desktop BitBlt (DWM-composited, robust for backgrounded games; window must be visible/unoccluded)"
+commands.allow = ["capture_screen_rect"]
+
+[[permission]]
+identifier = "allow-bring-to-front"
+description = "Allow bringing the game window to foreground before capture so backgrounded games re-run their render loop (best-effort, Windows focus policy may block)"
+commands.allow = ["bring_to_front"]
