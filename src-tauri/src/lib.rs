@@ -1722,25 +1722,7 @@ fn capture_region_bmp(hwnd: usize, x: i32, y: i32, w: i32, h: i32, full: bool) -
             }
 
             // 4) 构造 32 位 BMP（14 文件头 + 40 信息头 + BGRA 数据，top-down）
-            let data_len = out.len() as u32;
-            let file_len = 54 + data_len;
-            let mut bmp: Vec<u8> = Vec::with_capacity(54 + out.len());
-            bmp.extend_from_slice(b"BM");
-            bmp.extend_from_slice(&file_len.to_le_bytes());
-            bmp.extend_from_slice(&0u32.to_le_bytes());
-            bmp.extend_from_slice(&54u32.to_le_bytes());
-            let mut hdr = [0u8; 40];
-            hdr[0..4].copy_from_slice(&40u32.to_le_bytes());
-            hdr[4..8].copy_from_slice(&(rw as i32).to_le_bytes());
-            hdr[8..12].copy_from_slice(&(-(rh as i32)).to_le_bytes());
-            hdr[12..14].copy_from_slice(&1u16.to_le_bytes());
-            hdr[14..16].copy_from_slice(&32u16.to_le_bytes());
-            hdr[16..20].copy_from_slice(&(BI_RGB as u32).to_le_bytes());
-            hdr[20..24].copy_from_slice(&data_len.to_le_bytes());
-            bmp.extend_from_slice(&hdr);
-            bmp.extend_from_slice(&out);
-
-            Ok(bmp)
+            Ok(build_bmp(&out, rw, rh))
         }
     }
     #[cfg(not(windows))]
@@ -1753,6 +1735,127 @@ fn capture_region_bmp(hwnd: usize, x: i32, y: i32, w: i32, h: i32, full: bool) -
 #[tauri::command]
 fn capture_window_region(hwnd: usize, x: i32, y: i32, w: i32, h: i32, full: Option<bool>) -> Result<String, String> {
     Ok(B64.encode(capture_region_bmp(hwnd, x, y, w, h, full.unwrap_or(false))?))
+}
+
+/// 把 BGRA 像素构造为 32 位 BMP（14 文件头 + 40 信息头 + 数据，top-down）。
+/// 供 PrintWindow 与桌面截图共用，保证两种截图返回格式一致。
+#[cfg(windows)]
+fn build_bmp(out: &[u8], rw: i32, rh: i32) -> Vec<u8> {
+    let data_len = out.len() as u32;
+    let file_len = 54 + data_len;
+    let mut bmp: Vec<u8> = Vec::with_capacity(54 + out.len());
+    bmp.extend_from_slice(b"BM");
+    bmp.extend_from_slice(&file_len.to_le_bytes());
+    bmp.extend_from_slice(&0u32.to_le_bytes());
+    bmp.extend_from_slice(&54u32.to_le_bytes());
+    let mut hdr = [0u8; 40];
+    hdr[0..4].copy_from_slice(&40u32.to_le_bytes());
+    hdr[4..8].copy_from_slice(&rw.to_le_bytes());
+    hdr[8..12].copy_from_slice(&(-rh).to_le_bytes());
+    hdr[12..14].copy_from_slice(&1u16.to_le_bytes());
+    hdr[14..16].copy_from_slice(&32u16.to_le_bytes());
+    hdr[16..20].copy_from_slice(&0u32.to_le_bytes()); // BI_RGB = 0
+    hdr[20..24].copy_from_slice(&data_len.to_le_bytes());
+    bmp.extend_from_slice(&hdr);
+    bmp.extend_from_slice(out);
+    bmp
+}
+
+/// 桌面截图：直接 BitBlt 屏幕 DC 上「窗口矩形」对应的真实像素。
+/// 走 DWM 合成层，永远是最新、已落地的画面，不依赖游戏内部渲染循环 ——
+/// 解决「游戏后台时 PrintWindow 截到陈旧/半渲染帧」的精准截图难题。
+/// 要求：游戏窗口在屏幕上可见（未被其他窗口完全遮挡）。
+fn capture_screen_rect_bmp(hwnd: usize, x: i32, y: i32, w: i32, h: i32, full: bool) -> Result<Vec<u8>, String> {
+    #[cfg(windows)]
+    {
+        use std::mem;
+        use winapi::shared::windef::{HWND, HGDIOBJ, RECT};
+        use winapi::um::wingdi::{
+            BITMAPINFO, BITMAPINFOHEADER, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC,
+            DeleteObject, GetDIBits, SelectObject, DIB_RGB_COLORS, BI_RGB, SRCCOPY, BitBlt,
+        };
+        use winapi::um::winuser::{GetDC, GetWindowRect, ReleaseDC};
+
+        if w <= 0 || h <= 0 {
+            return Err(format!("区域尺寸非法：{}x{}", w, h));
+        }
+        let hwnd = hwnd as HWND;
+        unsafe {
+            let mut win_rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+            if GetWindowRect(hwnd, &mut win_rect) == 0 {
+                return Err("获取窗口位置失败（窗口可能已关闭）".into());
+            }
+            let (sx, sy) = if full {
+                (win_rect.left, win_rect.top)
+            } else {
+                (win_rect.left + x, win_rect.top + y)
+            };
+            let sw = if full { win_rect.right - win_rect.left } else { w };
+            let sh = if full { win_rect.bottom - win_rect.top } else { h };
+            if sw <= 0 || sh <= 0 {
+                return Err("窗口尺寸非法".into());
+            }
+            let hdc_screen = GetDC(0 as HWND);
+            if hdc_screen.is_null() {
+                return Err("获取屏幕 DC 失败".into());
+            }
+            let hdc_mem = CreateCompatibleDC(hdc_screen);
+            let hbmp = CreateCompatibleBitmap(hdc_screen, sw, sh);
+            let old_bmp = SelectObject(hdc_mem, hbmp as HGDIOBJ);
+            // SRCCOPY：拷屏幕真实像素（DWM 已合成，绕过游戏后台渲染节流）
+            let _ = BitBlt(hdc_mem, 0, 0, sw, sh, hdc_screen, sx, sy, SRCCOPY);
+            let mut bmi: BITMAPINFO = mem::zeroed();
+            bmi.bmiHeader.biSize = mem::size_of::<BITMAPINFOHEADER>() as u32;
+            bmi.bmiHeader.biWidth = sw;
+            bmi.bmiHeader.biHeight = -sh;
+            bmi.bmiHeader.biPlanes = 1;
+            bmi.bmiHeader.biBitCount = 32;
+            bmi.bmiHeader.biCompression = BI_RGB;
+            let mut pixels: Vec<u8> = vec![0u8; (sw as usize) * (sh as usize) * 4];
+            let got = GetDIBits(hdc_mem, hbmp, 0, sh as u32, pixels.as_mut_ptr() as *mut _, &mut bmi, DIB_RGB_COLORS);
+            if got == 0 {
+                SelectObject(hdc_mem, old_bmp);
+                DeleteObject(hbmp as HGDIOBJ);
+                DeleteDC(hdc_mem);
+                ReleaseDC(0 as HWND, hdc_screen);
+                return Err("读取屏幕像素失败".into());
+            }
+            SelectObject(hdc_mem, old_bmp);
+            DeleteObject(hbmp as HGDIOBJ);
+            DeleteDC(hdc_mem);
+            ReleaseDC(0 as HWND, hdc_screen);
+            Ok(build_bmp(&pixels, sw, sh))
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (hwnd, x, y, w, h, full);
+        Err("仅支持 Windows".into())
+    }
+}
+
+#[tauri::command]
+fn capture_screen_rect(hwnd: usize, x: i32, y: i32, w: i32, h: i32, full: Option<bool>) -> Result<String, String> {
+    Ok(B64.encode(capture_screen_rect_bmp(hwnd, x, y, w, h, full.unwrap_or(false))?))
+}
+
+/// 把游戏窗口置顶/恢复前台：让后台节流的游戏重新跑渲染循环，
+/// 配合 PrintWindow 后台截图可在捕获前拿到最新画面（best-effort，受 Windows 焦点策略限制）。
+#[tauri::command]
+fn bring_to_front(hwnd: usize) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use winapi::shared::windef::HWND;
+        use winapi::um::winuser::{IsIconic, SetForegroundWindow, ShowWindow, SW_RESTORE};
+        let hwnd = hwnd as HWND;
+        unsafe {
+            if IsIconic(hwnd) != 0 { ShowWindow(hwnd, SW_RESTORE); }
+            SetForegroundWindow(hwnd);
+        }
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    { let _ = hwnd; Err("仅支持 Windows".into()) }
 }
 
 /// TTS 语音播报核心（命令与波数监控线程共用）
@@ -2914,6 +3017,8 @@ pub fn run() {
             game_monitor_status,
             gm_click,
             gm_wheel,
+            capture_screen_rect,
+            bring_to_front,
         ])
         .manage(AppState { umi_pid: std::sync::Mutex::new(None), heartbeat: std::sync::Mutex::new(None), checkin_day: std::sync::Mutex::new(None) })
         .setup(|app| {
