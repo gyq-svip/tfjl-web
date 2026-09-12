@@ -1536,7 +1536,11 @@ async function deepseaCapFrame(){
             const o=sel.selectedOptions && sel.selectedOptions[0];
             _dsAutoCap.winTitle=o?(o.textContent||''):'';
         }
-        const b64=await deepseaCapGrab(false);
+        // 自动连拍：强制整窗截图（忽略框选区域）。滚动 delta 与卡片高度非整数倍会导致固定区域错位截到半张卡，
+        // 且游戏平滑滚动有累积抖动；整窗每帧独立、靠 OCR 去重吸收偏移（重叠合并、边缘补切），偏移不再产生漏识别。
+        // 手动滚动（未勾自动下滑）时仍可用框选区域提速。
+        const cbScroll=document.getElementById('deepseaCapAutoScroll');
+        const b64=await deepseaCapGrab(!(cbScroll && cbScroll.checked) ? false : true);
         _dsAutoCap.frame++;
         const append = (_dsAutoCap.baseCount>0) || (_dsAutoCap.frame>1);
         await deepseaRunOcr([deepseaCapB64ToFile(b64,'dscap-'+Date.now()+'.bmp')],
