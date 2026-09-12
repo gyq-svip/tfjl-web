@@ -55,8 +55,6 @@
     "allow-game-monitor-status",
     "allow-gm-click",
     "allow-gm-wheel",
-    "allow-capture-screen-rect",
-    "allow-bring-to-front",
     "dialog:default",
     "dialog:allow-open",
     "dialog:allow-save",
