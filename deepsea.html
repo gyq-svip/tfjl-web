@@ -233,12 +233,6 @@ tr.rk-weak:hover td{opacity:1}
                     <option value="-2160">3 条联盟</option>
                     <option value="-3600">约一页</option>
                 </select>
-                <select id="deepseaCapCaptureMode" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:3px 6px;font-size:0.72rem;" title="截图方式：🪟窗口(PrintWindow) 后台可能截到陈旧帧；🖥桌面 走 DWM 合成层、永远是最新画面（游戏需可见、未被遮挡）">
-                    <option value="window" selected>🪟 窗口截图</option>
-                    <option value="screen">🖥 桌面截图(更稳)</option>
-                </select>
-                <label style="display:flex;align-items:center;gap:4px;font-size:0.72rem;color:#cfe;cursor:pointer;" title="捕获前把游戏窗口置顶，让后台节流的游戏重新渲染（需更新软件）"><input type="checkbox" id="deepseaCapForeground"> ⤒ 置顶</label>
-                <label style="display:flex;align-items:center;gap:4px;font-size:0.72rem;color:#cfe;cursor:pointer;" title="每次滚动后等多少毫秒再截图，确保平滑动画落地（防截到半截卡）">稳定<input type="number" id="deepseaCapSettle" value="350" min="0" max="2000" style="width:50px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:2px 4px;font-size:0.72rem;">ms</label>
                 <span id="deepseaCapStatus" style="font-size:0.72rem;color:rgba(255,255,255,0.6);"></span>
             </div>
             <div id="deepseaOcrPanel" class="hidden" style="border:1px dashed rgba(77,182,172,0.4);border-radius:8px;padding:8px;margin-bottom:8px;">
@@ -1457,7 +1451,7 @@ function deepseaPickFaction(f){
 //   → 直接喂 deepseaRunOcr（追加模式）→ 每帧统计「去重后的联盟数」，滚到哪记到哪。
 // 滚动：优先调 gm_wheel（见 lib.rs，**新版 exe 才有**）；旧版拿不到就提示一次、由你手动滚轮，连拍照常累积。
 let _dsAutoCap = { on:false, hwnd:0, winTitle:'', region:null, winW:0, winH:0,
-                   timer:null, frame:0, baseCount:0, err:0, busy:false, warned:false, wheelOk:null, screenWarned:false };
+                   timer:null, frame:0, baseCount:0, err:0, busy:false, warned:false, wheelOk:null };
 
 function deepseaCapB64ToFile(b64, name){
     const bin=atob(b64), n=bin.length, u8=new Uint8Array(n);
@@ -1510,18 +1504,6 @@ async function deepseaCapResolveWin(){
 async function deepseaCapGrab(full){
     const invoke=deepseaGetInvoke();
     const r=_dsAutoCap.region;
-    const modeSel=document.getElementById('deepseaCapCaptureMode');
-    const mode=(modeSel&&modeSel.value)||'window';
-    if(mode==='screen'){
-        try{
-            if(!full && r) return await invoke('capture_screen_rect', {hwnd:_dsAutoCap.hwnd, x:r.x, y:r.y, w:r.w, h:r.h, full:false});
-            return await invoke('capture_screen_rect', {hwnd:_dsAutoCap.hwnd, x:0, y:0, w:1, h:1, full:true});
-        }catch(e){
-            // 旧版 exe 无该命令 → 兜底回窗口截图并提示一次
-            if(!_dsAutoCap.screenWarned){ _dsAutoCap.screenWarned=true; toast('⚠️ 桌面截图需更新软件后才可用，已回退窗口截图'); }
-            deepseaCapStatus('💡 桌面截图不可用，回退窗口截图', '#ffb84d');
-        }
-    }
     if(!full && r) return await invoke('capture_window_region', {hwnd:_dsAutoCap.hwnd, x:r.x, y:r.y, w:r.w, h:r.h});
     return await invoke('capture_window_region', {hwnd:_dsAutoCap.hwnd, x:0, y:0, w:1, h:1, full:true});
 }
@@ -1554,13 +1536,10 @@ async function deepseaCapFrame(){
             const o=sel.selectedOptions && sel.selectedOptions[0];
             _dsAutoCap.winTitle=o?(o.textContent||''):'';
         }
-        // 自动连拍：强制整窗截图（忽略框选区域）。可选「🖥 桌面截图」模式走 DWM 合成层，
-        // 永远是最新落地画面，绕开游戏后台渲染节流（PrintWindow 在后台会截到陈旧帧）。
-        // 滚动 delta 与卡片高度非整数倍 / 平滑滚动抖动 → 靠 OCR 按联盟ID去重吸收重叠，不再漏识别。
-        // 捕获前可勾「⤒ 置顶」让后台游戏重新渲染；每次滚动后等「稳定」毫秒再截，防截到半截卡。
+        // 自动连拍：强制整窗截图（忽略框选区域）。滚动 delta 与卡片高度非整数倍会导致固定区域错位截到半张卡，
+        // 且游戏平滑滚动有累积抖动；整窗每帧独立、靠 OCR 去重吸收偏移（重叠合并、边缘补切），偏移不再产生漏识别。
+        // 手动滚动（未勾自动下滑）时仍可用框选区域提速。
         const cbScroll=document.getElementById('deepseaCapAutoScroll');
-        const fg=document.getElementById('deepseaCapForeground');
-        if(fg && fg.checked){ try{ const inv=deepseaGetInvoke(); if(inv) await inv('bring_to_front', {hwnd:_dsAutoCap.hwnd}); }catch(e){} }
         const b64=await deepseaCapGrab(!(cbScroll && cbScroll.checked) ? false : true);
         _dsAutoCap.frame++;
         const append = (_dsAutoCap.baseCount>0) || (_dsAutoCap.frame>1);
@@ -1571,12 +1550,7 @@ async function deepseaCapFrame(){
         deepseaCapStatus('📸 已拍 '+_dsAutoCap.frame+' 张 → 识别出 '+st.uniq+' 个联盟'
             +(dup?('（重复 '+dup+' 条已自动过滤）'):'')+'，继续滚…', '#7CFC9B');
         const cb=document.getElementById('deepseaCapAutoScroll');
-        if(cb && cb.checked){
-            await deepseaCapWheel();
-            const sv=document.getElementById('deepseaCapSettle');
-            const ms=sv?Math.max(0,Number(sv.value)||350):350;
-            if(ms>0) await new Promise(r=>setTimeout(r,ms));
-        }
+        if(cb && cb.checked) await deepseaCapWheel();
     }catch(e){
         _dsAutoCap.err++;
         deepseaCapStatus('⚠️ 第 '+_dsAutoCap.frame+' 张失败：'+((e&&e.message)||e)+'（继续尝试）', '#ffb84d');
