@@ -226,6 +226,13 @@ tr.rk-weak:hover td{opacity:1}
                     <option value="4000">4 秒/张</option>
                 </select>
                 <label style="display:flex;align-items:center;gap:4px;font-size:0.72rem;color:#cfe;cursor:pointer;" title="连拍时自动向下滚动列表（需要更新软件后才可用；不支持时会提示一次，请改用手动滚轮）"><input type="checkbox" id="deepseaCapAutoScroll"> ⤓ 自动下滑</label>
+                <select id="deepseaCapScrollStep" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:3px 6px;font-size:0.72rem;" title="每次自动下滑滚多少：-360≈半条联盟，-1440≈2条联盟（默认），-2160≈3条，-3600≈一页">
+                    <option value="-360">半条联盟（微调）</option>
+                    <option value="-720">1 条联盟</option>
+                    <option value="-1440" selected>2 条联盟</option>
+                    <option value="-2160">3 条联盟</option>
+                    <option value="-3600">约一页</option>
+                </select>
                 <span id="deepseaCapStatus" style="font-size:0.72rem;color:rgba(255,255,255,0.6);"></span>
             </div>
             <div id="deepseaOcrPanel" class="hidden" style="border:1px dashed rgba(77,182,172,0.4);border-radius:8px;padding:8px;margin-bottom:8px;">
@@ -1658,8 +1665,11 @@ async function deepseaCapWheel(){
     const r=_dsAutoCap.region;
     const px = r ? Math.round(r.x + r.w/2) : Math.round((_dsAutoCap.winW||600)/2);
     const py = r ? Math.round(r.y + r.h/2) : Math.round((_dsAutoCap.winH||400)*0.7);
+    // 滚动步长可配：-360≈半条联盟，-1440≈2条（默认），-3600≈一页；如果 UI 没渲染，用 -1440 兜底。
+    const stepSel=document.getElementById('deepseaCapScrollStep');
+    const delta=stepSel ? Math.min(-120, Number(stepSel.value)||-1440) : -1440;
     try{
-        await invoke('gm_wheel', { hwnd:_dsAutoCap.hwnd, x:px, y:py, delta:-360, times:1 });
+        await invoke('gm_wheel', { hwnd:_dsAutoCap.hwnd, x:px, y:py, delta:delta, times:1 });
         _dsAutoCap.wheelOk=true;
     }catch(e){
         _dsAutoCap.wheelOk=false;

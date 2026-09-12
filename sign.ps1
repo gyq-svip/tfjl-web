@@ -126,13 +126,17 @@ Copy-Item $SrcExe $TempExe -Force
 Write-Host "Temp file: tfjl-sign-temp.exe" -ForegroundColor Cyan
 
 # ---- 4. Sign ----
-$env:TAURI_SIGNING_PRIVATE_KEY = $clean
-# 🔴 密码必须走环境变量 TAURI_SIGNING_PRIVATE_KEY_PASSWORD，不能走 --password 命令行参数：
-#    空密码（""）经 npx 的 cmd 垫片传参时会被整参数吞掉 → --password 错位吃掉文件路径 →
-#    报「required arguments were not provided: <FILE>」。环境变量即使是空串也是"已设置"，语义正确。
-$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = $SignPassword
+# 2026-09-12：改为直接调用 tauri CLI 入口（node node_modules/@tauri-apps/cli/tauri.js），
+# 避开 npx 的 cmd 垫片；私钥走 --private-key-path（避免内联多行字符串炸参数解析）；
+# 空密码用 --password=（无值）传，非空密码用 --password <pwd> 传，彻底告别交互输入。
+$cliPath = Join-Path $PSScriptRoot "node_modules/@tauri-apps/cli/tauri.js"
 Write-Host "Signing ..." -ForegroundColor Yellow
-npx tauri signer sign --private-key "$clean" "$TempExe"
+if ($SignPassword -eq '') {
+  $signArgs = @('signer', 'sign', '--private-key-path', $keyPath, '--password=', $TempExe)
+} else {
+  $signArgs = @('signer', 'sign', '--private-key-path', $keyPath, '--password', $SignPassword, $TempExe)
+}
+& node $cliPath $signArgs
 
 # ---- 5. Result + final verify ----
 $sigPath = "$TempExe.sig"

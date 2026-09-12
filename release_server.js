@@ -2,6 +2,11 @@
 /* =====================================================================
  * release_server.js —— tfjl 本地「自助打包 / 签名 / 发布」小服务（localhost 网页）
  * ---------------------------------------------------------------------
+ * ⚠️ 编码铁律：本文件（及仓库内所有 .js）必须以 UTF-8 保存！
+ *    若用只支持 GBK 的编辑器保存，Node 会按 UTF-8 误读中文 → 页面内联
+ *    <script> 中文全变乱码字节 → 浏览器报 "Invalid or unexpected token"、
+ *    整段脚本不执行、按钮全灰卡在「载入中」。遇此症状：重启本服务即恢复。
+ * ---------------------------------------------------------------------
  * 存在的意义：把《铁律.md》里 A→E 发版流程 + 历史上踩过的所有坑，固化成一个
  *             点按钮就能跑、出错能看懂、不必每次重新踩坑的本地工具。
  *
@@ -21,7 +26,7 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { spawn, spawnSync } = require('child_process');
+const { spawn, spawnSync, execSync } = require('child_process');
 const { StringDecoder } = require('string_decoder');
 
 const ROOT = __dirname;
@@ -83,6 +88,19 @@ const state = {
 };
 const MAX_LOGS = 6000;
 
+// 自愈：若「运行中」指向的进程 PID 已不存在（被外部杀掉 / 崩溃却没触发 close），
+// 自动清空 state.running，避免 UI 永久把所有按钮关掉、连「中止」都点不了。
+function isPidAlive(pid) {
+  if (!pid) return false;
+  try { process.kill(pid, 0); return true; } catch (e) { return false; }
+}
+function clearStaleRunning() {
+  if (state.running && state.running.pid && !isPidAlive(state.running.pid)) {
+    pushLog(state.running.key || 'server', '[自愈] 运行中进程(PID ' + state.running.pid + ') 已不在，自动解锁');
+    state.running = null;
+  }
+}
+
 function pushLog(step, text) {
   const s = String(text).replace(/\r\n/g, '\n');
   const parts = s.split('\n');
@@ -98,7 +116,8 @@ function logsFrom(from) {
   return state.logs.filter(function (l) { return l.n > n; });
 }
 
-function runStep(key, label, psBody, onDone) {
+function runStep(key, label, psBody, opts, onDone) {
+  clearStaleRunning();
   if (state.running) return { ok: false, err: '已有步骤在运行：' + state.running.label };
   pushLog(key, '==================== ' + label + ' 开始 ====================');
   let child;
@@ -111,6 +130,13 @@ function runStep(key, label, psBody, onDone) {
   }
   state.running = { key: key, label: label, pid: child.pid, startedAt: Date.now() };
   state.startedAt = Date.now();
+  // 签名等需要密码的步骤：无 TTY 时 tauri signer 会卡在交互输入。把密码（空密码即一个回车）喂进 stdin，
+  // 让子进程无需终端即可完成，避免网页端「卡在密码」。（stdin 数据会缓存在管道，rsign 提问时读到）
+  if (opts && opts.input != null) {
+    try {
+      if (child.stdin) { child.stdin.write(opts.input); child.stdin.end(); }
+    } catch (e) { pushLog(key, '[stdin 喂入失败] ' + e.message); }
+  }
   const decOut = new StringDecoder('utf8');
   const decErr = new StringDecoder('utf8');
   if (child.stdout) child.stdout.on('data', function (d) { pushLog(key, decOut.write(d)); });
@@ -590,9 +616,53 @@ const STEPS = {
   publish: { label: '发布（publish_update.ps1）', ps: "& './publish_update.ps1'" }
 };
 
+/* 一键发布：打包 → 签名(空密码) → 发布 → 线上验证，逐步串行，任一步失败即中止。
+ * publish_update.ps1 会自动读取 sign 产出的 .sig（见 publish_update.ps1 第 135/140 行），无需手工关联。 */
+function runPipeline() {
+  pushLog('release', '==================== 一键发布开始（打包 → 签名 → 发布 → 验证） ====================');
+  const steps = [
+    { key: 'build', label: '打包', ps: STEPS.build.ps },
+    { key: 'sign', label: '签名', ps: "& './sign.ps1' -SignPassword ''" },
+    { key: 'publish', label: '发布', ps: STEPS.publish.ps }
+  ];
+  let i = 0;
+  function next() {
+    if (i >= steps.length) {
+      pushLog('release', '✔ 打包/签名/发布完成，开始线上验证…');
+      runOnlineVerify().then(function (okv) {
+        state.running = null;
+        state.lastResult = { step: 'release', label: '一键发布', code: okv ? 0 : 1, ok: okv, ts: Date.now() };
+        pushLog('release', '==================== 一键发布结束（线上验证 ' + (okv ? '✅ 成功' : '❌ 失败') + '） ====================');
+      }).catch(function (e) {
+        state.running = null;
+        state.lastResult = { step: 'release', label: '一键发布', code: 1, ok: false, ts: Date.now() };
+        pushLog('release', '[验证异常] ' + e.message);
+      });
+      return;
+    }
+    const s = steps[i++];
+    state.running = null;            // 清掉上一步遗留，避免 runStep 的并发守卫误判
+    runStep(s.key, s.label, s.ps);
+    const t = setInterval(function () {
+      if (!state.running) {
+        clearInterval(t);
+        const lr = state.lastResult;
+        if (lr && lr.ok) { pushLog('release', '✔ ' + s.label + ' 成功 → 下一步'); next(); }
+        else {
+          state.running = null;
+          state.lastResult = { step: 'release', label: '一键发布', code: 1, ok: false, ts: Date.now() };
+          pushLog('release', '❌ ' + s.label + ' 失败，已中止一条龙（后续步骤未执行）');
+        }
+      }
+    }, 1000);
+  }
+  next();
+}
+
 const server = http.createServer(async function (req, res) {
   const u = new URL(req.url, 'http://127.0.0.1');
   const p = u.pathname;
+  clearStaleRunning();   // 每次请求先自愈：清掉已死却没触发 close 的运行态，避免 UI 被永久锁死
 
   if (p === '/' || p === '/index.html') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -607,6 +677,7 @@ const server = http.createServer(async function (req, res) {
 
   try {
     if (p === '/api/status' && req.method === 'GET') {
+      clearStaleRunning();
       const conf = readJSON(P.conf) || {};
       const vj = readJSON(P.version) || {};
       const swTxt = readText(P.sw) || '';
@@ -679,9 +750,27 @@ const server = http.createServer(async function (req, res) {
         json(res, 202, { ok: true });
         return;
       }
+      if (key === 'release') {
+        if (state.running) { json(res, 409, { ok: false, err: '已有步骤在运行' }); return; }
+        runPipeline();
+        json(res, 202, { ok: true });
+        return;
+      }
       const def = STEPS[key];
       if (!def) { json(res, 400, { ok: false, err: '未知步骤: ' + key }); return; }
-      const r = runStep(key, def.label, def.ps);
+      let psBody = def.ps;
+      let input = null;
+      // 签名步骤：私钥密码处理（避免子进程无 TTY 时卡在交互输入）。
+      //   非空密码 → 经 -SignPassword 传入（PowerShell 单引号包裹、内部 ' 转义为 ''），env 设真实密码无需交互；
+      //   空密码   → 不传参（sign.ps1 默认空环境变量），并向 stdin 喂一个回车，模拟终端里的直接回车。
+      //   两种情况下都向 stdin 喂 (pwd + '\n') 兜底，确保无论 tauri 走 env 还是交互都能完成。
+      if (key === 'sign') {
+        const pwd = (b.pwd != null) ? String(b.pwd) : '';
+        // 空/非空密码都显式传 -SignPassword；sign.ps1 直接调用 tauri.js（绕 npx cmd 垫片），空密码也能正确接收。
+        psBody = "& './sign.ps1' -SignPassword '" + pwd.replace(/'/g, "''") + "'";
+        input = pwd + '\n';
+      }
+      const r = runStep(key, def.label, psBody, { input: input });
       json(res, r.ok ? 202 : 409, r);
       return;
     }
@@ -767,9 +856,11 @@ details summary{cursor:pointer;color:#a5b4d4;font-size:13px}
     <div class="step"><div class="t">③ 打包</div><div class="d">npx tauri build，约 3 分钟。产物在 bundle/nsis</div>
       <button class="primary" id="btnBuild">开始打包</button></div>
     <div class="step"><div class="t">④ 签名</div><div class="d">sign.ps1：恢复密钥→校验→复制英文包名→签名→keynum 复核</div>
-      <button class="primary" id="btnSign">开始签名</button></div>
+      <div class="row"><input type="password" id="signPwd" placeholder="私钥密码（空密码留空；非空密码必填，否则卡在交互输入）"><button class="primary" id="btnSign">开始签名</button></div></div>
     <div class="step"><div class="t">⑤ 发布</div><div class="d">publish_update.ps1：写 json→传 Gitee 发行版→推 GitHub（含 rebase 自愈）</div>
       <button class="primary" id="btnPub">开始发布</button></div>
+    <div class="step"><div class="t">🚀 一键发布</div><div class="d">打包→签名→发布→验证，逐步串行，任一步失败即停（发布不可逆）</div>
+      <button class="ok" id="btnRelease">一键发布</button></div>
     <div class="step"><div class="t">⑥ 线上验证</div><div class="d">查 updater.json / version.json / Pages / Gitee 直链大小</div>
       <button class="ok" id="btnVer">开始验证</button></div>
   </div>
@@ -827,7 +918,7 @@ async function poll(){
 }
 function setRunning(run){
   const busy=!!run;
-  ['btnBuild','btnSign','btnPub','btnVer','btnBump','btnPre'].forEach(id=>{const b=$(id);if(b)b.disabled=busy;});
+  ['btnBuild','btnSign','btnPub','btnVer','btnBump','btnPre','btnRelease'].forEach(id=>{const b=$(id);if(b)b.disabled=busy;});
   window.__busy=busy;
   if(busy)$('bar').dataset.busy='1';
 }
@@ -892,7 +983,24 @@ async function doCancel(){
 $('btnPre').onclick=doPre;
 $('btnBump').onclick=doBump;
 $('btnBuild').onclick=()=>run('build','打包');
-$('btnSign').onclick=()=>run('sign','签名');
+$('btnSign').onclick=doSign;
+$('btnRelease').onclick=doRelease;
+async function doRelease(){
+  if(window.__busy){alert('已有步骤在运行');return;}
+  if(!confirm('一键发布将执行：打包 → 签名 → 发布 → 线上验证。\\n其中「发布」上传 Gitee 发行版 + 推送 GitHub Pages，不可逆。\\n确认版本已 bump 且产物无误？'))return;
+  const r=await api('/api/run',{method:'POST',body:JSON.stringify({step:'release'})});
+  if(!r.ok){alert(r.err||'启动失败');return;}
+  $('preSummary').innerHTML='<span class="spin"></span>正在执行：一键发布';
+  setTimeout(poll,300);
+}
+async function doSign(){
+  if(window.__busy){alert('已有步骤在运行');return;}
+  const pwd=$('signPwd').value;
+  const r=await api('/api/run',{method:'POST',body:JSON.stringify({step:'sign',pwd})});
+  if(!r.ok){alert(r.err||'启动失败');return;}
+  $('preSummary').innerHTML='<span class="spin"></span>正在执行：签名';
+  setTimeout(poll,300);
+}
 $('btnPub').onclick=()=>run('publish','发布');
 $('btnVer').onclick=()=>run('verify-online','线上验证');
 $('btnCancel').onclick=doCancel;
@@ -929,7 +1037,43 @@ process.on('exit', clearRuntime);
   try { process.on(sig, function () { clearRuntime(); process.exit(0); }); } catch (e) {}
 });
 
-server.listen(PORT, '127.0.0.1', function () {
+/* 终止占用指定端口的旧进程（用于启动时清理残留实例，避免 EADDRINUSE 起不来）。
+ * 仅杀 127.0.0.1:port 的 LISTENING 进程，且不会杀自己。返回是否杀过。 */
+function killPortOccupant(port) {
+  try {
+    const out = execSync('netstat -ano -p TCP', { encoding: 'utf8', windowsHide: true });
+    const lines = out.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const m = lines[i].match(/127\.0\.0\.1:(\d+)\s+[0-9a-f:\.]+\s+LISTENING\s+(\d+)/i);
+      if (m && parseInt(m[1], 10) === port) {
+        const pid = parseInt(m[2], 10);
+        if (pid && pid !== process.pid) {
+          try {
+            execSync('taskkill /PID ' + pid + ' /F /T', { windowsHide: true });
+            pushLog('server', '已终止占用端口 ' + port + ' 的旧进程（PID ' + pid + '）');
+            return true;
+          } catch (e) { pushLog('server', '终止旧进程 PID ' + pid + ' 失败: ' + e.message); }
+        }
+      }
+    }
+  } catch (e) { /* netstat 不可用则跳过 */ }
+  return false;
+}
+
+// 启动前先清理可能残留的占用本端口的旧实例（上次没正常退出时常见）
+killPortOccupant(PORT);
+server.on('error', function (err) {
+  if (err.code === 'EADDRINUSE') {
+    pushLog('server', '端口 ' + PORT + ' 被占用，尝试终止旧进程后重试…');
+    if (killPortOccupant(PORT)) { setTimeout(function () { server.listen(PORT, '127.0.0.1', onListening); }, 800); return; }
+    console.error('端口 ' + PORT + ' 被占用且无法终止（可能是其他程序）。请手动结束占用进程后再启动。');
+    process.exit(1);
+  }
+  console.error('启动失败: ' + err.message);
+  process.exit(1);
+});
+server.listen(PORT, '127.0.0.1', onListening);
+function onListening() {
   const url = 'http://127.0.0.1:' + PORT + '/';
   writeRuntime();
   pushLog('server', '服务启动 · 端口 ' + PORT + ' · PID ' + process.pid + ' · 仓库根 ' + ROOT);
@@ -945,30 +1089,4 @@ server.listen(PORT, '127.0.0.1', function () {
   if (!process.env.TFJL_NO_OPEN) {
     try { spawn('cmd', ['/c', 'start', '', url], { shell: true, detached: true, windowsHide: true }).unref(); } catch (e) {}
   }
-});
-server.on('error', function (e) {
-  if (e.code === 'EADDRINUSE') {
-    // 先看运行时文件：若确实是「本工具的另一个实例」在跑，那不是错误，直接告知地址
-    let rt = null;
-    try { rt = JSON.parse(fs.readFileSync(RUNTIME_FILE, 'utf8')); } catch (e2) {}
-    let alive = false;
-    if (rt && rt.pid) { try { process.kill(rt.pid, 0); alive = true; } catch (e2) { alive = false; } }
-    if (rt && alive && rt.port === PORT) {
-      const u = rt.url || ('http://127.0.0.1:' + PORT + '/');
-      console.log('本工具已在运行中 → 直接打开 ' + u);
-      console.log('（网页 UI 与命令行接口均为这个实例服务；无需重复启动）');
-      // 双击 .bat 时也应有反馈：把浏览器开到这个已在运行的实例
-      if (!process.env.TFJL_NO_OPEN) {
-        try { spawn('cmd', ['/c', 'start', '', u], { shell: true, detached: true, windowsHide: true }).unref(); } catch (e2) {}
-      }
-      process.exit(0);
-    }
-    console.log('❌ 端口 ' + PORT + ' 被其他程序占用（多为上次没关干净的旧实例）。');
-    console.log('   · 换端口：set TFJL_RELEASE_PORT=8800 && node release_server.js');
-    console.log('   · 或找占用者：netstat -ano | findstr :' + PORT + '   →   taskkill /PID <那行的PID> /F');
-    console.log('   · 用命令行接口最省事（自动挑空闲端口）：node release_cli.js status');
-  } else {
-    console.log('启动失败: ' + e.message);
-  }
-  process.exit(1);
-});
+}
