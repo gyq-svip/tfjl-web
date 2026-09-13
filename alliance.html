@@ -169,6 +169,8 @@
           <option value="-2160">3 条</option>
           <option value="-3600">约一页</option>
         </select>
+        <label style="display:flex;align-items:center;gap:4px;font-size:0.78rem;cursor:pointer;" title="把每帧窗口原图 / 三列切片图 / 每块识别原文 + 解析结果写到本地磁盘（排查「识别不到」用）。目录：软件数据目录\tfjl_diag\alcap-<时间>\"><input type="checkbox" id="allianceCapDiag" checked> 📝 诊断落盘</label>
+        <button class="btn btn-ghost btn-sm" onclick="allianceCapOpenDump()">📂 打开诊断目录</button>
       </div>
       <div id="allianceCapStatus" class="hint" style="margin-top:6px;"></div>
       <div class="hint" style="margin-top:4px;">自动截图不用你截图/上传：软件自己抓游戏窗口 → 按行切出「名次 / 人名 / 杯数」→ 自动去重填入上表（最大连胜识别不到不影响，可留空）。列表一屏放不下时勾「⤓ 自动下滑」；不勾也行——手动滚动列表，翻屏后会自动续拍。</div>
@@ -388,15 +390,26 @@ function allianceGetInvoke(){
   return (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke)
       || (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke);
 }
+// Umi-OCR 对"空图/无文字"会返回 "No text found in image. Path: \"base64\"" —— 里面含 "64" 这种数字，
+// 一旦当正文用会被解析器当成名次（真实 OCR 复现过 rank=64）！统一清洗成空串。
+function _alOcrClean(s){
+  const t=String(s==null?'':s).trim();
+  if(!t) return '';
+  if(/no\s*text\s*found/i.test(t)) return '';
+  return t;
+}
 function allianceExtractOcrText(r){
   if(!r) return '';
-  if(typeof r === 'string') return r;
+  if(typeof r === 'string') return _alOcrClean(r);
   if(r.code === 100 && r.data){
-    return typeof r.data === 'string' ? r.data : (Array.isArray(r.data) ? r.data.map(x=>x.text||x).join('\n') : '');
+    const out = typeof r.data === 'string' ? r.data
+      : (Array.isArray(r.data) ? r.data.map(x=>(x&&typeof x==='object')?(x.text||''):x).join('\n')
+      : ((r.data && typeof r.data==='object' && r.data.text) || ''));
+    return _alOcrClean(out);
   }
-  if(r.ocr && r.ocr.text) return r.ocr.text;
-  if(r.text) return r.text;
-  if(r.data) return typeof r.data === 'string' ? r.data : '';
+  if(r.ocr && r.ocr.text) return _alOcrClean(r.ocr.text);
+  if(r.text) return _alOcrClean(r.text);
+  if(typeof r.data === 'string') return _alOcrClean(r.data);
   return '';
 }
 // 解析 OCR 文本 → [{rank,name,cups,streak}]
@@ -461,9 +474,11 @@ function parseAllianceOcrText(text){
 // 名次来自左列(rankText)首个数字；名字+连胜来自整块(nameText)；杯数来自右列(cupText)，排除连胜数字后的剩余数字。
 function parseAllianceFields(o){
   const nameText=o.nameText||'', rankText=o.rankText||'', cupText=o.cupText||'';
-  const rankM=rankText.match(/-?\d+/) || nameText.match(/-?\d+/);
-  const rank=rankM?parseInt(rankM[0],10):null;
-  if(rank==null || rank<=0) return null;
+  // 名次只看左列——名字里的数字（"果子13"的 13）绝不能被当成名次（真实 OCR 下曾得到 rank=13/64）。
+  // 左列读不到时用调用方给的 ordinal（本帧内序号），仍未知则记 0（不再因名次读不到而丢掉整行，如"龙行"）。
+  const rankM=rankText.match(/\d+/);
+  let rank=rankM?parseInt(rankM[0],10):(Number(o.ordinal)||0);
+  if(!Number.isFinite(rank) || rank<0) rank=0;
   // 名字：从整块(mid)取，遇到"最大连胜/连胜"关键词即截断（该词现在多在右列，但保险起见仍处理）
   const streakM=nameText.match(/(?:最大连胜|大连胜|连胜)\D*?(-?\d+)/);
   const cut=streakM?streakM.index:nameText.length;
@@ -479,13 +494,16 @@ function parseAllianceFields(o){
   // 右列现在切68-88%(奖杯图标+杯数,排除最大连胜),放大6倍。
   // 右列可能识别出"奖杯 1234"或"1234"或"1 234"(带空格),需拼接。
   // 策略:去掉"奖杯/奖/杯"等文字后,把数字拼接成完整数字。
-  const cupClean=cupText.replace(/奖杯|奖|杯|[:：]/g,'').replace(/\s+/g,'');
-  const cupMatch=cupClean.match(/-?\d+/);
+  // OCR 常把奖杯图标或数字 0 读成 o/O/〇/口，把 1 读成 l/I → 先形近归一，再取第一个数字
+  const cupNorm=cupText.replace(/奖杯|奖|杯|[:：]/g,'')
+    .replace(/[oO〇口Q]/g,'0').replace(/[lI|]/g,'1')
+    .replace(/\s+/g,'');
+  const cupMatch=cupNorm.match(/\d+/);
   let cups=0;
   if(cupMatch) cups=parseInt(cupMatch[0],10);
-  // 兜底:取右列最大数字
+  // 兜底:取右列最大数字（同样先归一）
   if(!cups || cups<0){
-    const cupNums=[...cupText.matchAll(/-?\d+/g)].map(m=>parseInt(m[0],10)).filter(n=>n>=0);
+    const cupNums=[...cupNorm.matchAll(/\d+/g)].map(m=>parseInt(m[0],10)).filter(n=>n>=0);
     if(cupNums.length) cups=Math.max(...cupNums);
   }
   if(cups<0) cups=0;
@@ -809,6 +827,7 @@ async function allianceCapEnsureWindows(){
   let list=[]; try{ list=await inv('find_game_windows',{}); }catch(e){}
   if(!list||!list.length){ try{ list=await inv('find_game_windows',{deep:true}); }catch(e){} }
   if(!list||!list.length) throw new Error('没找到游戏窗口：请先打开游戏、保证窗口可见且未最小化');
+  allianceCapDumpLog('find_game_windows → '+list.map(w=>w.hwnd+':'+(w.title||'(无标题)')).join(' | '));
   const sel=$('allianceCapWin');
   if(sel){
     const cur=sel.value;
@@ -827,6 +846,7 @@ async function allianceCapResolveWin(){
   _alAutoCap.hwnd=hwnd;
   const o=sel&&sel.selectedOptions&&sel.selectedOptions[0];
   _alAutoCap.winTitle=o?(o.textContent||''):(_alAutoCap.winTitle||'');
+  allianceCapDumpLog('选中窗口 hwnd='+hwnd+' 标题='+_alAutoCap.winTitle);
   return hwnd;
 }
 function allianceCapImgSize(b64){
@@ -844,24 +864,99 @@ async function allianceCapGrab(){
   const inv=allianceGetInvoke();
   return await inv('capture_window_region',{hwnd:_alAutoCap.hwnd,x:0,y:0,w:1,h:1,full:true});
 }
+// ---------- 诊断落盘（排查「识别不到」）：窗口原图 + 三列切片图 + 每块 OCR 原文/解析结果 ----------
+// 目录：get_diag_log_dir()\alcap-<yyyyMMdd-HHmmss>\（默认 D:\withfriends\塔防精灵助手数据\tfjl_diag\）
+// 图片有上限（maxImgs），文字日志全量。所有操作 try/catch，绝不因诊断影响连拍。
+async function allianceCapDumpInit(){
+  try{
+    const inv=allianceGetInvoke(); if(!inv) return null;
+    const root=await inv('get_diag_log_dir');
+    if(!root) return null;
+    const d=new Date(), p=n=>String(n).padStart(2,'0');
+    const dir=root+'\\alcap-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes())+p(d.getSeconds());
+    try{ await inv('create_dir',{dirPath:dir}); }catch(e){}
+    _alAutoCap.dump={ dir, lines:[], imgs:0, maxImgs:16 };
+    return dir;
+  }catch(e){ return null; }
+}
+function allianceCapDumpLog(msg){
+  const d=_alAutoCap.dump; if(!d) return;
+  try{ d.lines.push('['+new Date().toLocaleTimeString()+'] '+msg); if(d.lines.length%8===0) allianceCapDumpFlush(); }catch(e){}
+}
+function allianceCapDumpFlush(){
+  const d=_alAutoCap.dump; if(!d||!d.dir) return;
+  try{ const inv=allianceGetInvoke(); if(inv) inv('write_text_file',{ filePath:d.dir+'\\diag.log', content:'\ufeff'+d.lines.join('\r\n')+'\r\n' }); }catch(e){}
+}
+async function allianceCapDumpImg(name, dataUrl){
+  const d=_alAutoCap.dump; if(!d||!d.dir||d.imgs>=d.maxImgs) return;
+  try{
+    const b64=String(dataUrl||'').split(',')[1]; if(!b64) return;
+    const inv=allianceGetInvoke(); if(!inv) return;
+    await inv('write_binary_file',{ filePath:d.dir+'\\'+name, contentBase64:b64 });
+    d.imgs++;
+  }catch(e){}
+}
+function allianceCapBmpToPngDataUrl(b64){
+  return new Promise(res=>{
+    const im=new Image();
+    im.onload=()=>{ try{
+      const c=document.createElement('canvas'); c.width=im.naturalWidth; c.height=im.naturalHeight;
+      c.getContext('2d').drawImage(im,0,0);
+      res(c.toDataURL('image/png'));
+    }catch(e){ res(null); } };
+    im.onerror=()=>res(null);
+    im.src='data:image/bmp;base64,'+b64;
+  });
+}
+function allianceCapOpenDump(){
+  try{
+    const inv=allianceGetInvoke();
+    if(!inv){ allianceToast('需在桌面 App 内打开', true); return; }
+    const d=_alAutoCap.dump;
+    if(d&&d.dir) inv('show_in_folder',{ path:d.dir+'\\diag.log' });
+    else inv('get_diag_log_dir').then(root=>{ if(root) inv('show_in_folder',{ path:root }); }).catch(()=>{});
+  }catch(e){}
+}
 // 抓一帧 → 切片 → 逐块 OCR（中=名字 / 左=名次 / 右=杯数）→ 解析成行
 async function allianceCapOcrFrame(){
   const inv=allianceGetInvoke();
   const b64=await allianceCapGrab();
+  const sz=await allianceCapImgSize(b64);
   const slices=await allianceSliceImage(allianceCapB64ToFile(b64));
+  const no=_alAutoCap.frame+1, first2=(_alAutoCap.frame<2);
+  allianceCapDumpLog('帧'+no+'：窗口 '+sz.w+'x'+sz.h+'，列表区域='+(allianceLastRegion?('x'+allianceLastRegion.x0+'..'+allianceLastRegion.x1+' w'+allianceLastRegion.w):'未定位(用整幅)')
+    +'，行切片='+slices.length+(allianceLastSliceInfo?('｜行距='+allianceLastSliceInfo.lineSpacing+' 合并阈值='+allianceLastSliceInfo.mergeGap):''));
+  if(first2){ const png=await allianceCapBmpToPngDataUrl(b64); if(png) await allianceCapDumpImg('f'+no+'_window.png', png); }
   const ocrOpts={ data:{format:'text', outputDirName:'', outputFileName:'', outputFileFormat:[]}, ocr:{language:'models/config_chinese.txt', cls:true} };
   const rows=[];
-  for(const sl of slices){
+  for(let i=0;i<slices.length;i++){
+    const sl=slices[i];
     let txt='', rankTxt='', cupTxt='';
     try{ const r=await inv('umi_ocr',{base64:sl.mid, options:ocrOpts}); txt=allianceExtractOcrText(r); }catch(e){}
     if(sl.left){ try{ const rl=await inv('umi_ocr',{base64:sl.left, options:ocrOpts}); rankTxt=allianceExtractOcrText(rl); }catch(e){} }
     if(sl.right){ try{ const rr=await inv('umi_ocr',{base64:sl.right, options:ocrOpts}); cupTxt=allianceExtractOcrText(rr); }catch(e){} }
     const rw=parseAllianceFields({nameText:txt, rankText:rankTxt, cupText:cupTxt});
+    const one=s=>String(s||'').replace(/\s+/g,' ').trim();
+    allianceCapDumpLog('  块#'+(i+1)+' 中「'+one(txt)+'」 左「'+one(rankTxt)+'」 右「'+one(cupTxt)+'」 → '+(rw?('✓ rank='+rw.rank+' name='+rw.name+' cups='+rw.cups):'✗ 解析为空(该块丢弃)'));
+    if(first2){
+      await allianceCapDumpImg('f'+no+'_s'+(i+1)+'_mid.png', 'data:image/png;base64,'+sl.mid);
+      if(sl.left) await allianceCapDumpImg('f'+no+'_s'+(i+1)+'_left.png', 'data:image/png;base64,'+sl.left);
+      if(sl.right) await allianceCapDumpImg('f'+no+'_s'+(i+1)+'_right.png', 'data:image/png;base64,'+sl.right);
+    }
     if(!rw) continue;
     const key='alcap_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
     allianceSliceMeta[key]={ dataUrl:'data:image/png;base64,'+sl.mid, leftDataUrl:sl.left?('data:image/png;base64,'+sl.left):null, rightDataUrl:sl.right?('data:image/png;base64,'+sl.right):null, text:txt, rankText:rankTxt, cupText:cupTxt };
     rows.push({ rank:rw.rank, name:rw.name, cups:rw.cups, streak:rw.streak, key });
   }
+  // 名次回推：同一帧内名次连续。以第一个已知名次为锚，向前回推(-1)、向后补齐(+1)
+  // （真实场景：第1名是金色奖牌，左列 OCR 读不到 → 靠"果子13=2"推回"龙行=1"）
+  const _fk=rows.findIndex(r=>r.rank>0);
+  if(_fk>=0){
+    for(let j=_fk-1;j>=0;j--) rows[j].rank=Math.max(1,(rows[j+1].rank||1)-1);
+    for(let i=_fk+1;i<rows.length;i++){ if(!rows[i].rank) rows[i].rank=(rows[i-1].rank||0)+1; }
+  }
+  rows.forEach(r=>{ if(!(r.rank>0)) r.rank=0; });
+  allianceCapDumpFlush();
   return { rows, raw:b64 };
 }
 // 按「人名」去重累积（同一个人被重复识别到时补齐更可信的字段，不重复填行）
@@ -952,13 +1047,21 @@ async function allianceAutoCapRun(){
     allianceCapStatus('📸 第 '+_alAutoCap.frame+' 张：本帧 '+fr.rows.length+' 行，新增 '+added+' 人 → 共 '+total+' 人'
       + (fr.rows.length?'':'（本帧没识别到，可能动画中/切错）'), added?'#7CFC9B':'#ffb84d');
     if(useAuto){
-      if(added===0) noNew++; else noNew=0;
-      if(total>0 && noNew>=2){ allianceCapStatus('🏁 连续 2 帧无新增，认为已到列表底部，自动停止。共 '+total+' 人', '#7CFC9B'); break; }
-      if(emptyFrames>=4){ allianceCapStatus('⚠️ 连续多帧没识别到，已停止（共 '+total+' 人）', '#ffb84d'); break; }
+    if(added===0) noNew++; else noNew=0;
+    if(total>0 && noNew>=2){ allianceCapStatus('🏁 连续 2 帧无新增，认为已到列表底部，自动停止。共 '+total+' 人', '#7CFC9B'); break; }
+    if(emptyFrames>=4){
+      const _ddir=(_alAutoCap.dump&&_alAutoCap.dump.dir)||'';
+      allianceCapStatus('⚠️ 连续 '+emptyFrames+' 帧没识别到内容，已停止。请检查：①窗口选对没 ②游戏切到前台、别被本窗口遮挡 ③游戏里联盟战成员列表已打开'+(_ddir?('。诊断图：'+_ddir):''), '#ffb84d');
+      break;
+    }
       await allianceCapWheel(1);
       await allianceCapSleep(650);
     }else{
-      if(emptyFrames>=4){ allianceCapStatus('⚠️ 连续多帧没识别到，已停止（共 '+total+' 人）', '#ffb84d'); break; }
+      if(emptyFrames>=4){
+        const _mdir=(_alAutoCap.dump&&_alAutoCap.dump.dir)||'';
+        allianceCapStatus('⚠️ 连续 '+emptyFrames+' 帧没识别到内容，已停止（共 '+total+' 人）。请检查：①窗口选对没 ②游戏切到前台、别被本窗口遮挡 ③列表已打开'+(_mdir?('。诊断图：'+_mdir):''), '#ffb84d');
+        break;
+      }
       allianceCapStatus('✅ 已识别 '+total+' 人。滚动列表到下一屏会自动续拍；若已拍完，点「⏹ 停止自动截图」', '#7CFC9B');
       const ok=await allianceCapWaitScroll(fr.raw);
       if(!ok){ allianceCapStatus('⏹ 列表没有再变化，已自动停止。共 '+total+' 人——核对后点「保存并上传 Gist」', '#7CFC9B'); break; }
@@ -976,10 +1079,15 @@ async function allianceAutoCapStart(){
     allianceToast('❌ '+m, true); allianceCapStatus('❌ '+m, '#ff8a80'); return;
   }
   _alAutoCap.on=true; _alAutoCap.frame=0; _alAutoCap.rows=new Map(); _alAutoCap.wheelOk=null; _alAutoCap.warned=false;
+  _alAutoCap.dump=null;
+  if($('allianceCapDiag') && $('allianceCapDiag').checked){
+    const dir=await allianceCapDumpInit();
+    allianceCapDumpLog('诊断开启 dir='+dir+'（记录：窗口枚举/选中窗口/每帧窗口尺寸/列表区域/行切片数/每块三列OCR原文+解析结果）');
+  }
   allianceCapBtnText();
   const cb=$('allianceCapAutoScroll');
-  allianceToast('▶️ 自动截图已开始：软件自己抓游戏窗口 → 识别 → 逐行填表'+(cb&&cb.checked?'（自动下滑）':'（手动滚动列表，翻屏后自动续拍）'));
-  allianceCapStatus('▶️ 自动截图中：'+(_alAutoCap.winTitle||'游戏窗口'), '#7CFC9B');
+  allianceToast('▶️ 自动截图已开始：软件自己抓游戏窗口 → 识别 → 逐行填表'+(cb&&cb.checked?'（自动下滑）':'（手动滚动列表，翻屏后自动续拍）')+'　⚠️ 请把游戏切到前台、别被本窗口遮挡');
+  allianceCapStatus('▶️ 自动截图中：'+(_alAutoCap.winTitle||'游戏窗口')+'　（游戏需在前台且未被本窗口遮挡）', '#7CFC9B');
   allianceAutoCapRun();
 }
 function allianceAutoCapStop(){
@@ -987,8 +1095,11 @@ function allianceAutoCapStop(){
   allianceCapBtnText();
   try{ persistAllianceSlices(); }catch(e){}
   const n=_alAutoCap.rows.size;
-  allianceCapStatus('⏹ 已停止：共拍 '+_alAutoCap.frame+' 张，识别出 '+n+' 人。核对无误后点「保存并上传 Gist」', '#7CFC9B');
-  allianceToast('⏹ 自动截图已停止（'+n+' 人）');
+  const dir=_alAutoCap.dump&&_alAutoCap.dump.dir;
+  allianceCapDumpLog('停止：共拍 '+_alAutoCap.frame+' 张，去重后 '+n+' 人');
+  allianceCapDumpFlush();
+  allianceCapStatus('⏹ 已停止：共拍 '+_alAutoCap.frame+' 张，识别出 '+n+' 人。核对无误后点「保存并上传 Gist」'+(dir?('（诊断日志：'+dir+'）'):''), '#7CFC9B');
+  allianceToast('⏹ 自动截图已停止（'+n+' 人）'+(dir?'，诊断已落盘':''));
 }
 async function allianceAutoCapToggle(){
   if(_alAutoCap.on){ allianceAutoCapStop(); return; }
