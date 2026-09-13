@@ -917,6 +917,42 @@ function allianceCapOpenDump(){
     else inv('get_diag_log_dir').then(root=>{ if(root) inv('show_in_folder',{ path:root }); }).catch(()=>{});
   }catch(e){}
 }
+// 拆「两个人被并进同一行」的拼接名：行切片偶尔会把相邻两行的文字带合并成一块，
+// OCR 就读成「龙行6果子13」「果子2龙行」这种拼接名 → 按名字去重失效、同一个人出现两行。
+// 办法：用"已经认识的名字"（本帧其它行 + 已累积的人）做**最长**前缀/后缀匹配切开；
+// 切开后第二半名次记 0（交给同帧名次回推/后续帧补），杯数同样不继承（避免把上一个人的杯数安到下一个人头上）。
+function allianceCapSplitMergedNames(rows){
+  const known=new Set();
+  try{ _alAutoCap.rows.forEach((v,k)=>{ if(k) known.add(k); }); }catch(e){}
+  rows.forEach(r=>{ const n=String(r.name||'').trim(); if(n) known.add(n); });
+  const bad=/联盟成员|联盟商店|联盟聊天|聊天|奖杯|最大连胜|排名|成员|商店/;
+  const out=[];
+  for(const r of rows){
+    const nm=String(r.name||'').trim();
+    let best=null, bestScore=-1;
+    if(nm.length>=4 && known.size){
+      // 打分择优：切出的两半"都认识"最优先 > 匹配名字更长 > 前缀优先（读序自然，避免同长度时前后缀随机胜出）
+      known.forEach(k=>{
+        if(!k || k.length<2 || k===nm) return;
+        let mode='', rest='';
+        if(nm.startsWith(k) && nm.length-k.length>=2){ mode='pre'; rest=nm.slice(k.length); }
+        else if(nm.endsWith(k) && nm.length-k.length>=2){ mode='suf'; rest=nm.slice(0, nm.length-k.length); }
+        else return;
+        if(!rest || rest.length>12 || bad.test(rest) || /^[\d\s]/.test(rest)) return;
+        const score=((known.has(rest)?1:0)+(known.has(k)?1:0))*1000 + k.length*10 + (mode==='pre'?1:0);
+        if(score>bestScore){ bestScore=score; best={k,mode,rest}; }
+      });
+    }
+    if(!best){ out.push(r); continue; }
+    console.log('[联盟][拆名] 合并行「'+nm+'」→「'+best.k+'」+「'+best.rest+'」('+best.mode+')');
+    const a=(best.mode==='pre') ? best.k : best.rest;
+    const b=(best.mode==='pre') ? best.rest : best.k;
+    // 名次不可信（一块里含两个人的名次框）→ 都记 0，交给"同帧回推"/后续帧补；第一半继承杯数（右列第一个数字属最上面那个人）
+    out.push({ rank:0, name:a, cups:r.cups, streak:r.streak, key:r.key });
+    out.push({ rank:0, name:b, cups:0,      streak:0,      key:r.key });
+  }
+  return out;
+}
 // 抓一帧 → 切片 → 逐块 OCR（中=名字 / 左=名次 / 右=杯数）→ 解析成行
 async function allianceCapOcrFrame(){
   const inv=allianceGetInvoke();
@@ -928,7 +964,7 @@ async function allianceCapOcrFrame(){
     +'，行切片='+slices.length+(allianceLastSliceInfo?('｜行距='+allianceLastSliceInfo.lineSpacing+' 合并阈值='+allianceLastSliceInfo.mergeGap):''));
   if(first2){ const png=await allianceCapBmpToPngDataUrl(b64); if(png) await allianceCapDumpImg('f'+no+'_window.png', png); }
   const ocrOpts={ data:{format:'text', outputDirName:'', outputFileName:'', outputFileFormat:[]}, ocr:{language:'models/config_chinese.txt', cls:true} };
-  const rows=[];
+  let rows=[];
   for(let i=0;i<slices.length;i++){
     const sl=slices[i];
     let txt='', rankTxt='', cupTxt='';
@@ -948,6 +984,7 @@ async function allianceCapOcrFrame(){
     allianceSliceMeta[key]={ dataUrl:'data:image/png;base64,'+sl.mid, leftDataUrl:sl.left?('data:image/png;base64,'+sl.left):null, rightDataUrl:sl.right?('data:image/png;base64,'+sl.right):null, text:txt, rankText:rankTxt, cupText:cupTxt };
     rows.push({ rank:rw.rank, name:rw.name, cups:rw.cups, streak:rw.streak, key });
   }
+  rows = allianceCapSplitMergedNames(rows);   // 先拆"两个人被并进一行"的拼接名（否则按名字去重会失效）
   // 名次回推：同一帧内名次连续。以第一个已知名次为锚，向前回推(-1)、向后补齐(+1)
   // （真实场景：第1名是金色奖牌，左列 OCR 读不到 → 靠"果子13=2"推回"龙行=1"）
   const _fk=rows.findIndex(r=>r.rank>0);
@@ -959,17 +996,45 @@ async function allianceCapOcrFrame(){
   allianceCapDumpFlush();
   return { rows, raw:b64 };
 }
-// 按「人名」去重累积（同一个人被重复识别到时补齐更可信的字段，不重复填行）
+// 人名归一：全角→半角、去空白/标点、统一大小写、形近字归一（l/I→1、o/O/〇→0）。
+// 用于把同一人的不同识别结果（"电52A"/"电52a"、"果子l3"/"果子13"）归到一起。
+function _alNameKey(name){
+  let s=String(name||'').trim();
+  if(!s) return '';
+  s=s.replace(/[\uFF01-\uFF5E]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))
+     .replace(/[\s.、，。,:：#()\-_|·]/g,'')
+     .toUpperCase();
+  s=s.replace(/[O〇口Q]/g,'0').replace(/[LI|]/g,'1');
+  return s;
+}
+// 判定"是不是同一个人"：核心（去掉数字后的部分）必须一致；数字必须一致；
+// 例外——一边完全没有数字、另一边只多一个单字符尾标（游戏里的上标等级，如"龙行⁶"/"龙行"）也算同一人。
+// 这样 果子13/果子14/果子15 绝不会被误并（数字不同），但别名能并。
+function _alSamePerson(a,b){
+  const ka=_alNameKey(a), kb=_alNameKey(b);
+  if(!ka || !kb) return false;
+  if(ka===kb) return true;
+  const da=(ka.match(/\d/g)||[]).join(''), db=(kb.match(/\d/g)||[]).join('');
+  if(ka.replace(/\d/g,'')!==kb.replace(/\d/g,'')) return false;   // 核心不同 → 两个人
+  if(da===db) return true;
+  if(da==='' && db.length<=1) return true;
+  if(db==='' && da.length<=1) return true;
+  return false;
+}
+// 按「人」去重累积：先精确匹配，匹配不到再按 _alSamePerson 模糊匹配（同一个人只保留一行，补齐更可信的字段）
 function allianceCapMerge(rows){
   let added=0;
   for(const r of rows){
     const nm=String(r.name||'').trim(); if(!nm) continue;
-    const prev=_alAutoCap.rows.get(nm);
-    if(!prev){ _alAutoCap.rows.set(nm, r); added++; continue; }
+    let exKey=_alAutoCap.rows.has(nm)?nm:null;
+    if(!exKey){ for(const k of _alAutoCap.rows.keys()){ if(_alSamePerson(k,nm)){ exKey=k; break; } } }
+    if(!exKey){ _alAutoCap.rows.set(nm, r); added++; continue; }
+    const prev=_alAutoCap.rows.get(exKey);
     if((!prev.rank||prev.rank<=0) && r.rank>0) prev.rank=r.rank;
     if((!prev.cups||prev.cups===0) && r.cups>0) prev.cups=r.cups;
     if((!prev.streak||prev.streak===0) && r.streak>0) prev.streak=r.streak;
     if(r.key) prev.key=r.key;
+    if(_alSamePerson(exKey, nm) && nm!==exKey) console.log('[联盟][同名归一] 「'+nm+'」并入「'+exKey+'」');
   }
   return added;
 }
@@ -1125,13 +1190,16 @@ async function allianceParseAndImport(){
   const status=$('ocrStatus');
   if(!allianceSliceResults.length && !$('ocrRaw').value.trim()){ setMsg('saveMsg','请先上传战绩截图并切片识别','err'); return; }
   let added=0;
-  $('recBody').innerHTML='';   // OCR 以截图为准，先清空再填（手动行请识别后补）
+  let parsed=[];
   for(const s of allianceSliceResults){
     const rw=parseAllianceFields({ nameText:s.text||'', rankText:s.rankText||'', cupText:s.cupText||'' });
-    if(rw){ addRow(rw.rank, rw.name, rw.cups, rw.streak, s.key); added++; }
+    if(rw){ rw.key=s.key; parsed.push(rw); }
   }
   const manual=$('ocrRaw').value.trim();
-  if(manual){ parseAllianceOcrText(manual).forEach(rw=>{ addRow(rw.rank,rw.name,rw.cups,rw.streak,''); added++; }); }
+  if(manual){ parseAllianceOcrText(manual).forEach(rw=>parsed.push(rw)); }
+  parsed=allianceCapSplitMergedNames(parsed);   // 拆"两个人被并进一行"的拼接名，避免同一人两行
+  $('recBody').innerHTML='';   // OCR 以截图为准，先清空再填（手动行请识别后补）
+  parsed.forEach(rw=>{ addRow(rw.rank, rw.name, rw.cups, rw.streak, rw.key||''); added++; });
   persistAllianceSlices();
   if(status) status.textContent='已填入 '+added+' 条战绩（点表中 📷 可回看每行原图）';
   setMsg('saveMsg','OCR 解析完成，已填入 '+added+' 条战绩，请核对无误后点「保存并上传 Gist」','ok');
