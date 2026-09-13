@@ -156,6 +156,22 @@
         <button class="btn btn-ghost btn-sm" onclick="allianceClearOcr()">🗑 清空</button>
         <span id="ocrStatus" class="hint"></span>
       </div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px dashed rgba(255,255,255,0.15);display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <button id="allianceAutoCapBtn" class="btn btn-primary btn-sm" onclick="allianceAutoCapToggle()" title="不用手动截图：软件自动抓游戏窗口 → 按行切片 → 识别 → 逐行去重填入战绩表">🖱️ 自动截图识别</button>
+        <select id="allianceCapWin" onchange="_alAutoCap.hwnd=Number(this.value)||_alAutoCap.hwnd" style="max-width:200px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#eaeefb;border-radius:6px;padding:4px 6px;font-size:0.76rem;" title="要截图的游戏窗口（启动时自动找，优先标题含「塔防/精灵」的）">
+          <option value="">— 启动时自动找游戏窗口 —</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:4px;font-size:0.78rem;cursor:pointer;" title="列表一屏放不下时自动向下滚动（需要新版软件才有滚轮命令；不支持时会提示并改用手动滚动）"><input type="checkbox" id="allianceCapAutoScroll"> ⤓ 自动下滑</label>
+        <select id="allianceCapScrollStep" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#eaeefb;border-radius:6px;padding:4px 6px;font-size:0.76rem;" title="每次自动下滑滚多少">
+          <option value="-360">半条</option>
+          <option value="-720">1 条</option>
+          <option value="-1440" selected>2 条</option>
+          <option value="-2160">3 条</option>
+          <option value="-3600">约一页</option>
+        </select>
+      </div>
+      <div id="allianceCapStatus" class="hint" style="margin-top:6px;"></div>
+      <div class="hint" style="margin-top:4px;">自动截图不用你截图/上传：软件自己抓游戏窗口 → 按行切出「名次 / 人名 / 杯数」→ 自动去重填入上表（最大连胜识别不到不影响，可留空）。列表一屏放不下时勾「⤓ 自动下滑」；不勾也行——手动滚动列表，翻屏后会自动续拍。</div>
       <div class="hint" style="margin-top:6px;">上传战绩截图（可多选）→ 自动按行切片并调本机 Umi-OCR 逐块识别；下方「切片↔识别」左图右文逐块对照，确认无误后点「解析并填入战绩表」即把每行结果填入上表，并保留来源切片（点表中 📷 可回看该行原图）。也可 Ctrl+V 直接粘贴截图。</div>
       <div id="allianceOcrCompare" style="display:none;margin-top:10px;"></div>
       <div id="ocrRawBox" style="display:none;margin-top:8px;">
@@ -489,6 +505,7 @@ function restoreAllianceSlices(){ try{ const s=localStorage.getItem(allianceSlic
 // 每个文字带=一个人(一行，名字+奖杯/连胜等上下多行也合并为一个带)，精确切该带，绝不切到字、绝不几行并一块。
 // 自动量出"行距 / 行间间距"供状态栏显示核对。
 let allianceLastSliceInfo=null;
+let allianceLastRegion=null;   // 最近一次自动定位到的"成员列表"横向范围 {x0,x1,w}（自动截图据此算滚轮落点）
 function allianceDetectRowSlices(img, w, h){
   const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
   const ctx=cv.getContext('2d'); ctx.drawImage(img,0,0);
@@ -642,6 +659,7 @@ function allianceSliceImage(file, maxH){
       let rx=0, rw=w;
       try{
         const rg=allianceDetectListRegion(img,w,h);
+        allianceLastRegion = rg || null;
         if(rg){ rx=rg.x0; rw=rg.w; console.log('[联盟][区域] 自动定位成员列表 x='+rg.x0+'..'+rg.x1+'（宽 '+rw+'/'+w+'）'); }
       }catch(e){}
       let rcv=null;
@@ -765,6 +783,216 @@ async function allianceRunOcr(files){
   const totalLines=$('ocrRaw').value.split(/\r?\n/).filter(Boolean).length;
   const sp=allianceLastSliceInfo?('｜合并阈值='+allianceLastSliceInfo.mergeGap+'px 共'+allianceLastSliceInfo.rows+'块'):'';
   if(status) status.textContent='已切 '+totalSlice+' 块（识别 '+files.length+' 张图），共 '+totalLines+' 行'+sp+'，逐块对照后点「解析并填入战绩表」';
+}
+
+// ===================== 自动截图（连拍）：软件自己抓游戏窗口 → 切片 → OCR → 去重填表 =====================
+// 与深海统计同款：不用手动截图/上传。整屏截图里成员列表常只在左半边，
+// 切片会先用 allianceDetectListRegion 自动圈出列表区域，再按行切「名次/人名/杯数」三列分别 OCR。
+let _alAutoCap = { on:false, hwnd:0, winTitle:'', winW:0, winH:0, frame:0, rows:new Map(), wheelOk:null, warned:false };
+function allianceCapStatus(msg, color){
+  const s=$('allianceCapStatus');
+  if(s){ s.textContent=msg||''; s.style.color=color||'rgba(255,255,255,0.75)'; }
+}
+function allianceCapBtnText(){
+  const b=$('allianceAutoCapBtn');
+  if(b) b.textContent = _alAutoCap.on ? '⏹ 停止自动截图' : '🖱️ 自动截图识别';
+}
+function allianceCapB64ToFile(b64, name){
+  const bin=atob(b64), n=bin.length, u8=new Uint8Array(n);
+  for(let i=0;i<n;i++) u8[i]=bin.charCodeAt(i);
+  return new File([u8], name||('alcap-'+Date.now()+'.bmp'), {type:'image/bmp'});
+}
+function allianceCapSleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+async function allianceCapEnsureWindows(){
+  const inv=allianceGetInvoke();
+  if(!inv) throw new Error('自动截图需在桌面 App 内运行');
+  let list=[]; try{ list=await inv('find_game_windows',{}); }catch(e){}
+  if(!list||!list.length){ try{ list=await inv('find_game_windows',{deep:true}); }catch(e){} }
+  if(!list||!list.length) throw new Error('没找到游戏窗口：请先打开游戏、保证窗口可见且未最小化');
+  const sel=$('allianceCapWin');
+  if(sel){
+    const cur=sel.value;
+    sel.innerHTML=list.map(w=>'<option value="'+w.hwnd+'">'+esc(w.title||'(无标题)')+'</option>').join('');
+    const keep=list.some(w=>String(w.hwnd)===cur);
+    const pref=list.find(w=>/塔防|精灵/.test(w.title||''));
+    sel.value=keep?cur:String((pref||list[0]).hwnd);
+  }
+  return list;
+}
+async function allianceCapResolveWin(){
+  if(!_alAutoCap.hwnd) await allianceCapEnsureWindows();
+  const sel=$('allianceCapWin');
+  const hwnd=(sel&&sel.value)?Number(sel.value):_alAutoCap.hwnd;
+  if(!hwnd) throw new Error('未选择游戏窗口');
+  _alAutoCap.hwnd=hwnd;
+  const o=sel&&sel.selectedOptions&&sel.selectedOptions[0];
+  _alAutoCap.winTitle=o?(o.textContent||''):(_alAutoCap.winTitle||'');
+  return hwnd;
+}
+function allianceCapImgSize(b64){
+  return new Promise(res=>{ const im=new Image(); im.onload=()=>res({w:im.naturalWidth||0,h:im.naturalHeight||0}); im.onerror=()=>res({w:0,h:0}); im.src='data:image/bmp;base64,'+b64; });
+}
+async function allianceCapProbeSize(){
+  const inv=allianceGetInvoke();
+  const b64=await inv('capture_window_region',{hwnd:_alAutoCap.hwnd,x:0,y:0,w:1,h:1,full:true});
+  const sz=await allianceCapImgSize(b64);
+  if(!sz.w) throw new Error('截图失败：窗口可能已最小化，或被其他窗口完全遮挡');
+  _alAutoCap.winW=sz.w; _alAutoCap.winH=sz.h;
+  return sz;
+}
+async function allianceCapGrab(){
+  const inv=allianceGetInvoke();
+  return await inv('capture_window_region',{hwnd:_alAutoCap.hwnd,x:0,y:0,w:1,h:1,full:true});
+}
+// 抓一帧 → 切片 → 逐块 OCR（中=名字 / 左=名次 / 右=杯数）→ 解析成行
+async function allianceCapOcrFrame(){
+  const inv=allianceGetInvoke();
+  const b64=await allianceCapGrab();
+  const slices=await allianceSliceImage(allianceCapB64ToFile(b64));
+  const ocrOpts={ data:{format:'text', outputDirName:'', outputFileName:'', outputFileFormat:[]}, ocr:{language:'models/config_chinese.txt', cls:true} };
+  const rows=[];
+  for(const sl of slices){
+    let txt='', rankTxt='', cupTxt='';
+    try{ const r=await inv('umi_ocr',{base64:sl.mid, options:ocrOpts}); txt=allianceExtractOcrText(r); }catch(e){}
+    if(sl.left){ try{ const rl=await inv('umi_ocr',{base64:sl.left, options:ocrOpts}); rankTxt=allianceExtractOcrText(rl); }catch(e){} }
+    if(sl.right){ try{ const rr=await inv('umi_ocr',{base64:sl.right, options:ocrOpts}); cupTxt=allianceExtractOcrText(rr); }catch(e){} }
+    const rw=parseAllianceFields({nameText:txt, rankText:rankTxt, cupText:cupTxt});
+    if(!rw) continue;
+    const key='alcap_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+    allianceSliceMeta[key]={ dataUrl:'data:image/png;base64,'+sl.mid, leftDataUrl:sl.left?('data:image/png;base64,'+sl.left):null, rightDataUrl:sl.right?('data:image/png;base64,'+sl.right):null, text:txt, rankText:rankTxt, cupText:cupTxt };
+    rows.push({ rank:rw.rank, name:rw.name, cups:rw.cups, streak:rw.streak, key });
+  }
+  return { rows, raw:b64 };
+}
+// 按「人名」去重累积（同一个人被重复识别到时补齐更可信的字段，不重复填行）
+function allianceCapMerge(rows){
+  let added=0;
+  for(const r of rows){
+    const nm=String(r.name||'').trim(); if(!nm) continue;
+    const prev=_alAutoCap.rows.get(nm);
+    if(!prev){ _alAutoCap.rows.set(nm, r); added++; continue; }
+    if((!prev.rank||prev.rank<=0) && r.rank>0) prev.rank=r.rank;
+    if((!prev.cups||prev.cups===0) && r.cups>0) prev.cups=r.cups;
+    if((!prev.streak||prev.streak===0) && r.streak>0) prev.streak=r.streak;
+    if(r.key) prev.key=r.key;
+  }
+  return added;
+}
+function allianceCapRenderTable(){
+  const tb=$('recBody'); if(!tb) return;
+  tb.innerHTML='';
+  const list=[..._alAutoCap.rows.values()].sort((a,b)=>(a.rank||9999)-(b.rank||9999));
+  list.forEach(r=>addRow(r.rank, r.name, r.cups, r.streak, r.key));
+  if(!list.length) addRow();
+}
+async function allianceCapScrollDelta(){ const sel=$('allianceCapScrollStep'); return sel?Math.min(-120, Number(sel.value)||-1440) : -1440; }
+// dir=1 向下滚；dir<0 回退一点（重新对齐）
+async function allianceCapWheel(dir){
+  if(dir>0 && _alAutoCap.wheelOk===false) return;
+  const inv=allianceGetInvoke(); if(!inv) return;
+  const rg=allianceLastRegion;
+  const px = rg ? Math.round(rg.x0 + rg.w*0.5) : Math.round((_alAutoCap.winW||600)*0.30);
+  const py = Math.round((_alAutoCap.winH||400)*0.55);
+  const step=await allianceCapScrollDelta();
+  const delta = dir>0 ? step : Math.round(-step*0.34);
+  try{
+    await inv('gm_wheel',{ hwnd:_alAutoCap.hwnd, x:px, y:py, delta:delta, times:1 });
+    if(dir>0) _alAutoCap.wheelOk=true;
+  }catch(e){
+    if(dir>0){
+      _alAutoCap.wheelOk=false;
+      const cb=$('allianceCapAutoScroll'); if(cb) cb.checked=false;
+      if(!_alAutoCap.warned){ _alAutoCap.warned=true; allianceToast('⚠️ 自动下滑需要新版软件才有（当前版本没有滚轮命令）——请手动滚动列表，自动截图照常记录', true); }
+    }
+  }
+}
+// 手动模式：检测"用户是否滚动了列表"（48×48 粗指纹，忽略小幅动画）
+function allianceCapFingerprint(b64){
+  return new Promise(res=>{
+    const im=new Image();
+    im.onload=()=>{ try{
+      const c=document.createElement('canvas'); c.width=48; c.height=48;
+      const ctx=c.getContext('2d'); ctx.drawImage(im,0,0,48,48);
+      const d=ctx.getImageData(0,0,48,48).data; let s='';
+      for(let i=0;i<d.length;i+=4) s+=(d[i]>>4)+','+(d[i+1]>>4)+','+(d[i+2]>>4)+';';
+      res(s);
+    }catch(e){ res('len'+b64.length); } };
+    im.onerror=()=>res('len'+b64.length);
+    im.src='data:image/bmp;base64,'+b64;
+  });
+}
+async function allianceCapWaitScroll(lastB64, timeoutMs){
+  const t0=Date.now(), to=timeoutMs||45000;
+  const fp0=await allianceCapFingerprint(lastB64);
+  while(_alAutoCap.on && (Date.now()-t0)<to){
+    await allianceCapSleep(450);
+    let b64; try{ b64=await allianceCapGrab(); }catch(e){ continue; }
+    if((await allianceCapFingerprint(b64))!==fp0) return true;
+  }
+  return false;
+}
+async function allianceAutoCapRun(){
+  const cb=$('allianceCapAutoScroll');
+  const useAuto=!!(cb&&cb.checked);
+  let noNew=0, emptyFrames=0;
+  while(_alAutoCap.on){
+    let fr;
+    try{ fr=await allianceCapOcrFrame(); }
+    catch(e){
+      _alAutoCap.frame++;
+      if(++emptyFrames>5){ allianceCapStatus('⚠️ 连续多帧失败，已停止：'+((e&&e.message)||e), '#ff8a80'); break; }
+      allianceCapStatus('⚠️ 第 '+_alAutoCap.frame+' 张失败：'+((e&&e.message)||e)+'（继续尝试）', '#ffb84d');
+      await allianceCapSleep(600); continue;
+    }
+    _alAutoCap.frame++;
+    const added=allianceCapMerge(fr.rows);
+    allianceCapRenderTable();
+    const total=_alAutoCap.rows.size;
+    emptyFrames = fr.rows.length ? 0 : (emptyFrames+1);
+    allianceCapStatus('📸 第 '+_alAutoCap.frame+' 张：本帧 '+fr.rows.length+' 行，新增 '+added+' 人 → 共 '+total+' 人'
+      + (fr.rows.length?'':'（本帧没识别到，可能动画中/切错）'), added?'#7CFC9B':'#ffb84d');
+    if(useAuto){
+      if(added===0) noNew++; else noNew=0;
+      if(total>0 && noNew>=2){ allianceCapStatus('🏁 连续 2 帧无新增，认为已到列表底部，自动停止。共 '+total+' 人', '#7CFC9B'); break; }
+      if(emptyFrames>=4){ allianceCapStatus('⚠️ 连续多帧没识别到，已停止（共 '+total+' 人）', '#ffb84d'); break; }
+      await allianceCapWheel(1);
+      await allianceCapSleep(650);
+    }else{
+      if(emptyFrames>=4){ allianceCapStatus('⚠️ 连续多帧没识别到，已停止（共 '+total+' 人）', '#ffb84d'); break; }
+      allianceCapStatus('✅ 已识别 '+total+' 人。滚动列表到下一屏会自动续拍；若已拍完，点「⏹ 停止自动截图」', '#7CFC9B');
+      const ok=await allianceCapWaitScroll(fr.raw);
+      if(!ok){ allianceCapStatus('⏹ 列表没有再变化，已自动停止。共 '+total+' 人——核对后点「保存并上传 Gist」', '#7CFC9B'); break; }
+      await allianceCapSleep(550);
+    }
+  }
+  if(_alAutoCap.on) allianceAutoCapStop();
+}
+async function allianceAutoCapStart(){
+  try{
+    await allianceCapResolveWin();
+    await allianceCapProbeSize();
+  }catch(e){
+    const m=(e&&e.message)||String(e);
+    allianceToast('❌ '+m, true); allianceCapStatus('❌ '+m, '#ff8a80'); return;
+  }
+  _alAutoCap.on=true; _alAutoCap.frame=0; _alAutoCap.rows=new Map(); _alAutoCap.wheelOk=null; _alAutoCap.warned=false;
+  allianceCapBtnText();
+  const cb=$('allianceCapAutoScroll');
+  allianceToast('▶️ 自动截图已开始：软件自己抓游戏窗口 → 识别 → 逐行填表'+(cb&&cb.checked?'（自动下滑）':'（手动滚动列表，翻屏后自动续拍）'));
+  allianceCapStatus('▶️ 自动截图中：'+(_alAutoCap.winTitle||'游戏窗口'), '#7CFC9B');
+  allianceAutoCapRun();
+}
+function allianceAutoCapStop(){
+  _alAutoCap.on=false;
+  allianceCapBtnText();
+  try{ persistAllianceSlices(); }catch(e){}
+  const n=_alAutoCap.rows.size;
+  allianceCapStatus('⏹ 已停止：共拍 '+_alAutoCap.frame+' 张，识别出 '+n+' 人。核对无误后点「保存并上传 Gist」', '#7CFC9B');
+  allianceToast('⏹ 自动截图已停止（'+n+' 人）');
+}
+async function allianceAutoCapToggle(){
+  if(_alAutoCap.on){ allianceAutoCapStop(); return; }
+  await allianceAutoCapStart();
 }
 function allianceRenderOcrCompare(){
   const box=$('allianceOcrCompare');
