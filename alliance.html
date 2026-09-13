@@ -590,21 +590,76 @@ function allianceDetectRowSlices(img, w, h){
   console.log('[联盟][切片] rowPeriod='+rowPeriod+' mergeMaxH='+mergeMaxHeight+' mergeMaxGap='+mergeMaxGap+' 共切 '+segs.length+' 块', segs);
   return segs.length>=1 ? segs : null;
 }
+// 自动识别"成员列表"的横向范围（x0..x1）。
+// 为什么需要：整屏截图里成员列表常只占**左半边**，右边是奖励面板（金色盾牌/红色横幅/蓝色底）。
+//   而列裁剪（左列排名 / 中列名字 / 右列杯数）必须相对**列表本身**算，否则"杯数"会切到右侧面板、
+//   "名字"会粘上杯数数字（如 龙行0）。判据：成员行的行背景是**灰底**（R≈G≈B、亮度中等），
+//   而面板/游戏背景/金框/红幅都是饱和色。逐列统计"灰底像素"占比 → 取最长连续段
+//   （允许跨越头像造成的窄断口）→ 即列表横向范围。判定失败 → 返回 null，调用方回退整幅宽度（旧行为）。
+function allianceDetectListRegion(img,w,h){
+  try{
+    const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+    const ctx=cv.getContext('2d'); ctx.drawImage(img,0,0,w,h);
+    const data=ctx.getImageData(0,0,w,h).data;
+    const need=Math.max(2,Math.round(h*0.18));
+    const runs=[]; let s=-1;
+    for(let x=0;x<=w;x++){
+      let ok=false;
+      if(x<w){
+        let c=0;
+        for(let y=0;y<h;y++){
+          const i=(y*w+x)*4, r=data[i],g=data[i+1],b=data[i+2];
+          const mx=Math.max(r,g,b), mn=Math.min(r,g,b);
+          if(mx-mn<32 && r>=45 && r<=175) c++;
+        }
+        ok = c>=need;
+      }
+      if(ok && s<0) s=x;
+      if(!ok && s>=0){ runs.push({s,e:x-1}); s=-1; }
+    }
+    if(!runs.length) return null;
+    const gapMax=Math.max(90, Math.round(w*0.12));
+    let best=null, cur=null;
+    const better=r=>{ if(r && (!best || (r.e-r.s)>(best.e-best.s))) best=r; };
+    for(const r of runs){
+      if(cur && (r.s-cur.e-1)<=gapMax) cur.e=r.e;
+      else { better(cur); cur={s:r.s,e:r.e}; }
+    }
+    better(cur);
+    if(!best) return null;
+    const span=best.e-best.s+1;
+    if(span < w*0.30) return null;               // 太窄 → 判定失败，回退整图
+    if(span > w*0.98 && best.s<=1) return null;   // 基本就是整图 → 无需裁
+    return { x0:best.s, x1:best.e+1, w:span };
+  }catch(e){ return null; }
+}
 function allianceSliceImage(file, maxH){
   return new Promise((resolve,reject)=>{
     const img=new Image();
     img.onload=()=>{
       const w=img.naturalWidth,h=img.naturalHeight; const slices=[];
-      // 优先：一行(一人)切一张，并自适应裁出"排名左列"与"杯数右列"分别放大 OCR
+      // ① 先自动圈出"成员列表"横向范围（整屏截图里列表常只在左半边）；失败则用整幅
+      let rx=0, rw=w;
       try{
-        const rows=allianceDetectRowSlices(img,w,h);
+        const rg=allianceDetectListRegion(img,w,h);
+        if(rg){ rx=rg.x0; rw=rg.w; console.log('[联盟][区域] 自动定位成员列表 x='+rg.x0+'..'+rg.x1+'（宽 '+rw+'/'+w+'）'); }
+      }catch(e){}
+      let rcv=null;
+      try{
+        rcv=document.createElement('canvas'); rcv.width=rw; rcv.height=h;
+        rcv.getContext('2d').drawImage(img,rx,0,rw,h,0,0,rw,h);
+      }catch(e){ rcv=null; }
+      const src = rcv || img, sw = rcv ? rw : w;
+      // ② 只在这块里做行检测/列裁剪，避免右侧奖励面板干扰
+      try{
+        const rows=allianceDetectRowSlices(src,sw,h);
         if(rows){
           for(const seg of rows){
             const sh=seg.bottom-seg.top;
             if(sh<4) continue;
-            const cv=document.createElement('canvas'); cv.width=w; cv.height=sh;
-            cv.getContext('2d').drawImage(img,0,seg.top,w,sh,0,0,w,sh);
-            const crops=allianceColumnCrops(cv,w,sh);
+            const cv=document.createElement('canvas'); cv.width=sw; cv.height=sh;
+            cv.getContext('2d').drawImage(src,0,seg.top,sw,sh,0,0,sw,sh);
+            const crops=allianceColumnCrops(cv,sw,sh);
             const mid=crops?crops.mid:cv.toDataURL('image/png').split(',')[1];
             slices.push({ mid, left:crops?crops.left:null, right:crops?crops.right:null });
           }
@@ -618,9 +673,9 @@ function allianceSliceImage(file, maxH){
         while(y<h){
           const sh=Math.min(fbMax,h-y);
           if(sh>=10){
-            const cv=document.createElement('canvas'); cv.width=w; cv.height=sh;
-            cv.getContext('2d').drawImage(img,0,y,w,sh,0,0,w,sh);
-            const crops=allianceColumnCrops(cv,w,sh);
+            const cv=document.createElement('canvas'); cv.width=sw; cv.height=sh;
+            cv.getContext('2d').drawImage(src,0,y,sw,sh,0,0,sw,sh);
+            const crops=allianceColumnCrops(cv,sw,sh);
             const mid=crops?crops.mid:cv.toDataURL('image/png').split(',')[1];
             slices.push({ mid, left:crops?crops.left:null, right:crops?crops.right:null });
           }
