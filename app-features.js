@@ -9566,7 +9566,10 @@
                 notepadMarks: (typeof getNotebookMainMarks === 'function' ? (getNotebookMainMarks() || []) : []),
                 notebookColor: (typeof notebookColorCfg !== 'undefined' && notebookColorCfg && notebookColorCfg.color) || (typeof DEFAULT_NOTEBOOK_COLOR !== 'undefined' ? DEFAULT_NOTEBOOK_COLOR : '#e0e0e0'),
                 txtFiles: safeArr(typeof txtFiles !== 'undefined' ? txtFiles : []),
-                referenceImages: (typeof referenceImages !== 'undefined' ? referenceImages.slice() : [])
+                referenceImages: (typeof referenceImages !== 'undefined' ? referenceImages.slice() : []),
+                // 🚂 战车随项目分享：导入方 / 打开共享项目时战车设置与分享方保持一致
+                myChariot: (typeof window.collectChariotData === 'function' ? window.collectChariotData().myChariot : { main: 1, sub: 0 }),
+                teammateChariot: (typeof window.collectChariotData === 'function' ? window.collectChariotData().teammateChariot : { main: 1, sub: 0 })
             };
             // 皮肤固化：把继承全局默认皮的卡显式写进项目配置，单项目分享自包含（与导出备份/需求墙分享同款）
             if (typeof materializeProjectSkinConfig === 'function') {
