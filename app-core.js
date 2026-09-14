@@ -13567,17 +13567,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             return getDamageReductionBreakdown(cardList, side, tableName).total;
         }
 
-        // 把减伤拆分对象格式化成悬浮提示文本，0 的项目自动隐藏
-        function formatDrTooltip(bd, label) {
+        // 把减伤拆分对象格式化成悬浮提示文本，0 的项目自动隐藏；不显示「我方/队友」前缀
+        function formatDrTooltip(bd) {
             const parts = [];
             if (bd.refine > 0) parts.push(`洗炼${bd.refine}`);
             if (bd.qiuzhang > 0) parts.push(`酋长${bd.qiuzhang}`);
             if (bd.xiaoye > 0) parts.push(`小野${bd.xiaoye}`);
             if (bd.baoku > 0) parts.push(`宝库${bd.baoku}`);
             if (bd.chariot > 0) parts.push(`战车减伤${bd.chariot}`);
-            if (parts.length === 0) return label ? `${label} 暂无减伤` : '暂无减伤';
-            const body = `${parts.join('+')}=合计${bd.total}`;
-            return label ? `${label} ${body}` : body;
+            if (parts.length === 0) return '暂无减伤';
+            return `${parts.join('+')}=合计${bd.total}`;
         }
 
         // 减伤显示：我的卡组/队友卡组各可独立切换减伤表查看（下拉选择，默认「我的」/「队友」）
@@ -13599,13 +13598,17 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const myEl = document.getElementById('myDamageReduction');
             if (myEl) {
                 myEl.textContent = `总减伤:${myTotal}`;
-                myEl.title = formatDrTooltip(myBd, '我方');
+                const tip = formatDrTooltip(myBd);
+                myEl.title = tip;
+                myEl.setAttribute('data-tip', tip);
             }
 
             const teammateEl = document.getElementById('teammateDamageReduction');
             if (teammateEl) {
                 teammateEl.textContent = `总减伤:${teammateTotal}`;
-                teammateEl.title = formatDrTooltip(tmBd, '队友');
+                const tip = formatDrTooltip(tmBd);
+                teammateEl.title = tip;
+                teammateEl.setAttribute('data-tip', tip);
             }
 
             // 🛡 全队合计：两边直接相加（每边已各自含自己的战车，不存在重复计算）
@@ -13613,7 +13616,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (teamEl) {
                 const combined = Math.round((myTotal + teammateTotal) * 10) / 10;
                 teamEl.textContent = `🛡 全队合计:${combined}`;
-                teamEl.title = `我方 ${formatDrTooltip(myBd, '')}｜队友 ${formatDrTooltip(tmBd, '')}｜全队合计=${combined}`;
+                const tip = `${formatDrTooltip(myBd)}｜${formatDrTooltip(tmBd)}｜全队合计=${combined}`;
+                teamEl.title = tip;
+                teamEl.setAttribute('data-tip', tip);
             }
 
             // 填充两个减伤表切换下拉
