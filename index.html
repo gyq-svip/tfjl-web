@@ -1033,6 +1033,7 @@
                     <label style="font-size:0.7rem;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;">
                         <input type="checkbox" id="fusionSkinSplitToggle" checked onchange="toggleFusionSkinSplit(this.checked)" title="勾选：融合卡显示完整融合皮肤（主卡整皮 + 被融合卡右下角小图）；不勾：只显示主卡（单卡）整张皮肤。卡名始终按现状显示。"> 显示融合
                     </label>
+                    <span id="teamTotalDr" data-tip="全队合计减伤 = 我方卡组 + 队友卡组 + 全队战车（战车两边共享，合计只算一次，不会重复相加）。鼠标悬停可看拆分。" style="background:rgba(255,215,0,0.14);border:1px solid rgba(255,215,0,0.45);color:#ffd700;padding:4px 10px;border-radius:6px;font-size:0.75rem;white-space:nowrap;cursor:help;">🛡 全队合计:0</span>
                     <div style="position:relative;">
                         <button onclick="toggleDamageReductionMenu(this)" data-tip="减伤菜单：设置/导出/导入各卡组的洗炼减伤数据（用于计算实际承伤）" style="background:rgba(78,205,196,0.2);border:1px solid rgba(78,205,196,0.4);color:#4ecdc4;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🛡️ 减伤</button>
                         <div id="damageReductionMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:rgba(42,42,74,0.95);border:1px solid rgba(78,205,196,0.3);border-radius:8px;padding:8px 0;min-width:140px;z-index:1000;box-shadow:0 4px 15px rgba(0,0,0,0.4);">

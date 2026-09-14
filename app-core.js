@@ -13559,16 +13559,36 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
             // 计算我的卡组减伤（用所选表）
             const myTotal = calculateTotalDamageReduction(myPlacedCards, 'my', window._myDrTable);
+            // 计算队友卡组减伤（用所选表）
+            const teammateTotal = calculateTotalDamageReduction(teammatePlacedCards, 'teammate', window._teammateDrTable);
+            // 🚂 全队战车减伤：两边卡组**各自**都吃这一笔（战车是全队共享），所以
+            //    直接把两边总减伤相加会把战车算两遍 —— 全队合计必须扣掉一次。
+            const teamChariot = (typeof chariotTeamDr === 'function') ? (chariotTeamDr().total || 0) : 0;
+            const myCardOnly = Math.round((myTotal - teamChariot) * 10) / 10;
+            const tmCardOnly = Math.round((teammateTotal - teamChariot) * 10) / 10;
+
             const myEl = document.getElementById('myDamageReduction');
             if (myEl) {
                 myEl.textContent = `总减伤:${myTotal}`;
+                myEl.title = (teamChariot > 0)
+                    ? (`卡组 ${myCardOnly} + 全队战车 ${teamChariot} = ${myTotal}（战车全队共享，队友侧同样吃到这一笔）`)
+                    : (`卡组 ${myTotal}`);
             }
 
-            // 计算队友卡组减伤（用所选表）
-            const teammateTotal = calculateTotalDamageReduction(teammatePlacedCards, 'teammate', window._teammateDrTable);
             const teammateEl = document.getElementById('teammateDamageReduction');
             if (teammateEl) {
                 teammateEl.textContent = `总减伤:${teammateTotal}`;
+                teammateEl.title = (teamChariot > 0)
+                    ? (`卡组 ${tmCardOnly} + 全队战车 ${teamChariot} = ${teammateTotal}（战车全队共享，我方侧同样吃到这一笔）`)
+                    : (`卡组 ${teammateTotal}`);
+            }
+
+            // 🛡 全队合计：我方卡 + 队友卡 + 全队战车（只算一次）
+            const teamEl = document.getElementById('teamTotalDr');
+            if (teamEl) {
+                const combined = Math.round((myCardOnly + tmCardOnly + teamChariot) * 10) / 10;
+                teamEl.textContent = `🛡 全队合计:${combined}`;
+                teamEl.title = `我方卡组 ${myCardOnly} + 队友卡组 ${tmCardOnly} + 全队战车 ${teamChariot} = ${combined}（战车共享，只算一次）`;
             }
 
             // 填充两个减伤表切换下拉
