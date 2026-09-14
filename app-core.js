@@ -13636,15 +13636,29 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (!tableName || !window.drTables[tableName]) return;
             if (side === 'teammate') window._teammateDrTable = tableName;
             else window._myDrTable = tableName;
-            // 只重算对应一侧，避免整页重排
-            if (side === 'teammate') {
-                const t = calculateTotalDamageReduction(teammatePlacedCards, 'teammate', tableName);
-                const el = document.getElementById('teammateDamageReduction');
-                if (el) el.textContent = `总减伤:${t}`;
-            } else {
-                const t = calculateTotalDamageReduction(myPlacedCards, 'my', tableName);
-                const el = document.getElementById('myDamageReduction');
-                if (el) el.textContent = `总减伤:${t}`;
+            // 重算该侧并同步数字 + data-tip 拆分提示（否则切换表后悬浮显示的还是旧表组成）
+            const bd = getDamageReductionBreakdown(
+                side === 'teammate' ? teammatePlacedCards : myPlacedCards,
+                side,
+                tableName
+            );
+            const el = document.getElementById(side === 'teammate' ? 'teammateDamageReduction' : 'myDamageReduction');
+            if (el) {
+                el.textContent = `总减伤:${bd.total}`;
+                const tip = formatDrTooltip(bd);
+                el.title = tip;
+                el.setAttribute('data-tip', tip);
+            }
+            // 同步全队合计（一侧变了，合计也变）
+            const teamEl = document.getElementById('teamTotalDr');
+            if (teamEl) {
+                const myT = getDamageReductionBreakdown(myPlacedCards, 'my', window._myDrTable).total;
+                const tmT = getDamageReductionBreakdown(teammatePlacedCards, 'teammate', window._teammateDrTable).total;
+                const combined = Math.round((myT + tmT) * 10) / 10;
+                teamEl.textContent = `🛡 全队合计:${combined}`;
+                const ttip = `${formatDrTooltip(getDamageReductionBreakdown(myPlacedCards, 'my', window._myDrTable))}｜${formatDrTooltip(getDamageReductionBreakdown(teammatePlacedCards, 'teammate', window._teammateDrTable))}｜全队合计=${combined}`;
+                teamEl.title = ttip;
+                teamEl.setAttribute('data-tip', ttip);
             }
         }
 
