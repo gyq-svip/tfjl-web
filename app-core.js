@@ -13150,7 +13150,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         </div>
                         <div style="background:rgba(255,152,0,0.1);border-radius:8px;padding:12px;margin-bottom:15px;">
                             <div style="color:#ff9800;font-size:0.85rem;margin-bottom:6px;padding:5px;background:rgba(255,152,0,0.1);border-radius:4px;">🚂 战车减伤 <span style="color:#888">（改到主页设置，此处不再手填）</span></div>
-                            <div style="color:rgba(255,255,255,0.55);font-size:0.75rem;line-height:1.65;">战车减伤<b>只在主页「我的手牌 / 队友手牌」标题行旁的金色战车框里设置</b>：主车、副车各选战车 + 等级 + 副车融合，系统自动算，我方/队友合计都加。<br>规则：只有「走马江湖号」计减伤（主车 3×等级+6；副车再×融合系数 50%~80%）；全队主车取最高、副车取最高（不能都是主车或都是副车）。<br>💡 要改战车：关掉本窗口 → 回主页点那个金色战车框。</div>
+                            <div style="color:rgba(255,255,255,0.55);font-size:0.75rem;line-height:1.65;">战车减伤<b>只在主页「我的手牌 / 队友手牌」标题行旁的金色战车框里设置</b>：主车、副车各选战车 + 等级 + 副车融合，系统自动算。<br>规则：只有「走马江湖号」计减伤（主车 3×等级+6；副车再×融合系数 50%~80%）。<b>每边总减伤只算自己这边的战车</b>：我的 = 我方主车+副车，队友的 = 队友主车+副车；「全队合计」= 两边直接相加。<br>💡 要改战车：关掉本窗口 → 回主页点那个金色战车框。</div>
                             <div style="color:#ff9800;font-size:0.85rem;margin:10px 0 6px;padding:5px;background:rgba(255,152,0,0.1);border-radius:4px;">⚡ 技能减伤（小野/酋长/宝库 — 被动技能，卡在场上有就算；与上方「卡的洗炼」无关，数值填在这一栏，每张表独立）</div>
                             <div style="color:rgba(255,152,0,0.8);font-size:0.72rem;margin-bottom:8px;line-height:1.5;">⚠️ 这里填的是<b>被动技能</b>减伤（如小野被动90）。小野的<b>自身占卜洗炼</b>是另一笔，请在上方「牧师类→小野 <span style="color:#ff9800;">(自身洗炼)</span>」那一行填。两笔都会相加：总减伤 = 自身洗炼 + 被动技能。</div>
                             <div style="display:flex;flex-wrap:wrap;gap:12px;">
@@ -13470,11 +13470,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
 
             // ========== 第一步：战车特殊减伤 ==========
-            // 🚂 战车减伤（2026-09-15 简化版）：**只认主页战车框里选的配置** —— 只有「走马江湖号」计入，
-            //    全队 主车取最高 + 副车取最高。减伤表手填的 我的战车/队友战车 已废弃（不再参与计算）。
+            // 🚂 战车减伤（2026-09-15 单边版）：**只认主页战车框里选的配置** —— 只有「走马江湖号」计入。
+            //    每边只算**自己这边**的战车（我的主车+我的副车），不算对方的 —— 用户明确：
+            //    「个人总减伤 = 个人卡组 + 自己的马车，不要算队友的马车」。
             //    🔴 主界面「卡组总减伤」走的就是本函数（calculateTotalDamageReduction），
             //       与脚本解析面板的 calculateDamageReductionForCards 是两条计算路径，改一处必须同步另一处。
-            let chariotVal = (typeof chariotTeamDr === 'function') ? (chariotTeamDr().total || 0) : 0;
+            let chariotVal = (typeof chariotDrInfo === 'function') ? ((chariotDrInfo(side) || {}).total || 0) : 0;
             if (chariotVal > 0) total += chariotVal;
 
             // ========== 第二步：洗炼减伤 + 小野/酋长/宝库的特殊技能减伤（仅上阵时计算）==========
@@ -13561,34 +13562,35 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const myTotal = calculateTotalDamageReduction(myPlacedCards, 'my', window._myDrTable);
             // 计算队友卡组减伤（用所选表）
             const teammateTotal = calculateTotalDamageReduction(teammatePlacedCards, 'teammate', window._teammateDrTable);
-            // 🚂 全队战车减伤：两边卡组**各自**都吃这一笔（战车是全队共享），所以
-            //    直接把两边总减伤相加会把战车算两遍 —— 全队合计必须扣掉一次。
-            const teamChariot = (typeof chariotTeamDr === 'function') ? (chariotTeamDr().total || 0) : 0;
-            const myCardOnly = Math.round((myTotal - teamChariot) * 10) / 10;
-            const tmCardOnly = Math.round((teammateTotal - teamChariot) * 10) / 10;
+            // 🚂 单边战车减伤：每边只算**自己这边**的战车（我的主车+副车 / 队友的主车+副车），
+            //    不掺对方的 —— 个人总减伤 = 个人卡组 + 自己的马车（用户 2026-09-15 明确）。
+            const myChariot = (typeof chariotDrInfo === 'function') ? ((chariotDrInfo('my') || {}).total || 0) : 0;
+            const tmChariot = (typeof chariotDrInfo === 'function') ? ((chariotDrInfo('teammate') || {}).total || 0) : 0;
+            const myCardOnly = Math.round((myTotal - myChariot) * 10) / 10;
+            const tmCardOnly = Math.round((teammateTotal - tmChariot) * 10) / 10;
 
             const myEl = document.getElementById('myDamageReduction');
             if (myEl) {
                 myEl.textContent = `总减伤:${myTotal}`;
-                myEl.title = (teamChariot > 0)
-                    ? (`卡组 ${myCardOnly} + 全队战车 ${teamChariot} = ${myTotal}（战车全队共享，队友侧同样吃到这一笔）`)
+                myEl.title = (myChariot > 0)
+                    ? (`卡组 ${myCardOnly} + 我方战车 ${myChariot} = ${myTotal}（只算我自己的马车，不含队友的）`)
                     : (`卡组 ${myTotal}`);
             }
 
             const teammateEl = document.getElementById('teammateDamageReduction');
             if (teammateEl) {
                 teammateEl.textContent = `总减伤:${teammateTotal}`;
-                teammateEl.title = (teamChariot > 0)
-                    ? (`卡组 ${tmCardOnly} + 全队战车 ${teamChariot} = ${teammateTotal}（战车全队共享，我方侧同样吃到这一笔）`)
+                teammateEl.title = (tmChariot > 0)
+                    ? (`卡组 ${tmCardOnly} + 队友战车 ${tmChariot} = ${teammateTotal}（只算队友自己的马车，不含我方的）`)
                     : (`卡组 ${teammateTotal}`);
             }
 
-            // 🛡 全队合计：我方卡 + 队友卡 + 全队战车（只算一次）
+            // 🛡 全队合计：两边直接相加（每边已各自含自己的战车，不存在重复计算）
             const teamEl = document.getElementById('teamTotalDr');
             if (teamEl) {
-                const combined = Math.round((myCardOnly + tmCardOnly + teamChariot) * 10) / 10;
+                const combined = Math.round((myTotal + teammateTotal) * 10) / 10;
                 teamEl.textContent = `🛡 全队合计:${combined}`;
-                teamEl.title = `我方卡组 ${myCardOnly} + 队友卡组 ${tmCardOnly} + 全队战车 ${teamChariot} = ${combined}（战车共享，只算一次）`;
+                teamEl.title = `我方 ${myTotal}（卡组 ${myCardOnly} + 我方战车 ${myChariot}） + 队友 ${teammateTotal}（卡组 ${tmCardOnly} + 队友战车 ${tmChariot}） = ${combined}`;
             }
 
             // 填充两个减伤表切换下拉
@@ -13713,10 +13715,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 specialDamageReduction = { "我的战车": 0, "队友战车": 0, "小野": 0, "酋长": 0, "宝库": 0 };
             }
 
-            // 🚂 战车减伤（2026-09-15 简化版）：**只认主页战车框里选的配置**（只有「走马江湖号」计入，
-            //    全队 主车取最高 + 副车取最高）；减伤表手填的 我的战车/队友战车 已废弃。
+            // 🚂 战车减伤（2026-09-15 单边版）：**只认主页战车框里选的配置**（只有「走马江湖号」计入）。
+            //    每边只算**自己这边**的战车，不算对方的；减伤表手填的 我的战车/队友战车 已废弃。
             //    注意：skipChariot=true 用于「单卡明细」，战车减伤只应计入总和一次，不能摊到每张卡。
-            let chariotVal = (typeof chariotTeamDr === 'function') ? (chariotTeamDr().total || 0) : 0;
+            let chariotVal = (typeof chariotDrInfo === 'function') ? ((chariotDrInfo(side) || {}).total || 0) : 0;
             if (chariotVal > 0 && !skipChariot) total += chariotVal;
 
             if (Array.isArray(cardNames)) {
