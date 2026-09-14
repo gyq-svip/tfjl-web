@@ -1741,7 +1741,44 @@
             '银河之光号', '银河之星号', '葫芦神山号', '飞龙在天号', '花果神山号', '地精飞艇号',
             '寂静之月号', '神剑山庄号', '浴火凤凰号', '山河社稷号', '狮王争霸号'
         ];
-        const CHARIOT_DEFAULT = { main: 1, sub: 0 };
+        const CHARIOT_DEFAULT = { main: 1, mainLv: 1, sub: 0, subLv: 1, subFusion: 0 };
+        // 🚂 战车减伤（用户 2026-09-15 提供数值表）：
+        //   主车减伤 = 3×等级 + 6（1级9% … 20级66%）；副车做被融合车 = 自身值 × 融合系数
+        //   融合系数：0级50% / 1级60% / 2级70% / 3级80%（满级 80%）。
+        //   皇家宝藏号是加血车 → 不计减伤。未设置主车 → 整个战车减伤记 0。
+        function chariotCarDr(level) { const lv = Math.min(20, Math.max(1, Number(level) || 1)); return 3 * lv + 6; }
+        function chariotDrInfo(side) {
+            const st = (_chariotState()[side]) || CHARIOT_DEFAULT;
+            const main = Number(st.main) || 0;
+            if (!main) return null;                       // 未设置主车 → 不计算战车减伤
+            const out = { mainVal: 0, subVal: 0, total: 0, detail: [] };
+            const mainName = chariotName(main);
+            const mainLv = Math.min(20, Math.max(1, Number(st.mainLv) || 1));
+            if (mainName && mainName.indexOf('皇家') === -1) {
+                out.mainVal = chariotCarDr(mainLv);
+                out.total += out.mainVal;
+                out.detail.push('主车' + mainName + ' ' + mainLv + '级=' + out.mainVal + '%');
+            } else if (mainName) {
+                out.detail.push('主车' + mainName + '(加血不计)');
+            }
+            const sub = Number(st.sub) || 0;
+            if (sub) {
+                const subName = chariotName(sub);
+                const subLv = Math.min(20, Math.max(1, Number(st.subLv) || 1));
+                const fus = Math.min(3, Math.max(0, Number(st.subFusion) || 0));
+                const mult = [0.5, 0.6, 0.7, 0.8][fus];
+                if (subName && subName.indexOf('皇家') === -1) {
+                    out.subVal = Math.round(chariotCarDr(subLv) * mult * 10) / 10;
+                    out.total += out.subVal;
+                    out.detail.push('副车' + subName + ' ' + subLv + '级×' + Math.round(mult * 100) + '%=' + out.subVal + '%');
+                } else if (subName) {
+                    out.detail.push('副车' + subName + '(加血不计)');
+                }
+            }
+            out.total = Math.round(out.total * 10) / 10;
+            return out;
+        }
+        window.chariotDrInfo = chariotDrInfo;
         function _chariotState() {
             if (!window.__tfjlChariot) window.__tfjlChariot = { my: Object.assign({}, CHARIOT_DEFAULT), teammate: Object.assign({}, CHARIOT_DEFAULT) };
             return window.__tfjlChariot;
@@ -1799,7 +1836,7 @@
             if (!box) return;
             const pop = document.createElement('div');
             pop.className = 'chariot-picker';
-            pop.style.cssText = 'position:absolute;z-index:3000;background:rgba(26,26,48,0.99);border:1px solid rgba(255,215,0,0.45);border-radius:10px;padding:10px;box-shadow:0 10px 30px rgba(0,0,0,0.6);font-size:0.78rem;color:#fff;min-width:176px;';
+            pop.style.cssText = 'position:absolute;z-index:3000;background:rgba(26,26,48,0.99);border:1px solid rgba(255,215,0,0.45);border-radius:10px;padding:10px;box-shadow:0 10px 30px rgba(0,0,0,0.6);font-size:0.78rem;color:#fff;min-width:262px;';
             const opts = function (withUnset, cur) {
                 let h = '';
                 if (withUnset) h += '<option value="0"' + (Number(cur) === 0 ? ' selected' : '') + '>未设置</option>';
@@ -1808,10 +1845,25 @@
                 });
                 return h;
             };
+            const lvOpts = function (cur) {
+                let h = '';
+                for (let i = 1; i <= 20; i++) h += '<option value="' + i + '"' + (Number(cur) === i ? ' selected' : '') + '>' + i + '级</option>';
+                return h;
+            };
+            const fusOpts = function (cur) {
+                let h = '';
+                ['0级(50%)', '1级(60%)', '2级(70%)', '3级(80%满)'].forEach(function (n, i) {
+                    h += '<option value="' + i + '"' + (Number(cur) === i ? ' selected' : '') + '>' + n + '</option>';
+                });
+                return h;
+            };
+            const selCss = 'background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:6px;padding:4px 5px;font-size:0.76rem;';
             pop.innerHTML = '<div style="color:#ffd700;font-weight:700;margin-bottom:6px;">🚂 ' + who + '战车</div>'
-                + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.7);flex:0 0 34px;">主车</span><select id="chariotMainSel" style="flex:1;min-width:0;background:#16213e;color:#fff;border:1px solid rgba(255,215,0,0.35);border-radius:6px;padding:4px 6px;font-size:0.78rem;">' + opts(false, st.main) + '</select></div>'
-                + '<div style="display:flex;align-items:center;gap:6px;"><span style="color:rgba(255,255,255,0.7);flex:0 0 34px;">副车</span><select id="chariotSubSel" style="flex:1;min-width:0;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:4px 6px;font-size:0.78rem;">' + opts(true, st.sub) + '</select></div>'
-                + '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-top:6px;line-height:1.45;">显示 4 个字：主车 2 字 + 副车 2 字；只设主车显示主车 4 个字。悬停可看全名。</div>';
+                + '<div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;"><span style="color:rgba(255,255,255,0.7);flex:0 0 30px;">主车</span><select id="chariotMainSel" style="flex:1;min-width:0;' + selCss + '">' + opts(false, st.main) + '</select><select id="chariotMainLvSel" title="主车等级（主车减伤 = 3×等级+6：1级9%…20级66%）" style="flex:0 0 66px;' + selCss + '">' + lvOpts(st.mainLv) + '</select></div>'
+                + '<div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;"><span style="color:rgba(255,255,255,0.7);flex:0 0 30px;">副车</span><select id="chariotSubSel" style="flex:1;min-width:0;' + selCss + '">' + opts(true, st.sub) + '</select><select id="chariotSubLvSel" title="副车等级（被融合时按自身值×融合系数计入）" style="flex:0 0 66px;' + selCss + '">' + lvOpts(st.subLv) + '</select></div>'
+                + '<div style="display:flex;align-items:center;gap:5px;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.7);flex:0 0 30px;">融合</span><select id="chariotFusSel" title="副车被融合次数：0级50% / 1级60% / 2级70% / 3级80%(满)" style="flex:1;' + selCss + '">' + fusOpts(st.subFusion) + '</select></div>'
+                + '<div id="chariotDrPreview" style="font-size:0.72rem;color:#7CFC9B;line-height:1.5;margin-bottom:5px;"></div>'
+                + '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;line-height:1.45;">皇家宝藏号是加血车，不计减伤；未设置主车则不计战车减伤。悬停战车框可看全名。</div>';
             document.body.appendChild(pop);
             const r = box.getBoundingClientRect();
             const pw = pop.offsetWidth, ph = pop.offsetHeight;
@@ -1822,15 +1874,25 @@
             pop.style.left = Math.max(8, left) + 'px';
             pop.style.top = Math.max(8, top) + 'px';
             const onCh = function () {
-                const m = Number(document.getElementById('chariotMainSel').value) || 1;
-                const s = Number(document.getElementById('chariotSubSel').value) || 0;
                 const cur = _chariotState()[side] || CHARIOT_DEFAULT;
-                cur.main = m; cur.sub = s;
+                cur.main = Number(document.getElementById('chariotMainSel').value) || 0;
+                cur.mainLv = Number(document.getElementById('chariotMainLvSel').value) || 1;
+                cur.sub = Number(document.getElementById('chariotSubSel').value) || 0;
+                cur.subLv = Number(document.getElementById('chariotSubLvSel').value) || 1;
+                cur.subFusion = Number(document.getElementById('chariotFusSel').value) || 0;
                 renderChariots();
+                const info = chariotDrInfo(side);
+                const pv = document.getElementById('chariotDrPreview');
+                if (pv) pv.innerHTML = info
+                    ? ('战车减伤：' + (info.detail.join(' + ') || '0') + ' = <b style="color:#ffd700;">' + info.total + '%</b>')
+                    : '未设置主车 → 不计战车减伤';
                 if (typeof autoSaveProject === 'function') autoSaveProject();
+                if (typeof updateDamageReductionDisplay === 'function') updateDamageReductionDisplay();
             };
-            document.getElementById('chariotMainSel').onchange = onCh;
-            document.getElementById('chariotSubSel').onchange = onCh;
+            ['chariotMainSel', 'chariotMainLvSel', 'chariotSubSel', 'chariotSubLvSel', 'chariotFusSel'].forEach(function (id) {
+                const el = document.getElementById(id); if (el) el.onchange = onCh;
+            });
+            onCh();   // 打开面板先渲染一次当前战车减伤预览
             const close = function (e) {
                 if (pop.contains(e.target) || box.contains(e.target)) return;
                 pop.remove(); document.removeEventListener('mousedown', close);
@@ -13175,6 +13237,30 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             listContainer.innerHTML = buildDamageReductionCardsList(filter, window._damageReductionCardsByProfession, getDrTable(window.drActiveTable).洗炼);
         }
         
+        // 🟡 减伤填写实时保存（2026-09-15）：输入即写内存 + 防抖 300ms 落盘，不用点「保存」按钮。
+        //   修复：填完牧师 → 切到法师筛选（列表重建）→ 牧师填的值没保存而丢失。
+        //   内存同步是即时的（切筛选重建列表不会丢），落盘仅防抖。
+        let _drRtTimer = null;
+        document.addEventListener('input', function (e) {
+            const t = e.target;
+            if (!t || !t.dataset) return;
+            if (t.dataset.card === undefined && t.dataset.special === undefined) return;
+            if (!t.closest || !t.closest('#damageReductionModal')) return;
+            const tb = getDrTable(window.drActiveTable);
+            if (t.dataset.card !== undefined) {
+                const cardName = t.dataset.card;
+                const value = parseFloat(t.value) || 0;
+                if (value > 0) tb.洗炼[cardName] = value; else delete tb.洗炼[cardName];
+            } else {
+                tb[t.dataset.special] = parseFloat(t.value) || 0;
+            }
+            if (_drRtTimer) clearTimeout(_drRtTimer);
+            _drRtTimer = setTimeout(function () {
+                saveDamageReductionData();
+                if (typeof updateDamageReductionDisplay === 'function') updateDamageReductionDisplay();
+            }, 300);
+        }, true);
+
         // 从弹窗保存减伤数据：洗炼写当前激活表，战车写当前激活表，小野/酋长/宝库写共享
         function saveDamageReductionFromDialog() {
             const t = getDrTable(window.drActiveTable);
@@ -13575,7 +13661,13 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             // 这样「我的」表里既能配自己的战车也能配队友战车的减伤，方便对比。
             // 注意：skipChariot=true 用于「单卡明细」，战车减伤只应计入总和一次，不能摊到每张卡。
             const chariotKey = (side === 'teammate') ? '队友战车' : '我的战车';
-            const chariotVal = (table && typeof table[chariotKey] === 'number') ? table[chariotKey] : 0;
+            let chariotVal = (table && typeof table[chariotKey] === 'number') ? table[chariotKey] : 0;
+            // 🚂 战车系统自动计算优先（2026-09-15）：选了主车 → 用 主车等级 + 副车等级×融合系数 自动算，
+            //    减伤记录里手填的 我的战车/队友战车 不再生效；未设置主车 → 战车减伤记 0（不计算）。
+            if (typeof chariotDrInfo === 'function') {
+                const _ci = chariotDrInfo(side);
+                chariotVal = _ci ? _ci.total : 0;
+            }
             if (chariotVal > 0 && !skipChariot) total += chariotVal;
 
             if (Array.isArray(cardNames)) {
