@@ -1742,38 +1742,52 @@
             '寂静之月号', '神剑山庄号', '浴火凤凰号', '山河社稷号', '狮王争霸号'
         ];
         const CHARIOT_DEFAULT = { main: 1, mainLv: 1, sub: 0, subLv: 1, subFusion: 0 };
-        // 🚂 战车减伤（用户 2026-09-15 提供数值表）：
-        //   主车减伤 = 3×等级 + 6（1级9% … 20级66%）；副车做被融合车 = 自身值 × 融合系数
+        // 🚂 战车减伤（2026-09-15 用户最终规则）：
+        //   ✅ 只有「走马江湖号」是减伤车（马车）；其余 22 辆是其它属性 → 只作显示，不计入减伤。
+        //   主车 = 3×等级 + 6（1级9% … 20级66%）；副车（被融合）= (3×等级+6) × 融合系数
         //   融合系数：0级50% / 1级60% / 2级70% / 3级80%（满级 80%）。
-        //   皇家宝藏号是加血车 → 不计减伤。未设置主车 → 整个战车减伤记 0。
+        //   ⚖️ 全队去重：马车不能都是主车、也不能都是副车 —— 主车位置全队只取最高、副车位置全队只取最高
+        //      （即最多算 2 辆马车）。例：我 冰封+走马(副) / 队友 走马(主)+冰封 → 算 2 次；
+        //       双方都是「走马主车」→ 只算最高的那 1 次。
         function chariotCarDr(level) { const lv = Math.min(20, Math.max(1, Number(level) || 1)); return 3 * lv + 6; }
+        function chariotIsDrCar(idx) { const n = chariotName(idx); return !!n && n.indexOf('走马') !== -1; }
+        function chariotFusionMult(fusion) { return [0.5, 0.6, 0.7, 0.8][Math.min(3, Math.max(0, Number(fusion) || 0))]; }
+        // 某车在指定角色下的减伤（非走马一律 0）
+        function chariotRoleDr(idx, level, asSub, fusion) {
+            if (!chariotIsDrCar(idx)) return 0;
+            return Math.round(chariotCarDr(level) * (asSub ? chariotFusionMult(fusion) : 1) * 10) / 10;
+        }
+        // 全队战车减伤：主车取最高 + 副车取最高，各最多算一次
+        function chariotTeamDr() {
+            const st = _chariotState();
+            let bestMain = 0, bestSub = 0;
+            const detail = [];
+            ['my', 'teammate'].forEach(function (s) {
+                const c = st[s] || CHARIOT_DEFAULT;
+                const who = (s === 'my') ? '我方' : '队友';
+                if (Number(c.main) > 0) {
+                    const v = chariotRoleDr(c.main, c.mainLv, false, 0);
+                    if (v > 0) { if (v > bestMain) bestMain = v; detail.push(who + '主车走马' + (Number(c.mainLv) || 1) + '级=' + v + '%'); }
+                }
+                if (Number(c.sub) > 0) {
+                    const v = chariotRoleDr(c.sub, c.subLv, true, c.subFusion);
+                    if (v > 0) { if (v > bestSub) bestSub = v; detail.push(who + '副车走马' + (Number(c.subLv) || 1) + '级×' + Math.round(chariotFusionMult(c.subFusion) * 100) + '%=' + v + '%'); }
+                }
+            });
+            return { mainVal: bestMain, subVal: bestSub, total: Math.round((bestMain + bestSub) * 10) / 10, detail: detail };
+        }
+        window.chariotTeamDr = chariotTeamDr;
+        // 单侧的走马减伤（供选择面板 / 悬停显示；不含全队去重）
         function chariotDrInfo(side) {
             const st = (_chariotState()[side]) || CHARIOT_DEFAULT;
-            const main = Number(st.main) || 0;
-            if (!main) return null;                       // 未设置主车 → 不计算战车减伤
             const out = { mainVal: 0, subVal: 0, total: 0, detail: [] };
-            const mainName = chariotName(main);
-            const mainLv = Math.min(20, Math.max(1, Number(st.mainLv) || 1));
-            if (mainName && mainName.indexOf('皇家') === -1) {
-                out.mainVal = chariotCarDr(mainLv);
-                out.total += out.mainVal;
-                out.detail.push('主车' + mainName + ' ' + mainLv + '级=' + out.mainVal + '%');
-            } else if (mainName) {
-                out.detail.push('主车' + mainName + '(加血不计)');
+            if (Number(st.main) > 0) {
+                const v = chariotRoleDr(st.main, st.mainLv, false, 0);
+                if (v > 0) { out.mainVal = v; out.total += v; out.detail.push('主车走马' + (Number(st.mainLv) || 1) + '级=' + v + '%'); }
             }
-            const sub = Number(st.sub) || 0;
-            if (sub) {
-                const subName = chariotName(sub);
-                const subLv = Math.min(20, Math.max(1, Number(st.subLv) || 1));
-                const fus = Math.min(3, Math.max(0, Number(st.subFusion) || 0));
-                const mult = [0.5, 0.6, 0.7, 0.8][fus];
-                if (subName && subName.indexOf('皇家') === -1) {
-                    out.subVal = Math.round(chariotCarDr(subLv) * mult * 10) / 10;
-                    out.total += out.subVal;
-                    out.detail.push('副车' + subName + ' ' + subLv + '级×' + Math.round(mult * 100) + '%=' + out.subVal + '%');
-                } else if (subName) {
-                    out.detail.push('副车' + subName + '(加血不计)');
-                }
+            if (Number(st.sub) > 0) {
+                const v = chariotRoleDr(st.sub, st.subLv, true, st.subFusion);
+                if (v > 0) { out.subVal = v; out.total += v; out.detail.push('副车走马' + (Number(st.subLv) || 1) + '级×' + Math.round(chariotFusionMult(st.subFusion) * 100) + '%=' + v + '%'); }
             }
             out.total = Math.round(out.total * 10) / 10;
             return out;
@@ -1797,11 +1811,17 @@
         }
         function chariotTip(side) {
             const st = _chariotState()[side] || CHARIOT_DEFAULT;
-            const main = Number(st.main) || 1, sub = Number(st.sub) || 0;
+            const main = Number(st.main) || 0, sub = Number(st.sub) || 0;
             const who = (side === 'my') ? '我方' : '队友';
-            return who + '主战车：' + main + ' ' + (chariotName(main) || '—')
-                + '\n' + who + '副战车：' + (sub ? (sub + ' ' + chariotName(sub)) : '未设置')
-                + '\n（点击设置）';
+            let t = who + '主战车：' + (main ? (main + ' ' + chariotName(main)) : '未设置');
+            if (main) t += '（' + (Number(st.mainLv) || 1) + '级）';
+            t += '\n' + who + '副战车：' + (sub ? (sub + ' ' + chariotName(sub)) : '未设置');
+            if (sub) t += '（' + (Number(st.subLv) || 1) + '级，融合' + ['0级(50%)', '1级(60%)', '2级(70%)', '3级(80%满)'][Math.min(3, Math.max(0, Number(st.subFusion) || 0))] + '）';
+            const info = (typeof chariotDrInfo === 'function') ? chariotDrInfo(side) : null;
+            if (info && info.total > 0) t += '\n减伤：' + info.detail.join(' + ') + ' = ' + info.total + '%';
+            else t += '\n减伤：不计（只有走马江湖号计减伤）';
+            t += '\n（点击设置）';
+            return t;
         }
         function renderChariots() {
             ['my', 'teammate'].forEach(function (side) {
@@ -1810,7 +1830,11 @@
                 const st = _chariotState()[side] || CHARIOT_DEFAULT;
                 const lbl = box.querySelector('.chariot-text');
                 if (lbl) lbl.textContent = chariotShort(st.main, st.sub);
-                box.title = chariotTip(side);
+                // ⚠️ 页面初始化会把 title 转成 data-tip 并移除 title（app-features.js），所以两个都要写：
+                //    只写 title 的话，自定义悬浮提示会一直显示初始那句「战车（点击设置）」，看不到战车全称。
+                const tip = chariotTip(side);
+                try { box.setAttribute('data-tip', tip); } catch (e) {}
+                box.title = tip;   // 兜底：未被转换时走浏览器原生提示
                 box.style.opacity = (Number(st.sub) > 0) ? '1' : '0.8';
             });
         }
@@ -1881,11 +1905,13 @@
                 cur.subLv = Number(document.getElementById('chariotSubLvSel').value) || 1;
                 cur.subFusion = Number(document.getElementById('chariotFusSel').value) || 0;
                 renderChariots();
-                const info = chariotDrInfo(side);
+                const mine = chariotDrInfo(side);
+                const team = (typeof chariotTeamDr === 'function') ? chariotTeamDr() : { total: 0, detail: [] };
                 const pv = document.getElementById('chariotDrPreview');
-                if (pv) pv.innerHTML = info
-                    ? ('战车减伤：' + (info.detail.join(' + ') || '0') + ' = <b style="color:#ffd700;">' + info.total + '%</b>')
-                    : '未设置主车 → 不计战车减伤';
+                if (pv) pv.innerHTML = team.detail.length
+                    ? ('本方：' + (mine && mine.detail.length ? mine.detail.join(' + ') : '不计')
+                        + '<br>全队战车减伤：' + team.detail.join('，') + ' = <b style="color:#ffd700;">' + team.total + '%</b>')
+                    : '未配置走马江湖号 → 不计战车减伤（可在「减伤记录」手填兜底）';
                 if (typeof autoSaveProject === 'function') autoSaveProject();
                 if (typeof updateDamageReductionDisplay === 'function') updateDamageReductionDisplay();
             };
@@ -13661,12 +13687,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             // 这样「我的」表里既能配自己的战车也能配队友战车的减伤，方便对比。
             // 注意：skipChariot=true 用于「单卡明细」，战车减伤只应计入总和一次，不能摊到每张卡。
             const chariotKey = (side === 'teammate') ? '队友战车' : '我的战车';
-            let chariotVal = (table && typeof table[chariotKey] === 'number') ? table[chariotKey] : 0;
-            // 🚂 战车系统自动计算优先（2026-09-15）：选了主车 → 用 主车等级 + 副车等级×融合系数 自动算，
-            //    减伤记录里手填的 我的战车/队友战车 不再生效；未设置主车 → 战车减伤记 0（不计算）。
-            if (typeof chariotDrInfo === 'function') {
-                const _ci = chariotDrInfo(side);
-                chariotVal = _ci ? _ci.total : 0;
+            let chariotVal = (table && typeof table[chariotKey] === 'number') ? table[chariotKey] : 0;   // 手填值（兜底）
+            // 🚂 战车减伤（2026-09-15 最终版）：只有「走马江湖号」计入；全队 主车取最高 + 副车取最高。
+            //    战车系统选了走马 → 用自动值；没选（自动值=0）→ 回退减伤表里手填的 我的战车/队友战车。
+            if (typeof chariotTeamDr === 'function') {
+                const _ct = chariotTeamDr().total;
+                if (_ct > 0) chariotVal = _ct;
             }
             if (chariotVal > 0 && !skipChariot) total += chariotVal;
 
