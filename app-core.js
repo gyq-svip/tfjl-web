@@ -13143,7 +13143,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                                     <input type="number" data-special="队友战车" value="${(window.drTables[window.drActiveTable] && window.drTables[window.drActiveTable]['队友战车']) || 0}" min="0" max="100" step="0.1" style="width:50px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,152,0,0.4);color:#ff9800;padding:4px 6px;border-radius:4px;text-align:center;font-size:0.8rem;">
                                 </div>
                             </div>
-                            <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-top:8px;">💡 「主战车」算我方卡组，「副战车」算队友卡组。每张表独立保存。</div>
+                            <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-top:8px;">💡 「主战车」算我方卡组，「副战车」算队友卡组，每张表独立保存。🚂 若战车系统里选了「走马江湖号」，会按 等级/融合 自动计算并优先使用；此处手填值仅在未选走马时兜底。</div>
                             <div style="color:#ff9800;font-size:0.85rem;margin:10px 0 6px;padding:5px;background:rgba(255,152,0,0.1);border-radius:4px;">⚡ 技能减伤（小野/酋长/宝库 — 被动技能，卡在场上有就算；与上方「卡的洗炼」无关，数值填在这一栏，每张表独立）</div>
                             <div style="color:rgba(255,152,0,0.8);font-size:0.72rem;margin-bottom:8px;line-height:1.5;">⚠️ 这里填的是<b>被动技能</b>减伤（如小野被动90）。小野的<b>自身占卜洗炼</b>是另一笔，请在上方「牧师类→小野 <span style="color:#ff9800;">(自身洗炼)</span>」那一行填。两笔都会相加：总减伤 = 自身洗炼 + 被动技能。</div>
                             <div style="display:flex;flex-wrap:wrap;gap:12px;">
@@ -13462,9 +13462,17 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 specialDamageReduction = { "我的战车": 0, "队友战车": 0, "小野": 0, "酋长": 0, "宝库": 0 };
             }
 
-            // ========== 第一步：战车特殊减伤（每张表自带 我的战车/队友战车；side 决定取哪一项）==========
+            // ========== 第一步：战车特殊减伤 ==========
+            // 🚂 战车减伤（2026-09-15 最终版）：只有「走马江湖号」计入；全队 主车取最高 + 副车取最高。
+            //    战车系统选了走马 → 用自动值；没选（自动值=0）→ 回退减伤表里手填的 我的战车/队友战车。
+            //    🔴 主界面「卡组总减伤」走的就是本函数（calculateTotalDamageReduction），
+            //       与脚本解析面板的 calculateDamageReductionForCards 是两条计算路径，改一处必须同步另一处。
             const chariotKey = (side === 'teammate') ? '队友战车' : '我的战车';
-            const chariotVal = (table && typeof table[chariotKey] === 'number') ? table[chariotKey] : 0;
+            let chariotVal = (table && typeof table[chariotKey] === 'number') ? table[chariotKey] : 0;
+            if (typeof chariotTeamDr === 'function') {
+                const _ct = chariotTeamDr().total;
+                if (_ct > 0) chariotVal = _ct;
+            }
             if (chariotVal > 0) total += chariotVal;
 
             // ========== 第二步：洗炼减伤 + 小野/酋长/宝库的特殊技能减伤（仅上阵时计算）==========
