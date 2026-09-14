@@ -8893,12 +8893,28 @@
 
             // 两行阵容
             let y = HEAD_H;
-            const drawRow = function (label, cards, drVal, labelColor) {
+            // 🚂 战车：取当前项目的主/副战车显示文本（4 个字），画在该方标题行的右端
+            const _chrData = (typeof window.collectChariotData === 'function') ? window.collectChariotData() : null;
+            const _chrTxt = function (c) {
+                if (!c) return '';
+                if (typeof window.chariotShort === 'function') { try { return window.chariotShort(c.main, c.sub) || ''; } catch (e) { return ''; } }
+                return '';
+            };
+            const chrMy = _chrData ? _chrTxt(_chrData.myChariot) : '';
+            const chrMate = _chrData ? _chrTxt(_chrData.teammateChariot) : '';
+            const drawRow = function (label, cards, drVal, labelColor, chariotTxt) {
                 ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
                 ctx.fillStyle = labelColor;
                 ctx.font = 'bold 18px "Microsoft YaHei", sans-serif';
                 const fullLabel = label + (drVal ? '　洗炼总减伤 ' + drVal : '');
                 ctx.fillText(fullLabel, gridX, y + 12);
+                if (chariotTxt) {
+                    ctx.textAlign = 'right';
+                    ctx.fillStyle = '#ffd700';
+                    ctx.font = 'bold 18px "Microsoft YaHei", sans-serif';
+                    ctx.fillText('🚂 ' + chariotTxt, gridX + gridW, y + 12);
+                    ctx.textAlign = 'left';
+                }
                 y += 24;
                 cards.forEach(function (c, i) {
                     _lineupDrawSlot(ctx, gridX + i * (SLOT_W + GAP), y, SLOT_W, SLOT_H, c);
@@ -8918,9 +8934,9 @@
                 });
                 y += SLOT_H + 12;
             };
-            drawRow('👤 我方', my, myDr, '#4fc3f7');
+            drawRow('👤 我方', my, myDr, '#4fc3f7', chrMy);
             drawHandRow('🃏 我方手牌', myHand, '#4fc3f7');
-            drawRow('👥 队友', tm, tmDr, '#81c784');
+            drawRow('👥 队友', tm, tmDr, '#81c784', chrMate);
             drawHandRow('🃏 队友手牌', tmHand, '#81c784');
 
             // ---- 底部区：整框背景（短码 + 留言/推广/生成信息 + 右下二维码）----
