@@ -25429,6 +25429,8 @@ ${maSection}
             document.getElementById('adminMenuSection').style.display = 'block';
             updateBroadcastToggleStatus();
             adminRenderApiUsage();
+            if (typeof renderAdminFabQrExpiry === 'function') renderAdminFabQrExpiry();   // 群二维码到期提示条
+            if (typeof _fabQrEnsureTimer === 'function') _fabQrEnsureTimer();
             if (typeof adminApplyMenuOrder === 'function') adminApplyMenuOrder();
             if (typeof adminMenuDragInit === 'function') adminMenuDragInit();
         }
@@ -27141,13 +27143,13 @@ ${maSection}
             return {};
         }
 
-        // 写入索引 Gist 的 room_index.json 某个字段（远程开关用）
-        async function setRoomIndexConfigField(field, value) {
+        // 写入索引 Gist 的 room_index.json 多个字段（一次 GET + 一次 PATCH；Gist 请求很贵，能合并就合并）
+        async function setRoomIndexConfigFields(obj) {
             const token = getGistToken();
             if (!token) throw new Error('无Token');
             const url = await getIndexGistUrl();
             const cur = await getRoomIndexConfig();
-            cur[field] = value;
+            Object.assign(cur, obj || {});
             const r = await fetch(url, {
                 method: 'PATCH',
                 headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
@@ -27155,6 +27157,11 @@ ${maSection}
             });
             if (!r.ok) throw new Error('写回失败(' + r.status + ')');
             return cur;
+        }
+        // 写入索引 Gist 的 room_index.json 某个字段（远程开关用；内部走多字段版）
+        async function setRoomIndexConfigField(field, value) {
+            const o = {}; o[field] = value;
+            return setRoomIndexConfigFields(o);
         }
 
         // 把 desc 里的 HTML 标签剥离为纯文本，供 title 悬浮说明使用（避免 <br> 等被当字面量显示）
@@ -27249,7 +27256,10 @@ ${maSection}
                     设置后，所有用户把鼠标移到右下角「💬 问题反馈」悬浮按钮上，会浮出该二维码（存索引 Gist，全网生效）。
                 </div>
                 <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;">
-                    <div id="fabQrPreview" style="width:132px;height:132px;border:1px dashed rgba(255,255,255,0.25);border-radius:10px;background:rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.35);font-size:0.7rem;overflow:hidden;">未设置</div>
+                    <div style="width:132px;flex:0 0 auto;display:flex;flex-direction:column;gap:6px;">
+                        <div id="fabQrPreview" style="width:132px;height:132px;border:1px dashed rgba(255,255,255,0.25);border-radius:10px;background:rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.35);font-size:0.7rem;overflow:hidden;">未设置</div>
+                        <div id="fabQrExpiry" title="群二维码有效期 7 天：以最后一次保存二维码的时间为准，每天自动 -1，到期前请及时更换" style="font-size:0.66rem;line-height:1.45;text-align:center;color:rgba(255,255,255,0.55);min-height:28px;"></div>
+                    </div>
                     <div style="flex:1;min-width:230px;display:flex;flex-direction:column;gap:8px;">
                         <input type="file" id="fabQrFile" accept="image/*" onchange="onFabQrFile(this)" style="font-size:0.72rem;color:rgba(255,255,255,0.7);">
                         <div id="fabQrPasteZone" tabindex="0" onpaste="onFabQrPaste(event)" onclick="this.focus()" style="padding:10px;border:1px dashed rgba(79,195,247,0.5);border-radius:8px;text-align:center;color:rgba(255,255,255,0.6);font-size:0.72rem;cursor:pointer;background:rgba(79,195,247,0.05);outline:none;line-height:1.5;">
@@ -27274,6 +27284,69 @@ ${maSection}
 
         // ==================== 悬浮按钮二维码（💬 问题反馈 hover 显示，全网生效）====================
         // 存储：room_index.json 的 fabQrcode（图片 dataURL 或 http 链接）+ fabQrcodeTip（二维码下方文字）
+        // 二维码有效期倒计时（群二维码 7 天）：以最后一次保存时间为准，按自然日每天 -1，第 7 天到期
+        const FAB_QR_VALID_DAYS = 7;
+        function _fabQrDayStart(t) { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
+        function fabQrExpiryInfo(cfg) {
+            const src = (cfg && cfg.fabQrcode) || '';
+            if (!src) return null;                       // 未设置二维码 → 不显示倒计时
+            const ts = Number(cfg && cfg.fabQrcodeTs) || 0;
+            if (!ts) return { unknown: true };           // 老数据没记时间 → 提示重新保存后开始计时
+            const DAY = 86400000;
+            const elapsed = Math.floor((_fabQrDayStart(Date.now()) - _fabQrDayStart(ts)) / DAY);
+            const left = FAB_QR_VALID_DAYS - elapsed;
+            const exp = new Date(_fabQrDayStart(ts) + FAB_QR_VALID_DAYS * DAY);
+            return { unknown: false, left: left, expStr: (exp.getMonth() + 1) + '月' + exp.getDate() + '日' };
+        }
+        // 渲染到功能开关卡片里二维码下方的 #fabQrExpiry
+        function renderFabQrExpiry(cfg) {
+            const el = document.getElementById('fabQrExpiry');
+            if (!el) return;
+            const info = fabQrExpiryInfo(cfg);
+            if (!info) { el.innerHTML = ''; return; }
+            if (info.unknown) { el.innerHTML = '<span style="color:rgba(255,255,255,0.45);">⏳ 未记录设置时间<br>重新保存后开始计时</span>'; return; }
+            if (info.left > 0) {
+                const c = info.left <= 2 ? '#ffb84d' : '#7CFC9B';
+                el.innerHTML = '<span style="color:' + c + ';font-weight:700;">⏳ 剩余 ' + info.left + ' 天</span><br><span style="color:rgba(255,255,255,0.45);">' + info.expStr + ' 到期' + (info.left <= 2 ? '，建议尽快更换' : '') + '</span>';
+            } else {
+                el.innerHTML = '<span style="color:#ff6b6b;font-weight:700;">⚠️ 已到期</span><br><span style="color:rgba(255,255,255,0.45);">' + info.expStr + ' 已过期，请立即更换</span>';
+            }
+        }
+        window.fabQrExpiryInfo = fabQrExpiryInfo;   // 供管理员菜单显示同一份倒计时
+        // 60s 刷新一次（跨自然日自动 -1）；两个位置（功能开关卡片 / 管理员菜单）共用同一个计时器
+        function _fabQrEnsureTimer() {
+            if (window.__fabQrExpiryTimer) return;
+            window.__fabQrExpiryTimer = setInterval(function () {
+                renderFabQrExpiry(window.__fabQrCfg);
+                if (typeof renderAdminFabQrExpiry === 'function') renderAdminFabQrExpiry(window.__fabQrCfg);
+            }, 60000);
+        }
+        // 管理员菜单里的「群二维码到期」提示条（绿色充裕 / 橙色临近 / 红色已到期；点一下直达功能开关页更换）
+        let _fabQrCfgCacheAt = 0;
+        async function renderAdminFabQrExpiry(cfg) {
+            const el = document.getElementById('adminFabQrExpiry');
+            if (!el) return;
+            if (!cfg) {
+                // 3 分钟内复用内存里的配置，避免反复读 Gist（API 用量敏感）
+                if (window.__fabQrCfg && (Date.now() - _fabQrCfgCacheAt) < 180000) { cfg = window.__fabQrCfg; }
+                else { try { cfg = await getRoomIndexConfig(); _fabQrCfgCacheAt = Date.now(); } catch (e) { cfg = window.__fabQrCfg || {}; } }
+            }
+            if (cfg) window.__fabQrCfg = cfg;
+            const info = fabQrExpiryInfo(cfg);
+            if (!info) { el.style.display = 'none'; return; }
+            el.style.display = 'block';
+            let bg, bd, txt;
+            if (info.unknown) { bg = 'rgba(255,255,255,0.06)'; bd = 'rgba(255,255,255,0.22)'; txt = '⏳ 群二维码：未记录设置时间（重新保存后开始计时）'; }
+            else if (info.left > 2) { bg = 'rgba(76,175,80,0.14)'; bd = 'rgba(76,175,80,0.5)'; txt = '⏳ 群二维码剩余 <b>' + info.left + '</b> 天（' + info.expStr + ' 到期）'; }
+            else if (info.left > 0) { bg = 'rgba(255,152,0,0.16)'; bd = 'rgba(255,152,0,0.55)'; txt = '⚠️ 群二维码只剩 <b>' + info.left + '</b> 天（' + info.expStr + ' 到期），建议尽快更换'; }
+            else { bg = 'rgba(244,67,54,0.18)'; bd = 'rgba(244,67,54,0.6)'; txt = '🔴 群二维码 <b>已到期</b>（' + info.expStr + '），请立即更换'; }
+            el.style.background = bg;
+            el.style.border = '1px solid ' + bd;
+            const col = info.unknown ? 'rgba(255,255,255,0.6)' : (info.left > 2 ? '#a5d6a7' : (info.left > 0 ? '#ffcc80' : '#ff8a80'));
+            el.style.color = col;
+            el.innerHTML = txt + '<span style="color:rgba(255,255,255,0.45);font-size:0.7rem;"> · 点此更换</span>';
+        }
+        window.renderAdminFabQrExpiry = renderAdminFabQrExpiry;
         function initFabQrPreview(cfg) {
             try {
                 const src = (cfg && cfg.fabQrcode) || '';
@@ -27283,6 +27356,10 @@ ${maSection}
                 if (u && /^https?:/i.test(src)) u.value = src;
                 const t = document.getElementById('fabQrTipInput');
                 if (t && cfg && cfg.fabQrcodeTip) t.value = cfg.fabQrcodeTip;
+                // 二维码有效期倒计时：渲染 + 每分钟刷新（跨自然日自动 -1）
+                window.__fabQrCfg = cfg || {};
+                renderFabQrExpiry(window.__fabQrCfg);
+                _fabQrEnsureTimer();
                 // 面板打开期间，页面任意处直接 Ctrl+V 也能粘贴（焦点在输入框/文本域时不接管，粘贴文字也不拦截）
                 if (!window.__fabQrPasteBound) {
                     window.__fabQrPasteBound = true;
@@ -27360,10 +27437,14 @@ ${maSection}
             const tip = (tipEl && tipEl.value.trim()) ? tipEl.value.trim() : '扫码加群';
             try {
                 if (st) st.textContent = '保存中…';
-                await setRoomIndexConfigField('fabQrcode', val || '');
-                await setRoomIndexConfigField('fabQrcodeTip', val ? tip : '');
+                const ts = val ? Date.now() : '';   // 记录保存时间 → 7 天有效期倒计时基准
+                await setRoomIndexConfigFields({ fabQrcode: val || '', fabQrcodeTip: val ? tip : '', fabQrcodeTs: ts });
                 window.__fabQrPending = '';
-                if (st) st.textContent = val ? '✅ 已保存（全网生效，用户刷新页面后 hover 可见）' : '✅ 已清除';
+                window.__fabQrCfg = Object.assign({}, window.__fabQrCfg || {}, { fabQrcode: val || '', fabQrcodeTip: val ? tip : '', fabQrcodeTs: ts });
+                renderFabQrExpiry(window.__fabQrCfg);
+                _fabQrCfgCacheAt = Date.now();
+                if (typeof renderAdminFabQrExpiry === 'function') renderAdminFabQrExpiry(window.__fabQrCfg);
+                if (st) st.textContent = val ? '✅ 已保存（全网生效，用户刷新页面后 hover 可见）·有效期倒计时已重置为 7 天' : '✅ 已清除';
             } catch (e) {
                 if (st) st.textContent = '❌ 保存失败：' + ((e && e.message) || e);
             }
@@ -27373,9 +27454,12 @@ ${maSection}
             const st = document.getElementById('fabQrStatus');
             if (!getGistToken()) { if (st) st.textContent = '⚠️ 未配置 Gist Token，无法清除'; return; }
             try {
-                await setRoomIndexConfigField('fabQrcode', '');
-                await setRoomIndexConfigField('fabQrcodeTip', '');
+                await setRoomIndexConfigFields({ fabQrcode: '', fabQrcodeTip: '', fabQrcodeTs: '' });
                 window.__fabQrPending = '';
+                window.__fabQrCfg = Object.assign({}, window.__fabQrCfg || {}, { fabQrcode: '', fabQrcodeTip: '', fabQrcodeTs: '' });
+                renderFabQrExpiry(window.__fabQrCfg);
+                _fabQrCfgCacheAt = Date.now();
+                if (typeof renderAdminFabQrExpiry === 'function') renderAdminFabQrExpiry(window.__fabQrCfg);
                 const u = document.getElementById('fabQrUrlInput'); if (u) u.value = '';
                 const pv = document.getElementById('fabQrPreview'); if (pv) pv.innerHTML = '未设置';
                 if (st) st.textContent = '✅ 已清除（悬浮按钮不再显示二维码）';
