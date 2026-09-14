@@ -1793,8 +1793,22 @@
             return out;
         }
         window.chariotDrInfo = chariotDrInfo;
+        // 本机"上次设置过的战车"：新建项目 / 老项目没存战车数据时用它当默认值，
+        // 免得每次新建项目都回到 1 号图腾战车、等级也归 1（用户 2026-09-15 要求）。
+        const CHARIOT_LAST_KEY = 'tfjl_chariot_last';
+        function _chariotLast() {
+            let o = null;
+            try { const s = localStorage.getItem(CHARIOT_LAST_KEY); if (s) o = JSON.parse(s); } catch (e) {}
+            return {
+                my: Object.assign({}, CHARIOT_DEFAULT, (o && o.my) || {}),
+                teammate: Object.assign({}, CHARIOT_DEFAULT, (o && o.teammate) || {})
+            };
+        }
+        function _chariotSaveLast() {
+            try { const st = _chariotState(); localStorage.setItem(CHARIOT_LAST_KEY, JSON.stringify({ my: st.my, teammate: st.teammate })); } catch (e) {}
+        }
         function _chariotState() {
-            if (!window.__tfjlChariot) window.__tfjlChariot = { my: Object.assign({}, CHARIOT_DEFAULT), teammate: Object.assign({}, CHARIOT_DEFAULT) };
+            if (!window.__tfjlChariot) window.__tfjlChariot = _chariotLast();
             return window.__tfjlChariot;
         }
         function chariotName(idx) { return CHARIOT_LIST[Number(idx) - 1] || ''; }
@@ -1845,10 +1859,12 @@
         }
         window.collectChariotData = collectChariotData;
         function applyChariotData(a, b) {
+            const last = _chariotLast();
             const st = _chariotState();
-            st.my = Object.assign({}, CHARIOT_DEFAULT, a || {});
-            st.teammate = Object.assign({}, CHARIOT_DEFAULT, b || {});
+            st.my = Object.assign({}, last.my, a || {});
+            st.teammate = Object.assign({}, last.teammate, b || {});
             renderChariots();
+            if (a || b) _chariotSaveLast();   // 载入带战车数据的项目 → 同步记为本机"上次设置"
         }
         window.applyChariotData = applyChariotData;
         // 选择面板：两个原生下拉（主车 / 副车），改动即时生效并标记项目已修改
@@ -1905,6 +1921,7 @@
                 cur.subLv = Number(document.getElementById('chariotSubLvSel').value) || 1;
                 cur.subFusion = Number(document.getElementById('chariotFusSel').value) || 0;
                 renderChariots();
+                _chariotSaveLast();   // 记住本次设置 → 下次新建项目默认沿用
                 const mine = chariotDrInfo(side);
                 const team = (typeof chariotTeamDr === 'function') ? chariotTeamDr() : { total: 0, detail: [] };
                 const pv = document.getElementById('chariotDrPreview');
@@ -13132,18 +13149,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             <button onclick="clearActiveDrTable()" style="background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.4);color:#ef4444;padding:8px 12px;border-radius:6px;">清空当前表</button>
                         </div>
                         <div style="background:rgba(255,152,0,0.1);border-radius:8px;padding:12px;margin-bottom:15px;">
-                            <div style="color:#ff9800;font-size:0.85rem;margin-bottom:8px;padding:5px;background:rgba(255,152,0,0.1);border-radius:4px;">⚡ 当前表战车减伤 <span style="color:#888">（小野/酋长/宝库技能减伤每张表独立，编辑在下方）</span></div>
-                            <div style="display:flex;flex-wrap:wrap;gap:12px;">
-                                <div style="display:flex;align-items:center;gap:6px;">
-                                    <span style="color:#fff;font-size:0.85rem;">主战车:</span>
-                                    <input type="number" data-special="我的战车" value="${(window.drTables[window.drActiveTable] && window.drTables[window.drActiveTable]['我的战车']) || 0}" min="0" max="100" step="0.1" style="width:50px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,152,0,0.4);color:#ff9800;padding:4px 6px;border-radius:4px;text-align:center;font-size:0.8rem;">
-                                </div>
-                                <div style="display:flex;align-items:center;gap:6px;">
-                                    <span style="color:#fff;font-size:0.85rem;">副战车:</span>
-                                    <input type="number" data-special="队友战车" value="${(window.drTables[window.drActiveTable] && window.drTables[window.drActiveTable]['队友战车']) || 0}" min="0" max="100" step="0.1" style="width:50px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,152,0,0.4);color:#ff9800;padding:4px 6px;border-radius:4px;text-align:center;font-size:0.8rem;">
-                                </div>
-                            </div>
-                            <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-top:8px;">💡 「主战车」算我方卡组，「副战车」算队友卡组，每张表独立保存。🚂 若战车系统里选了「走马江湖号」，会按 等级/融合 自动计算并优先使用；此处手填值仅在未选走马时兜底。</div>
+                            <div style="color:#ff9800;font-size:0.85rem;margin-bottom:6px;padding:5px;background:rgba(255,152,0,0.1);border-radius:4px;">🚂 战车减伤 <span style="color:#888">（改到主页设置，此处不再手填）</span></div>
+                            <div style="color:rgba(255,255,255,0.55);font-size:0.75rem;line-height:1.65;">战车减伤<b>只在主页「我的手牌 / 队友手牌」标题行旁的金色战车框里设置</b>：主车、副车各选战车 + 等级 + 副车融合，系统自动算，我方/队友合计都加。<br>规则：只有「走马江湖号」计减伤（主车 3×等级+6；副车再×融合系数 50%~80%）；全队主车取最高、副车取最高（不能都是主车或都是副车）。<br>💡 要改战车：关掉本窗口 → 回主页点那个金色战车框。</div>
                             <div style="color:#ff9800;font-size:0.85rem;margin:10px 0 6px;padding:5px;background:rgba(255,152,0,0.1);border-radius:4px;">⚡ 技能减伤（小野/酋长/宝库 — 被动技能，卡在场上有就算；与上方「卡的洗炼」无关，数值填在这一栏，每张表独立）</div>
                             <div style="color:rgba(255,152,0,0.8);font-size:0.72rem;margin-bottom:8px;line-height:1.5;">⚠️ 这里填的是<b>被动技能</b>减伤（如小野被动90）。小野的<b>自身占卜洗炼</b>是另一笔，请在上方「牧师类→小野 <span style="color:#ff9800;">(自身洗炼)</span>」那一行填。两笔都会相加：总减伤 = 自身洗炼 + 被动技能。</div>
                             <div style="display:flex;flex-wrap:wrap;gap:12px;">
@@ -13463,16 +13470,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
 
             // ========== 第一步：战车特殊减伤 ==========
-            // 🚂 战车减伤（2026-09-15 最终版）：只有「走马江湖号」计入；全队 主车取最高 + 副车取最高。
-            //    战车系统选了走马 → 用自动值；没选（自动值=0）→ 回退减伤表里手填的 我的战车/队友战车。
+            // 🚂 战车减伤（2026-09-15 简化版）：**只认主页战车框里选的配置** —— 只有「走马江湖号」计入，
+            //    全队 主车取最高 + 副车取最高。减伤表手填的 我的战车/队友战车 已废弃（不再参与计算）。
             //    🔴 主界面「卡组总减伤」走的就是本函数（calculateTotalDamageReduction），
             //       与脚本解析面板的 calculateDamageReductionForCards 是两条计算路径，改一处必须同步另一处。
-            const chariotKey = (side === 'teammate') ? '队友战车' : '我的战车';
-            let chariotVal = (table && typeof table[chariotKey] === 'number') ? table[chariotKey] : 0;
-            if (typeof chariotTeamDr === 'function') {
-                const _ct = chariotTeamDr().total;
-                if (_ct > 0) chariotVal = _ct;
-            }
+            let chariotVal = (typeof chariotTeamDr === 'function') ? (chariotTeamDr().total || 0) : 0;
             if (chariotVal > 0) total += chariotVal;
 
             // ========== 第二步：洗炼减伤 + 小野/酋长/宝库的特殊技能减伤（仅上阵时计算）==========
@@ -13691,17 +13693,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 specialDamageReduction = { "我的战车": 0, "队友战车": 0, "小野": 0, "酋长": 0, "宝库": 0 };
             }
 
-            // 战车特殊减伤（每张表自带 我的战车/队友战车；side 决定取哪一项）
-            // 这样「我的」表里既能配自己的战车也能配队友战车的减伤，方便对比。
-            // 注意：skipChariot=true 用于「单卡明细」，战车减伤只应计入总和一次，不能摊到每张卡。
-            const chariotKey = (side === 'teammate') ? '队友战车' : '我的战车';
-            let chariotVal = (table && typeof table[chariotKey] === 'number') ? table[chariotKey] : 0;   // 手填值（兜底）
-            // 🚂 战车减伤（2026-09-15 最终版）：只有「走马江湖号」计入；全队 主车取最高 + 副车取最高。
-            //    战车系统选了走马 → 用自动值；没选（自动值=0）→ 回退减伤表里手填的 我的战车/队友战车。
-            if (typeof chariotTeamDr === 'function') {
-                const _ct = chariotTeamDr().total;
-                if (_ct > 0) chariotVal = _ct;
-            }
+            // 🚂 战车减伤（2026-09-15 简化版）：**只认主页战车框里选的配置**（只有「走马江湖号」计入，
+            //    全队 主车取最高 + 副车取最高）；减伤表手填的 我的战车/队友战车 已废弃。
+            //    注意：skipChariot=true 用于「单卡明细」，战车减伤只应计入总和一次，不能摊到每张卡。
+            let chariotVal = (typeof chariotTeamDr === 'function') ? (chariotTeamDr().total || 0) : 0;
             if (chariotVal > 0 && !skipChariot) total += chariotVal;
 
             if (Array.isArray(cardNames)) {
@@ -13977,16 +13972,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             let content = '# 减伤记录配置文件\n';
             content += `# 表名：${window.drActiveTable}\n`;
             content += '# 格式：卡牌名=减伤数值（支持小数，如 10.5）\n';
-            content += '# 战车：我的战车（主）、队友战车（副） — 写入当前表\n';
             content += '# 技能：小野 / 酋长 / 宝库 — 写入当前表\n';
             content += '# 示例：水灵=10.5\n';
             content += '# 精灵卡不参与减伤计算\n';
             content += '# 导出时间：' + new Date().toLocaleString('zh-CN') + '\n\n';
 
-            // 导出当前表的战车
-            content += '===== 当前表 战车减伤 =====\n';
-            content += `我的战车=${t['我的战车'] || 0}\n`;
-            content += `队友战车=${t['队友战车'] || 0}\n`;
+            // 🚂 战车减伤已改为只认主页战车框设置（2026-09-15），不再随减伤表导出
 
             // 导出技能减伤（当前表）
             content += '\n===== 技能减伤（当前表） =====\n';
@@ -14043,7 +14034,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const t = getDrTable(targetTable);
             const lines = content.split('\n');
             const newData = {};
-            const chariotKeys = ['我的战车', '队友战车'];
+            // 🚂 战车手填参数（我的战车/队友战车）已废弃：战车减伤只认主页战车框设置，导入时一律忽略
             const sharedKeys = ['小野', '酋长', '宝库'];
             // 分区感知：导出文件分「战车 / 技能 / 洗炼」三段，同名行含义不同——
             // 洗炼段的"小野=10.5"是小野自身占卜洗炼，技能段的"小野=90"才是被动技能减伤。
@@ -14065,14 +14056,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     const value = parseFloat(match[2]);
                     if (cardName === '战车') cardName = '我的战车';
                     if (!cardName || isNaN(value)) return;
+                    if (cardName === '我的战车' || cardName === '队友战车') return;   // 废弃字段，忽略
                     if (section === 'refine') {
                         // 洗炼段：即使叫"小野/酋长/宝库"也只写洗炼，不碰技能减伤
                         newData[cardName] = value;
                     } else if (section === 'skill') {
                         if (sharedKeys.includes(cardName)) t[cardName] = value; else newData[cardName] = value;
                     } else if (section === 'chariot') {
-                        if (chariotKeys.includes(cardName)) t[cardName] = value; else newData[cardName] = value;
-                    } else if (chariotKeys.includes(cardName) || sharedKeys.includes(cardName)) {
+                        return;   // 旧导出文件里的「战车」段：忽略（战车减伤以主页战车框为准）
+                    } else if (sharedKeys.includes(cardName)) {
                         // 无分段头的老文件：维持旧的名字路由
                         t[cardName] = value;
                     } else {
@@ -14099,10 +14091,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
             const count = Object.keys(newData).length;
             const specialCount = sharedKeys.filter(k => t[k] > 0).length;
-            const chariotCount = chariotKeys.filter(k => t[k] > 0).length;
             const msg = [];
             if (count) msg.push(`洗炼${count}条`);
-            if (chariotCount) msg.push(`战车${chariotCount}条`);
             if (specialCount) msg.push(`技能${specialCount}条`);
             if (msg.length) {
                 alert(`已导入到「${targetTable}」表：${msg.join('，')}`);
