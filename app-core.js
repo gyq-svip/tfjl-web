@@ -13450,9 +13450,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             updateDrActiveEditLabel();
         }
         
-        // 计算卡组的总减伤（洗炼减伤 + 特殊技能减伤）
-        // side: 'my' 表示我方卡组，'teammate' 表示队友卡组，默认为 'my'
-        function calculateTotalDamageReduction(cardList, side, tableName) {
+        // 返回减伤拆分对象：{ total, refine, xiaoye, qiuzhang, baoku, chariot }
+        function getDamageReductionBreakdown(cardList, side, tableName) {
             if (!side) side = 'my';
             // 选表：side='my' → 「我的」表；side='teammate' → 「队友」表；显式 tableName 优先。
             if (!tableName) {
@@ -13461,8 +13460,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const table = getDrTable(tableName);
             const tableData = table.洗炼;
 
-            let total = 0;
-            const seenCards = new Set(); // 用于洗炼去重
+            const bd = { total: 0, refine: 0, xiaoye: 0, qiuzhang: 0, baoku: 0, chariot: 0 };
+            const seenCards = new Set(); // 用于洗炼/技能去重
 
             // 确保 specialDamageReduction 有必要的键
             if (!specialDamageReduction || typeof specialDamageReduction !== 'object') {
@@ -13471,12 +13470,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
             // ========== 第一步：战车特殊减伤 ==========
             // 🚂 战车减伤（2026-09-15 单边版）：**只认主页战车框里选的配置** —— 只有「走马江湖号」计入。
-            //    每边只算**自己这边**的战车（我的主车+我的副车），不算对方的 —— 用户明确：
-            //    「个人总减伤 = 个人卡组 + 自己的马车，不要算队友的马车」。
-            //    🔴 主界面「卡组总减伤」走的就是本函数（calculateTotalDamageReduction），
-            //       与脚本解析面板的 calculateDamageReductionForCards 是两条计算路径，改一处必须同步另一处。
+            //    每边只算**自己这边**的战车（我的主车+我的副车），不算对方的。
             let chariotVal = (typeof chariotDrInfo === 'function') ? ((chariotDrInfo(side) || {}).total || 0) : 0;
-            if (chariotVal > 0) total += chariotVal;
+            if (chariotVal > 0) {
+                bd.chariot += chariotVal;
+                bd.total += chariotVal;
+            }
 
             // ========== 第二步：洗炼减伤 + 小野/酋长/宝库的特殊技能减伤（仅上阵时计算）==========
             if (Array.isArray(cardList)) {
@@ -13525,10 +13524,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
                     if (!seenCards.has(usedKey)) {
                         seenCards.add(usedKey);
-                        // 洗炼减伤永远只算主卡（usedKey=parts[0] 天然排除副卡洗炼）；
-                        // 小野/酋长/宝库的技能减伤走下方共享技能栏（出现就算，哪怕副卡），此处不混入。
+                        // 洗炼减伤永远只算主卡（usedKey=parts[0] 天然排除副卡洗炼）
                         if (tableData[usedKey] && tableData[usedKey] > 0) {
-                            total += tableData[usedKey];
+                            const v = tableData[usedKey];
+                            bd.refine += v;
+                            bd.total += v;
                         }
                     }
 
@@ -13540,49 +13540,72 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             if (!seenCards.has(seenKey)) {
                                 seenCards.add(seenKey);
                                 const specialVal = (table && typeof table[special] === 'number') ? table[special] : 0;
-                                if (specialVal > 0) total += specialVal;
+                                if (specialVal > 0) {
+                                    bd.total += specialVal;
+                                    if (special === '小野') bd.xiaoye += specialVal;
+                                    else if (special === '酋长') bd.qiuzhang += specialVal;
+                                    else if (special === '宝库') bd.baoku += specialVal;
+                                }
                             }
                         }
                     });
                 });
             }
 
-            return parseFloat(total.toFixed(1));
+            bd.total = parseFloat(bd.total.toFixed(1));
+            bd.refine = parseFloat(bd.refine.toFixed(1));
+            bd.xiaoye = parseFloat(bd.xiaoye.toFixed(1));
+            bd.qiuzhang = parseFloat(bd.qiuzhang.toFixed(1));
+            bd.baoku = parseFloat(bd.baoku.toFixed(1));
+            bd.chariot = parseFloat(bd.chariot.toFixed(1));
+            return bd;
+        }
+
+        // 计算卡组的总减伤（洗炼减伤 + 特殊技能减伤）
+        // side: 'my' 表示我方卡组，'teammate' 表示队友卡组，默认为 'my'
+        function calculateTotalDamageReduction(cardList, side, tableName) {
+            return getDamageReductionBreakdown(cardList, side, tableName).total;
+        }
+
+        // 把减伤拆分对象格式化成悬浮提示文本，0 的项目自动隐藏
+        function formatDrTooltip(bd, label) {
+            const parts = [];
+            if (bd.refine > 0) parts.push(`洗炼${bd.refine}`);
+            if (bd.qiuzhang > 0) parts.push(`酋长${bd.qiuzhang}`);
+            if (bd.xiaoye > 0) parts.push(`小野${bd.xiaoye}`);
+            if (bd.baoku > 0) parts.push(`宝库${bd.baoku}`);
+            if (bd.chariot > 0) parts.push(`战车减伤${bd.chariot}`);
+            if (parts.length === 0) return label ? `${label} 暂无减伤` : '暂无减伤';
+            const body = `${parts.join('+')}=合计${bd.total}`;
+            return label ? `${label} ${body}` : body;
         }
 
         // 减伤显示：我的卡组/队友卡组各可独立切换减伤表查看（下拉选择，默认「我的」/「队友」）
         function updateDamageReductionDisplay() {
-            loadDamageReductionData();
+            // 🔴 不再每次从磁盘重载 drTables —— 直接用内存里的值（弹窗编辑即时写内存）。
+            //    否则磁盘若比内存旧（编辑后落盘前的瞬间、或 D 盘恢复拿到旧值），计算会用旧值：
+            //    弹窗里明明设了减伤，悬浮却显示 0（用户 2026-09-15 实测）。磁盘只在启动时加载一次。
 
             // 当前查看的减伤表（用户可下拉切换；默认「我的」/「队友」）
             if (!window._myDrTable || !window.drTables[window._myDrTable]) window._myDrTable = '我的';
             if (!window._teammateDrTable || !window.drTables[window._teammateDrTable]) window._teammateDrTable = '队友';
 
-            // 计算我的卡组减伤（用所选表）
-            const myTotal = calculateTotalDamageReduction(myPlacedCards, 'my', window._myDrTable);
-            // 计算队友卡组减伤（用所选表）
-            const teammateTotal = calculateTotalDamageReduction(teammatePlacedCards, 'teammate', window._teammateDrTable);
-            // 🚂 单边战车减伤：每边只算**自己这边**的战车（我的主车+副车 / 队友的主车+副车），
-            //    不掺对方的 —— 个人总减伤 = 个人卡组 + 自己的马车（用户 2026-09-15 明确）。
-            const myChariot = (typeof chariotDrInfo === 'function') ? ((chariotDrInfo('my') || {}).total || 0) : 0;
-            const tmChariot = (typeof chariotDrInfo === 'function') ? ((chariotDrInfo('teammate') || {}).total || 0) : 0;
-            const myCardOnly = Math.round((myTotal - myChariot) * 10) / 10;
-            const tmCardOnly = Math.round((teammateTotal - tmChariot) * 10) / 10;
+            // 计算我的/队友卡组减伤拆分（用所选表）
+            const myBd = getDamageReductionBreakdown(myPlacedCards, 'my', window._myDrTable);
+            const tmBd = getDamageReductionBreakdown(teammatePlacedCards, 'teammate', window._teammateDrTable);
+            const myTotal = myBd.total;
+            const teammateTotal = tmBd.total;
 
             const myEl = document.getElementById('myDamageReduction');
             if (myEl) {
                 myEl.textContent = `总减伤:${myTotal}`;
-                myEl.title = (myChariot > 0)
-                    ? (`卡组 ${myCardOnly} + 我方战车 ${myChariot} = ${myTotal}（只算我自己的马车，不含队友的）`)
-                    : (`卡组 ${myTotal}`);
+                myEl.title = formatDrTooltip(myBd, '我方');
             }
 
             const teammateEl = document.getElementById('teammateDamageReduction');
             if (teammateEl) {
                 teammateEl.textContent = `总减伤:${teammateTotal}`;
-                teammateEl.title = (tmChariot > 0)
-                    ? (`卡组 ${tmCardOnly} + 队友战车 ${tmChariot} = ${teammateTotal}（只算队友自己的马车，不含我方的）`)
-                    : (`卡组 ${teammateTotal}`);
+                teammateEl.title = formatDrTooltip(tmBd, '队友');
             }
 
             // 🛡 全队合计：两边直接相加（每边已各自含自己的战车，不存在重复计算）
@@ -13590,7 +13613,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (teamEl) {
                 const combined = Math.round((myTotal + teammateTotal) * 10) / 10;
                 teamEl.textContent = `🛡 全队合计:${combined}`;
-                teamEl.title = `我方 ${myTotal}（卡组 ${myCardOnly} + 我方战车 ${myChariot}） + 队友 ${teammateTotal}（卡组 ${tmCardOnly} + 队友战车 ${tmChariot}） = ${combined}`;
+                teamEl.title = `我方 ${formatDrTooltip(myBd, '')}｜队友 ${formatDrTooltip(tmBd, '')}｜全队合计=${combined}`;
             }
 
             // 填充两个减伤表切换下拉
