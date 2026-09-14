@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-09-07T12:19:16.260Z",
+  "updated": "2026-09-14T11:11:53.878Z",
   "note": "融合卡定义：components 为参与融合的2张基础卡。",
   "fusions": {
     "火炮射线": {
@@ -234,6 +234,14 @@
       ],
       "profession": "射手",
       "quality": "紫"
+    },
+    "女王沙皇": {
+      "components": [
+        "女王",
+        "沙皇"
+      ],
+      "profession": "法师",
+      "quality": "金"
     }
   }
 }
