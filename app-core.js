@@ -1704,7 +1704,10 @@
                         : (typeof getNotebookMainMarks === 'function' ? (getNotebookMainMarks() || []) : []),
                     notebookColor: (currentData && currentData.notebookColor !== undefined) ? currentData.notebookColor : (notebookColorCfg.color || DEFAULT_NOTEBOOK_COLOR),
                     txtFiles: currentData?.txtFiles || (typeof txtFiles !== 'undefined' ? txtFiles : []),
-                    referenceImages: currentData?.referenceImages || (typeof referenceImages !== 'undefined' ? referenceImages : [])
+                    referenceImages: currentData?.referenceImages || (typeof referenceImages !== 'undefined' ? referenceImages : []),
+                    // 🚂 战车按项目落盘（跟随项目：切换/分享/导入都保持一致）
+                    myChariot: (currentData && currentData.myChariot) ? currentData.myChariot : (typeof collectChariotData === 'function' ? collectChariotData().myChariot : { main: 1, sub: 0 }),
+                    teammateChariot: (currentData && currentData.teammateChariot) ? currentData.teammateChariot : (typeof collectChariotData === 'function' ? collectChariotData().teammateChariot : { main: 1, sub: 0 })
                 };
 
                 // 保存项目数据
@@ -1725,6 +1728,116 @@
                 };
             });
         }
+
+        // ==================== 战车系统（主战车 + 副战车，按项目独立保存）====================
+        // 23 辆战车，顺序即用户指定顺序；名字格式「4 个字 + 号」（图腾战车 无号）。
+        // 显示规则：只设主车 → 显示主车 4 个字（去掉结尾"号"）；主+副 → 主车 2 字 + 副车 2 字；
+        //   若两车开头 2 字相同（如 银河之光 / 银河之星）→ 改取各自**后** 2 字，便于区分。
+        // 鼠标悬停显示全名（含编号）；副车默认"未设置"(0)；主车默认 1 号。
+        // 我方/队友各自独立（互不干预），随项目一起保存/加载。
+        const CHARIOT_LIST = [
+            '图腾战车', '皇家宝藏号', '花好月圆号', '先祖之魂号', '上古之树号', '胜利女神号',
+            '冰封之魂号', '沉鱼落雁号', '钢铁之心号', '熔岩巨兽号', '走马江湖号', '富甲天下号',
+            '银河之光号', '银河之星号', '葫芦神山号', '飞龙在天号', '花果神山号', '地精飞艇号',
+            '寂静之月号', '神剑山庄号', '浴火凤凰号', '山河社稷号', '狮王争霸号'
+        ];
+        const CHARIOT_DEFAULT = { main: 1, sub: 0 };
+        function _chariotState() {
+            if (!window.__tfjlChariot) window.__tfjlChariot = { my: Object.assign({}, CHARIOT_DEFAULT), teammate: Object.assign({}, CHARIOT_DEFAULT) };
+            return window.__tfjlChariot;
+        }
+        function chariotName(idx) { return CHARIOT_LIST[Number(idx) - 1] || ''; }
+        function chariotCore(name) { return String(name || '').replace(/号$/, ''); }
+        function chariotShort(main, sub) {
+            const a = chariotName(main);
+            if (!a) return '未设置';
+            const ca = chariotCore(a);
+            if (!sub || Number(sub) === Number(main)) return ca;      // 只设主车（或主副相同）→ 主车 4 个字
+            const b = chariotName(sub); if (!b) return ca;
+            const cb = chariotCore(b);
+            const sameHead = ca.slice(0, 2) === cb.slice(0, 2);
+            return (sameHead ? ca.slice(-2) : ca.slice(0, 2)) + (sameHead ? cb.slice(-2) : cb.slice(0, 2));
+        }
+        function chariotTip(side) {
+            const st = _chariotState()[side] || CHARIOT_DEFAULT;
+            const main = Number(st.main) || 1, sub = Number(st.sub) || 0;
+            const who = (side === 'my') ? '我方' : '队友';
+            return who + '主战车：' + main + ' ' + (chariotName(main) || '—')
+                + '\n' + who + '副战车：' + (sub ? (sub + ' ' + chariotName(sub)) : '未设置')
+                + '\n（点击设置）';
+        }
+        function renderChariots() {
+            ['my', 'teammate'].forEach(function (side) {
+                const box = document.getElementById(side === 'my' ? 'myChariotBox' : 'teammateChariotBox');
+                if (!box) return;
+                const st = _chariotState()[side] || CHARIOT_DEFAULT;
+                const lbl = box.querySelector('.chariot-text');
+                if (lbl) lbl.textContent = chariotShort(st.main, st.sub);
+                box.title = chariotTip(side);
+                box.style.opacity = (Number(st.sub) > 0) ? '1' : '0.8';
+            });
+        }
+        window.renderChariots = renderChariots;
+        function collectChariotData() {
+            const st = _chariotState();
+            return { myChariot: Object.assign({}, st.my), teammateChariot: Object.assign({}, st.teammate) };
+        }
+        window.collectChariotData = collectChariotData;
+        function applyChariotData(a, b) {
+            const st = _chariotState();
+            st.my = Object.assign({}, CHARIOT_DEFAULT, a || {});
+            st.teammate = Object.assign({}, CHARIOT_DEFAULT, b || {});
+            renderChariots();
+        }
+        window.applyChariotData = applyChariotData;
+        // 选择面板：两个原生下拉（主车 / 副车），改动即时生效并标记项目已修改
+        function openChariotPicker(side, anchorEl) {
+            document.querySelectorAll('.chariot-picker').forEach(function (n) { n.remove(); });
+            const st = _chariotState()[side] || CHARIOT_DEFAULT;
+            const who = (side === 'my') ? '我方' : '队友';
+            const box = (anchorEl || document.getElementById(side === 'my' ? 'myChariotBox' : 'teammateChariotBox'));
+            if (!box) return;
+            const pop = document.createElement('div');
+            pop.className = 'chariot-picker';
+            pop.style.cssText = 'position:absolute;z-index:3000;background:rgba(26,26,48,0.99);border:1px solid rgba(255,215,0,0.45);border-radius:10px;padding:10px;box-shadow:0 10px 30px rgba(0,0,0,0.6);font-size:0.78rem;color:#fff;min-width:176px;';
+            const opts = function (withUnset, cur) {
+                let h = '';
+                if (withUnset) h += '<option value="0"' + (Number(cur) === 0 ? ' selected' : '') + '>未设置</option>';
+                CHARIOT_LIST.forEach(function (n, i) {
+                    h += '<option value="' + (i + 1) + '"' + (Number(cur) === (i + 1) ? ' selected' : '') + '>' + (i + 1) + ' ' + n + '</option>';
+                });
+                return h;
+            };
+            pop.innerHTML = '<div style="color:#ffd700;font-weight:700;margin-bottom:6px;">🚂 ' + who + '战车</div>'
+                + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.7);flex:0 0 34px;">主车</span><select id="chariotMainSel" style="flex:1;min-width:0;background:#16213e;color:#fff;border:1px solid rgba(255,215,0,0.35);border-radius:6px;padding:4px 6px;font-size:0.78rem;">' + opts(false, st.main) + '</select></div>'
+                + '<div style="display:flex;align-items:center;gap:6px;"><span style="color:rgba(255,255,255,0.7);flex:0 0 34px;">副车</span><select id="chariotSubSel" style="flex:1;min-width:0;background:#16213e;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:4px 6px;font-size:0.78rem;">' + opts(true, st.sub) + '</select></div>'
+                + '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-top:6px;line-height:1.45;">显示 4 个字：主车 2 字 + 副车 2 字；只设主车显示主车 4 个字。悬停可看全名。</div>';
+            document.body.appendChild(pop);
+            const r = box.getBoundingClientRect();
+            const pw = pop.offsetWidth, ph = pop.offsetHeight;
+            let left = r.left + window.scrollX;
+            if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+            let top = r.bottom + window.scrollY + 4;
+            if (top + ph > window.innerHeight + window.scrollY - 8) top = r.top + window.scrollY - ph - 4;
+            pop.style.left = Math.max(8, left) + 'px';
+            pop.style.top = Math.max(8, top) + 'px';
+            const onCh = function () {
+                const m = Number(document.getElementById('chariotMainSel').value) || 1;
+                const s = Number(document.getElementById('chariotSubSel').value) || 0;
+                const cur = _chariotState()[side] || CHARIOT_DEFAULT;
+                cur.main = m; cur.sub = s;
+                renderChariots();
+                if (typeof autoSaveProject === 'function') autoSaveProject();
+            };
+            document.getElementById('chariotMainSel').onchange = onCh;
+            document.getElementById('chariotSubSel').onchange = onCh;
+            const close = function (e) {
+                if (pop.contains(e.target) || box.contains(e.target)) return;
+                pop.remove(); document.removeEventListener('mousedown', close);
+            };
+            setTimeout(function () { document.addEventListener('mousedown', close); }, 10);
+        }
+        window.openChariotPicker = openChariotPicker;
 
         // 从IndexedDB加载项目列表
         function loadProjectListFromDB() {
@@ -1779,6 +1892,8 @@
                         cardSkins = project.cardSkins || {};
                         window.fusionSkins = project.fusionSkins || {}; // 副卡皮肤按项目独立保存，不污染全局
                         cardMoHua = project.cardMoHua || {};
+                        // 🚂 战车：按项目恢复（导入/打开项目时与分享方一致）
+                        if (typeof applyChariotData === 'function') applyChariotData(project.myChariot, project.teammateChariot);
                         saveCardSkins();
                         // 捕获「已保存」皮肤快照（供放弃修改时回滚到切换前状态）
                         _savedCardSkinsSnapshot = JSON.parse(JSON.stringify(cardSkins || {}));
@@ -1881,6 +1996,8 @@
             // 清空战斗槽
             myPlacedCards = [];
             teammatePlacedCards = [];
+            // 🚂 战车回到默认（主车 1 号 / 副车未设置），避免上一个项目的战车串到下一个项目
+            if (typeof applyChariotData === 'function') applyChariotData(null, null);
             
             // 清空战斗槽的UI
             document.querySelectorAll('.battle-slot').forEach(slot => {
@@ -2271,7 +2388,10 @@
                 notepad: (document.getElementById('notepad') ? document.getElementById('notepad').value : ''),
                 notebookColor: notebookColorCfg.color || DEFAULT_NOTEBOOK_COLOR,
                 txtFiles: (typeof txtFiles !== 'undefined') ? txtFiles : [],
-                referenceImages: (typeof referenceImages !== 'undefined') ? referenceImages : []
+                referenceImages: (typeof referenceImages !== 'undefined') ? referenceImages : [],
+                // 🚂 战车随项目一并保存/分享
+                myChariot: (typeof collectChariotData === 'function' ? collectChariotData().myChariot : { main: 1, sub: 0 }),
+                teammateChariot: (typeof collectChariotData === 'function' ? collectChariotData().teammateChariot : { main: 1, sub: 0 })
             };
         }
 
@@ -2846,6 +2966,8 @@
             cardSkins = projectData.cardSkins || {};
             window.fusionSkins = projectData.fusionSkins || {};
             cardMoHua = projectData.cardMoHua || {};
+            // 🚂 战车：共享/导入项目同样恢复战车设置（与分享方一致）
+            if (typeof applyChariotData === 'function') applyChariotData(projectData.myChariot, projectData.teammateChariot);
             // 共享资源只读：不要把共享项目的皮肤写回本地全局皮肤
             if (!window.__sharedProjectReadOnly) saveCardSkins();
             _savedCardSkinsSnapshot = JSON.parse(JSON.stringify(cardSkins || {}));
