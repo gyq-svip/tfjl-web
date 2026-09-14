@@ -1838,6 +1838,7 @@
             setTimeout(function () { document.addEventListener('mousedown', close); }, 10);
         }
         window.openChariotPicker = openChariotPicker;
+        window.chariotShort = chariotShort;   // 供分享图(app-features.js)复用同一套显示规则
 
         // 从IndexedDB加载项目列表
         function loadProjectListFromDB() {
