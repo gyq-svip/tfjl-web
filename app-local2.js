@@ -5459,6 +5459,12 @@ if (true) {
                     <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;">多开同玩建议选「后台消息」</span>
                 </div>
 
+                <div style="display:flex;gap:8px;margin-bottom:10px;">
+                    <button id="gmTabWave" onclick="gmSwitchTab('wave')" style="flex:1;padding:8px;border:1px solid rgba(255,215,0,0.5);border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:bold;background:rgba(255,215,0,0.18);color:#ffd700;">📊 波数播报</button>
+                    <button id="gmTabIceMoon" onclick="gmSwitchTab('icemoon')" style="flex:1;padding:8px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.65);">🧊 寒冰暗月连打</button>
+                </div>
+
+                <div id="gmPaneWave">
                 <div id="gmCfgPanel" style="margin-bottom:12px;border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                         <label style="color:rgba(255,255,255,0.75);font-size:0.82rem;">② 选择配置窗口</label>
@@ -5544,6 +5550,44 @@ if (true) {
                 <div style="margin-top:14px;padding:10px;border-radius:8px;border:1px dashed rgba(255,215,0,0.35);background:rgba(255,152,0,0.08);text-align:center;">
                     <span style="color:#ffd700;font-size:0.78rem;font-weight:bold;">✨ 已支持：到波自动点击 · 识别文字自动点击 · 新局检测 · 托盘暂停播报…</span>
                 </div>
+                </div><!-- /gmPaneWave -->
+
+                <div id="gmPaneIceMoon" style="display:none;">
+                    <div style="color:rgba(255,255,255,0.45);font-size:0.72rem;margin-bottom:10px;line-height:1.6;">
+                        🧊 <b style="color:#4fc3f7;">寒冰暗月连打</b>：定时识别游戏窗口顶部数字（固定区域 x0.48 y0.10 w0.04 h0.06），识别到 <b style="color:#ffd700;">1 / 2 / 3</b>（新一局开局）自动执行一整套：<b style="color:#4dd0e1;">点卡组 → 返回 → 战车选择 → 翻页 → 点战车 → 确定</b>。<br>
+                        ⚠️ 滑动翻页需 <b style="color:#ff9e80;">新版桌面端（v2.1.2 及以上）</b>，旧版 exe 会提示找不到命令；点击方式沿用上方「点击方式」下拉。卡组翻页机制暂按"与战车同款滑动"实现，待实测校正。
+                    </div>
+                    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px;">
+                        <div>
+                            <label style="color:rgba(255,255,255,0.75);font-size:0.8rem;display:block;margin-bottom:4px;">🃏 卡组编号（1-15）</label>
+                            <input type="number" id="gmImDeck" min="1" max="15" value="1" style="width:80px;padding:7px 8px;border-radius:6px;border:1px solid rgba(78,205,196,0.4);background:rgba(0,0,0,0.3);color:#4ecdc4;font-size:0.9rem;text-align:center;">
+                            <div style="color:rgba(255,255,255,0.35);font-size:0.65rem;margin-top:3px;">1-5第1页 · 6-10第2页 · 11-15第3页</div>
+                        </div>
+                        <div>
+                            <label style="color:rgba(255,255,255,0.75);font-size:0.8rem;display:block;margin-bottom:4px;">🚂 战车编号（1-23）</label>
+                            <input type="number" id="gmImCart" min="1" max="23" value="1" style="width:80px;padding:7px 8px;border-radius:6px;border:1px solid rgba(255,152,0,0.4);background:rgba(0,0,0,0.3);color:#ff9800;font-size:0.9rem;text-align:center;">
+                            <div style="color:rgba(255,255,255,0.35);font-size:0.65rem;margin-top:3px;">每页6辆 · 向左滑一次+5（6→第6位）</div>
+                        </div>
+                        <div>
+                            <label style="color:rgba(255,255,255,0.75);font-size:0.8rem;display:block;margin-bottom:4px;">识别间隔（秒）</label>
+                            <input type="number" id="gmImInterval" min="1" max="30" value="2" style="width:60px;padding:7px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;text-align:center;">
+                        </div>
+                        <div>
+                            <label style="color:rgba(255,255,255,0.75);font-size:0.8rem;display:block;margin-bottom:4px;">触发冷却（秒）</label>
+                            <input type="number" id="gmImCooldown" min="3" max="120" value="15" style="width:60px;padding:7px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;text-align:center;">
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+                        <button onclick="gmImTestDeck()" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🃏 只切卡（测试）</button>
+                        <button onclick="gmImTestCart()" style="background:linear-gradient(135deg,#ff9800,#e65100);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🚂 只切车（测试）</button>
+                        <button onclick="gmImRunOnce()" style="background:linear-gradient(135deg,#9c27b0,#6a1b9a);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🔥 完整连打一次</button>
+                        <button id="gmImAutoBtn" onclick="gmImToggleAuto()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;font-weight:bold;">▶ 开始连打监控</button>
+                    </div>
+                    <div style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-bottom:8px;line-height:1.5;">
+                        切车流程（游戏坐标）：返回(0.86,0.11) → 等1秒 → 战车(0.61,0.75) → 拉回最左×4（按0.24,0.76滑到0.69,0.76）→ 按编号向左翻页（按0.69滑到0.24，每次+5）→ 点战车位(y0.77) → 确定(0.63,0.73)。每步之间随机延迟 500~1000ms。
+                    </div>
+                    <div id="gmImLog" style="background:rgba(0,0,0,0.3);border:1px solid rgba(78,205,196,0.2);border-radius:6px;padding:8px 10px;min-height:60px;max-height:150px;overflow:auto;color:rgba(255,255,255,0.6);font-size:0.7rem;line-height:1.6;">等待操作。先在 ① 勾选游戏窗口，再用「只切卡 / 只切车」单步测试。</div>
+                </div>
             </div>
         `;
         document.body.appendChild(modal);
@@ -5558,6 +5602,8 @@ if (true) {
         }
         // 点击组配置区渲染（⑥到波点击 / ⑦文字点击）
         _gmRenderRules();
+        // 🧊 寒冰暗月连打：恢复卡组/战车/间隔/冷却输入框
+        _gmImRestoreUI();
         if (_isApp) {
             // 刷新窗口列表（按上次的窗口标题自动勾选）——依赖 Tauri 枚举窗口
             gmRefreshWindows();
@@ -5756,6 +5802,225 @@ if (true) {
     // 全局点击方式（多开同操作时一处设置即可）：real=真实鼠标 / bg=后台消息
     window._gmClickMode = function () { const c = _gmLoadCfg(); return (c && c.clickMode) || 'real'; };
     window._gmSetClickMode = function (v) { const c = _gmLoadCfg(); c.clickMode = v; _gmSaveCfg(c); };
+    // 滑动手势原语（2026-09-16，需桌面端 v2.1.2+）：按下(x1,y1) → 分段拖到(x2,y2) → 松开。坐标 0~1 整窗比例。
+    window.gmSwipe = async function (hwnd, x1, y1, x2, y2, holdMs, mode) {
+        return await tauriInvoke('gm_swipe', { hwnd: hwnd, x1: x1, y1: y1, x2: x2, y2: y2, holdMs: holdMs || 400, mode: mode || 'real' });
+    };
+
+    // ==================== 🧊 寒冰暗月连打（2026-09-16） ====================
+    // 需求（用户提供的游戏坐标）：定时 OCR 顶部数字区（0.48,0.10,0.04,0.06），识别到 1/2/3（新一局开局）
+    // 自动执行：点卡组 → 返回 → 战车选择 → 拉回最左×4 → 按编号翻页 → 点战车 → 确定。
+    // 卡组 1-15（每页5个/共3页）；战车 1-23（每页6个，向左滑一次 +5，先拉回最左保证从第1页起算）。
+    const GM_IM_DECK_X = [0.56, 0.63, 0.71, 0.78, 0.86];       // 卡组每页 5 个位置 x（y=0.13）
+    const GM_IM_DECK_Y = 0.13;
+    const GM_IM_CART_X = [0.24, 0.33, 0.42, 0.51, 0.60, 0.69]; // 战车每页 6 个位置 x（点击 y=0.77，滑动 y=0.76）
+    const GM_IM_CART_Y = 0.77;
+    const GM_IM_BACK = { x: 0.86, y: 0.11 };        // 返回
+    const GM_IM_CART_ENTRY = { x: 0.61, y: 0.75 };  // 战车选择入口
+    const GM_IM_CART_OK = { x: 0.63, y: 0.73 };     // 确定（兼关闭战车弹窗）
+    const GM_IM_NUM_REGION = { x: 0.48, y: 0.10, w: 0.04, h: 0.06 }; // 顶部数字识别区（整窗比例）
+    const GM_IM_CFG_KEY = 'tfjl_gm_icemoon_cfg';
+    let _gmImAutoTimer = null;
+    let _gmImLastFire = 0;
+
+    function _gmImLoadCfg() { try { return JSON.parse(localStorage.getItem(GM_IM_CFG_KEY)) || {}; } catch (e) { return {}; } }
+    function _gmImSaveCfg(patch) { const c = Object.assign(_gmImLoadCfg(), patch); try { localStorage.setItem(GM_IM_CFG_KEY, JSON.stringify(c)); } catch (e) {} }
+    function _gmImSleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+    function _gmImDelay() { return _gmImSleep(500 + Math.floor(Math.random() * 501)); } // 500~1000ms 随机
+    function _gmImLog(msg) {
+        const el = document.getElementById('gmImLog');
+        if (!el) return;
+        const t = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+        el.innerHTML = '<div>[' + t + '] ' + msg + '</div>' + el.innerHTML;
+    }
+    function _gmImMode() { try { return window._gmClickMode(); } catch (e) { return 'real'; } }
+    function _gmImGuardApp() {
+        if (!_isTauriRuntime()) { _gmImLog('⚠️ 仅桌面版可用（需要控制鼠标 / 截图 / OCR）'); return false; }
+        return true;
+    }
+    function _gmImHwnd() {
+        try {
+            const sel = _gmSelectedWindows();
+            if (!sel || !sel.length) return null;
+            const target = sel.find(w => w.title === _gmCfgTarget) || sel[0];
+            return target ? target.hwnd : null;
+        } catch (e) { return null; }
+    }
+    function _gmImReadInputs() {
+        const g = id => { const el = document.getElementById(id); return el ? parseInt(el.value, 10) || 0 : 0; };
+        const cfg = {
+            deck: Math.max(1, Math.min(15, g('gmImDeck') || 1)),
+            cart: Math.max(1, Math.min(23, g('gmImCart') || 1)),
+            interval: Math.max(1, Math.min(30, g('gmImInterval') || 2)),
+            cooldown: Math.max(3, Math.min(120, g('gmImCooldown') || 15))
+        };
+        _gmImSaveCfg(cfg);
+        return cfg;
+    }
+    function _gmImRestoreUI() {
+        const c = _gmImLoadCfg();
+        const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+        set('gmImDeck', c.deck || 1);
+        set('gmImCart', c.cart || 1);
+        set('gmImInterval', c.interval || 2);
+        set('gmImCooldown', c.cooldown || 15);
+    }
+
+    // —— 切卡：deckNo 1-15 → 第 ceil(n/5) 页 第 ((n-1)%5)+1 位（卡组6=第2页第1位，13=第3页第3位）
+    // 页面切换假设：卡组列表与战车同款横向滑动翻页（按住第5位滑到第1位 = 翻一页 +5），待实测校正
+    async function gmImSwitchDeck(hwnd, deckNo) {
+        const mode = _gmImMode();
+        deckNo = Math.max(1, Math.min(15, deckNo | 0));
+        const page = Math.ceil(deckNo / 5);
+        const pos = ((deckNo - 1) % 5) + 1;
+        for (let i = 1; i < page; i++) {
+            await window.gmSwipe(hwnd, GM_IM_DECK_X[4], GM_IM_DECK_Y, GM_IM_DECK_X[0], GM_IM_DECK_Y, 400, mode);
+            await _gmImSleep(500);
+        }
+        await _gmImSleep(300);
+        await window.gmClick(hwnd, GM_IM_DECK_X[pos - 1], GM_IM_DECK_Y, 1, 200, mode);
+        await _gmImDelay();
+        return '🃏 卡组' + deckNo + '（第' + page + '页第' + pos + '位）已点';
+    }
+
+    // —— 切车：cartNo 1-23。返回 → 战车入口 → 拉回最左×4 → 向左翻 ceil((n-6)/5) 页 → 点第 n-5k 位 → 确定
+    // 例：6=初始页第6位；7=滑1页后第2位；16=滑2页后第6位（1-6初始页，每滑一次+5，最少滑动次数）
+    async function gmImSwitchCart(hwnd, cartNo) {
+        const mode = _gmImMode();
+        cartNo = Math.max(1, Math.min(23, cartNo | 0));
+        // 1) 返回（从卡组界面回到可打开战车选择的界面）
+        await window.gmClick(hwnd, GM_IM_BACK.x, GM_IM_BACK.y, 1, 200, mode);
+        await _gmImSleep(1000);
+        // 2) 打开战车选择
+        await window.gmClick(hwnd, GM_IM_CART_ENTRY.x, GM_IM_CART_ENTRY.y, 1, 200, mode);
+        await _gmImDelay();
+        // 3) 拉回最左（按住第1位滑到第6位 ×4，确保从第 1 页起算）
+        for (let i = 0; i < 4; i++) {
+            await window.gmSwipe(hwnd, GM_IM_CART_X[0], 0.76, GM_IM_CART_X[5], 0.76, 400, mode);
+            await _gmImSleep(350);
+        }
+        await _gmImSleep(400);
+        // 4) 向左翻页（按住第6位滑到第1位，每滑一次编号 +5）
+        const k = cartNo <= 6 ? 0 : Math.ceil((cartNo - 6) / 5);
+        const pos = cartNo - 5 * k; // 1..6
+        for (let i = 0; i < k; i++) {
+            await window.gmSwipe(hwnd, GM_IM_CART_X[5], 0.76, GM_IM_CART_X[0], 0.76, 400, mode);
+            await _gmImSleep(400);
+        }
+        // 5) 点战车
+        await window.gmClick(hwnd, GM_IM_CART_X[pos - 1], GM_IM_CART_Y, 1, 200, mode);
+        await _gmImDelay();
+        // 6) 确定（兼关闭战车弹窗）
+        await window.gmClick(hwnd, GM_IM_CART_OK.x, GM_IM_CART_OK.y, 1, 200, mode);
+        await _gmImDelay();
+        return '🚂 战车' + cartNo + '（滑' + k + '页后第' + pos + '位）已选';
+    }
+
+    // —— 完整连打一次：点卡组 → 切车（切车内部第一步就是「返回」，即卡组→战车之间的返回）
+    async function gmImRunSequence(hwnd, deckNo, cartNo) {
+        _gmImLog('▶ 开始：卡组' + deckNo + ' + 战车' + cartNo);
+        _gmImLog(await gmImSwitchDeck(hwnd, deckNo));
+        _gmImLog(await gmImSwitchCart(hwnd, cartNo));
+        _gmImLog('✅ 本轮连打完成');
+    }
+
+    // Tab 切换（仿卡组管理 cgmSwitchTab）
+    window.gmSwitchTab = function (tab) {
+        const panes = { wave: 'gmPaneWave', icemoon: 'gmPaneIceMoon' };
+        const tabs = { wave: 'gmTabWave', icemoon: 'gmTabIceMoon' };
+        Object.keys(panes).forEach(k => {
+            const p = document.getElementById(panes[k]);
+            if (p) p.style.display = (k === tab) ? '' : 'none';
+            const b = document.getElementById(tabs[k]);
+            if (b) {
+                const on = k === tab;
+                b.style.background = on ? 'rgba(255,215,0,0.18)' : 'rgba(255,255,255,0.05)';
+                b.style.color = on ? '#ffd700' : 'rgba(255,255,255,0.65)';
+                b.style.borderColor = on ? 'rgba(255,215,0,0.5)' : 'rgba(255,255,255,0.2)';
+                b.style.fontWeight = on ? 'bold' : 'normal';
+            }
+        });
+    };
+
+    window.gmImTestDeck = async function () {
+        if (!_gmImGuardApp()) return;
+        const hwnd = _gmImHwnd();
+        if (!hwnd) { _gmImLog('⚠️ 请先在 ① 勾选一个游戏窗口'); return; }
+        const cfg = _gmImReadInputs();
+        try { _gmImLog(await gmImSwitchDeck(hwnd, cfg.deck)); }
+        catch (e) { _gmImLog('❌ 切卡失败：' + (e && e.message || e)); }
+    };
+    window.gmImTestCart = async function () {
+        if (!_gmImGuardApp()) return;
+        const hwnd = _gmImHwnd();
+        if (!hwnd) { _gmImLog('⚠️ 请先在 ① 勾选一个游戏窗口'); return; }
+        const cfg = _gmImReadInputs();
+        try { _gmImLog(await gmImSwitchCart(hwnd, cfg.cart)); }
+        catch (e) { _gmImLog('❌ 切车失败：' + (e && e.message || e)); }
+    };
+    window.gmImRunOnce = async function () {
+        if (!_gmImGuardApp()) return;
+        const hwnd = _gmImHwnd();
+        if (!hwnd) { _gmImLog('⚠️ 请先在 ① 勾选一个游戏窗口'); return; }
+        const cfg = _gmImReadInputs();
+        try { await gmImRunSequence(hwnd, cfg.deck, cfg.cart); }
+        catch (e) { _gmImLog('❌ 连打失败：' + (e && e.message || e)); }
+    };
+
+    // OCR 顶部数字：整窗截图 → canvas 按比例裁剪数字区 → umi_ocr → 解析整数（比 Rust 整拍流程轻，仅连打监控用）
+    async function _gmImOcrNumber(hwnd) {
+        const bmp = await tauriInvoke('capture_window_region', { hwnd: hwnd, x: 0, y: 0, w: 10, h: 10, full: true });
+        if (!bmp) return null;
+        const img = await new Promise((resolve, reject) => {
+            const im = new Image();
+            im.onload = () => resolve(im);
+            im.onerror = () => reject(new Error('截图解码失败'));
+            im.src = 'data:image/bmp;base64,' + bmp;
+        });
+        const cv = document.createElement('canvas');
+        cv.width = Math.max(4, Math.round(GM_IM_NUM_REGION.w * img.naturalWidth));
+        cv.height = Math.max(4, Math.round(GM_IM_NUM_REGION.h * img.naturalHeight));
+        cv.getContext('2d').drawImage(img,
+            Math.round(GM_IM_NUM_REGION.x * img.naturalWidth), Math.round(GM_IM_NUM_REGION.y * img.naturalHeight),
+            cv.width, cv.height, 0, 0, cv.width, cv.height);
+        const pngB64 = cv.toDataURL('image/png').split(',')[1];
+        const j = await tauriInvoke('umi_ocr', { base64: pngB64, options: { ocr: { language: 'models/config_chinese.txt', cls: true } } });
+        if (!j || j.code !== 100 || !Array.isArray(j.data)) return null;
+        const texts = j.data.map(d => (d.text || '').trim()).join('');
+        const m = texts.match(/\d+/);
+        return m ? parseInt(m[0], 10) : null;
+    }
+
+    window.gmImToggleAuto = async function () {
+        const btn = document.getElementById('gmImAutoBtn');
+        if (_gmImAutoTimer) {
+            clearInterval(_gmImAutoTimer);
+            _gmImAutoTimer = null;
+            if (btn) { btn.textContent = '▶ 开始连打监控'; btn.style.background = 'linear-gradient(135deg,#4caf50,#2e7d32)'; }
+            _gmImLog('⏹ 连打监控已停止');
+            return;
+        }
+        if (!_gmImGuardApp()) return;
+        const hwnd = _gmImHwnd();
+        if (!hwnd) { _gmImLog('⚠️ 请先在 ① 勾选一个游戏窗口'); return; }
+        const cfg = _gmImReadInputs();
+        _gmImLastFire = 0;
+        _gmImAutoTimer = setInterval(async () => {
+            try {
+                const c = Object.assign({ deck: 1, cart: 1, cooldown: 15 }, _gmImLoadCfg()); // 面板关了也能继续跑
+                if (Date.now() - _gmImLastFire < (c.cooldown || 15) * 1000) return;
+                const hwnd2 = _gmImHwnd() || hwnd;
+                const num = await _gmImOcrNumber(hwnd2);
+                if (num === null || ![1, 2, 3].includes(num)) return;
+                _gmImLastFire = Date.now();
+                _gmImLog('🎯 识别到 ' + num + ' → 触发连打');
+                await gmImRunSequence(hwnd2, c.deck || 1, c.cart || 1);
+            } catch (e) { _gmImLog('❌ ' + (e && e.message || e)); }
+        }, Math.max(1, cfg.interval || 2) * 1000);
+        if (btn) { btn.textContent = '⏹ 停止连打监控'; btn.style.background = 'linear-gradient(135deg,#f44336,#c62828)'; }
+        _gmImLog('▶ 连打监控已启动：每 ' + (cfg.interval || 2) + 's 识别顶部数字，命中 1/2/3 触发（冷却 ' + (cfg.cooldown || 15) + 's）。关闭面板监控继续，重开面板可停止');
+    };
+    // ==================== 🧊 寒冰暗月连打 · 结束 ====================
 
     // 修改当前配置窗口（mutator 直接改 winCfg 后落库并重渲染）
     function _gmMutWinCfg(mutator) {
