@@ -5806,6 +5806,18 @@ if (true) {
     window.gmSwipe = async function (hwnd, x1, y1, x2, y2, holdMs, mode) {
         return await tauriInvoke('gm_swipe', { hwnd: hwnd, x1: x1, y1: y1, x2: x2, y2: y2, holdMs: holdMs || 400, mode: mode || 'real' });
     };
+    // 输入文字原语（需桌面端 v2.1.2+）：往当前有焦点的窗口逐字注入（支持中文）。前面通常先 gmClick 点输入框夺焦。
+    window.gmType = async function (text, delayMs) {
+        return await tauriInvoke('gm_type', { text: text || '', delayMs: delayMs || 0 });
+    };
+    // 虚拟按键原语：enter/tab/esc/space/方向键/f1~f12/单字符，组合键 "ctrl+a"、"alt+tab"
+    window.gmKey = async function (key, times, delayMs) {
+        return await tauriInvoke('gm_key', { key: key, times: times || 1, delayMs: delayMs || 120 });
+    };
+    // 激活/前置指定窗口（游戏 ↔ 老马助手界面切换用）
+    window.gmFocusWindow = async function (hwnd) {
+        return await tauriInvoke('gm_focus_window', { hwnd: hwnd });
+    };
 
     // ==================== 🧊 寒冰暗月连打（2026-09-16） ====================
     // 需求（用户提供的游戏坐标）：定时 OCR 顶部数字区（0.48,0.10,0.04,0.06），识别到 1/2/3（新一局开局）
