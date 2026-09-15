@@ -2606,6 +2606,10 @@
             attachSelectWheel(document.getElementById('categorySelector1'));
             attachSelectWheel(document.getElementById('projectSelector1'));
 
+            // 🔄 立即刷新按钮：仅共享模式下显示（2026-09-15 用户要求）
+            const rb = document.getElementById('hubRefreshBtn');
+            if (rb) rb.style.display = (scope === 'shared') ? '' : 'none';
+
             if (scope === 'shared') {
                 // 共享资源库：从分享索引读取 hub=true 的项目；分类下拉用全站固定分类（寒冰/暗月/漩涡/深海+默认分类兜底）
                 // 项目分类在加载时经 _hubNormalizeCat 折算进固定分类，保证共享库分类统一不乱
@@ -2674,6 +2678,23 @@
                 }
             }).catch(e => console.error('刷新项目选择器失败:', e));
         }
+
+        // 🔄 立即刷新共享列表：强制从云端拉一次（忽略本地/内存缓存），拉完立即重渲下拉
+        // 其它路径（切 scope、搜索）行为不变 —— 只有点这个按钮才 force 云端。
+        window.refreshSharedHub = async function () {
+            const btn = document.getElementById('hubRefreshBtn');
+            const oldText = btn ? btn.textContent : '';
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ 刷新中…'; }
+            try {
+                await _shareIndexLoad(true);      // 强制云端拉取，写内存+本地缓存
+                refreshProjectSelectors();        // 用最新数据重渲分类/项目下拉
+            } catch (e) {
+                console.error('[共享] 立即刷新失败:', e);
+                if (typeof showToast === 'function') showToast('☁️ 云端拉取失败，请检查网络', 'error');
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = oldText || '🔄 立即刷新'; }
+            }
+        };
 
         // ==================== 共享资源库（2026-09-10）====================
         // 复用分享索引 Gist（SHARE_INDEX_GIST_ID），条目加 hub:true 标记即视为资源库项目。

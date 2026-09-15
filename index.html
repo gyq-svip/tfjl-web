@@ -392,6 +392,7 @@
                     <option value="">-- 选择项目 --</option>
                 </select>
                 <button id="hubImportToLocalBtn" onclick="hubImportSharedToLocal()" data-tip="把当前共享资源（只读）复制到本地成为可编辑项目：自定项目名，不影响原共享资源" style="display:none;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.95rem;line-height:1;">📥 导入到本地</button>
+                <button id="hubRefreshBtn" onclick="refreshSharedHub()" data-tip="立即从云端拉取最新共享列表（忽略本地缓存）：别人刚分享也能马上看到" style="display:none;background:linear-gradient(135deg,#2196f3,#1565c0);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.95rem;line-height:1;">🔄 立即刷新</button>
                 <button onclick="toggleProjectMenu(this)" data-tip="项目菜单：新建项目 / 新建分类 / 重命名 / 删除项目等管理操作" style="background:#444;color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:1rem;line-height:1;">⋮</button>
                 <button onclick="showProjectSearchPanel()" title="搜索项目" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">🔍</button>
                 <button onclick="toggleNotepadPanel()" title="记事本" data-tip="记事本：记录当前项目的笔记（随项目走，不同项目互不干扰；自动保存仅在该项目已打开时生效）" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1;">📝</button>
