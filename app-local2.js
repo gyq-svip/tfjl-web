@@ -6089,11 +6089,19 @@ if (true) {
             im.src = 'data:image/bmp;base64,' + bmp;
         });
         const cv = document.createElement('canvas');
-        cv.width = Math.max(4, Math.round(GM_IM_NUM_REGION.w * img.naturalWidth));
-        cv.height = Math.max(4, Math.round(GM_IM_NUM_REGION.h * img.naturalHeight));
-        cv.getContext('2d').drawImage(img,
+        // 🔴 必须 4x 放大再 OCR：徽章"循环箭头+数字"原始只有 ~52×42px，小图直接识别会误判（实测"3"→"包"），
+        //    放大后笔画清晰才能读对（2026-09-16 实测 4x 后稳定输出 "3"）。
+        const IM_SCALE = 4;
+        const sw = Math.max(4, Math.round(GM_IM_NUM_REGION.w * img.naturalWidth));
+        const sh = Math.max(4, Math.round(GM_IM_NUM_REGION.h * img.naturalHeight));
+        cv.width = sw * IM_SCALE;
+        cv.height = sh * IM_SCALE;
+        const cx = cv.getContext('2d');
+        cx.imageSmoothingEnabled = true;
+        cx.imageSmoothingQuality = 'high';
+        cx.drawImage(img,
             Math.round(GM_IM_NUM_REGION.x * img.naturalWidth), Math.round(GM_IM_NUM_REGION.y * img.naturalHeight),
-            cv.width, cv.height, 0, 0, cv.width, cv.height);
+            sw, sh, 0, 0, cv.width, cv.height);
         const pngB64 = cv.toDataURL('image/png').split(',')[1];
         const j = await tauriInvoke('umi_ocr', { base64: pngB64, options: { ocr: { language: 'models/config_chinese.txt', cls: true } } });
         if (!j || j.code !== 100 || !Array.isArray(j.data)) return null;
