@@ -5843,7 +5843,7 @@ if (true) {
     const GM_IM_CART_ENTRY = { x: 0.61, y: 0.75 };  // 战车选择入口
     const GM_IM_CART_OK = { x: 0.63, y: 0.73 };     // 确定（兼关闭战车弹窗）
     const GM_IM_PAGE_BTN = { x: 0.55, y: 0.13 };    // 卡组翻页（点一次页码 +1，循环 1→2→3→1）
-    const GM_IM_NUM_REGION = { x: 0.48, y: 0.10, w: 0.04, h: 0.06 }; // 卡组页码识别区（整窗比例）
+    const GM_IM_NUM_REGION = { x: 0.48, y: 0.045, w: 0.05, h: 0.07 }; // 卡组页码识别区（2026-09-16 实测校准：页码徽章约 0.478~0.513 × 0.057~0.096 @1046×593，旧值 y=0.10 切到徽章下方空白）
     const GM_IM_CFG_KEY = 'tfjl_gm_icemoon_cfg';
     const GM_IM_MAX_PAGE = 3;                        // 卡组共 3 页
     let _gmImAutoTimer = null;
