@@ -277,8 +277,13 @@
     if (ctl.latestSwVersion) {
       try {
         const cur = (document.getElementById('versionTag') || {}).textContent || '';
-        const curNum = parseInt((cur.match(/s1\.0\.(\d+)/) || [])[1] || '0', 10);
-        const newNum = parseInt((ctl.latestSwVersion.match(/s1\.0\.(\d+)/) || [])[1] || '0', 10);
+        // 通用语义化版本 sX.Y.Z → 可比较数值（支持 1.1.x/1.2.x/2.0.x）
+        const _semNum = (v) => {
+          const m = String(v || '').match(/s?(\d+)\.(\d+)\.(\d+)/);
+          return m ? (parseInt(m[1], 10) * 1000000 + parseInt(m[2], 10) * 1000 + parseInt(m[3], 10)) : 0;
+        };
+        const curNum = _semNum(cur);
+        const newNum = _semNum(ctl.latestSwVersion);
         if (newNum > curNum && !_isAcked('verUp@' + ctl.latestSwVersion)) {
           _markAck('verUp@' + ctl.latestSwVersion);
           if (typeof window.__tfjlForceRefresh === 'function') window.__tfjlForceRefresh('检测到新版本 ' + ctl.latestSwVersion);

@@ -96,7 +96,7 @@ jobs:
                   continue
               def inc(m):
                   return m.group(1) + str(int(m.group(2)) + 1) + m.group(3)
-              s2 = re.sub(r"(CACHE_VERSION = 's1\.\d+\.)(\d+)(')", inc, s)
+              s2 = re.sub(r"(CACHE_VERSION = 's\d+\.\d+\.)(\d+)(')", inc, s)
               # 注入/替换 DEPLOY_TAG 常量（紧跟 CACHE_VERSION），让 SW_VERSION 消息能携带部署日期到页面
               # 彻底解决「版本号日期消失」——之前依赖 HTML 文本 split/CDN 缓存的 window.__DEPLOY_TAG 都会失效
               if re.search(r"const DEPLOY_TAG = '[^']*'", s2):
@@ -117,7 +117,7 @@ jobs:
           except Exception:
               vj = {}
           # 取 sw.js 已经自增后的 CACHE_VERSION 作为 frontVersion 基值
-          m = re.search(r"CACHE_VERSION = '(s1\.\d+\.\d+)'", open('sw.js', encoding='utf-8').read())
+          m = re.search(r"CACHE_VERSION = '(s\d+\.\d+\.\d+)'", open('sw.js', encoding='utf-8').read())
           front_ver = m.group(1) if m else vj.get('frontVersion', 's1.0.470')
           vj['frontVersion'] = front_ver
           vj['deployTag'] = deploy_tag
