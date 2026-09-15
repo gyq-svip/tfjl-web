@@ -12794,12 +12794,22 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         function saveDrFavorites() {
             try { localStorage.setItem('tdjl_dr_favCards', JSON.stringify(window.drFavCards || [])); } catch (e) {}
         }
-        // 切换减伤常用卡收藏（点 ☆ / ⭐）
+        // 切换减伤常用卡收藏（点 ☆ / ⭐）：新收藏默认置顶
         window.toggleDrFavCard = function (cardName) {
             window.drFavCards = window.drFavCards || [];
             const i = window.drFavCards.indexOf(cardName);
             if (i >= 0) window.drFavCards.splice(i, 1);
-            else window.drFavCards.push(cardName);
+            else window.drFavCards.unshift(cardName);
+            saveDrFavorites();
+            if (typeof filterDamageReductionCards === 'function') filterDamageReductionCards();
+        };
+        // 把某张卡「置顶」到「常用卡」区最上方（已在最前不动；未收藏则顺便收藏）
+        window.pinDrFavCard = function (cardName) {
+            window.drFavCards = window.drFavCards || [];
+            const i = window.drFavCards.indexOf(cardName);
+            if (i === 0) return;
+            if (i > 0) window.drFavCards.splice(i, 1);
+            window.drFavCards.unshift(cardName);
             saveDrFavorites();
             if (typeof filterDamageReductionCards === 'function') filterDamageReductionCards();
         };
@@ -13258,7 +13268,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-radius:6px;${isSpecial ? 'background:rgba(255,152,0,0.12);border:1px solid rgba(255,152,0,0.45);' : 'background:rgba(255,255,255,0.05);'}">
                     <span style="color:#fff;font-size:0.85rem;">${escapeHtml(cardName)}${isSpecial ? ' <span style="color:#ff9800;font-size:0.7rem;">(自身洗炼)</span>' : ''}</span>
                     <span style="display:flex;align-items:center;gap:6px;">
-                        <button type="button" onclick="toggleDrFavCard('${escapeHtml(cardName)}')" title="收藏到「常用卡」置顶 / 取消收藏" style="background:none;border:none;cursor:pointer;font-size:1.05rem;line-height:1;padding:2px 4px;color:${starred ? '#ffd700' : 'rgba(255,255,255,0.35)'};">${starred ? '⭐' : '☆'}</button>
+                        <button type="button" onclick="pinDrFavCard('${escapeHtml(cardName)}')" title="置顶：移到「常用卡」区最上方（未收藏则顺便收藏）" style="background:none;border:none;cursor:pointer;font-size:0.95rem;line-height:1;padding:2px 4px;color:${starred ? '#ffd700' : 'rgba(255,255,255,0.3)'};">⏫</button>
+                        <button type="button" onclick="toggleDrFavCard('${escapeHtml(cardName)}')" title="收藏到「常用卡」/ 取消收藏" style="background:none;border:none;cursor:pointer;font-size:1.05rem;line-height:1;padding:2px 4px;color:${starred ? '#ffd700' : 'rgba(255,255,255,0.35)'};">${starred ? '⭐' : '☆'}</button>
                         <input type="number"
                                data-card="${escapeHtml(cardName)}"
                                value="${value}"
@@ -13277,7 +13288,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const favForFilter = (filter === 'all' || filter === 'fav') ? favs : favs.filter(c => cardProf[c] === filter);
             if (filter !== 'fav' && favForFilter.length) {
                 html += `<div style="margin-bottom:10px;">
-                    <div style="color:#ffd700;font-size:0.85rem;margin-bottom:5px;padding:5px;background:rgba(255,215,0,0.12);border-radius:4px;display:flex;align-items:center;gap:6px;">⭐ 常用卡（置顶 · 点 ☆ 取消收藏）</div>
+                    <div style="color:#ffd700;font-size:0.85rem;margin-bottom:5px;padding:5px;background:rgba(255,215,0,0.12);border-radius:4px;display:flex;align-items:center;gap:6px;">⭐ 常用卡（置顶 · 点 ⏫ 把这张移到最上 / 点 ☆ 取消收藏）</div>
                     <div style="display:flex;flex-direction:column;gap:4px;">${favForFilter.map(renderRow).join('')}</div>
                 </div>`;
             }
