@@ -2699,6 +2699,134 @@ fn gm_click(hwnd: usize, x: f64, y: f64, times: Option<u32>, gap_ms: Option<u64>
     }
 }
 
+/// 滑动手势原语（2026-09-16 新增，「寒冰暗月连打」卡组/战车列表翻页用）：
+/// 在窗口比例坐标 (x1,y1) 按下 → 分段拖动到 (x2,y2) → 松开，模拟人手滑动。
+///   mode="real"（默认）：SetCursorPos + mouse_event 真实拖动（窗口需可见/未最小化/不被遮挡，会移动用户鼠标）；
+///   mode="bg"        ：PostMessageW 合成按下/移动/抬起消息（不抢鼠标，能否生效取决于目标程序，需实测）；
+///   mode="adb"       ：MuMu `adb shell input swipe`（模拟器系统层注入，最可靠）。
+/// hold_ms：按下到松开的总时长（默认 400ms），路径按 16 段插值逼近人手轨迹。
+#[tauri::command]
+fn gm_swipe(hwnd: usize, x1: f64, y1: f64, x2: f64, y2: f64, hold_ms: Option<u64>, mode: Option<String>) -> Result<String, String> {
+    for (x, y) in [(x1, y1), (x2, y2)] {
+        if !(0.0..=1.0).contains(&x) || !(0.0..=1.0).contains(&y) {
+            return Err("滑动坐标必须在 0~1 比例范围内".into());
+        }
+    }
+    let hold = hold_ms.unwrap_or(400).clamp(80, 3000);
+    let mode = mode.unwrap_or_else(|| "real".to_string());
+    gm_swipe_impl(hwnd, x1, y1, x2, y2, hold, &mode)?;
+    Ok(format!("已滑动 ({:.3},{:.3})→({:.3},{:.3}) 按住{}ms（{} 模式）", x1, y1, x2, y2, hold, mode))
+}
+
+fn gm_swipe_impl(hwnd: usize, x1: f64, y1: f64, x2: f64, y2: f64, hold_ms: u64, mode: &str) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        if mode == "adb" {
+            return gm_swipe_adb(x1, y1, x2, y2, hold_ms);
+        }
+        if mode == "bg" {
+            return gm_swipe_bg(hwnd, x1, y1, x2, y2, hold_ms);
+        }
+        use winapi::um::winuser::{mouse_event, SetCursorPos, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP};
+        let (sx1, sy1) = gm_win_point_to_screen(hwnd, x1, y1)?;
+        let (sx2, sy2) = gm_win_point_to_screen(hwnd, x2, y2)?;
+        const STEPS: u64 = 16;
+        let step_ms = (hold_ms / STEPS).max(15);
+        unsafe {
+            SetCursorPos(sx1, sy1);
+            std::thread::sleep(std::time::Duration::from_millis(60));
+            mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            for i in 1..=STEPS {
+                let t = i as f64 / STEPS as f64;
+                let ix = (sx1 as f64 + (sx2 - sx1) as f64 * t).round() as i32;
+                let iy = (sy1 as f64 + (sy2 - sy1) as f64 * t).round() as i32;
+                SetCursorPos(ix, iy);
+                std::thread::sleep(std::time::Duration::from_millis(step_ms));
+            }
+            std::thread::sleep(std::time::Duration::from_millis(60));
+            mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+        }
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (hwnd, x1, y1, x2, y2, hold_ms, mode);
+        Err("仅支持 Windows".into())
+    }
+}
+
+/// bg 模式滑动：PostMessageW 合成 按下→移动→抬起（客户区坐标换算与 gm_click_background 完全一致）
+#[cfg(windows)]
+fn gm_swipe_bg(hwnd: usize, rx1: f64, ry1: f64, rx2: f64, ry2: f64, hold_ms: u64) -> Result<(), String> {
+    use winapi::shared::windef::{HWND, POINT, RECT};
+    use winapi::um::winuser::{
+        ClientToScreen, GetWindowRect, PostMessageW, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEMOVE, MK_LBUTTON,
+    };
+    let hwnd = hwnd as HWND;
+    unsafe {
+        let mut wr: RECT = std::mem::zeroed();
+        if GetWindowRect(hwnd, &mut wr) == 0 {
+            return Err("获取窗口位置失败（窗口可能已关闭）".into());
+        }
+        let ww = (wr.right - wr.left) as f64;
+        let wh = (wr.bottom - wr.top) as f64;
+        if ww <= 0.0 || wh <= 0.0 {
+            return Err("窗口尺寸非法（可能已最小化）".into());
+        }
+        let mut pt: POINT = std::mem::zeroed();
+        if ClientToScreen(hwnd, &mut pt) == 0 {
+            return Err("坐标转换失败".into());
+        }
+        let ox = pt.x - wr.left;
+        let oy = pt.y - wr.top;
+        let cx1 = (rx1 * ww) as i32 - ox;
+        let cy1 = (ry1 * wh) as i32 - oy;
+        let cx2 = (rx2 * ww) as i32 - ox;
+        let cy2 = (ry2 * wh) as i32 - oy;
+        let lp = |x: i32, y: i32| (((y << 16) | (x & 0xffff)) as isize);
+        const STEPS: u64 = 16;
+        let step_ms = (hold_ms / STEPS).max(15);
+        PostMessageW(hwnd, WM_LBUTTONDOWN, MK_LBUTTON as usize, lp(cx1, cy1));
+        std::thread::sleep(std::time::Duration::from_millis(60));
+        for i in 1..=STEPS {
+            let t = i as f64 / STEPS as f64;
+            let ix = (cx1 as f64 + (cx2 - cx1) as f64 * t).round() as i32;
+            let iy = (cy1 as f64 + (cy2 - cy1) as f64 * t).round() as i32;
+            PostMessageW(hwnd, WM_MOUSEMOVE, MK_LBUTTON as usize, lp(ix, iy));
+            std::thread::sleep(std::time::Duration::from_millis(step_ms));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(60));
+        PostMessageW(hwnd, WM_LBUTTONUP, 0, lp(cx2, cy2));
+    }
+    Ok(())
+}
+
+/// adb 模式滑动：MuMu `adb shell input swipe x1 y1 x2 y2 时长ms`（模拟器内部 1040×585，与 gm_click_adb 同一坐标系）
+#[cfg(windows)]
+fn gm_swipe_adb(x1: f64, y1: f64, x2: f64, y2: f64, hold_ms: u64) -> Result<(), String> {
+    let adb = find_adb().ok_or_else(|| "找不到 MuMu 的 adb.exe（请确认 MuMu 已安装，或手动配置 adb 路径）".to_string())?;
+    let port = adb_port();
+    let ax1 = (x1 * 1040.0).round().clamp(0.0, 1040.0) as i32;
+    let ay1 = (y1 * 585.0).round().clamp(0.0, 585.0) as i32;
+    let ax2 = (x2 * 1040.0).round().clamp(0.0, 1040.0) as i32;
+    let ay2 = (y2 * 585.0).round().clamp(0.0, 585.0) as i32;
+    let _ = std::process::Command::new(&adb)
+        .args(["connect", &format!("127.0.0.1:{}", port)])
+        .output();
+    let out = std::process::Command::new(&adb)
+        .args([
+            "-s", &format!("127.0.0.1:{}", port), "shell", "input", "swipe",
+            &ax1.to_string(), &ay1.to_string(), &ax2.to_string(), &ay2.to_string(), &hold_ms.to_string(),
+        ])
+        .output()
+        .map_err(|e| format!("执行 adb 失败: {}", e))?;
+    if !out.status.success() {
+        return Err(format!("adb swipe 失败: {}", String::from_utf8_lossy(&out.stderr)));
+    }
+    Ok(())
+}
+
 /// 鼠标滚轮原语（2026-09-12 新增，用于「深海统计 · 自动连拍」的自动下滑翻页）：
 /// 坐标基准与 capture_window_region **完全一致** —— **窗口外框内的绝对像素**（x,y 从窗口左上角起算），
 /// 便于前端直接把「框选识别区域」的中心当滚轮落点，不用再做比例换算。
@@ -2837,7 +2965,10 @@ pub fn run() {
 
     // ====================== 单实例锁 ======================
     // 防止多次双击 exe 开出多个进程 → 托盘图标叠加、窗口找不到、退不干净
-    const SINGLETON_PORT: u16 = 23456;
+    // 🔴 2026-09-15 冲突修复：本端口必须与「塔防老马助手」TFJL.exe 的 SINGLETON_PORT 不同！
+    //   旧值 23456 与老马共用 → 开一个会把"replace"发给对方的监听 → 对方收"replace"后 exit(0) 闪退。
+    //   改成本项目专用端口（老马若仍用 23456 则互不干扰）。两软件要能共存：端口 + bundle identifier 都必须各异。
+    const SINGLETON_PORT: u16 = 34567;
     let listener = match TcpListener::bind(("127.0.0.1", SINGLETON_PORT)) {
         Ok(l) => Some(l),
         Err(_) => {
@@ -2913,6 +3044,7 @@ pub fn run() {
             game_monitor_stop,
             game_monitor_status,
             gm_click,
+            gm_swipe,
             gm_wheel,
         ])
         .manage(AppState { umi_pid: std::sync::Mutex::new(None), heartbeat: std::sync::Mutex::new(None), checkin_day: std::sync::Mutex::new(None) })

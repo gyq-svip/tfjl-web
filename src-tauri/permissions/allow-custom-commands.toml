@@ -194,6 +194,11 @@ description = "Allow frontend-driven mouse click primitive at a window ratio poi
 commands.allow = ["gm_click"]
 
 [[permission]]
+identifier = "allow-gm-swipe"
+description = "Allow frontend-driven swipe gesture primitive (press at ratio point, drag to second point, release; used by icemoon auto-battle list paging; real=mouse_event drag, bg=PostMessage synth, adb=input swipe)"
+commands.allow = ["gm_swipe"]
+
+[[permission]]
 identifier = "allow-gm-wheel"
 description = "Allow frontend-driven mouse wheel primitive at a window-frame pixel point (used by deepsea auto-capture auto-scroll; bg=PostMessage to window, real=SetCursorPos+mouse_event)"
 commands.allow = ["gm_wheel"]
