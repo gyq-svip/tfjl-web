@@ -630,8 +630,10 @@
             // 解析不出（'dev'/空/日期串）返回 0，调用方据此判定"无法核实 → 不弹气泡"。
             function _extractFrontVerNum(s) {
                 if (!s) return 0;
-                const m = String(s).match(/s?1\.0\.(\d+)/);
-                return m ? (parseInt(m[1], 10) || 0) : 0;
+                // 通用语义化版本 sX.Y.Z → major*1e6 + minor*1e3 + patch（支持 1.1.x/1.2.x/2.0.x 逐级递增）
+                const m = String(s).match(/s?(\d+)\.(\d+)\.(\d+)/);
+                if (!m) return 0;
+                return parseInt(m[1], 10) * 1000000 + parseInt(m[2], 10) * 1000 + parseInt(m[3], 10);
             }
             // 把 SW 缓存版本号显示到右下角版本标签（如 "v260727-57 · sw-v62"）
             function updateCacheVersionDisplay(swVersion, deployTag) {
@@ -884,10 +886,13 @@
                 }
             } catch (e) {}
         }
-        // 简单版本号比较：a>b 返回 1，a<b 返回 -1，相等 0。支持 's1.0.470' / 'v260729-1706' 这类
+        // 简单版本号比较：a>b 返回 1，a<b 返回 -1，相等 0。支持 's1.1.470' / 's2.0.0' / 'v260729-1706' 这类
         function _versionCompare(a, b) {
-            const pa = String(a).split(/[.\-vV]/).filter(x => /^\d+$/.test(x)).map(Number);
-            const pb = String(b).split(/[.\-vV]/).filter(x => /^\d+$/.test(x)).map(Number);
+            // 🔴 先剥掉前缀字母 s/v：否则 's2.0.0' 的第一段 's2' 会被过滤掉 → major 丢失，
+            //    导致 s1.1.8 被误判为大于 s2.0.0。
+            const _vparts = (v) => String(v).replace(/^[sSvV]/, '').split(/[.\-]/).filter(x => /^\d+$/.test(x)).map(Number);
+            const pa = _vparts(a);
+            const pb = _vparts(b);
             const n = Math.max(pa.length, pb.length);
             for (let i = 0; i < n; i++) {
                 const x = pa[i] || 0, y = pb[i] || 0;
