@@ -13189,7 +13189,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                                 <option value="fav" style="background:rgba(30,30,60,0.95);">⭐ 常用卡</option>
                                 ${professions.map(prof => `<option value="${prof}" style="background:rgba(30,30,60,0.95);">${prof}</option>`).join('')}
                             </select>
-                            <button onclick="exportDamageReductionToTxt('active')" data-tip="导出当前「${escapeHtml(window.drActiveTable)}」表为 TXT（多表时在菜单里可导出全部）" style="background:rgba(74,222,128,0.2);border:1px solid rgba(74,222,128,0.4);color:#4ade80;padding:8px 12px;border-radius:6px;white-space:nowrap;">📤 导出「${escapeHtml(window.drActiveTable)}」</button>
+                            <button id="drExportActiveBtn" onclick="exportDamageReductionToTxt('active')" data-tip="导出当前「${escapeHtml(window.drActiveTable)}」表为 TXT（多表时在菜单里可导出全部）" style="background:rgba(74,222,128,0.2);border:1px solid rgba(74,222,128,0.4);color:#4ade80;padding:8px 12px;border-radius:6px;white-space:nowrap;">📤 导出「${escapeHtml(window.drActiveTable)}」</button>
                             <button onclick="exportAllDamageReductionToTxt()" data-tip="把全部减伤表导出为一个 TXT（每表一段），便于整体备份 / 整体恢复" style="background:rgba(74,222,128,0.12);border:1px solid rgba(74,222,128,0.3);color:#4ade80;padding:8px 12px;border-radius:6px;font-size:0.85rem;white-space:nowrap;">📤 导出全部</button>
                             <button onclick="importDamageReductionFromTxt();setTimeout(()=>{filterDamageReductionCards();},500);" style="background:rgba(96,165,250,0.2);border:1px solid rgba(96,165,250,0.4);color:#60a5fa;padding:8px 12px;border-radius:6px;white-space:nowrap;">📥 导入</button>
                             <button onclick="clearActiveDrTable()" style="background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.4);color:#ef4444;padding:8px 12px;border-radius:6px;white-space:nowrap;">清空当前表</button>
@@ -13308,6 +13308,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             return '#b388ff';
         }
 
+        // 导出「当前表」按钮的标签随激活表实时刷新（否则切表后还显示旧表名，易误以为只能导「我的」）
+        function updateDrExportBtnLabel() {
+            const btn = document.getElementById('drExportActiveBtn');
+            if (!btn) return;
+            const name = window.drActiveTable || '我的';
+            btn.textContent = `📤 导出「${name}」`;
+            btn.setAttribute('data-tip', `导出当前「${name}」表为 TXT（多表时在菜单里可导出全部）`);
+        }
+
         // 更新弹窗里"正在编辑：XXX 表"的高亮标识
         function updateDrActiveEditLabel() {
             const el = document.getElementById('drActiveEditLabel');
@@ -13319,6 +13328,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             el.style.background = `rgba(${hexToRgb(color)},0.12)`;
             el.style.border = `1px solid ${color}`;
             el.innerHTML = `📝 正在编辑：<span style="color:${color};font-size:1.05rem;">${escapeHtml(name)}</span> 表 ${sideNote}`;
+            updateDrExportBtnLabel();
         }
 
         // #xxxxxx → "r,g,b"
@@ -13774,16 +13784,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     <tbody>${rows}</tbody>
                 </table>`;
             panel.style.display = 'block';
-        }
-        
-        // 切换减伤菜单
-        function toggleDamageReductionMenu(btn) {
-            const menu = document.getElementById('damageReductionMenu');
-            if (menu.style.display === 'none') {
-                menu.style.display = 'block';
-            } else {
-                menu.style.display = 'none';
-            }
         }
         
         // 非分隔符融合卡匹配基础卡（如"火炮射线" → "火炮"）
