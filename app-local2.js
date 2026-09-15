@@ -5554,9 +5554,21 @@ if (true) {
 
                 <div id="gmPaneIceMoon" style="display:none;">
                     <div style="color:rgba(255,255,255,0.45);font-size:0.72rem;margin-bottom:10px;line-height:1.6;">
-                        🧊 <b style="color:#4fc3f7;">寒冰暗月连打</b>：定时识别游戏窗口顶部数字（固定区域 x0.48 y0.10 w0.04 h0.06），识别到 <b style="color:#ffd700;">1 / 2 / 3</b>（新一局开局）自动执行一整套：<b style="color:#4dd0e1;">点卡组 → 返回 → 战车选择 → 翻页 → 点战车 → 确定</b>。<br>
-                        ⚠️ 滑动翻页需 <b style="color:#ff9e80;">新版桌面端（v2.1.2 及以上）</b>，旧版 exe 会提示找不到命令；点击方式沿用上方「点击方式」下拉。卡组翻页机制暂按"与战车同款滑动"实现，待实测校正。
+                        🧊 <b style="color:#4fc3f7;">寒冰暗月连打</b>：在<b style="color:#4fc3f7;">游戏窗口</b>里选卡组+战车，再切到<b style="color:#4fc3f7;">老马窗口</b>选脚本开打。卡组共 3 页每页 5 个：<b style="color:#ffd700;">识别页码(0.48,0.10)</b> → 点 <b style="color:#ffd700;">(0.55,0.13)</b> 循环翻页（1→2→3→1…）→ 到目标页后点卡组位置。<br>
+                        ⚠️ 需 <b style="color:#ff9e80;">桌面端 v2.1.2 及以上</b>（战车滑动/输入文字/切窗口都是新命令）；点击方式沿用上方「点击方式」下拉。
                     </div>
+                    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px;">
+                        <div>
+                            <label style="color:rgba(255,255,255,0.75);font-size:0.78rem;display:block;margin-bottom:4px;">🎮 游戏窗口（卡组/战车/页码）</label>
+                            <select id="gmImGameWin" onchange="_gmImSaveWinSel()" style="background:rgba(0,0,0,0.4);color:#4ecdc4;border:1px solid rgba(78,205,196,0.4);border-radius:6px;padding:6px 10px;font-size:0.76rem;max-width:220px;cursor:pointer;"></select>
+                        </div>
+                        <div>
+                            <label style="color:rgba(255,255,255,0.75);font-size:0.78rem;display:block;margin-bottom:4px;">🐴 老马窗口（后续选脚本用）</label>
+                            <select id="gmImLmWin" onchange="_gmImSaveWinSel()" style="background:rgba(0,0,0,0.4);color:#ff9800;border:1px solid rgba(255,152,0,0.4);border-radius:6px;padding:6px 10px;font-size:0.76rem;max-width:220px;cursor:pointer;"></select>
+                        </div>
+                        <button onclick="gmImRefreshWins()" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:#fff;border:none;padding:7px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🔄 刷新窗口</button>
+                    </div>
+                    <div style="color:rgba(255,255,255,0.35);font-size:0.66rem;margin-bottom:10px;line-height:1.5;">两个下拉各自选一次即记住（按窗口标题保存）。找不到老马窗口时点「刷新窗口」（深度扫描）；两个 tab 共用上方 ① 的窗口列表。</div>
                     <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px;">
                         <div>
                             <label style="color:rgba(255,255,255,0.75);font-size:0.8rem;display:block;margin-bottom:4px;">🃏 卡组编号（1-15）</label>
@@ -5830,10 +5842,13 @@ if (true) {
     const GM_IM_BACK = { x: 0.86, y: 0.11 };        // 返回
     const GM_IM_CART_ENTRY = { x: 0.61, y: 0.75 };  // 战车选择入口
     const GM_IM_CART_OK = { x: 0.63, y: 0.73 };     // 确定（兼关闭战车弹窗）
-    const GM_IM_NUM_REGION = { x: 0.48, y: 0.10, w: 0.04, h: 0.06 }; // 顶部数字识别区（整窗比例）
+    const GM_IM_PAGE_BTN = { x: 0.55, y: 0.13 };    // 卡组翻页（点一次页码 +1，循环 1→2→3→1）
+    const GM_IM_NUM_REGION = { x: 0.48, y: 0.10, w: 0.04, h: 0.06 }; // 卡组页码识别区（整窗比例）
     const GM_IM_CFG_KEY = 'tfjl_gm_icemoon_cfg';
+    const GM_IM_MAX_PAGE = 3;                        // 卡组共 3 页
     let _gmImAutoTimer = null;
     let _gmImLastFire = 0;
+    let _gmImWins = [];                              // 本 tab 枚举到的窗口（含老马，供两个下拉用）
 
     function _gmImLoadCfg() { try { return JSON.parse(localStorage.getItem(GM_IM_CFG_KEY)) || {}; } catch (e) { return {}; } }
     function _gmImSaveCfg(patch) { const c = Object.assign(_gmImLoadCfg(), patch); try { localStorage.setItem(GM_IM_CFG_KEY, JSON.stringify(c)); } catch (e) {} }
@@ -5850,14 +5865,57 @@ if (true) {
         if (!_isTauriRuntime()) { _gmImLog('⚠️ 仅桌面版可用（需要控制鼠标 / 截图 / OCR）'); return false; }
         return true;
     }
-    function _gmImHwnd() {
-        try {
-            const sel = _gmSelectedWindows();
-            if (!sel || !sel.length) return null;
-            const target = sel.find(w => w.title === _gmCfgTarget) || sel[0];
-            return target ? target.hwnd : null;
-        } catch (e) { return null; }
+    // 按标题取 hwnd：优先本 tab 枚举的窗口，回退 ① 勾选的窗口
+    function _gmImHwndByTitle(title) {
+        if (!title) return null;
+        let w = (_gmImWins || []).find(x => x.title === title);
+        if (!w) {
+            try { w = (_gmSelectedWindows() || []).find(x => x.title === title); } catch (e) {}
+        }
+        return w ? w.hwnd : null;
     }
+    function _gmImHwnd() {
+        const cfg = _gmImLoadCfg();
+        return _gmImHwndByTitle(cfg.gameTitle) || (function () {
+            try {
+                const sel = _gmSelectedWindows();
+                if (!sel || !sel.length) return null;
+                const target = sel.find(w => w.title === _gmCfgTarget) || sel[0];
+                return target ? target.hwnd : null;
+            } catch (e) { return null; }
+        })();
+    }
+    function _gmLmHwnd() {
+        return _gmImHwndByTitle(_gmImLoadCfg().lmTitle);
+    }
+    // 下拉选择后记住标题（hwnd 每次启动会变，按标题更稳）
+    window._gmImSaveWinSel = function () {
+        const g = document.getElementById('gmImGameWin');
+        const l = document.getElementById('gmImLmWin');
+        _gmImSaveCfg({ gameTitle: g ? g.value : '', lmTitle: l ? l.value : '' });
+    };
+    // 枚举窗口填充两个下拉（深度扫描，能列出老马助手等窗口）
+    window.gmImRefreshWins = async function () {
+        if (!_isTauriRuntime()) { _gmImLog('⚠️ 仅桌面版可枚举窗口'); return; }
+        try {
+            const wins = await tauriInvoke('find_game_windows', { deep: true });
+            _gmImWins = Array.isArray(wins) ? wins : [];
+            const cfg = _gmImLoadCfg();
+            const fill = (id, keep) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.innerHTML = '<option value="">（不选）</option>' +
+                    _gmImWins.map(w => '<option value="' + String(w.title).replace(/"/g, '&quot;') + '"' +
+                        (keep && keep === w.title ? ' selected' : '') + '>' + String(w.title).replace(/</g, '&lt;') + '</option>').join('');
+                if (keep) el.value = keep;
+            };
+            fill('gmImGameWin', cfg.gameTitle || '');
+            fill('gmImLmWin', cfg.lmTitle || '');
+            _gmImLog('🔄 已枚举到 ' + _gmImWins.length + ' 个窗口，请在上方选择游戏窗口 / 老马窗口');
+        } catch (e) {
+            _gmImLog('❌ 枚举窗口失败：' + (e && e.message || e));
+        }
+    };
     function _gmImReadInputs() {
         const g = id => { const el = document.getElementById(id); return el ? parseInt(el.value, 10) || 0 : 0; };
         const cfg = {
@@ -5876,23 +5934,64 @@ if (true) {
         set('gmImCart', c.cart || 1);
         set('gmImInterval', c.interval || 2);
         set('gmImCooldown', c.cooldown || 15);
+        // 窗口下拉：先用已有列表填充并保留上次选择，再异步枚举一次补全（老马窗口常需深度扫描）
+        const fillWins = () => {
+            const list = (_gmImWins && _gmImWins.length) ? _gmImWins : (function () {
+                try { return _gmSelectedWindows() || []; } catch (e) { return []; }
+            })();
+            const fill = (id, keep) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.innerHTML = '<option value="">（不选）</option>' + list.map(w =>
+                    '<option value="' + String(w.title).replace(/"/g, '&quot;') + '"' +
+                    (keep && keep === w.title ? ' selected' : '') + '>' + String(w.title).replace(/</g, '&lt;') + '</option>').join('');
+                if (keep) el.value = keep;
+            };
+            fill('gmImGameWin', c.gameTitle || '');
+            fill('gmImLmWin', c.lmTitle || '');
+        };
+        fillWins();
+        if (_isTauriRuntime()) setTimeout(() => { window.gmImRefreshWins(); }, 400);
     }
 
-    // —— 切卡：deckNo 1-15 → 第 ceil(n/5) 页 第 ((n-1)%5)+1 位（卡组6=第2页第1位，13=第3页第3位）
-    // 页面切换假设：卡组列表与战车同款横向滑动翻页（按住第5位滑到第1位 = 翻一页 +5），待实测校正
+    // —— 读卡组当前页码（1/2/3）：OCR 区域 (0.48,0.10,0.04,0.06)
+    async function _gmImReadPage(hwnd) {
+        const num = await _gmImOcrNumber(hwnd);
+        if (num === null) return null;
+        if (num >= 1 && num <= GM_IM_MAX_PAGE) return num;
+        return null;
+    }
+
+    // —— 切卡：deckNo 1-15 → 目标页 ceil(n/5)、位 ((n-1)%5)+1（卡组6=第2页第1位，13=第3页第3位）
+    // 翻页：识别当前页码 → 点 (0.55,0.13) 循环切换 1→2→3→1… → 到目标页后点卡组位置
     async function gmImSwitchDeck(hwnd, deckNo) {
         const mode = _gmImMode();
         deckNo = Math.max(1, Math.min(15, deckNo | 0));
-        const page = Math.ceil(deckNo / 5);
+        const tgtPage = Math.min(GM_IM_MAX_PAGE, Math.ceil(deckNo / 5));
         const pos = ((deckNo - 1) % 5) + 1;
-        for (let i = 1; i < page; i++) {
-            await window.gmSwipe(hwnd, GM_IM_DECK_X[4], GM_IM_DECK_Y, GM_IM_DECK_X[0], GM_IM_DECK_Y, 400, mode);
-            await _gmImSleep(500);
+        let cur = await _gmImReadPage(hwnd);
+        if (cur === null) {
+            cur = 1;
+            _gmImLog('⚠️ 页码识别失败，按「当前第1页」处理（盲翻）');
+        } else {
+            _gmImLog('📄 当前页码 ' + cur + ' → 目标第 ' + tgtPage + ' 页');
+        }
+        // 循环翻页：1→2→3→1，点一次 +1
+        const clicks = ((tgtPage - cur) % GM_IM_MAX_PAGE + GM_IM_MAX_PAGE) % GM_IM_MAX_PAGE;
+        for (let i = 0; i < clicks; i++) {
+            await window.gmClick(hwnd, GM_IM_PAGE_BTN.x, GM_IM_PAGE_BTN.y, 1, 200, mode);
+            await _gmImSleep(600);
+        }
+        if (clicks > 0) {
+            const after = await _gmImReadPage(hwnd);
+            if (after !== null && after !== tgtPage) {
+                _gmImLog('⚠️ 翻页校验：期望第' + tgtPage + '页，实际读到' + after + '（仍按位置点击，请核对坐标 0.55,0.13）');
+            }
         }
         await _gmImSleep(300);
         await window.gmClick(hwnd, GM_IM_DECK_X[pos - 1], GM_IM_DECK_Y, 1, 200, mode);
         await _gmImDelay();
-        return '🃏 卡组' + deckNo + '（第' + page + '页第' + pos + '位）已点';
+        return '🃏 卡组' + deckNo + '（第' + tgtPage + '页第' + pos + '位，翻页' + clicks + '次）已点';
     }
 
     // —— 切车：cartNo 1-23。返回 → 战车入口 → 拉回最左×4 → 向左翻 ceil((n-6)/5) 页 → 点第 n-5k 位 → 确定
