@@ -12781,9 +12781,32 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         // 点（buildDamageReductionCardsList 等）继续可用，避免大规模替换。
         let damageReductionData = window.drTables['我的'].洗炼;
         let damageReductionDiskLoaded = false; // 磁盘恢复是否已完成首次尝试
-        
+        // 🔴 2026-09-15 减伤「常用卡」收藏：独立 key，与手牌 favoriteCards 区分
+        window.drFavCards = [];   // 收藏的卡名数组（按加入顺序），渲染时置顶
+
+        function loadDrFavorites() {
+            try {
+                const f = localStorage.getItem('tdjl_dr_favCards');
+                window.drFavCards = (f && JSON.parse(f)) || [];
+                if (!Array.isArray(window.drFavCards)) window.drFavCards = [];
+            } catch (e) { window.drFavCards = []; }
+        }
+        function saveDrFavorites() {
+            try { localStorage.setItem('tdjl_dr_favCards', JSON.stringify(window.drFavCards || [])); } catch (e) {}
+        }
+        // 切换减伤常用卡收藏（点 ☆ / ⭐）
+        window.toggleDrFavCard = function (cardName) {
+            window.drFavCards = window.drFavCards || [];
+            const i = window.drFavCards.indexOf(cardName);
+            if (i >= 0) window.drFavCards.splice(i, 1);
+            else window.drFavCards.push(cardName);
+            saveDrFavorites();
+            if (typeof filterDamageReductionCards === 'function') filterDamageReductionCards();
+        };
+
         // 加载减伤数据（兼容旧键 + 新键）
         function loadDamageReductionData() {
+            loadDrFavorites();
             // 优先读新结构
             const savedV2 = localStorage.getItem('tdjl_dr_tables_v2');
             if (savedV2) {
@@ -13160,14 +13183,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                                 <button onclick="drDeleteActiveTable()" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#ef4444;padding:6px 10px;border-radius:6px;font-size:0.8rem;">删除表</button>
                             </div>
                         </div>
-                        <div style="display:flex;gap:8px;margin-bottom:15px;">
-                            <select id="professionFilter" onchange="filterDamageReductionCards()" style="background:rgba(30,30,60,0.95);border:1px solid rgba(78,205,196,0.4);color:#fff;padding:8px 12px;border-radius:6px;flex:1;">
+                        <div style="display:flex;gap:8px;margin-bottom:15px;flex-wrap:wrap;">
+                            <select id="professionFilter" onchange="filterDamageReductionCards()" style="background:rgba(30,30,60,0.95);border:1px solid rgba(78,205,196,0.4);color:#fff;padding:8px 12px;border-radius:6px;flex:1;min-width:120px;">
                                 <option value="all" style="background:rgba(30,30,60,0.95);">全部职业</option>
+                                <option value="fav" style="background:rgba(30,30,60,0.95);">⭐ 常用卡</option>
                                 ${professions.map(prof => `<option value="${prof}" style="background:rgba(30,30,60,0.95);">${prof}</option>`).join('')}
                             </select>
-                            <button onclick="exportDamageReductionToTxt()" style="background:rgba(74,222,128,0.2);border:1px solid rgba(74,222,128,0.4);color:#4ade80;padding:8px 12px;border-radius:6px;">导出</button>
-                            <button onclick="importDamageReductionFromTxt();setTimeout(()=>{filterDamageReductionCards();},500);" style="background:rgba(96,165,250,0.2);border:1px solid rgba(96,165,250,0.4);color:#60a5fa;padding:8px 12px;border-radius:6px;">导入</button>
-                            <button onclick="clearActiveDrTable()" style="background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.4);color:#ef4444;padding:8px 12px;border-radius:6px;">清空当前表</button>
+                            <button onclick="exportDamageReductionToTxt('active')" data-tip="导出当前「${escapeHtml(window.drActiveTable)}」表为 TXT（多表时在菜单里可导出全部）" style="background:rgba(74,222,128,0.2);border:1px solid rgba(74,222,128,0.4);color:#4ade80;padding:8px 12px;border-radius:6px;white-space:nowrap;">📤 导出「${escapeHtml(window.drActiveTable)}」</button>
+                            <button onclick="exportAllDamageReductionToTxt()" data-tip="把全部减伤表导出为一个 TXT（每表一段），便于整体备份 / 整体恢复" style="background:rgba(74,222,128,0.12);border:1px solid rgba(74,222,128,0.3);color:#4ade80;padding:8px 12px;border-radius:6px;font-size:0.85rem;white-space:nowrap;">📤 导出全部</button>
+                            <button onclick="importDamageReductionFromTxt();setTimeout(()=>{filterDamageReductionCards();},500);" style="background:rgba(96,165,250,0.2);border:1px solid rgba(96,165,250,0.4);color:#60a5fa;padding:8px 12px;border-radius:6px;white-space:nowrap;">📥 导入</button>
+                            <button onclick="clearActiveDrTable()" style="background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.4);color:#ef4444;padding:8px 12px;border-radius:6px;white-space:nowrap;">清空当前表</button>
                         </div>
                         <div style="background:rgba(255,152,0,0.1);border-radius:8px;padding:12px;margin-bottom:15px;">
                             <div style="color:#ff9800;font-size:0.85rem;margin-bottom:6px;padding:5px;background:rgba(255,152,0,0.1);border-radius:4px;">🚂 战车减伤 <span style="color:#888">（改到主页设置，此处不再手填）</span></div>
@@ -13217,41 +13242,62 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         }
         
         // 构建减伤卡牌列表
+        // 渲染减伤卡列表：收藏的卡（window.drFavCards）置顶到「⭐ 常用卡」区，其余按职业分组
+        // filter: 'all' | 职业名 | 'fav'（只看常用卡）
         function buildDamageReductionCardsList(filter, cardsByProfession, currentData) {
+            // 卡名 → 职业 映射（用于按职业过滤收藏卡）
+            const cardProf = {};
+            Object.keys(cardsByProfession).forEach(p => (cardsByProfession[p] || []).forEach(c => { cardProf[c] = p; }));
+            const favs = (window.drFavCards || []).filter(c => cardProf[c]);   // 只保留仍存在的卡
+            const isFav = c => favs.indexOf(c) >= 0;
+
+            const renderRow = (cardName) => {
+                const value = currentData[cardName] || 0;
+                const isSpecial = ['小野', '酋长', '宝库'].includes(cardName);
+                const starred = isFav(cardName);
+                return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-radius:6px;${isSpecial ? 'background:rgba(255,152,0,0.12);border:1px solid rgba(255,152,0,0.45);' : 'background:rgba(255,255,255,0.05);'}">
+                    <span style="color:#fff;font-size:0.85rem;">${escapeHtml(cardName)}${isSpecial ? ' <span style="color:#ff9800;font-size:0.7rem;">(自身洗炼)</span>' : ''}</span>
+                    <span style="display:flex;align-items:center;gap:6px;">
+                        <button type="button" onclick="toggleDrFavCard('${escapeHtml(cardName)}')" title="收藏到「常用卡」置顶 / 取消收藏" style="background:none;border:none;cursor:pointer;font-size:1.05rem;line-height:1;padding:2px 4px;color:${starred ? '#ffd700' : 'rgba(255,255,255,0.35)'};">${starred ? '⭐' : '☆'}</button>
+                        <input type="number"
+                               data-card="${escapeHtml(cardName)}"
+                               value="${value}"
+                               min="0"
+                               max="100"
+                               step="0.1"
+                               style="width:60px;background:rgba(255,255,255,0.1);border:1px solid ${isSpecial ? 'rgba(255,152,0,0.5)' : 'rgba(78,205,196,0.3)'};color:${isSpecial ? '#ff9800' : '#4ecdc4'};padding:4px 8px;border-radius:4px;text-align:center;font-size:0.85rem;"
+                               onchange="this.style.color='${isSpecial ? '#ff9800' : '#4ecdc4'}'">
+                    </span>
+                </div>`;
+            };
+
             let html = '';
+
+            // 置顶区：当前筛选下的收藏卡（'fav' 时只有这块）
+            const favForFilter = (filter === 'all' || filter === 'fav') ? favs : favs.filter(c => cardProf[c] === filter);
+            if (filter !== 'fav' && favForFilter.length) {
+                html += `<div style="margin-bottom:10px;">
+                    <div style="color:#ffd700;font-size:0.85rem;margin-bottom:5px;padding:5px;background:rgba(255,215,0,0.12);border-radius:4px;display:flex;align-items:center;gap:6px;">⭐ 常用卡（置顶 · 点 ☆ 取消收藏）</div>
+                    <div style="display:flex;flex-direction:column;gap:4px;">${favForFilter.map(renderRow).join('')}</div>
+                </div>`;
+            }
+
+            if (filter === 'fav') {
+                if (!favs.length) html += `<div style="color:rgba(255,255,255,0.4);font-size:0.8rem;padding:12px;text-align:center;">暂无常用卡，点任意卡右侧的 ☆ 添加收藏</div>`;
+                return html;
+            }
+
             const professions = Object.keys(cardsByProfession);
-            
             professions.forEach(prof => {
                 if (filter !== 'all' && filter !== prof) return;
-                
-                const cards = cardsByProfession[prof];
+                const cards = (cardsByProfession[prof] || []).filter(c => !isFav(c));  // 收藏卡已在置顶区，避免重复
                 if (cards.length === 0) return;
-                
                 html += `<div style="margin-bottom:10px;">
                     <div style="color:#ffd700;font-size:0.85rem;margin-bottom:5px;padding:5px;background:rgba(255,215,0,0.1);border-radius:4px;">${prof}类 (${cards.length}张)</div>
-                    <div style="display:flex;flex-direction:column;gap:4px;">`;
-                
-                cards.forEach(cardName => {
-                    const value = currentData[cardName] || 0;
-                    const isSpecial = ['小野', '酋长', '宝库'].includes(cardName);
-                    html += `
-                        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-radius:6px;${isSpecial ? 'background:rgba(255,152,0,0.12);border:1px solid rgba(255,152,0,0.45);' : 'background:rgba(255,255,255,0.05);'}">
-                            <span style="color:#fff;font-size:0.85rem;">${cardName}${isSpecial ? ' <span style="color:#ff9800;font-size:0.7rem;">(自身洗炼)</span>' : ''}</span>
-                            <input type="number" 
-                                   data-card="${cardName}" 
-                                   value="${value}" 
-                                   min="0" 
-                                   max="100"
-                                   step="0.1"
-                                   style="width:60px;background:rgba(255,255,255,0.1);border:1px solid ${isSpecial ? 'rgba(255,152,0,0.5)' : 'rgba(78,205,196,0.3)'};color:${isSpecial ? '#ff9800' : '#4ecdc4'};padding:4px 8px;border-radius:4px;text-align:center;font-size:0.85rem;"
-                                   onchange="this.style.color='${isSpecial ? '#ff9800' : '#4ecdc4'}'">
-                        </div>
-                    `;
-                });
-                
-                html += `</div></div>`;
+                    <div style="display:flex;flex-direction:column;gap:4px;">${cards.map(renderRow).join('')}</div>
+                </div>`;
             });
-            
+
             return html;
         }
         
@@ -14046,52 +14092,87 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             allEl.style.color = allDr < 100 ? '#ff6b6b' : allDr < 130 ? '#ffd700' : '#4ecdc4';
         }
 
-        // 导出减伤记录为TXT文件（导出当前激活表；战车导出表内的两个值，小野/酋长/宝库导出共享）
-        function exportDamageReductionToTxt() {
-            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('减伤导出TXT');
-            loadDamageReductionData();
-            const t = getDrTable(window.drActiveTable);
-            const tableData = t.洗炼;
-            const safeName = (window.drActiveTable || '我的').replace(/[\\/:*?"<>|]/g, '_');
+        // 下载减伤 TXT（Tauri / 浏览器统一）
+        function _drDownloadTxt(fileName, content) {
+            const isTauri = !!(window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke);
+            if (isTauri) _downloadScriptTauri(fileName, content);
+            else _downloadScriptBlob(fileName, content);
+        }
 
+        // 导出单张减伤表为 TXT（保持旧格式，兼容历史文件导入）
+        function exportOneDrTable(tableName) {
+            const t = getDrTable(tableName);
+            if (!t) return;
+            const tableData = t.洗炼;
+            const safeName = (tableName || '我的').replace(/[\\/:*?"<>|]/g, '_');
             let content = '# 减伤记录配置文件\n';
-            content += `# 表名：${window.drActiveTable}\n`;
+            content += `# 表名：${tableName}\n`;
             content += '# 格式：卡牌名=减伤数值（支持小数，如 10.5）\n';
             content += '# 技能：小野 / 酋长 / 宝库 — 写入当前表\n';
             content += '# 示例：水灵=10.5\n';
             content += '# 精灵卡不参与减伤计算\n';
             content += '# 导出时间：' + new Date().toLocaleString('zh-CN') + '\n\n';
-
-            // 🚂 战车减伤已改为只认主页战车框设置（2026-09-15），不再随减伤表导出
-
-            // 导出技能减伤（当前表）
             content += '\n===== 技能减伤（当前表） =====\n';
-            const sharedKeys = ['小野', '酋长', '宝库'];
-            sharedKeys.forEach(key => {
-                content += `${key}=${t[key] || 0}\n`;
-            });
-
-            // 导出洗炼减伤数据
+            ['小野', '酋长', '宝库'].forEach(key => { content += `${key}=${t[key] || 0}\n`; });
             content += '\n===== 洗炼减伤 =====\n';
-            const sortedCards = Object.keys(tableData).sort();
-            sortedCards.forEach(cardName => {
-                content += `${cardName}=${tableData[cardName]}\n`;
-            });
-
+            Object.keys(tableData).sort().forEach(cardName => { content += `${cardName}=${tableData[cardName]}\n`; });
             const fileName = `减伤记录_${safeName}_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.txt`;
-            const isTauri = !!(window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke);
-            if (isTauri) {
-                _downloadScriptTauri(fileName, content);
-            } else {
-                _downloadScriptBlob(fileName, content);
+            _drDownloadTxt(fileName, content);
+        }
+
+        // 导出全部减伤表（每表一段，便于整体备份 / 整体恢复）
+        function exportAllDamageReductionToTxt() {
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('减伤导出全部TXT');
+            loadDamageReductionData();
+            const tables = window.drTableOrder || Object.keys(window.drTables);
+            let content = '# 减伤记录配置文件（全部表）\n';
+            content += '# 每张表以 ===== 表：表名 ===== 分段，段内分「技能减伤 / 洗炼减伤」\n';
+            content += '# 导入时按表名自动分流（不存在的表会自动新建）\n';
+            content += '# 导出时间：' + new Date().toLocaleString('zh-CN') + '\n\n';
+            tables.forEach(name => {
+                const t = getDrTable(name);
+                if (!t) return;
+                content += `===== 表：${name} =====\n`;
+                content += '----- 技能减伤 -----\n';
+                ['小野', '酋长', '宝库'].forEach(k => { content += `${k}=${t[k] || 0}\n`; });
+                content += '----- 洗炼减伤 -----\n';
+                Object.keys(t.洗炼).sort().forEach(c => { content += `${c}=${t.洗炼[c]}\n`; });
+                content += '\n';
+            });
+            const fileName = `减伤记录_全部表_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.txt`;
+            _drDownloadTxt(fileName, content);
+        }
+
+        // 导出减伤记录为 TXT：mode 省略时（菜单入口）多表会询问导哪张；'active' 导当前表；'all' 导全部
+        async function exportDamageReductionToTxt(mode) {
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('减伤导出TXT');
+            loadDamageReductionData();
+            const tables = window.drTableOrder || Object.keys(window.drTables);
+            if (!mode) {
+                if (tables.length > 1) {
+                    const choice = await askTextInputAsync({
+                        title: '导出减伤',
+                        label: `当前共有 ${tables.length} 张减伤表。要导出哪张？\n当前表：「${window.drActiveTable}」\n\n` +
+                               `• 直接回车 / 输入表名 → 导出该表（回车=当前表）\n` +
+                               `• 输入 all → 导出全部表（每表一段，可整体备份/恢复）\n\n可用表：${tables.join('、')}`,
+                        defaultValue: window.drActiveTable || ''
+                    });
+                    const c = (choice || '').trim();
+                    if (c.toLowerCase() === 'all') return exportAllDamageReductionToTxt();
+                    if (c && window.drTables[c]) return exportOneDrTable(c);
+                    // 否则落到当前表
+                }
+                mode = 'active';
             }
+            if (mode === 'all') return exportAllDamageReductionToTxt();
+            exportOneDrTable(window.drActiveTable);
         }
 
         // 导入减伤记录从TXT文件（弹窗选择导入到哪张表）
         async function importDamageReductionFromTxt() {
             if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('减伤导入TXT');
             const options = window.drTableOrder.map(n => `${n}:导入到「${n}」表`).join('\n');
-            const choice = await askTextInputAsync({ title: '导入减伤', label: `要把 TXT 减伤导入到哪张表？\n当前激活（选中）的表是：「${window.drActiveTable}」\n\n可用表名：\n${options}\n\n直接回车 = 导入到当前激活的表「${window.drActiveTable}」；\n也可输入其它已存在的表名导入到那张表。`, defaultValue: window.drActiveTable || '' });
+            const choice = await askTextInputAsync({ title: '导入减伤', label: `要把 TXT 减伤导入到哪张表？\n当前激活（选中）的表是：「${window.drActiveTable}」\n\n可用表名：\n${options}\n\n直接回车 = 导入到当前激活的表「${window.drActiveTable}」；\n也可输入其它已存在的表名导入到那张表。\n\n💡 若 TXT 是「导出全部表」生成的（含 ===== 表：XXX ===== 分段），\n会按表名自动分流到对应表，不存在的表自动新建，此处选择仅作兜底。`, defaultValue: window.drActiveTable || '' });
             let target = (choice || '').trim();
             if (!target) target = window.drActiveTable || '我的';
             if (!window.drTables[target]) {
@@ -14113,74 +14194,76 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             input.click();
         }
 
-        // 解析减伤TXT文件，写入指定表（targetTable）
+        // 解析减伤 TXT：单表文件导入到 targetTable；多表文件（含 ===== 表：XXX =====）按表名分流，不存在的表自动新建
         function parseDamageReductionTxt(content, targetTable) {
             targetTable = targetTable || window.drActiveTable || '我的';
-            const t = getDrTable(targetTable);
-            const lines = content.split('\n');
-            const newData = {};
-            // 🚂 战车手填参数（我的战车/队友战车）已废弃：战车减伤只认主页战车框设置，导入时一律忽略
             const sharedKeys = ['小野', '酋长', '宝库'];
-            // 分区感知：导出文件分「战车 / 技能 / 洗炼」三段，同名行含义不同——
-            // 洗炼段的"小野=10.5"是小野自身占卜洗炼，技能段的"小野=90"才是被动技能减伤。
-            // 旧逻辑不看分段、只按名字路由，洗炼段的行会把技能段刚导入的值覆盖（技能减伤被洗炼覆盖）。
             let section = '';
+            let curName = targetTable;                  // 单表文件：整段写入 targetTable
+            const ensureTable = (name) => {
+                if (!window.drTables[name]) {
+                    window.drTables[name] = { 洗炼: {}, 我的战车: 0, 队友战车: 0, 小野: 0, 酋长: 0, 宝库: 0 };
+                    if (window.drTableOrder.indexOf(name) < 0) window.drTableOrder.push(name);
+                }
+                return window.drTables[name];
+            };
+            const touched = new Set();
+            let recCount = 0;
+            const writeRefine = (name, card, val) => { const tb = ensureTable(name); tb.洗炼[card] = val; if (name === '我的') damageReductionData = tb.洗炼; touched.add(name); recCount++; };
+            const writeSkill = (name, card, val) => { const tb = ensureTable(name); tb[card] = val; touched.add(name); recCount++; };
 
+            const lines = content.split('\n');
             lines.forEach(rawLine => {
-                const line = rawLine.replace(/\r+$/, '');   // 兼容 Windows 记事本保存的 CRLF 行尾
+                const line = rawLine.replace(/\r+$/, '');   // 兼容 Windows 记事本 CRLF
                 if (line.startsWith('#') || line.trim() === '') return;
                 if (line.includes('=====')) {
+                    if (line.includes('表：')) {
+                        // 多表模式：取「表：」之后到「=====」之前的名字
+                        let namePart = line.substring(line.indexOf('表：') + 2).replace(/=+$/, '').trim();
+                        if (namePart) curName = namePart;
+                        section = '';
+                        return;
+                    }
                     if (line.includes('洗炼')) section = 'refine';
                     else if (line.includes('技能')) section = 'skill';
                     else if (line.includes('战车')) section = 'chariot';
                     return;
                 }
                 const match = line.match(/^([^=]+)=(\d+(?:\.\d+)?)$/);
-                if (match) {
-                    let cardName = match[1].trim();
-                    const value = parseFloat(match[2]);
-                    if (cardName === '战车') cardName = '我的战车';
-                    if (!cardName || isNaN(value)) return;
-                    if (cardName === '我的战车' || cardName === '队友战车') return;   // 废弃字段，忽略
-                    if (section === 'refine') {
-                        // 洗炼段：即使叫"小野/酋长/宝库"也只写洗炼，不碰技能减伤
-                        newData[cardName] = value;
-                    } else if (section === 'skill') {
-                        if (sharedKeys.includes(cardName)) t[cardName] = value; else newData[cardName] = value;
-                    } else if (section === 'chariot') {
-                        return;   // 旧导出文件里的「战车」段：忽略（战车减伤以主页战车框为准）
-                    } else if (sharedKeys.includes(cardName)) {
-                        // 无分段头的老文件：维持旧的名字路由
-                        t[cardName] = value;
-                    } else {
-                        newData[cardName] = value;
-                    }
+                if (!match) return;
+                let cardName = match[1].trim();
+                const value = parseFloat(match[2]);
+                if (cardName === '战车') cardName = '我的战车';
+                if (!cardName || isNaN(value)) return;
+                if (cardName === '我的战车' || cardName === '队友战车') return;   // 废弃字段，忽略
+                if (section === 'refine') {
+                    writeRefine(curName, cardName, value);          // 洗炼段：即使叫小野/酋长/宝库也只写洗炼
+                } else if (section === 'skill') {
+                    if (sharedKeys.includes(cardName)) writeSkill(curName, cardName, value);
+                    else writeRefine(curName, cardName, value);
+                } else if (section === 'chariot') {
+                    return;                                          // 旧导出文件的「战车」段：忽略
+                } else if (sharedKeys.includes(cardName)) {
+                    writeSkill(curName, cardName, value);           // 老文件无分段：按名字路由
+                } else {
+                    writeRefine(curName, cardName, value);
                 }
             });
 
-            // 合并（不清空已有数据，覆盖同名键；想清空请用「清空当前表」）
-            Object.assign(t.洗炼, newData);
-
-            // 兼容别名
-            if (targetTable === '我的') damageReductionData = t.洗炼;
-
+            if (window.drTables['我的']) damageReductionData = window.drTables['我的'].洗炼;  // 兼容别名
             saveDamageReductionData();
             updateDamageReductionDisplay();
 
-            // 导入到哪张表，弹窗就切换到那张表编辑：否则弹窗仍停在旧表，
-            // 输入框却被刷成新表的值，用户随手一改会把导入的值误写进旧表
-            window.drActiveTable = targetTable;
+            // 导入完成后切到最后一个处理的表，弹窗展示导入结果（避免误写旧表）
+            window.drActiveTable = curName;
             renderDrTableChips();
             updateDrActiveEditLabel();
             refreshDamageReductionDialogContent();
 
-            const count = Object.keys(newData).length;
-            const specialCount = sharedKeys.filter(k => t[k] > 0).length;
-            const msg = [];
-            if (count) msg.push(`洗炼${count}条`);
-            if (specialCount) msg.push(`技能${specialCount}条`);
-            if (msg.length) {
-                alert(`已导入到「${targetTable}」表：${msg.join('，')}`);
+            if (touched.size === 1) {
+                alert(`已导入到「${[...touched][0]}」表（共 ${recCount} 条）`);
+            } else if (touched.size > 1) {
+                alert(`已导入 ${touched.size} 张表（共 ${recCount} 条）：${[...touched].join('、')}`);
             } else {
                 alert('未找到有效的减伤记录');
             }
