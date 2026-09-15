@@ -5837,7 +5837,12 @@ if (true) {
     // 卡组 1-15（每页5个/共3页）；战车 1-23（每页6个，向左滑一次 +5，先拉回最左保证从第1页起算）。
     const GM_IM_DECK_X = [0.56, 0.63, 0.71, 0.78, 0.86];       // 卡组每页 5 个位置 x（y=0.13）
     const GM_IM_DECK_Y = 0.13;
-    const GM_IM_CART_X = [0.24, 0.33, 0.42, 0.51, 0.60, 0.69]; // 战车每页 6 个位置 x（点击 y=0.77，滑动 y=0.76）
+    const GM_IM_CART_X = [0.24, 0.33, 0.42, 0.51, 0.60, 0.69]; // 战车常规页 6 个位置 x（点击 y=0.77，滑动 y=0.76）
+    // 🔴 末页特殊（2026-09-16 用户实测）：共 23 辆，滑到底时起始项被夹到 17（=总数-6），
+    //    末页显示 17~23 共 7 个位置，且第6/7位坐标与前几页不同（22→0.67、23→0.76），需单独一张表。
+    const GM_IM_CART_X_LAST = [0.24, 0.33, 0.42, 0.51, 0.60, 0.67, 0.76];
+    const GM_IM_CART_TOTAL = 23;                 // 战车总数
+    const GM_IM_CART_LAST_START = GM_IM_CART_TOTAL - 6; // 17：滑到底那一屏的首个编号
     const GM_IM_CART_Y = 0.77;
     const GM_IM_BACK = { x: 0.86, y: 0.11 };        // 返回
     const GM_IM_CART_ENTRY = { x: 0.61, y: 0.75 };  // 战车选择入口
@@ -6011,20 +6016,33 @@ if (true) {
             await _gmImSleep(350);
         }
         await _gmImSleep(400);
-        // 4) 向左翻页（按住第6位滑到第1位，每滑一次编号 +5）
-        const k = cartNo <= 6 ? 0 : Math.ceil((cartNo - 6) / 5);
-        const pos = cartNo - 5 * k; // 1..6
+        // 4) 计算翻页次数：每滑一次起始 +5，但到底会被夹到 LAST_START（末页 17~23）
+        //    取"能覆盖目标编号的最少滑动次数"，避免 22/23 因末页回夹而点错。
+        const startOf = kk => Math.min(1 + 5 * kk, GM_IM_CART_LAST_START);
+        let k = 0;
+        for (;;) {
+            const s = startOf(k);
+            // 非末页只能点 6 位（第7位只露一半），末页可点 7 位
+            const maxCovered = (s >= GM_IM_CART_LAST_START) ? GM_IM_CART_TOTAL : s + 5;
+            if (cartNo <= maxCovered || k >= 4) break;
+            k++;
+        }
+        const start = startOf(k);
+        const pos = cartNo - start + 1;   // 1..6（末页 1..7）
         for (let i = 0; i < k; i++) {
             await window.gmSwipe(hwnd, GM_IM_CART_X[5], 0.76, GM_IM_CART_X[0], 0.76, 400, mode);
             await _gmImSleep(400);
         }
-        // 5) 点战车
-        await window.gmClick(hwnd, GM_IM_CART_X[pos - 1], GM_IM_CART_Y, 1, 200, mode);
+        // 5) 点战车（末页用末页专属坐标表）
+        const isLastPage = start >= GM_IM_CART_LAST_START;
+        const list = isLastPage ? GM_IM_CART_X_LAST : GM_IM_CART_X;
+        const px = list[pos - 1] !== undefined ? list[pos - 1] : list[list.length - 1];
+        await window.gmClick(hwnd, px, GM_IM_CART_Y, 1, 200, mode);
         await _gmImDelay();
         // 6) 确定（兼关闭战车弹窗）
         await window.gmClick(hwnd, GM_IM_CART_OK.x, GM_IM_CART_OK.y, 1, 200, mode);
         await _gmImDelay();
-        return '🚂 战车' + cartNo + '（滑' + k + '页后第' + pos + '位）已选';
+        return '🚂 战车' + cartNo + '（滑' + k + '次 → 起始' + start + ' 第' + pos + '位 @x' + px + (isLastPage ? '，末页' : '') + '）已选';
     }
 
     // —— 完整连打一次：点卡组 → 切车（切车内部第一步就是「返回」，即卡组→战车之间的返回）
