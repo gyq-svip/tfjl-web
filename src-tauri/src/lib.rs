@@ -2827,6 +2827,182 @@ fn gm_swipe_adb(x1: f64, y1: f64, x2: f64, y2: f64, hold_ms: u64) -> Result<(), 
     Ok(())
 }
 
+/// 输入文字原语（前端可直接编排）：包装已有的 gm_type_text（SendInput UNICODE 逐字注入，支持中文）。
+/// ⚠️ 需目标窗口持有焦点 —— 通常前面先 gm_click 点一下输入框即可把焦点切过去。
+#[tauri::command]
+fn gm_type(text: String, delay_ms: Option<u64>) -> Result<String, String> {
+    if text.is_empty() {
+        return Err("输入内容为空".into());
+    }
+    if let Some(d) = delay_ms {
+        if d > 0 {
+            std::thread::sleep(std::time::Duration::from_millis(d));
+        }
+    }
+    let n = text.chars().count();
+    gm_type_text(&text);
+    Ok(format!("已输入文字「{}」（{} 字）", text, n))
+}
+
+/// 单个/组合虚拟按键原语（前端可直接编排）：回车确认、Tab 切焦点、Ctrl+A/C/V、方向键等。
+/// key 支持：enter / tab / esc / space / backspace / delete / home / end / up / down / left / right /
+///          pageup / pagedown / f1~f12 / 单字符（a-z、0-9、常见符号），
+///          组合键写法 "ctrl+a"、"ctrl+shift+s"、"alt+tab"（修饰键仅限 ctrl/alt/shift/win，且必须在前）。
+#[tauri::command]
+fn gm_key(key: String, times: Option<u32>, delay_ms: Option<u64>) -> Result<String, String> {
+    let k = key.trim().to_lowercase();
+    if k.is_empty() {
+        return Err("按键为空".into());
+    }
+    let parts: Vec<&str> = k.split('+').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+    if parts.is_empty() {
+        return Err("按键为空".into());
+    }
+    let mut mods: Vec<u16> = Vec::new();
+    let mut main: Option<u16> = None;
+    for (i, p) in parts.iter().enumerate() {
+        let is_last = i == parts.len() - 1;
+        match *p {
+            "ctrl" | "control" => mods.push(0x11), // VK_CONTROL
+            "alt" => mods.push(0x12),              // VK_MENU
+            "shift" => mods.push(0x10),            // VK_SHIFT
+            "win" | "meta" => mods.push(0x5B),     // VK_LWIN
+            _ => {
+                if !is_last {
+                    return Err(format!("修饰键必须写在前面：{}", p));
+                }
+                main = Some(
+                    gm_vk_from_name(p)
+                        .ok_or_else(|| format!("不支持的按键：{}（可用 enter/tab/esc/space/方向键/f1~f12/单字符）", p))?,
+                );
+            }
+        }
+    }
+    let vk = main.ok_or_else(|| "缺少主按键".to_string())?;
+    let times = times.unwrap_or(1).clamp(1, 10);
+    let gap = delay_ms.unwrap_or(120).max(20);
+    #[cfg(windows)]
+    {
+        for n in 0..times {
+            for m in &mods {
+                gm_send_vk(*m, true);
+            }
+            gm_send_vk(vk, true);
+            gm_send_vk(vk, false);
+            for m in mods.iter().rev() {
+                gm_send_vk(*m, false);
+            }
+            if n + 1 < times {
+                std::thread::sleep(std::time::Duration::from_millis(gap));
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (vk, times, gap);
+        return Err("仅支持 Windows".into());
+    }
+    Ok(format!("已按键 {} ×{} 次", key, times))
+}
+
+/// 按键名 → 虚拟键码（VK_*）
+fn gm_vk_from_name(name: &str) -> Option<u16> {
+    let v = match name {
+        "enter" | "return" => 0x0D,
+        "tab" => 0x09,
+        "esc" | "escape" => 0x1B,
+        "space" => 0x20,
+        "backspace" | "bksp" => 0x08,
+        "delete" | "del" => 0x2E,
+        "insert" | "ins" => 0x2D,
+        "home" => 0x24,
+        "end" => 0x23,
+        "up" => 0x26,
+        "down" => 0x28,
+        "left" => 0x25,
+        "right" => 0x27,
+        "pageup" | "pgup" => 0x21,
+        "pagedown" | "pgdn" => 0x22,
+        _ => {
+            if name.len() == 1 {
+                let c = name.chars().next().unwrap().to_ascii_uppercase();
+                if c.is_ascii_alphanumeric() {
+                    return Some(c as u16);
+                }
+                return match c {
+                    '-' => Some(0xBD),
+                    '=' => Some(0xBB),
+                    '[' => Some(0xDB),
+                    ']' => Some(0xDD),
+                    '\\' => Some(0xDC),
+                    ';' => Some(0xBA),
+                    '\'' => Some(0xDE),
+                    ',' => Some(0xBC),
+                    '.' => Some(0xBE),
+                    '/' => Some(0xBF),
+                    '`' => Some(0xC0),
+                    _ => None,
+                };
+            }
+            if let Some(rest) = name.strip_prefix('f') {
+                if let Ok(n) = rest.parse::<u16>() {
+                    if (1..=12).contains(&n) {
+                        return Some(0x6F + n); // VK_F1 = 0x70
+                    }
+                }
+            }
+            return None;
+        }
+    };
+    Some(v)
+}
+
+/// SendInput 虚拟按键（true=按下 / false=松开）
+#[cfg(windows)]
+fn gm_send_vk(vk: u16, down: bool) {
+    use winapi::um::winuser::{SendInput, INPUT, INPUT_KEYBOARD, KEYEVENTF_KEYUP};
+    unsafe {
+        let mut input: INPUT = std::mem::zeroed();
+        input.type_ = INPUT_KEYBOARD;
+        input.u.ki_mut().wVk = vk;
+        input.u.ki_mut().dwFlags = if down { 0 } else { KEYEVENTF_KEYUP };
+        SendInput(1, &mut input as *mut _, std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
+/// 激活/前置指定窗口（切换到另一个程序界面，如从游戏切到老马助手）。
+/// 先还原最小化，再 SetForegroundWindow；失败时退回 AttachThreadInput 兜底（Windows 限制前台切换时的常用手段）。
+#[tauri::command]
+fn gm_focus_window(hwnd: usize) -> Result<String, String> {
+    #[cfg(windows)]
+    {
+        use winapi::shared::windef::HWND;
+        use winapi::um::winuser::{BringWindowToTop, IsIconic, SetForegroundWindow, ShowWindow, SW_RESTORE};
+        let h = hwnd as HWND;
+        unsafe {
+            if IsIconic(h) != 0 {
+                ShowWindow(h, SW_RESTORE);
+            }
+            // Windows 限制：只有前台进程才能 SetForegroundWindow。本程序通常由用户点开（自身即前台），
+            // 此时切换到游戏/老马窗口是允许的；若被拒（后台自启场景）再试 BringWindowToTop 兜底。
+            if SetForegroundWindow(h) != 0 {
+                let _ = BringWindowToTop(h);
+                return Ok("窗口已激活到前台".into());
+            }
+            if BringWindowToTop(h) != 0 {
+                Ok("窗口已置顶（未获得键盘焦点，输入前建议先点一下输入框）".into())
+            } else {
+                Err("激活窗口失败（系统拒绝了前台切换，请手动点一下该窗口）".into())
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = hwnd;
+        Err("仅支持 Windows".into())
+    }
+}
+
 /// 鼠标滚轮原语（2026-09-12 新增，用于「深海统计 · 自动连拍」的自动下滑翻页）：
 /// 坐标基准与 capture_window_region **完全一致** —— **窗口外框内的绝对像素**（x,y 从窗口左上角起算），
 /// 便于前端直接把「框选识别区域」的中心当滚轮落点，不用再做比例换算。
@@ -3046,6 +3222,9 @@ pub fn run() {
             gm_click,
             gm_swipe,
             gm_wheel,
+            gm_type,
+            gm_key,
+            gm_focus_window,
         ])
         .manage(AppState { umi_pid: std::sync::Mutex::new(None), heartbeat: std::sync::Mutex::new(None), checkin_day: std::sync::Mutex::new(None) })
         .setup(|app| {

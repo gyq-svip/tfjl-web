@@ -199,6 +199,21 @@ description = "Allow frontend-driven swipe gesture primitive (press at ratio poi
 commands.allow = ["gm_swipe"]
 
 [[permission]]
+identifier = "allow-gm-type"
+description = "Allow frontend-driven text typing primitive (SendInput UNICODE per char, supports Chinese; types into the focused window, so click the input box first)"
+commands.allow = ["gm_type"]
+
+[[permission]]
+identifier = "allow-gm-key"
+description = "Allow frontend-driven virtual key press primitive (enter/tab/esc/arrows/f1-f12/single char and ctrl|alt|shift combos like ctrl+a)"
+commands.allow = ["gm_key"]
+
+[[permission]]
+identifier = "allow-gm-focus-window"
+description = "Allow bringing a window handle to foreground (restore if minimized, SetForegroundWindow with AttachThreadInput fallback; used to switch between game and helper app)"
+commands.allow = ["gm_focus_window"]
+
+[[permission]]
 identifier = "allow-gm-wheel"
 description = "Allow frontend-driven mouse wheel primitive at a window-frame pixel point (used by deepsea auto-capture auto-scroll; bg=PostMessage to window, real=SetCursorPos+mouse_event)"
 commands.allow = ["gm_wheel"]
