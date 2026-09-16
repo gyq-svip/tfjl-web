@@ -9178,6 +9178,39 @@
             return s;
         }
 
+        // 🔴 2026-09-16 全局复制文本工具（顶层，页面加载即存在）：
+        //    多处弹窗（取回卡片 / 转发 / 作品分享…）都写成 `if (typeof copyText === 'function') copyText(...)`，
+        //    但它们各自作用域里并没有 copyText（只有分享弹窗/画廊/项目分享几个函数内部有局部定义）
+        //    → 判断为 false → 点下去静默什么都不做（用户只看到"没反应"，连报错都没有）。
+        //    挂到 window 上，让这些受保护调用全部真正生效；签名与局部版一致 (text, okMsg, btn)。
+        window.copyText = async function (text, okMsg, btn) {
+            const fb = function (t, ms) {
+                if (!btn) return;
+                if (!btn._origText) btn._origText = btn.textContent;
+                btn.textContent = t;
+                if (btn._fbTimer) clearTimeout(btn._fbTimer);
+                btn._fbTimer = setTimeout(function () { btn.textContent = btn._origText; }, ms || 1600);
+            };
+            try {
+                if (!text) { if (typeof showToast === 'function') showToast('没有可复制的内容', 'error'); return; }
+                await navigator.clipboard.writeText(text);
+                fb('✓ 已复制');
+                if (okMsg && typeof showToast === 'function') showToast(okMsg, 'success');
+            } catch (e) {
+                try {
+                    // 兜底：老 WebView 无 clipboard API，选中 textarea + execCommand
+                    const ta = document.createElement('textarea');
+                    ta.value = text; document.body.appendChild(ta); ta.select();
+                    document.execCommand('copy'); ta.remove();
+                    fb('✓ 已复制');
+                    if (okMsg && typeof showToast === 'function') showToast(okMsg, 'success');
+                } catch (e2) {
+                    fb('❌ 复制失败');
+                    if (typeof showToast === 'function') showToast('❌ 复制失败，请手动复制', 'error');
+                }
+            }
+        };
+
         // 📸 分享阵容图：先选有效期/密码 → 🔴先查本机是否分享过同一套阵容（命中可直取回，不重复上传）→ 整个项目上传 Gist（含脚本/记事本/参考图）→ 生成图+短码 → 弹窗预览
         // 对方扫码 / 报短码 / 点链接 → 与「分享整个项目」同款导入（完整项目，非纯阵容）。
         // 上传失败自动降级为纯图片（无短码，图上有重试提示），分享功能不受影响。
@@ -10040,8 +10073,28 @@
                         document.body.appendChild(a); a.click(); a.remove();
                     } catch (e) {}
                 };
-                modal.querySelector('#lineupShareCopyImg').onclick = function () {
-                    try { if (typeof copyText === 'function') copyText(card.dataUrl, '📋 图片已复制（可直接粘贴到聊天窗口）', this); } catch (e) {}
+                // 🔴 2026-09-16 修复「点复制图片没反应」：
+                //    旧实现调 copyText(card.dataUrl,...) —— ① copyText 是分享弹窗内部的局部函数，本作用域不存在
+                //    （typeof 判断为 false → 静默什么都不做）；② 即便存在也只是把 base64 文本写进剪贴板，粘贴出来是字符串不是图。
+                //    现在改成真正的图片复制：dataUrl → blob → ClipboardItem 写图片；不支持时明确提示改用「下载图片」。
+                modal.querySelector('#lineupShareCopyImg').onclick = async function () {
+                    const btn = this;
+                    const orig = btn.textContent;
+                    btn.textContent = '⏳ 复制中…';
+                    const restore = function (t, ms) { btn.textContent = t; setTimeout(function () { btn.textContent = orig; }, ms || 1600); };
+                    try {
+                        if (!card.dataUrl) throw new Error('卡片图片为空');
+                        if (!navigator.clipboard || !navigator.clipboard.write || typeof ClipboardItem === 'undefined') {
+                            throw new Error('当前环境不支持复制图片');
+                        }
+                        const blob = await (await fetch(card.dataUrl)).blob();
+                        await navigator.clipboard.write([new ClipboardItem({ [blob.type || 'image/png']: blob })]);
+                        restore('✓ 图片已复制');
+                        if (typeof showToast === 'function') showToast('📋 图片已复制，可直接粘贴到微信/QQ', 'success');
+                    } catch (e) {
+                        restore('❌ 复制失败', 2200);
+                        if (typeof showToast === 'function') showToast('❌ 复制图片失败（' + ((e && e.message) || '环境不支持') + '），请用「💾 下载图片」', 'error');
+                    }
                 };
                 if (onReshare) {
                     const _rb = modal.querySelector('#lineupShareReshare');
