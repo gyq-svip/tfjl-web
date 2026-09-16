@@ -9457,11 +9457,15 @@
                 }
                 // 自定义留言：记住上次写的内容（每换一条不用重打）
                 try { msgInput.value = localStorage.getItem('TFJL_ShareMsg') || ''; } catch (e) {}
-                // 卡片名称：默认填当前项目名，记住上次写的（用户可改；留空则分享图用项目名兜底）
+                // 卡片名称：默认「当前项目名」（2026-09-16 修复：旧版无条件沿用上次写的名字，
+                // 换项目分享时名字还停在旧项目上 → 不同项目的卡片同名，取卡片/看图都会互相串、覆盖）。
+                // 现在按项目记忆：只有「上次的名字本来就是给当前项目起的」才沿用，否则填当前项目名。
                 const cardNameInput = modal.querySelector('#lineupShareCardName');
                 try {
+                    const curProj = (typeof currentProjectName !== 'undefined' && currentProjectName) || '';
                     const lastCardName = localStorage.getItem('TFJL_ShareCardName') || '';
-                    cardNameInput.value = lastCardName || ((typeof currentProjectName !== 'undefined' && currentProjectName) ? currentProjectName : '');
+                    const lastForProj = localStorage.getItem('TFJL_ShareCardNameProj') || '';
+                    cardNameInput.value = (lastCardName && lastForProj === curProj) ? lastCardName : curProj;
                 } catch (e) {}
                 // 加密分享不参与复用（无法安全判断密码是否与上次一致），勾了密码就藏起「强制新建」，免得勾了没效果
                 const forceNewBox = modal.querySelector('#lineupShareForceNewBox');
@@ -9485,9 +9489,12 @@
                     if (wallChk) { try { localStorage.setItem('TFJL_ShareWallSync', wallChk.checked ? '1' : '0'); } catch (e) {} }
                     const msg = (msgInput.value || '').trim();
                     try { localStorage.setItem('TFJL_ShareMsg', msg); } catch (e) {}
-                    // 卡片名称：自定义主题名，留空则分享图/卡片用项目名兜底；记住上次
+                    // 卡片名称：自定义主题名，留空则分享图/卡片用项目名兜底；按项目记住（换项目自动换成新项目名）
                     const cardName = (cardNameInput && cardNameInput.value || '').trim();
-                    try { localStorage.setItem('TFJL_ShareCardName', cardName); } catch (e) {}
+                    try {
+                        localStorage.setItem('TFJL_ShareCardName', cardName);
+                        localStorage.setItem('TFJL_ShareCardNameProj', (typeof currentProjectName !== 'undefined' && currentProjectName) || '');
+                    } catch (e) {}
                     // 🔴 2026-09-01 分类选择：同步上墙时归到所选分类（记住上次，没选则用当前项目分类）
                     const cat = ((catInput && catInput.value) || '').trim() || (function () { try { return (typeof currentProjectCategory !== 'undefined' && currentProjectCategory) || ''; } catch (e) { return ''; } })();
                     try { localStorage.setItem('TFJL_ShareWallCat', cat); } catch (e) {}
