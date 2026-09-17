@@ -232,6 +232,7 @@
             if (val.indexOf('grad:') === 0) return 0.35;
             if (val.indexOf('custom:') === 0) return 0.4;
             if (val.indexOf('img:') === 0) return 0.4;
+            if (val.indexOf('video:') === 0) return 0.35;
             if (val.indexOf('builtin:') === 0) return 0.3;
             if (val.indexOf('preset:') === 0) {
                 const key = val.slice(7);
@@ -299,6 +300,41 @@
         const BG_DB = 'tfjl-bg-images';
         const BG_STORE = 'images';
         let bgImgUrl = null, bgImgId = null, bgMigrateTried = false, bgThumbUrls = [];
+        let bgVideoUrl = null, bgVideoId = null;
+
+        // 动态视频背景（MP4/WebM，存 IndexedDB 媒体库，静音循环播放）
+        function ensureBgVideo() {
+            let v = document.getElementById('bgVideo');
+            if (!v) {
+                v = document.createElement('video');
+                v.id = 'bgVideo';
+                v.setAttribute('autoplay', '');
+                v.setAttribute('loop', '');
+                v.muted = true; // 静音循环，浏览器才允许自动播放
+                v.setAttribute('playsinline', '');
+                v.style.cssText = 'position:fixed;top:-40px;left:-40px;width:calc(100% + 80px);height:calc(100% + 80px);object-fit:cover;z-index:-2;pointer-events:none;';
+                document.body.appendChild(v);
+            }
+            return v;
+        }
+        function stopBgVideo() {
+            const v = document.getElementById('bgVideo');
+            if (v) { try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) {} }
+            if (bgVideoUrl) { try { URL.revokeObjectURL(bgVideoUrl); } catch (e) {} }
+            bgVideoUrl = null; bgVideoId = null;
+        }
+        function bgApplyVideo(id) {
+            return bgGetImage(id).then(function (rec) {
+                if (!rec || !rec.blob) throw new Error('video not found');
+                stopBgVideo();
+                bgVideoUrl = URL.createObjectURL(rec.blob);
+                bgVideoId = id;
+                const v = ensureBgVideo();
+                v.src = bgVideoUrl;
+                const p = v.play();
+                if (p && p.catch) p.catch(function () {});
+            });
+        }
 
         function bgOpenDb() {
             return new Promise(function (res, rej) {
@@ -389,9 +425,19 @@
             layer.style.backgroundImage = '';
             layer.style.backgroundAttachment = '';
             const val = (localStorage.getItem(BG_KEY) || '').trim();
-            if (!val || val === 'default') { bgRevokeUrl(); applyBgBlur(); return; }
-            if (val.indexOf('img:') !== 0) bgRevokeUrl();
-            if (val.indexOf('img:') === 0) {
+            if (!val || val === 'default') { bgRevokeUrl(); stopBgVideo(); applyBgBlur(); return; }
+            if (val.indexOf('img:') !== 0 && val.indexOf('video:') !== 0) bgRevokeUrl();
+            if (val.indexOf('video:') !== 0) stopBgVideo();
+            if (val.indexOf('video:') === 0) {
+                const vid = val.slice(6);
+                layer.classList.add('bg-custom');
+                if (bgVideoId === vid && bgVideoUrl) {
+                    const v = ensureBgVideo();
+                    if (v.paused) { const p = v.play(); if (p && p.catch) p.catch(function () {}); }
+                } else {
+                    bgApplyVideo(vid).catch(function () {});
+                }
+            } else if (val.indexOf('img:') === 0) {
                 const id = val.slice(4);
                 layer.classList.add('bg-custom');
                 if (bgImgId === id && bgImgUrl) {
@@ -425,9 +471,24 @@
             applyBgBlur();
         }
 
-        // 上传图片：canvas 压缩到最长边 1920px、JPEG 0.8，避免超 localStorage 配额 / 拖慢加载
+        // 上传图片/视频：图片 canvas 压缩到最长边 1920px、JPEG 0.8；视频直接入媒体库（IndexedDB）
         function handleBgFile(file) {
             if (!file) return;
+            if (file.type && file.type.indexOf('video/') === 0) {
+                if (file.size > 100 * 1024 * 1024) {
+                    try { if (typeof showToast === 'function') showToast('⚠️ 视频太大（超 100MB），请先压缩'); } catch (e) {}
+                    return;
+                }
+                bgSaveImage(file, file.name).then(function (id) {
+                    localStorage.setItem(BG_KEY, 'video:' + id);
+                    applyUserBackground();
+                    if (typeof renderBgImageList === 'function') renderBgImageList();
+                    try { if (typeof showToast === 'function') showToast('✅ 视频背景已应用'); } catch (e) {}
+                }).catch(function () {
+                    try { if (typeof showToast === 'function') showToast('视频保存失败'); } catch (e) {}
+                });
+                return;
+            }
             const reader = new FileReader();
             reader.onload = function () {
                 const img = new Image();
@@ -524,15 +585,17 @@
                 }
                 box.innerHTML = '';
                 list.forEach(function (rec) {
+                    const isVideo = !!(rec.blob && rec.blob.type && rec.blob.type.indexOf('video/') === 0);
                     const u = URL.createObjectURL(rec.blob);
                     bgThumbUrls.push(u);
-                    const name = String(rec.name || '背景图').replace(/[<>&"']/g, '');
-                    const active = cur === 'img:' + rec.id;
+                    const name = String(rec.name || (isVideo ? '视频' : '背景图')).replace(/[<>&"']/g, '');
+                    const scheme = isVideo ? 'video:' : 'img:';
+                    const active = cur === scheme + rec.id;
                     const wrap = document.createElement('div');
                     wrap.style.cssText = 'position:relative;width:78px;text-align:center;';
                     wrap.innerHTML =
-                        '<div onclick="window.__bgUseImage(\'' + rec.id + '\')" title="点击切换到这张背景" style="width:78px;height:52px;border-radius:8px;background-image:url(' + u + ');background-size:cover;background-position:center;border:2px solid ' + (active ? '#ffd700' : 'rgba(255,255,255,0.28)') + ';box-shadow:' + (active ? '0 0 10px rgba(255,215,0,0.55)' : 'none') + ';cursor:pointer;"></div>' +
-                        '<button onclick="window.__bgDeleteImage(\'' + rec.id + '\')" title="删除这张背景图" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#e53935;border:none;color:#fff;font-size:0.66rem;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.5);">✕</button>' +
+                        '<div onclick="window.__bgUseImage(\'' + rec.id + '\',\'' + (isVideo ? 'video' : 'img') + '\')" title="点击切换到这张背景" style="width:78px;height:52px;border-radius:8px;display:flex;align-items:center;justify-content:center;' + (isVideo ? 'background:rgba(255,255,255,0.08);font-size:1.4rem;' : 'background-image:url(' + u + ');background-size:cover;background-position:center;') + 'border:2px solid ' + (active ? '#ffd700' : 'rgba(255,255,255,0.28)') + ';box-shadow:' + (active ? '0 0 10px rgba(255,215,0,0.55)' : 'none') + ';cursor:pointer;">' + (isVideo ? '🎬' : '') + '</div>' +
+                        '<button onclick="window.__bgDeleteImage(\'' + rec.id + '\')" title="删除" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#e53935;border:none;color:#fff;font-size:0.66rem;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.5);">✕</button>' +
                         '<div style="font-size:0.6rem;color:' + (active ? '#ffd700' : 'rgba(255,255,255,0.55)') + ';margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (active ? '使用中 ' : '') + name + '</div>';
                     box.appendChild(wrap);
                 });
@@ -540,8 +603,8 @@
                 box.innerHTML = '<span style="font-size:0.72rem;color:rgba(255,255,255,0.4);">读取背景图失败</span>';
             });
         }
-        window.__bgUseImage = function (id) {
-            localStorage.setItem(BG_KEY, 'img:' + id);
+        window.__bgUseImage = function (id, kind) {
+            localStorage.setItem(BG_KEY, (kind === 'video' ? 'video:' : 'img:') + id);
             applyUserBackground();
             renderBgImageList();
             try { if (typeof showToast === 'function') showToast('✅ 已切换背景'); } catch (e) {}
@@ -551,7 +614,7 @@
             const cur = (localStorage.getItem(BG_KEY) || '').trim();
             bgDelImage(id).then(function () {
                 if (bgImgId === id) bgRevokeUrl();
-                if (cur === 'img:' + id) { localStorage.setItem(BG_KEY, 'default'); applyUserBackground(); }
+                if (cur === 'img:' + id || cur === 'video:' + id) { localStorage.setItem(BG_KEY, 'default'); applyUserBackground(); }
                 renderBgImageList();
                 try { if (typeof showToast === 'function') showToast('🗑️ 已删除'); } catch (e) {}
             }).catch(function () { try { if (typeof showToast === 'function') showToast('删除失败'); } catch (e) {} });
@@ -649,7 +712,7 @@
                 '  </div>' +
                 '  <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">' +
                 '    <label style="padding:8px 14px;border-radius:8px;background:linear-gradient(135deg,#4facfe,#00f2fe);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.85rem;">' +
-                '      📤 上传并保存<input type="file" accept="image/*" style="display:none;" onchange="window.__bgFile(this.files[0])">' +
+                '      📤 上传图片/视频<input type="file" accept="image/*,video/mp4,video/webm" style="display:none;" onchange="window.__bgFile(this.files[0])">' +
                 '    </label>' +
                 '    <button onclick="window.__setBgPreset(\'default\')" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.85rem;">↺ 恢复默认</button>' +
                 '    <button onclick="toggleVisualEffects()" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.85rem;">✨ 炫酷特效</button>' +
