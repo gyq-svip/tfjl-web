@@ -26891,8 +26891,8 @@ ${maSection}
                         // 🔴 2026-08-29 诊断面板统一配色常量（同类参数同色，便于一眼分辨）
                         const C_NICK = '#4ade80', C_ID = '#64748b', C_TIME = '#94a3b8', C_NUM = '#fbbf24', C_FRONTV = '#60a5fa', C_DESKV = '#a78bfa', C_OK = '#4ade80', C_BAD = '#f87171', C_BUF = '#a78bfa';
                         const _colorWho = (who) => who.replace(/^([^(（]+)[(（]([^)）]+)[)）]?$/, '<b style="color:' + C_NICK + ';">$1</b><span style="color:' + C_ID + ';">($2)</span>');
-                        // 🔴 2026-09-10：按用户 TOP 展示「全部用户」（原来只取前 10）
-                        const uTop = sortBy(perUser), gTop = sortBy(perGist).slice(0, 10), fTop = sortBy(perFn).slice(0, 10);
+                        // 🔴 2026-09-10：按用户 TOP / 按 Gist 文件 TOP / 按功能 TOP 均展示全部（原来只取前 10）
+                        const uTop = sortBy(perUser), gTop = sortBy(perGist), fTop = sortBy(perFn);
                         const uMax = uTop.length ? uTop[0].v : 1, gMax = gTop.length ? gTop[0].v : 1, fMax = fTop.length ? fTop[0].v : 1;
                         let html = '<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:8px 12px;margin-bottom:12px;">';
                         html += '📁 诊断 Gist: <code style="color:#60a5fa;">' + gid + '</code> ｜ 上报文件数: <b>' + diagFiles.length + '</b> ｜ 累计写入: <b>' + totalWrites + '</b> 次</div>';
@@ -27058,7 +27058,11 @@ ${maSection}
                         html += '<details style="margin-bottom:16px;border:1px solid rgba(96,165,250,0.35);border-radius:10px;background:rgba(96,165,250,0.04);overflow:hidden;"><summary style="cursor:pointer;padding:9px 12px;font-size:0.85rem;color:#60a5fa;font-weight:700;">📄 按 Gist 文件 TOP <span style="color:#94a3b8;font-size:0.72rem;font-weight:400;">（共 ' + gTop.length + ' 个 · 点此展开/收起，点每行看写入详情）</span></summary><div style="padding:6px 12px 10px 12px;">';
                         gTop.forEach((x, i) => {
                             const id = 'gDetail_' + i;
-                            html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, gMax) + ' ' + x.v + '　' + (x.k.substring(0, 16) + '…') + ' <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
+                            // 32 位 Gist ID → 中文用途标签（emoji + label + 可点击短哈希），与下方「真实写 Gist」面板一致，避免裸哈希看不懂
+                            const _gi = (typeof _gistLabel === 'function') ? _gistLabel(x.k) : { emoji: '📄', label: x.k, url: '' };
+                            const _g8 = x.k.substring(0, 8);
+                            const _glink = _gi.url ? '<a href="' + _gi.url + '" target="_blank" rel="noopener" style="color:#60a5fa;text-decoration:underline;font-size:0.68rem;margin-left:6px;" title="' + _gi.url + '">' + _g8 + '</a>' : _g8;
+                            html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, gMax) + ' <b style="color:' + C_NUM + ';">' + x.v + '</b>　' + _gi.emoji + ' <b style="color:#fca5a5;">' + _gi.label + '</b> ' + _glink + ' <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
                             html += '<div id="' + id + '" style="display:none;background:rgba(0,0,0,0.25);border-left:2px solid #60a5fa;padding:6px 10px;margin:4px 0 8px 12px;font-size:0.75rem;">';
                             (detailByGist[x.k] || []).forEach(row => {
                                 const m = row.file, e = row.entry;
@@ -27075,7 +27079,7 @@ ${maSection}
                         const writeAgg = {}, useAgg = {};
                         writeKeys.forEach(k => { const base = k.substring(6); writeAgg[base] = (writeAgg[base] || 0) + detailByFn[k].reduce((s, r) => s + r.entry.count, 0); });
                         useKeys.forEach(k => { const base = k.substring(4); useAgg[base] = (useAgg[base] || 0) + detailByFn[k].reduce((s, r) => s + r.entry.count, 0); });
-                        const wTop = sortBy(writeAgg), uTop2 = sortBy(useAgg).slice(0, 10);   // 🔴 2026-09-10：真实写 Gist 展示全部
+                        const wTop = sortBy(writeAgg), uTop2 = sortBy(useAgg);   // 🔴 2026-09-10：真实写 Gist / 功能使用均展示全部
                         const wMax = wTop.length ? wTop[0].v : 1, uMax2 = uTop2.length ? uTop2[0].v : 1;
                         // 组1：🟥 真实写 Gist
                         // 🔴 2026-09-10：整块包一层折叠（默认不展开），内部展示全部写操作
