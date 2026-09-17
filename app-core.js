@@ -14246,7 +14246,21 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const dockTop = dock ? dock.getBoundingClientRect().top : r.top;
                 const top = Math.max(60, Math.round(dockTop));
                 sec.style.top = top + 'px';
-                sec.style.maxHeight = Math.max(240, window.innerHeight - top - 140) + 'px';
+                // 🔴 2026-09-18 面板高度封顶：最多显示 7 排卡（再多在框内下拉滚动看），避免遮住下方手牌区。
+                //    行高按实际卡片量（卡高 + 行间距），7 排之外还受视口兜底（top 到底部留 140px）约束。
+                let maxH = Math.max(240, window.innerHeight - top - 140);
+                try {
+                    const grid = sec.querySelector('.cards-grid');
+                    const card = grid && grid.querySelector('.card-item');
+                    if (grid && card) {
+                        const cs = getComputedStyle(grid);
+                        const rowGap = parseFloat(cs.rowGap) || 6;
+                        const gridTop = Math.max(0, Math.round(grid.getBoundingClientRect().top - sec.getBoundingClientRect().top));
+                        const sevenRows = gridTop + Math.round((card.offsetHeight + rowGap) * 7) + 6;
+                        maxH = Math.min(maxH, Math.max(240, sevenRows));
+                    }
+                } catch (e) {}
+                sec.style.maxHeight = maxH + 'px';
             } catch (e) {}
         }
         window.addEventListener('resize', function () {
