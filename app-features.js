@@ -1526,8 +1526,13 @@
             if (modal) modal.remove();
         }
 
-        // 网站功能说明弹窗（首次进入简短版）
+        // 网站功能说明弹窗（按大版本首次弹出；仅网页版，含下载桌面版引导）
         function showWelcomeGuide() {
+            // 桌面版用户已在 APP 内，无需引导下载；仅网页版弹
+            if (window.__TAURI__ || window.__TAURI_INTERNALS__) return;
+            // 每个大版本（SW CACHE_VERSION 的 sX.Y 两级）首次进入才弹
+            const key = 'TFJL_WelcomeRead_' + _welcomeBigVer();
+            try { if (localStorage.getItem(key)) return; } catch (e) {}
             const guideHtml = `
                 <div id="welcomeGuideModal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;">
                     <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.5);border-radius:16px;padding:24px;max-width:460px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
@@ -1545,10 +1550,11 @@
                             <div style="margin-bottom:8px;">🏪 <b>拍卖行</b> — 闲置物品自由上架、交换、求购，完全免费</div>
                             <div style="margin-bottom:8px;">📢 <b>需求墙</b> — 发布需求、分享脚本、互动交流</div>
                         </div>
-                        <div style="background:rgba(78,205,196,0.1);border:1px solid rgba(78,205,196,0.3);border-radius:8px;padding:8px 12px;margin-top:10px;text-align:center;">
-                            <span style="color:#4ecdc4;font-size:0.82rem;">💡 有好的需求、想法，欢迎在需求墙（右上角小喇叭）留言！</span>
+                        <div style="background:rgba(255,152,0,0.12);border:1px solid rgba(255,152,0,0.4);border-radius:8px;padding:8px 12px;margin-top:10px;text-align:center;">
+                            <span style="color:#ffb74d;font-size:0.8rem;">📥 <b>下载桌面版</b>解锁：本地 OCR 识别、寒冰暗月连打、后台挂机自动操作</span>
                         </div>
                         <div style="display:flex;gap:10px;margin-top:16px;justify-content:center;flex-wrap:wrap;">
+                            <button onclick="closeWelcomeGuide();openDownloadModal();" style="padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#ff9800,#e65100);color:white;cursor:pointer;font-size:0.85rem;font-weight:600;">📥 下载桌面版</button>
                             <button onclick="closeWelcomeGuide();openHelpPage();" style="padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#4fc3f7,#0288d1);color:white;cursor:pointer;font-size:0.85rem;font-weight:600;">📖 查看完整帮助</button>
                             <button onclick="closeWelcomeGuide()" style="padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#ffd700,#f59e0b);color:#1a1a2e;cursor:pointer;font-size:0.85rem;font-weight:600;">开始使用</button>
                         </div>
@@ -1559,10 +1565,30 @@
         }
 
         function closeWelcomeGuide() {
-            localStorage.setItem('TFJL_WelcomeRead', 'true');
+            try { localStorage.setItem('TFJL_WelcomeRead_' + _welcomeBigVer(), 'true'); } catch (e) {}
             const modal = document.getElementById('welcomeGuideModal');
             if (modal) modal.remove();
         }
+
+        // 解析当前大版本两级（SW CACHE_VERSION 的 sX.Y），用于「每个大版本首次进主页弹一次」引导。
+        // 优先读 #versionTag（线上为真实 s日期 · sX.Y.Z），本地 dev 回退 's1.1'。
+        function _welcomeBigVer() {
+            try {
+                const t = (document.getElementById('versionTag') || {}).textContent || '';
+                const m = t.match(/s(\d+)\.(\d+)\.\d+/);
+                if (m) return m[1] + '.' + m[2];
+            } catch (e) {}
+            return 's1.1';
+        }
+        // 主页加载后，仅网页版用户、按大版本首次弹出欢迎/下载引导（桌面版已在 APP 内，不弹）
+        (function _initWelcomeGuide() {
+            const fire = function () {
+                if (window.__TAURI__ || window.__TAURI_INTERNALS__) return;
+                showWelcomeGuide();
+            };
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fire);
+            else fire();
+        })();
 
         function closeChatRoom() {
             const panel = document.getElementById('chatRoomPanel');
