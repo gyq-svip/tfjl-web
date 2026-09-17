@@ -200,6 +200,139 @@
             updateEffectsVisibility();
         }
 
+        // ==================== 用户自定义背景 ====================
+        // 预设：明亮 / 动漫 / 炫酷（部分带动画）。实拍走「上传图片」（自动压缩，无需操心尺寸）。
+        const BG_PRESETS = {
+            bright: [
+                { name: '晴空', css: 'linear-gradient(135deg,#a1c4fd 0%,#c2e9fb 100%)' },
+                { name: '暖阳', css: 'linear-gradient(135deg,#fbc2eb 0%,#a6c1ee 100%)' },
+                { name: '薄荷', css: 'linear-gradient(135deg,#d4fc79 0%,#96e6a1 100%)' }
+            ],
+            anime: [
+                { name: '紫梦', css: 'linear-gradient(135deg,#667eea 0%,#764ba2 100%)' },
+                { name: '樱粉', css: 'linear-gradient(135deg,#f093fb 0%,#f5576c 100%)' },
+                { name: '青空', css: 'linear-gradient(135deg,#4facfe 0%,#00f2fe 100%)' }
+            ],
+            cool: [
+                { name: '极光', css: 'linear-gradient(135deg,#0f2027 0%,#203a43 50%,#2c5364 100%)', anim: 'aurora' },
+                { name: '霓虹', css: 'linear-gradient(135deg,#ee0979 0%,#ff6a00 100%)', anim: 'neon' },
+                { name: '星河', css: 'radial-gradient(ellipse at 50% 0%,#1b2735 0%,#090a0f 100%)', anim: 'stars' }
+            ]
+        };
+        const BG_KEY = 'TFJL_User_BG';
+
+        function applyUserBackground() {
+            document.body.classList.remove('bg-custom', 'bg-anim-aurora', 'bg-anim-neon', 'bg-anim-stars');
+            document.body.style.background = '';
+            document.body.style.backgroundImage = '';
+            document.body.style.backgroundAttachment = '';
+            const val = (localStorage.getItem(BG_KEY) || '').trim();
+            if (!val || val === 'default') return;
+            if (val.indexOf('preset:') === 0) {
+                const key = val.slice(7);
+                let css = null, anim = null;
+                for (const cat of Object.keys(BG_PRESETS)) {
+                    const p = BG_PRESETS[cat].find(function (x) { return x.name === key; });
+                    if (p) { css = p.css; anim = p.anim; break; }
+                }
+                if (css) {
+                    document.body.style.background = css;
+                    document.body.style.backgroundAttachment = 'fixed';
+                    if (anim) document.body.classList.add('bg-anim-' + anim);
+                }
+            } else if (val.indexOf('custom:') === 0) {
+                document.body.classList.add('bg-custom');
+                document.body.style.backgroundImage = 'url(' + val.slice(7) + ')';
+            }
+        }
+
+        // 上传图片：canvas 压缩到最长边 1920px、JPEG 0.8，避免超 localStorage 配额 / 拖慢加载
+        function handleBgFile(file) {
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function () {
+                const img = new Image();
+                img.onload = function () {
+                    const max = 1920;
+                    const scale = Math.min(1, max / Math.max(img.width, img.height));
+                    const cw = Math.max(1, Math.round(img.width * scale));
+                    const ch = Math.max(1, Math.round(img.height * scale));
+                    const canvas = document.createElement('canvas');
+                    canvas.width = cw; canvas.height = ch;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, cw, ch);
+                    let dataUrl;
+                    try { dataUrl = canvas.toDataURL('image/jpeg', 0.8); } catch (e) { dataUrl = reader.result; }
+                    localStorage.setItem(BG_KEY, 'custom:' + dataUrl);
+                    applyUserBackground();
+                    try { if (typeof showToast === 'function') showToast('✅ 背景已更新'); } catch (e) {}
+                };
+                img.src = reader.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        window.__setBgPreset = function (name) {
+            localStorage.setItem(BG_KEY, name === 'default' ? 'default' : 'preset:' + name);
+            applyUserBackground();
+            const m = document.getElementById('bgSettingsModal'); if (m) m.remove();
+            try { if (typeof showToast === 'function') showToast('✅ 背景已切换'); } catch (e) {}
+        };
+        window.__bgFile = function (file) { handleBgFile(file); const m = document.getElementById('bgSettingsModal'); if (m) m.remove(); };
+
+        function openBackgroundSettings() {
+            const old = document.getElementById('bgSettingsModal');
+            if (old) old.remove();
+            const labels = { bright: '☀️ 明亮', anime: '🌸 动漫', cool: '✨ 炫酷' };
+            const rows = [];
+            for (const cat of ['bright', 'anime', 'cool']) {
+                rows.push('<div style="color:rgba(255,255,255,0.55);font-size:0.78rem;margin:12px 0 6px;">' + labels[cat] + '</div>');
+                BG_PRESETS[cat].forEach(function (p) {
+                    rows.push('<button onclick="window.__setBgPreset(\'' + p.name + '\')" style="margin:4px;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:' + p.css + ';color:#fff;cursor:pointer;font-size:0.8rem;text-shadow:0 1px 2px rgba(0,0,0,0.4);">' + p.name + '</button>');
+                });
+            }
+            const modal = document.createElement('div');
+            modal.id = 'bgSettingsModal';
+            modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100000;display:flex;align-items:center;justify-content:center;';
+            modal.innerHTML = '' +
+                '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:22px;max-width:480px;width:90%;max-height:85vh;overflow:auto;">' +
+                '  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+                '    <span style="color:#ffd700;font-size:1.1rem;font-weight:bold;">🎨 背景设置</span>' +
+                '    <button onclick="document.getElementById(\'bgSettingsModal\').remove()" style="background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;">✕</button>' +
+                '  </div>' +
+                '  <div style="color:rgba(255,255,255,0.5);font-size:0.74rem;margin-bottom:6px;">上传图片会自动压缩到最长边 1920px（无需操心原图尺寸/体积），存在本机、每台设备独立。</div>' +
+                rows.join('') +
+                '  <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">' +
+                '    <label style="padding:8px 14px;border-radius:8px;background:linear-gradient(135deg,#4facfe,#00f2fe);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.85rem;">' +
+                '      📤 上传图片<input type="file" accept="image/*" style="display:none;" onchange="window.__bgFile(this.files[0])">' +
+                '    </label>' +
+                '    <button onclick="window.__setBgPreset(\'default\')" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.85rem;">↺ 恢复默认</button>' +
+                '    <button onclick="toggleVisualEffects()" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.85rem;">✨ 炫酷特效开关</button>' +
+                '  </div>' +
+                '  <div style="margin-top:12px;color:rgba(255,255,255,0.4);font-size:0.72rem;">提示：选「炫酷」预设并开启上方「炫酷特效」，粒子会叠加在背景上更带感。</div>' +
+                '</div>';
+            document.body.appendChild(modal);
+            modal.addEventListener('click', function (e) { if (e.target === modal) modal.remove(); });
+        }
+
+        // 在「背景特效」菜单项旁注入「🎨 背景」入口
+        function injectBackgroundMenu() {
+            const ref = document.getElementById('menuToggleEffects');
+            if (!ref) { setTimeout(injectBackgroundMenu, 600); return; }
+            if (document.getElementById('menuBgItem')) return;
+            const item = document.createElement('div');
+            item.id = 'menuBgItem';
+            item.className = ref.className || '';
+            item.style.cssText = ref.style.cssText;
+            item.textContent = '🎨 背景';
+            item.onclick = openBackgroundSettings;
+            ref.parentNode.insertBefore(item, ref.nextSibling);
+        }
+
+        window.openBackgroundSettings = openBackgroundSettings;
+        window.applyUserBackground = applyUserBackground;
+        window.injectBackgroundMenu = injectBackgroundMenu;
+
         // ==================== 密码验证 ====================
         // 密码存储在localStorage中，支持管理员动态管理
         const PASSWORDS_STORAGE_KEY = 'TFJL_AdminPasswords';
