@@ -14239,8 +14239,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 let x = Math.round(r.left - w - 10);
                 if (x < 84) x = 84; // 至少在停靠栏右侧
                 sec.style.left = x + 'px';
-                // 垂直方向与卡槽区对齐（在"出战选择"标题之下），高度到手册区上方为止
-                const top = Math.max(60, Math.round(r.top));
+                // 🔴 2026-09-18 垂直位置改锚【左侧停靠栏】的当前顶边：两者都是 position:fixed，与页面滚动无关，
+                //    永远齐平且稳定。旧逻辑用 battle-field 的视口 top——页面滚下去后它是负值，
+                //    Math.max(60,...) 直接顶到 60 → 「往下拉到底再点卡类，卡框跑到屏幕最上面」。
+                const dock = document.getElementById('poolTabBar');
+                const dockTop = dock ? dock.getBoundingClientRect().top : r.top;
+                const top = Math.max(60, Math.round(dockTop));
                 sec.style.top = top + 'px';
                 sec.style.maxHeight = Math.max(240, window.innerHeight - top - 140) + 'px';
             } catch (e) {}
@@ -14264,6 +14268,32 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             } catch (e) {}
         }
         window.positionPoolDock = positionPoolDock;
+
+        // ===== 页面滚动下限：往上滚到「项目管理器工具栏」就是顶，不再滚到页头 =====
+        // 用户要求：页头（大标题/欢迎/时钟）不想再看到，向上滚动到 出战选择/项目管理器 那排就停。
+        // 只拦截【向上】滚——向下滚完全自由，避免从页头往下滚时被误拉跳。
+        (function () {
+            let lastY = window.scrollY, locking = false;
+            function floorY() {
+                try {
+                    const el = document.getElementById('scheme1') || document.querySelector('.selection-area');
+                    if (!el) return -1;
+                    return Math.max(0, Math.round(el.getBoundingClientRect().top + window.scrollY) - 6);
+                } catch (e) { return -1; }
+            }
+            window.addEventListener('scroll', function () {
+                const y = window.scrollY;
+                const goingUp = y < lastY - 1;
+                lastY = y;
+                if (locking || !goingUp) return;
+                const limit = floorY();
+                if (limit > 0 && y < limit) {
+                    locking = true;
+                    window.scrollTo(0, limit);
+                    requestAnimationFrame(function () { locking = false; });
+                }
+            }, { passive: true });
+        })();
 
         // 收藏面板：排序模式开关（排序模式下按住卡片拖动调整顺序）
         window.__toggleFavSort = function () {
