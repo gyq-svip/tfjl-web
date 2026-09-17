@@ -1107,14 +1107,14 @@
         </div>
 
 
-        <!-- 卡池分区紧凑 Tab：一行替代 5 条大标题栏，点标签展开/收起（手风琴式） -->
-        <div id="poolTabBar">
-            <button class="pool-tab fav" data-sec="favorite" onclick="togglePoolTab('favorite')">⭐ 收藏</button>
-            <button class="pool-tab gold" data-sec="gold" onclick="togglePoolTab('gold')">🥇 金卡<span class="pool-skin-lock" data-rarity="gold" onclick="togglePoolSkinLock(event,'gold')" title="解锁后右键该分区卡牌可换皮">🔒</span></button>
-            <button class="pool-tab purple" data-sec="purple" onclick="togglePoolTab('purple')">🥈 紫卡<span class="pool-skin-lock" data-rarity="purple" onclick="togglePoolSkinLock(event,'purple')" title="解锁后右键该分区卡牌可换皮">🔒</span></button>
-            <button class="pool-tab blue" data-sec="blue" onclick="togglePoolTab('blue')">🥉 蓝卡<span class="pool-skin-lock" data-rarity="blue" onclick="togglePoolSkinLock(event,'blue')" title="解锁后右键该分区卡牌可换皮">🔒</span></button>
-            <button class="pool-tab green" data-sec="green" onclick="togglePoolTab('green')">🌿 绿卡<span class="pool-skin-lock" data-rarity="green" onclick="togglePoolSkinLock(event,'green')" title="解锁后右键该分区卡牌可换皮">🔒</span></button>
-            <span class="pool-tab-hint">点卡片上的⭐添加/删除收藏</span>
+        <!-- 卡池左侧停靠栏：点分类弹出选卡浮层（卡可拖进卡槽，落槽自动进手牌），可收起 -->
+        <div id="poolTabBar" title="卡池：点分类弹出选卡浮层，卡可直接拖进卡槽">
+            <button class="pool-dock-toggle" id="poolDockToggleBtn" onclick="window.__togglePoolDock()" title="收起/展开卡池栏">◀</button>
+            <button class="pool-tab fav" data-sec="favorite" onclick="togglePoolTab('favorite')" title="收藏">⭐<span>收藏</span></button>
+            <button class="pool-tab gold" data-sec="gold" onclick="togglePoolTab('gold')" title="金卡类">🥇<span>金卡</span><span class="pool-skin-lock" data-rarity="gold" onclick="togglePoolSkinLock(event,'gold')" title="解锁后右键该分区卡牌可换皮">🔒</span></button>
+            <button class="pool-tab purple" data-sec="purple" onclick="togglePoolTab('purple')" title="紫卡类">🥈<span>紫卡</span><span class="pool-skin-lock" data-rarity="purple" onclick="togglePoolSkinLock(event,'purple')" title="解锁后右键该分区卡牌可换皮">🔒</span></button>
+            <button class="pool-tab blue" data-sec="blue" onclick="togglePoolTab('blue')" title="蓝卡类">🥉<span>蓝卡</span><span class="pool-skin-lock" data-rarity="blue" onclick="togglePoolSkinLock(event,'blue')" title="解锁后右键该分区卡牌可换皮">🔒</span></button>
+            <button class="pool-tab green" data-sec="green" onclick="togglePoolTab('green')" title="绿卡类">🌿<span>绿卡</span><span class="pool-skin-lock" data-rarity="green" onclick="togglePoolSkinLock(event,'green')" title="解锁后右键该分区卡牌可换皮">🔒</span></button>
         </div>
 
         <div class="collapsible-section favorite">
