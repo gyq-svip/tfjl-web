@@ -1095,7 +1095,7 @@
             position: fixed;
             left: 82px;
             top: 60px;
-            width: 288px;
+            width: 232px;
             max-width: calc(100vw - 96px);
             max-height: calc(100vh - 240px);
             overflow: auto;
@@ -1108,13 +1108,13 @@
         .collapsible-section .profession-section h4 { font-size: 0.78rem; margin: 6px 0 4px; }
         .collapsible-section .cards-grid {
             display: grid !important;
-            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)) !important;
+            grid-template-columns: repeat(3, 1fr) !important;
             gap: 6px !important;
         }
         .collapsible-section .card-item { width: auto !important; min-width: 0 !important; max-width: none !important; }
         .collapsible-section #favoriteCardsGrid {
             display: grid !important;
-            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)) !important;
+            grid-template-columns: repeat(3, 1fr) !important;
             gap: 6px !important;
         }
         @media (max-width: 768px) {
