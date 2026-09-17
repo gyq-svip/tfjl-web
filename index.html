@@ -1107,6 +1107,16 @@
         </div>
 
 
+        <!-- 卡池分区紧凑 Tab：一行替代 5 条大标题栏，点标签展开/收起（手风琴式） -->
+        <div id="poolTabBar">
+            <button class="pool-tab fav" data-sec="favorite" onclick="togglePoolTab('favorite')">⭐ 收藏</button>
+            <button class="pool-tab gold" data-sec="gold" onclick="togglePoolTab('gold')">🥇 金卡<span class="pool-skin-lock" data-rarity="gold" onclick="togglePoolSkinLock(event,'gold')" title="解锁后右键该分区卡牌可换皮">🔒</span></button>
+            <button class="pool-tab purple" data-sec="purple" onclick="togglePoolTab('purple')">🥈 紫卡<span class="pool-skin-lock" data-rarity="purple" onclick="togglePoolSkinLock(event,'purple')" title="解锁后右键该分区卡牌可换皮">🔒</span></button>
+            <button class="pool-tab blue" data-sec="blue" onclick="togglePoolTab('blue')">🥉 蓝卡<span class="pool-skin-lock" data-rarity="blue" onclick="togglePoolSkinLock(event,'blue')" title="解锁后右键该分区卡牌可换皮">🔒</span></button>
+            <button class="pool-tab green" data-sec="green" onclick="togglePoolTab('green')">🌿 绿卡<span class="pool-skin-lock" data-rarity="green" onclick="togglePoolSkinLock(event,'green')" title="解锁后右键该分区卡牌可换皮">🔒</span></button>
+            <span class="pool-tab-hint">点卡片上的⭐添加/删除收藏</span>
+        </div>
+
         <div class="collapsible-section favorite">
             <div class="collapsible-header favorite" onclick="toggleSection(this)">
                 <h3><span>⭐</span> 收藏 <span class="small-text">（点击卡片上的⭐添加/删除）</span></h3>
