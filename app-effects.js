@@ -212,9 +212,35 @@
                 { name: '星河', css: 'radial-gradient(ellipse at 50% 0%,#1b2735 0%,#090a0f 100%)', anim: 'stars' }
             ]
         };
-        // 内置默认背景图（固化在仓库里，随网页分发；用户一键选用，不占本机存储）
-        // 格式：{ name: '名字', url: '相对/绝对图片地址' }。用户给图后在此追加即可（目标 5 个：深海/极光/星河 + 2 张图）
-        const BG_BUILTIN = [];
+        // 内置默认背景图（固化在仓库里，随网页分发；用户一键选用，不占本机存储；可删除）
+        // 用户指定的 6 张图（已复制到仓库 bg/ 目录）：城市 / 卡通美女 / 美女1~3 / 星空
+        const BG_BUILTIN = [
+            { name: '城市', url: 'bg/bg-city.jpg' },
+            { name: '卡通美女', url: 'bg/bg-cartoon.jpg' },
+            { name: '美女1', url: 'bg/bg-girl1.jpg' },
+            { name: '美女2', url: 'bg/bg-girl2.jpg' },
+            { name: '美女3', url: 'bg/bg-girl3.jpg' },
+            { name: '星空', url: 'bg/bg-starry.png' }
+        ];
+        // 被用户删除的内置图（存 url 列表），渲染时过滤
+        function bgHiddenBuiltins() {
+            try { return JSON.parse(localStorage.getItem('TFJL_BG_HIDE_BUILTIN') || '[]'); } catch (e) { return []; }
+        }
+        window.__bgHideBuiltin = function (url) {
+            if (!window.confirm('删除这张内置背景图？（本机不再显示，重装/清缓存可恢复）')) return;
+            const list = bgHiddenBuiltins();
+            if (list.indexOf(url) < 0) list.push(url);
+            localStorage.setItem('TFJL_BG_HIDE_BUILTIN', JSON.stringify(list));
+            if ((localStorage.getItem(BG_KEY) || '').trim() === 'builtin:' + url) {
+                localStorage.setItem(BG_KEY, 'default');
+                applyUserBackground();
+            }
+            if (typeof openBackgroundSettings === 'function') openBackgroundSettings();
+        };
+        window.__bgCloseSettings = function () {
+            const m = document.getElementById('bgSettingsModal');
+            if (m) m.remove();
+        };
         // 随机渐变用的协调浅色板
         const SOFT_PALETTE = ['#e0eafc','#cfdef3','#e6e6fa','#d8d8f6','#ffeef8','#ffd6e8','#e8f5e9','#c8e6c9','#fdfbfb','#ebedee','#fbc2eb','#a6c1ee','#a1c4fd','#c2e9fb','#fff1eb','#ace0f9'];
         let bgSelectedColors = [];
@@ -663,10 +689,17 @@
             });
             rows.push('</div>');
             if (BG_BUILTIN.length) {
-                rows.push('<div style="color:rgba(255,255,255,0.55);font-size:0.78rem;margin:12px 0 6px;">🖼️ 内置背景图</div>');
+                const hidden = bgHiddenBuiltins();
+                rows.push('<div style="color:rgba(255,255,255,0.55);font-size:0.78rem;margin:12px 0 6px;">🖼️ 内置背景图（右上角 ✕ 可删除）</div>');
+                rows.push('<div style="display:flex;flex-wrap:wrap;gap:8px;">');
                 BG_BUILTIN.forEach(function (b) {
-                    rows.push('<button onclick="window.__setBgBuiltin(\'' + b.url + '\')" style="margin:4px;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background-image:url(' + b.url + ');background-size:cover;background-position:center;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.85);cursor:pointer;font-size:0.8rem;min-width:96px;min-height:40px;">' + b.name + '</button>');
+                    if (hidden.indexOf(b.url) >= 0) return;
+                    rows.push('<div style="position:relative;">' +
+                        '<button onclick="window.__setBgBuiltin(\'' + b.url + '\')" style="padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background-image:url(' + b.url + ');background-size:cover;background-position:center;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.85);cursor:pointer;font-size:0.8rem;min-width:96px;min-height:40px;">' + b.name + '</button>' +
+                        '<button onclick="window.__bgHideBuiltin(\'' + b.url + '\')" title="删除" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#e53935;border:none;color:#fff;font-size:0.66rem;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.5);">✕</button>' +
+                        '</div>');
                 });
+                rows.push('</div>');
             }
             const overlayOn = localStorage.getItem(BG_OVERLAY_ON) === '1';
             const blurVal = readLevel(BG_BLUR_KEY);
@@ -677,7 +710,7 @@
             modal.innerHTML = '' +
                 '<div id="bgSettingsHeader" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;cursor:move;user-select:none;">' +
                 '  <span style="color:#ffd700;font-size:1.1rem;font-weight:bold;">🎨 背景设置</span>' +
-                '  <button onclick="document.getElementById(\'bgSettingsModal\').remove()" title="关闭" style="background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;">✕</button>' +
+                '  <button onclick="window.__bgCloseSettings()" onmousedown="event.stopPropagation()" title="关闭" style="background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;">✕</button>' +
                 '</div>' +
                 '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.82rem;color:rgba(255,255,255,0.85);cursor:pointer;">' +
                 '  <input type="checkbox" id="bgOverlaySwitch"' + (overlayOn ? ' checked' : '') + ' onchange="window.__bgToggleOverlay(this.checked)">' +
@@ -723,11 +756,10 @@
                 '      📤 上传图片/视频<input type="file" accept="image/*,video/mp4,video/webm" style="display:none;" onchange="window.__bgFile(this.files[0])">' +
                 '    </label>' +
                 '    <button onclick="window.__setBgPreset(\'default\')" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.85rem;">↺ 恢复默认</button>' +
-                '    <button onclick="toggleVisualEffects()" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.85rem;">✨ 炫酷特效</button>' +
                 '  </div>' +
-                '  <div style="margin-top:12px;color:rgba(255,255,255,0.4);font-size:0.72rem;">提示：选「炫酷」预设并开特效，粒子叠在背景上更带感；浅色背景可能让部分浅色文字变淡，可勾选上方「背景协调压暗」。</div>';
+                '  <div style="margin-top:12px;color:rgba(255,255,255,0.4);font-size:0.72rem;">提示：极光/星河为动态渐变背景；浅色背景可能让部分浅色文字变淡，可勾选上方「背景协调压暗」。</div>';
             document.body.appendChild(modal);
-            // 悬浮窗拖拽（仅标题栏拖动，点外部不关闭，需手动点 ✕）
+            // 悬浮窗拖拽（仅标题栏空白区拖动；按钮内点击不触发拖拽，避免关闭时窗体被拖走）
             try {
                 const hdr = document.getElementById('bgSettingsHeader');
                 let dragging = false, offX = 0, offY = 0;
@@ -737,8 +769,8 @@
                     offX = cx - r.left; offY = cy - r.top;
                     modal.style.right = 'auto'; modal.style.bottom = 'auto';
                 }
-                hdr.addEventListener('mousedown', function (e) { startDrag(e.clientX, e.clientY); e.preventDefault(); });
-                window.addEventListener('mousemove', function (e) { if (dragging) { modal.style.left = (e.clientX - offX) + 'px'; modal.style.top = (e.clientY - offY) + 'px'; } });
+                hdr.addEventListener('mousedown', function (e) { if (e.target.closest('button')) return; startDrag(e.clientX, e.clientY); });
+                window.addEventListener('mousemove', function (e) { if (dragging && modal.isConnected) { modal.style.left = (e.clientX - offX) + 'px'; modal.style.top = (e.clientY - offY) + 'px'; } });
                 window.addEventListener('mouseup', function () { dragging = false; });
                 hdr.addEventListener('touchstart', function (e) { const t = e.touches[0]; startDrag(t.clientX, t.clientY); }, { passive: true });
                 window.addEventListener('touchmove', function (e) { if (dragging) { const t = e.touches[0]; modal.style.left = (t.clientX - offX) + 'px'; modal.style.top = (t.clientY - offY) + 'px'; } }, { passive: true });

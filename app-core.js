@@ -12393,7 +12393,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 removeCardFromSlot(slotId);
             }
 
-            if (source === 'pool') {
+            if (source === 'pool' || source === 'favorite') {
                 const targetHand = isUserSlot ? myHandCards : teammateHandCards;
                 if (targetHand.length >= MAX_HAND_CARDS) return;
                 
