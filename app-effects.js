@@ -225,6 +225,13 @@
         const SOFT_PALETTE = ['#e0eafc','#cfdef3','#e6e6fa','#d8d8f6','#ffeef8','#ffd6e8','#e8f5e9','#c8e6c9','#fdfbfb','#ebedee','#fbc2eb','#a6c1ee','#a1c4fd','#c2e9fb','#fff1eb','#ace0f9'];
         let bgSelectedColors = [];
         const BG_KEY = 'TFJL_User_BG';
+        const BG_OVERLAY_ON = 'TFJL_BG_OVERLAY_ON';
+
+        window.__bgToggleOverlay = function (on) {
+            localStorage.setItem(BG_OVERLAY_ON, on ? '1' : '0');
+            applyUserBackground();
+            try { if (typeof showToast === 'function') showToast(on ? '✅ 已开启背景压暗' : '已关闭背景压暗'); } catch (e) {}
+        };
 
         function getBgOverlayForValue(val) {
             if (!val || val === 'default') return 0;
@@ -270,7 +277,9 @@
                 document.body.style.background = val.slice(5);
                 document.body.style.backgroundAttachment = 'fixed';
             }
-            document.body.style.setProperty('--bg-overlay', String(getBgOverlayForValue(val)));
+            let ov = 0;
+            if (localStorage.getItem(BG_OVERLAY_ON) === '1') ov = getBgOverlayForValue(val);
+            document.body.style.setProperty('--bg-overlay', String(ov));
         }
 
         // 上传图片：canvas 压缩到最长边 1920px、JPEG 0.8，避免超 localStorage 配额 / 拖慢加载
@@ -302,10 +311,9 @@
         window.__setBgPreset = function (name) {
             localStorage.setItem(BG_KEY, name === 'default' ? 'default' : 'preset:' + name);
             applyUserBackground();
-            const m = document.getElementById('bgSettingsModal'); if (m) m.remove();
             try { if (typeof showToast === 'function') showToast('✅ 背景已切换'); } catch (e) {}
         };
-        window.__bgFile = function (file) { handleBgFile(file); const m = document.getElementById('bgSettingsModal'); if (m) m.remove(); };
+        window.__bgFile = function (file) { handleBgFile(file); };
 
         // ---------- 圆盘选色器：多选浅色生成渐变 ----------
         function addBgColor(hex) {
@@ -334,7 +342,7 @@
             if (!bgSelectedColors.length) return;
             document.body.style.background = buildGrad(bgSelectedColors);
             document.body.style.backgroundAttachment = 'fixed';
-            document.body.style.setProperty('--bg-overlay', '0.35');
+            document.body.style.setProperty('--bg-overlay', localStorage.getItem(BG_OVERLAY_ON) === '1' ? '0.35' : '0');
         }
         window.__bgRemoveColor = function (i) {
             bgSelectedColors.splice(i, 1);
@@ -347,7 +355,6 @@
             const css = buildGrad(bgSelectedColors);
             localStorage.setItem(BG_KEY, 'grad:' + css);
             applyUserBackground();
-            const m = document.getElementById('bgSettingsModal'); if (m) m.remove();
             try { if (typeof showToast === 'function') showToast('✅ 渐变背景已应用'); } catch (e) {}
         };
         window.__bgRandomGrad = function () {
@@ -374,16 +381,19 @@
                     rows.push('<button onclick="window.__setBgPreset(\'' + p.name + '\')" style="margin:4px;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:' + p.css + ';color:' + (p.anim ? '#fff' : '#1a1a2e') + ';cursor:pointer;font-size:0.8rem;text-shadow:' + (p.anim ? '0 1px 2px rgba(0,0,0,0.5)' : 'none') + ';">' + p.name + '</button>');
                 });
             }
+            const overlayOn = localStorage.getItem(BG_OVERLAY_ON) === '1';
             const modal = document.createElement('div');
             modal.id = 'bgSettingsModal';
-            modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100000;display:flex;align-items:center;justify-content:center;';
+            modal.style.cssText = 'position:fixed;top:78px;right:18px;width:332px;max-width:92vw;z-index:100000;background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:14px 16px 16px;max-height:86vh;overflow:auto;box-shadow:0 12px 44px rgba(0,0,0,0.6);';
             modal.innerHTML = '' +
-                '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:22px;max-width:500px;width:92%;max-height:88vh;overflow:auto;">' +
-                '  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
-                '    <span style="color:#ffd700;font-size:1.1rem;font-weight:bold;">🎨 背景设置</span>' +
-                '    <button onclick="document.getElementById(\'bgSettingsModal\').remove()" style="background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;">✕</button>' +
-                '  </div>' +
-                '  <div style="color:rgba(255,255,255,0.5);font-size:0.74rem;margin-bottom:6px;">上传图片会自动压缩到最长边 1920px（无需操心尺寸），存在本机、每台设备独立。</div>' +
+                '<div id="bgSettingsHeader" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;cursor:move;user-select:none;">' +
+                '  <span style="color:#ffd700;font-size:1.1rem;font-weight:bold;">🎨 背景设置</span>' +
+                '  <button onclick="document.getElementById(\'bgSettingsModal\').remove()" title="关闭" style="background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;">✕</button>' +
+                '</div>' +
+                '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.82rem;color:rgba(255,255,255,0.85);cursor:pointer;">' +
+                '  <input type="checkbox" id="bgOverlaySwitch"' + (overlayOn ? ' checked' : '') + ' onchange="window.__bgToggleOverlay(this.checked)">' +
+                '  背景协调压暗（开启后浅色背景自动压暗，深色不影响）</label>' +
+                '<div style="color:rgba(255,255,255,0.5);font-size:0.74rem;margin-bottom:6px;">上传图片会自动压缩到最长边 1920px（无需操心尺寸），存在本机、每台设备独立。</div>' +
                 rows.join('') +
                 '  <div style="border-top:1px solid rgba(255,255,255,0.12);margin-top:14px;padding-top:12px;">' +
                 '    <div style="color:rgba(255,255,255,0.6);font-size:0.78rem;margin-bottom:8px;">🎨 圆盘自选渐变：用现有圆盘选色器，拖到亮处选浅色，松手即加入（最多 5 个）</div>' +
@@ -409,12 +419,27 @@
                 '      📤 上传图片<input type="file" accept="image/*" style="display:none;" onchange="window.__bgFile(this.files[0])">' +
                 '    </label>' +
                 '    <button onclick="window.__setBgPreset(\'default\')" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.85rem;">↺ 恢复默认</button>' +
-                '    <button onclick="toggleVisualEffects()" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.85rem;">✨ 炫酷特效开关</button>' +
+                '    <button onclick="toggleVisualEffects()" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.85rem;">✨ 炫酷特效</button>' +
                 '  </div>' +
-                '  <div style="margin-top:12px;color:rgba(255,255,255,0.4);font-size:0.72rem;">提示：选「炫酷」预设并开特效，粒子叠在背景上更带感；浅色背景可能让部分浅色文字变淡，可随时恢复默认。</div>' +
-                '</div>';
+                '  <div style="margin-top:12px;color:rgba(255,255,255,0.4);font-size:0.72rem;">提示：选「炫酷」预设并开特效，粒子叠在背景上更带感；浅色背景可能让部分浅色文字变淡，可勾选上方「背景协调压暗」。</div>';
             document.body.appendChild(modal);
-            modal.addEventListener('click', function (e) { if (e.target === modal) modal.remove(); });
+            // 悬浮窗拖拽（仅标题栏拖动，点外部不关闭，需手动点 ✕）
+            try {
+                const hdr = document.getElementById('bgSettingsHeader');
+                let dragging = false, offX = 0, offY = 0;
+                function startDrag(cx, cy) {
+                    dragging = true;
+                    const r = modal.getBoundingClientRect();
+                    offX = cx - r.left; offY = cy - r.top;
+                    modal.style.right = 'auto'; modal.style.bottom = 'auto';
+                }
+                hdr.addEventListener('mousedown', function (e) { startDrag(e.clientX, e.clientY); e.preventDefault(); });
+                window.addEventListener('mousemove', function (e) { if (dragging) { modal.style.left = (e.clientX - offX) + 'px'; modal.style.top = (e.clientY - offY) + 'px'; } });
+                window.addEventListener('mouseup', function () { dragging = false; });
+                hdr.addEventListener('touchstart', function (e) { const t = e.touches[0]; startDrag(t.clientX, t.clientY); }, { passive: true });
+                window.addEventListener('touchmove', function (e) { if (dragging) { const t = e.touches[0]; modal.style.left = (t.clientX - offX) + 'px'; modal.style.top = (t.clientY - offY) + 'px'; } }, { passive: true });
+                window.addEventListener('touchend', function () { dragging = false; });
+            } catch (e) {}
             renderBgColorList();
             try {
                 if (window.NBPC && NBPC.Wheel) {
