@@ -11521,6 +11521,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(() => {});
             // 同步刷新顶部「搜索选卡」按钮栏的卡数统计
             if (typeof refreshPoolCardCount === 'function') refreshPoolCardCount();
+            // 有收藏时显示「拖到卡槽 / 排序」提示条
+            syncFavTipVisible();
         }
         
         // 设置常用卡拖拽
@@ -14297,7 +14299,38 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         window.addEventListener('resize', function () {
             const openHdr = document.querySelector('.collapsible-section .collapsible-header.open');
             if (openHdr) { const sec = openHdr.closest('.collapsible-section'); if (sec) positionPoolPanel(sec); }
+            positionPoolDock();
         });
+        // 停靠栏顶部锚到「出战选择/卡槽区」顶部之下，底部不够放时内部滚动（紫卡/蓝卡/绿卡不再被截断）
+        function positionPoolDock() {
+            try {
+                const dock = document.getElementById('poolTabBar');
+                const bf = document.querySelector('.battle-field');
+                if (!dock || !bf) return;
+                const top = Math.max(60, Math.round(bf.getBoundingClientRect().top));
+                dock.style.top = top + 'px';
+                dock.style.transform = 'none';
+                dock.style.maxHeight = 'calc(100vh - ' + (top + 12) + 'px)';
+                dock.style.overflowY = 'auto';
+            } catch (e) {}
+        }
+        window.positionPoolDock = positionPoolDock;
+
+        // 收藏面板：排序模式开关（排序模式下按住卡片拖动调整顺序）
+        window.__toggleFavSort = function () {
+            const grid = document.getElementById('favoriteCardsGrid');
+            if (!grid) return;
+            const on = grid.classList.toggle('sort-mode');
+            const btn = document.getElementById('favSortBtn');
+            if (btn) btn.textContent = on ? '✅ 完成' : '✏️ 排序';
+            const hint = document.getElementById('favSortHint');
+            if (hint) hint.style.display = on ? '' : 'none';
+        };
+        function syncFavTipVisible() {
+            const tip = document.getElementById('favPanelTip');
+            if (!tip) return;
+            tip.style.display = document.querySelector('#favoriteCardsGrid .card-item') ? 'flex' : 'none';
+        }
         function renderProfDrawer(sec, name) {
             const box = document.getElementById('poolDrawer');
             if (!box) return;
@@ -14926,6 +14959,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
             if (typeof syncPoolBodyClass === 'function') syncPoolBodyClass();
             if (typeof syncPoolTabs === 'function') syncPoolTabs();
+            // 布局稳定后把停靠栏/卡框锚到卡槽区（字体加载会改变高度，延迟两次校准）
+            setTimeout(function () { if (typeof positionPoolDock === 'function') positionPoolDock(); }, 200);
+            setTimeout(function () { if (typeof positionPoolDock === 'function') positionPoolDock(); }, 900);
 
             // 恢复记事本折叠状态
             const notepadOpen = localStorage.getItem('tdjl_notepad_open');
