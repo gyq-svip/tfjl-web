@@ -2192,6 +2192,20 @@
                     </div>
                 </div>
                 <div class="admin-section">
+                    <h3>🧊 欢迎弹窗文案（网页版首次/每大版本弹出）</h3>
+                    <div class="admin-form-row">
+                        <div>
+                            <label>标题</label>
+                            <input type="text" id="adminWelcomeTitle" placeholder="欢迎来到塔防精灵助手">
+                        </div>
+                    </div>
+                    <label>功能说明（每行一条，行首可写图标，如「📂 项目管理」）</label>
+                    <textarea id="adminWelcomeContent" placeholder="📂 项目管理 — 脚本分类存储，支持脚本、图片、阵容、记事本&#10;📜 脚本文件 — 解析到手牌，支持拖拽、分享到需求墙" style="min-height:120px;"></textarea>
+                    <div style="text-align:right;">
+                        <button class="admin-btn admin-btn-primary" onclick="adminSaveWelcome()">保存欢迎词</button>
+                    </div>
+                </div>
+                <div class="admin-section">
                     <h3>📋 公告列表</h3>
                     <div style="text-align:right;margin-bottom:10px;">
                         <button class="admin-btn admin-btn-secondary" onclick="adminRefreshNews()" style="font-size:0.8rem;">🔄 刷新列表</button>

@@ -30466,6 +30466,60 @@ ${maSection}
             }
         }
 
+        // ==================== 欢迎弹窗文案（可后台编辑；存公告 Gist 的 category='welcome' 项） ====================
+        // 普通用户端 showWelcomeGuide 经 window.getWelcomeGuideData() 读取（公开仓库/缓存，无需 token）
+        window.getWelcomeGuideData = async function () {
+            let list = null;
+            try { if (typeof newsItems !== 'undefined' && Array.isArray(newsItems) && newsItems.length) list = newsItems; } catch (e) {}
+            if (!list) {
+                try { const c = localStorage.getItem(NEWS_CACHE_KEY); if (c) list = JSON.parse(c); } catch (e) {}
+            }
+            if (!list) {
+                try { list = await fetchNewsFromGitHub(); } catch (e) {}
+            }
+            if (!Array.isArray(list)) return null;
+            const w = list.find(n => n && n.category === 'welcome');
+            return w ? { title: w.name, content: (w.content || '').replace(/\r/g, '') } : null;
+        };
+
+        function loadWelcomeEditor() {
+            const w = (Array.isArray(newsItems) ? newsItems : []).find(n => n.category === 'welcome');
+            const t = document.getElementById('adminWelcomeTitle');
+            const c = document.getElementById('adminWelcomeContent');
+            if (t) t.value = w ? (w.name || '') : '';
+            if (c) c.value = w ? (w.content || '').replace(/\r/g, '') : '';
+        }
+
+        async function adminSaveWelcome() {
+            const tEl = document.getElementById('adminWelcomeTitle');
+            const cEl = document.getElementById('adminWelcomeContent');
+            if (!tEl || !cEl) return;
+            const title = tEl.value.trim();
+            const content = cEl.value;
+            if (!content.trim()) { showAdminStatus('请输入欢迎词内容', 'error'); return; }
+            try {
+                const newsData = await adminFetchNewsFromGist();
+                const idx = newsData.findIndex(n => n.category === 'welcome');
+                const item = {
+                    category: 'welcome',
+                    name: title || '欢迎来到塔防精灵助手',
+                    content: content,
+                    author: 'gyq',
+                    publish_time: new Date().toISOString().substring(0, 19).replace('T', ' '),
+                    permanent: true
+                };
+                if (idx >= 0) newsData[idx] = item; else newsData.unshift(item);
+                await adminSaveNewsToGist(newsData);
+                newsItems = newsData;
+                localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(newsItems));
+                initMarquee();
+                loadWelcomeEditor();
+                showAdminStatus('欢迎词已保存（全网生效）', 'success');
+            } catch (e) {
+                showAdminStatus('保存失败: ' + (e && e.message || e), 'error');
+            }
+        }
+
         async function adminRefreshNews() {
             const listEl = document.getElementById('adminNewsList');
             listEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;">加载中...</div>';
@@ -30499,6 +30553,7 @@ ${maSection}
                     listEl.insertAdjacentHTML('afterbegin', '<div style="color:#f59e0b;text-align:center;padding:8px;font-size:0.8rem;">⚠️ 网络不可用，显示默认公告</div>');
                 }
             }
+            loadWelcomeEditor();
         }
 
         function renderAdminNewsList(newsData) {
