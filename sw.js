@@ -58,8 +58,8 @@
 //      版本号采用 CI 的 `s1.0.337` + `s20260826-1804`。线上立刻能看到「前台只弹气泡，挂托盘才静默升」正确行为。
 // ============================================================
 
-const CACHE_VERSION = 's1.1.26';
-const DEPLOY_TAG = 's20260917-1850';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」)
+const CACHE_VERSION = 's1.1.5';
+const DEPLOY_TAG = 's20260915-1346';  // 部署时由 deploy.yml python 脚本注入为 's20260824-HHMM'（北京时区），SW_VERSION 消息携带到页面，根治「版本号日期消失」)
 const CACHE_RUNTIME = CACHE_VERSION + '-runtime';
 
 // 不缓存的路径（Gist API、计数器等需要实时数据）
@@ -75,12 +75,10 @@ const NEVER_CACHE = [
 // 实现「页面一直开着不 reload 也能自动升级」（弥补 register.update() 只在 load 时触发、开着不动不升的缺口）。
 const ONLINE_SW_URL = 'https://gyq-svip.github.io/tfjl-web/sw.js';
 
-// 从 CACHE_VERSION（形如 's1.1.314'）解析为可比较数值：major*1e6 + minor*1e3 + patch。
-// 支持语义化逐级递增（s1.1.x → s1.2.x → s1.3.x → s2.0.x），不再只取末尾数字（否则 s1.1.7 会被当成 7，比 s1.0.894 还小 → 版本倒挂）。
+// 从 CACHE_VERSION（形如 's1.0.314'）解析数字尾部，便于比较大小
 function _versionNum(v) {
-    const m = /(\d+)\.(\d+)\.(\d+)/.exec(v || '');
-    if (!m) return -1;
-    return parseInt(m[1], 10) * 1000000 + parseInt(m[2], 10) * 1000 + parseInt(m[3], 10);
+    const m = /(\d+)\s*$/.exec(v || '');
+    return m ? parseInt(m[1], 10) : -1;
 }
 
 // 读索引 Gist 的 forceReloadEnabled（用 api.github.com 读公开 gist，无需 token；raw gist.githubusercontent.com 路径易 404 导致误判开关关闭 → 永不升级）。

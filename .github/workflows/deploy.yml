@@ -47,7 +47,7 @@ jobs:
           cp -v loader.js modules.manifest.json _site/ 2>/dev/null || true
 
           # 更新元数据（App 更新器读取）
-          cp -v updater.json version.json _site/ 2>/dev/null || true
+          cp -v updater.json version.json welcome.json _site/ 2>/dev/null || true
           # 皮肤包索引（客户端据此得知当前有效包名，再从 Gitee 发行版拉取对应皮肤包）
           cp -v skins-index.json _site/ 2>/dev/null || true
 
