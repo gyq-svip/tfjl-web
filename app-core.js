@@ -11476,6 +11476,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             html += '</div>';
             
             grid.innerHTML = html;
+            // 🔴 JS 内联兜底（防 SW 旧 CSS 缓存吞掉新样式）：2 列大卡 + 卡高与卡池一致
+            grid.style.gridTemplateColumns = 'repeat(2, 1fr)';
+            grid.style.gap = '8px';
+            grid.querySelectorAll('.card-item').forEach(c => { c.style.minHeight = '72px'; c.style.fontSize = '0.82rem'; });
             
             // 添加事件监听
             grid.querySelectorAll('.card-item').forEach(card => {
@@ -11523,6 +11527,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (typeof refreshPoolCardCount === 'function') refreshPoolCardCount();
             // 有收藏时显示「拖到卡槽 / 排序」提示条
             syncFavTipVisible();
+            // 🔴 关键：动态渲染的收藏卡默认 draggable=false，原生拖拽（排序/拖到卡槽）根本启动不了
+            //    必须每次渲染后重设 draggable=true 并绑定 dragstart 载荷
+            if (typeof setupFavoriteCardDrag === 'function') setupFavoriteCardDrag();
         }
         
         // 设置常用卡拖拽
@@ -14286,6 +14293,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const bf = document.querySelector('.battle-field');
                 if (!bf) return;
                 const r = bf.getBoundingClientRect();
+                // 收藏面板宽一些（2 列大卡），JS 内联兜底防旧 CSS 缓存
+                sec.style.width = (sec.classList.contains('favorite') ? 252 : 232) + 'px';
                 const w = sec.offsetWidth || 288;
                 let x = Math.round(r.left - w - 10);
                 if (x < 84) x = 84; // 至少在停靠栏右侧
