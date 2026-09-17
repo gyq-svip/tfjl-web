@@ -14289,45 +14289,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         }
         window.positionPoolDock = positionPoolDock;
 
-        // ===== 页面滚动下限：往上滚到「项目管理器工具栏」就是顶，不再滚到页头 =====
-        // 🔴 2026-09-18 重写：上一版只监听 window——但本页真正的滚动容器是 #mainContent
-        //    （见 __tfjlScrollMain 的注释「优先 #mainContent，否则滚 window」），所以钳制完全没生效；
-        //    且 window.scrollTo(0, limit) 在 window 也有少量滚动空间时会把整个页面拽一下 → 反复跳。
-        //    现在两种滚动布局都挂钳制，各自只钳【向上】滚；钳制后把基准 lastY 设为 limit，避免连跳。
-        (function () {
-            let locking = false;
-            function floorFor(scroller) {
-                try {
-                    const t = document.getElementById('scheme1') || document.querySelector('.selection-area');
-                    if (!t) return -1;
-                    if (scroller) {
-                        return Math.max(0, Math.round(t.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop) - 6);
-                    }
-                    return Math.max(0, Math.round(t.getBoundingClientRect().top + window.scrollY) - 6);
-                } catch (e) { return -1; }
-            }
-            function attach(scroller) {
-                const isEl = !!scroller;
-                const target = isEl ? scroller : window;
-                let lastY = isEl ? scroller.scrollTop : window.scrollY;
-                target.addEventListener('scroll', function () {
-                    const y = isEl ? scroller.scrollTop : window.scrollY;
-                    const goingUp = y < lastY - 1;
-                    lastY = y;
-                    if (locking || !goingUp) return;
-                    const limit = floorFor(scroller);
-                    if (limit > 0 && y < limit) {
-                        locking = true;
-                        lastY = limit; // 钳制落点作为新基准，防止惯性滚动在边界反复拉跳
-                        if (isEl) scroller.scrollTop = limit; else window.scrollTo(0, limit);
-                        setTimeout(function () { locking = false; }, 60);
-                    }
-                }, { passive: true });
-            }
-            const mc = document.getElementById('mainContent');
-            if (mc) attach(mc);
-            attach(null);
-        })();
+        // 🔴 2026-09-18 滚动下限钳制【已整体移除】：事件钳制在真实环境（sticky 头部 + 滚动容器 + 惯性滚动）
+        //    下必然出现「滚不动 / 反复跳」。改为结构性方案——styles.css 直接 display:none 掉 #fixedHeader
+        //    （标题/公告/时钟，纯展示无功能控件），页面顶部就是「项目管理器工具栏」，
+        //    向上滚自然到顶即停，零 JS 干预、零跳动。看全部公告仍可走 showNewsListModal()。
 
         // 收藏面板：排序模式开关（排序模式下按住卡片拖动调整顺序）
         window.__toggleFavSort = function () {
