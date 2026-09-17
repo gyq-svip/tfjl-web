@@ -1056,14 +1056,14 @@
         /* 隐藏原大标题栏（DOM 保留，JS 兼容）；展开的分区以浮层形式显示，不再占页面流 */
         .collapsible-section > .collapsible-header { display: none !important; }
         .collapsible-section { display: none; }
-        /* 二级抽屉：职业列表（点分类后下拉出现） */
+        /* 二级抽屉：职业列表，锚定在停靠栏当前分类按钮正下方（JS 定位） */
         #poolDrawer {
             display: none;
             position: fixed;
-            left: 76px;
+            left: 8px;
             top: 60px;
             z-index: 9450;
-            width: 112px;
+            width: 66px;
             max-height: calc(100vh - 120px);
             overflow: auto;
             flex-direction: column;
@@ -1072,18 +1072,18 @@
             backdrop-filter: blur(8px);
             border: 1px solid rgba(255,215,0,0.22);
             border-radius: 12px;
-            padding: 6px;
+            padding: 5px;
             box-shadow: 0 8px 24px rgba(0,0,0,0.5);
         }
         .pool-prof {
             border: 1px solid rgba(255,255,255,0.14);
             background: rgba(255,255,255,0.06);
             color: rgba(255,255,255,0.85);
-            font-size: 0.72rem;
-            padding: 6px 5px;
+            font-size: 0.66rem;
+            padding: 5px 3px;
             border-radius: 8px;
             cursor: pointer;
-            text-align: left;
+            text-align: center;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -1091,31 +1091,32 @@
         .pool-prof:hover { background: rgba(255,255,255,0.16); }
         .pool-prof.active { background: linear-gradient(135deg, #ffd700, #ff9800); color: #1a1a2e; font-weight: bold; border-color: transparent; }
 
-        /* 卡片框：固定 4 张一排，贴在左侧，不遮挡右边卡槽/手牌 */
+        /* 卡片框：固定在停靠栏右侧，列数自适应（3~5 张一排），不遮挡右边卡槽/手牌 */
         .collapsible-section:has(> .collapsible-header.open) {
             display: block;
             position: fixed;
-            left: 200px;
+            left: 82px;
             top: 60px;
-            width: min(336px, calc(100vw - 224px));
-            max-height: calc(100vh - 120px);
+            width: 288px;
+            max-width: calc(100vw - 96px);
+            max-height: calc(100vh - 240px);
             overflow: auto;
             z-index: 9400;
             background: linear-gradient(135deg, rgba(20,20,42,0.96), rgba(14,20,42,0.96));
             box-shadow: 0 16px 48px rgba(0,0,0,0.65);
         }
         .collapsible-section .collapsible-content.open { max-height: none; }
-        .collapsible-section .collapsible-inner { padding: 6px 10px 12px; }
-        .collapsible-section .profession-section h4 { font-size: 0.8rem; margin: 6px 0 4px; }
+        .collapsible-section .collapsible-inner { padding: 6px 8px 10px; }
+        .collapsible-section .profession-section h4 { font-size: 0.78rem; margin: 6px 0 4px; }
         .collapsible-section .cards-grid {
             display: grid !important;
-            grid-template-columns: repeat(4, 1fr) !important;
+            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)) !important;
             gap: 6px !important;
         }
         .collapsible-section .card-item { width: auto !important; min-width: 0 !important; max-width: none !important; }
         .collapsible-section #favoriteCardsGrid {
             display: grid !important;
-            grid-template-columns: repeat(4, 1fr) !important;
+            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)) !important;
             gap: 6px !important;
         }
         /* 宽屏：卡片框展开时把主内容整体右推，彻底不遮挡 */
@@ -1125,12 +1126,12 @@
         @media (max-width: 768px) {
             #poolTabBar { left: 4px; padding: 5px 3px; gap: 4px; }
             .pool-tab { width: 46px; font-size: 0.6rem; padding: 5px 2px; }
-            #poolDrawer { left: 58px; width: 92px; top: 54px; }
+            #poolDrawer { left: 4px; width: 52px; top: 54px; }
             .collapsible-section:has(> .collapsible-header.open) {
-                left: 158px;
-                width: calc(100vw - 168px);
+                left: 60px;
+                width: calc(100vw - 70px);
                 top: 54px;
-                max-height: calc(100vh - 110px);
+                max-height: calc(100vh - 200px);
             }
         }
 
