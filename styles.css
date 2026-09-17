@@ -1060,7 +1060,7 @@
             position: fixed;
             left: 8px;
             top: 60px;
-            z-index: 9450;
+            z-index: 9520;
             width: 66px;
             max-height: calc(100vh - 120px);
             overflow: auto;

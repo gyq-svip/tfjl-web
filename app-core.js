@@ -14304,6 +14304,22 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 ps.style.display = (key === 'all' || key === 'p' + i) ? '' : 'none';
             });
         }
+        // 有职业分组时默认选第一个（避免"全部"把卡框撑成一大片遮挡）
+        function poolProfDefaultKey(sec) {
+            return sec.querySelector('.profession-section') ? 'p0' : 'all';
+        }
+        // 卡片框固定锚定在「我的卡槽」(battle-field) 左侧空白区，所有分类都在同一位置
+        function positionPoolPanel(sec) {
+            try {
+                const bf = document.querySelector('.battle-field');
+                if (!bf) return;
+                const r = bf.getBoundingClientRect();
+                const w = sec.offsetWidth || 288;
+                let x = Math.round(r.left - w - 10);
+                if (x < 84) x = 84; // 至少在停靠栏右侧
+                sec.style.left = x + 'px';
+            } catch (e) {}
+        }
         function renderProfDrawer(sec, name) {
             const box = document.getElementById('poolDrawer');
             if (!box) return;
@@ -14313,7 +14329,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 if (t) list.push(t);
             });
             if (!list.length) { closeProfDrawer(); return; }
-            const cur = poolProf[name] || 'all';
+            const cur = poolProf[name] || poolProfDefaultKey(sec);
             let html = '<button class="pool-prof' + (cur === 'all' ? ' active' : '') + '" onclick="window.__pickPoolProf(\'' + name + '\',\'all\')">全部</button>';
             list.forEach(function (t, i) {
                 const key = 'p' + i;
@@ -14336,7 +14352,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         window.__pickPoolProf = function (name, key) {
             poolProf[name] = key;
             const sec = document.querySelector('.collapsible-section.' + name);
-            if (sec) { applyProfFilter(sec, key); renderProfDrawer(sec, name); }
+            if (sec) { applyProfFilter(sec, key); renderProfDrawer(sec, name); positionPoolPanel(sec); }
         };
 
         function togglePoolTab(name) {
@@ -14351,8 +14367,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (h !== header) toggleSection(h);
                 });
                 toggleSection(header);
-                applyProfFilter(sec, poolProf[name] || 'all');
+                const defKey = poolProfDefaultKey(sec);
+                if (poolProf[name] === undefined) poolProf[name] = defKey;
+                applyProfFilter(sec, poolProf[name]);
                 renderProfDrawer(sec, name);
+                positionPoolPanel(sec);
             } else {
                 toggleSection(header);
                 closeProfDrawer();
