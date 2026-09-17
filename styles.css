@@ -994,7 +994,7 @@
         #poolTabBar {
             position: fixed;
             left: 8px;
-            top: 50%;
+            top: calc(50% + 80px);
             transform: translateY(-50%);
             z-index: 9500;
             display: flex;

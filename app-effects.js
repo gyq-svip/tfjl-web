@@ -253,6 +253,8 @@
             const px = blurLevelToPx(lv);
             document.documentElement.style.setProperty('--bg-blur', px + 'px');
             document.body.style.setProperty('--bg-blur', px + 'px');
+            const layer = ensureBgLayer();
+            if (layer) layer.style.filter = 'blur(' + px + 'px)'; // 内联兜底，不依赖 CSS 变量/新样式表
             return lv;
         }
         window.__bgSetBlur = function (v) {
@@ -312,7 +314,7 @@
                 bgRevokeUrl();
                 bgImgUrl = URL.createObjectURL(rec.blob);
                 bgImgId = id;
-                const layer = document.getElementById('bgLayer') || document.body;
+                const layer = ensureBgLayer() || document.body;
                 layer.classList.add('bg-custom');
                 layer.style.background = '';
                 layer.style.backgroundImage = 'url(' + bgImgUrl + ')';
@@ -334,10 +336,23 @@
                 }).catch(function () { localStorage.setItem('TFJL_BG_MIGRATED', '1'); });
         }
 
+        // 背景层关键样式由 JS 内联（防止 SW 缓存不同步：新 HTML/JS + 旧 styles.css 时层没有定位样式 → 背景画了也看不见）
+        function ensureBgLayer() {
+            const layer = document.getElementById('bgLayer');
+            if (!layer) return null;
+            if (!layer.dataset.bgStyled) {
+                layer.style.cssText = 'position:fixed;top:-40px;left:-40px;right:-40px;bottom:-40px;z-index:-2;' +
+                    'background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);' +
+                    'background-size:cover;background-position:center;background-repeat:no-repeat;pointer-events:none;';
+                layer.dataset.bgStyled = '1';
+            }
+            return layer;
+        }
+
         function applyUserBackground() {
             if (!bgMigrateTried) { bgMigrateTried = true; try { migrateLegacyCustomBg(); } catch (e) {} }
             // 背景统一画在独立层 #bgLayer 上（支持 filter 模糊）；body 只留兜底底色
-            const layer = document.getElementById('bgLayer') || document.body;
+            const layer = ensureBgLayer() || document.body;
             document.body.classList.remove('bg-custom', 'bg-anim-aurora', 'bg-anim-neon', 'bg-anim-stars');
             layer.classList.remove('bg-custom', 'bg-anim-aurora', 'bg-anim-neon', 'bg-anim-stars');
             layer.style.background = '';
@@ -456,7 +471,7 @@
         }
         function previewBgGrad() {
             if (!bgSelectedColors.length) return;
-            const layer = document.getElementById('bgLayer') || document.body;
+            const layer = ensureBgLayer() || document.body;
             layer.style.background = buildGrad(bgSelectedColors);
             document.body.style.setProperty('--bg-overlay', localStorage.getItem(BG_OVERLAY_ON) === '1' ? '0.35' : '0');
         }

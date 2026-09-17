@@ -14318,8 +14318,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 let x = Math.round(r.left - w - 10);
                 if (x < 84) x = 84; // 至少在停靠栏右侧
                 sec.style.left = x + 'px';
+                // 垂直方向与卡槽区对齐（在"出战选择"标题之下），高度到手册区上方为止
+                const top = Math.max(60, Math.round(r.top));
+                sec.style.top = top + 'px';
+                sec.style.maxHeight = Math.max(240, window.innerHeight - top - 140) + 'px';
             } catch (e) {}
         }
+        window.addEventListener('resize', function () {
+            const openHdr = document.querySelector('.collapsible-section .collapsible-header.open');
+            if (openHdr) { const sec = openHdr.closest('.collapsible-section'); if (sec) positionPoolPanel(sec); }
+        });
         function renderProfDrawer(sec, name) {
             const box = document.getElementById('poolDrawer');
             if (!box) return;
@@ -15185,7 +15193,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     //    __nativeDrag 卡在 true → pointerup 首行 if (__nativeDrag) return → Pointer 兜底层整个会话永久失效。
                     //    安全性：真实原生拖拽进行中浏览器会吞掉 pointerdown，不存在误清。
                     window.__nativeDrag = false;
-                    const card = e.target.closest('.selected-card:not(.empty), .battle-slot.filled .card-item');
+                    const card = e.target.closest('.selected-card:not(.empty), .battle-slot.filled .card-item, .collapsible-section .cards-grid .card-item');
                     if (!card || card.closest('#favoriteCardsGrid')) return;
                     if (e.target.closest('.card-level-badge')) return; // 等级徽章不触发拖拽
                     window.__pd = { el: card, x: e.clientX, y: e.clientY, started: false, payload: buildDragPayload(card) };
@@ -15227,6 +15235,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
 
             function buildDragPayload(card) {
+                // 卡池卡：拖进卡槽（source pool，落槽会自动加进手牌）
+                if (card.closest('.collapsible-section') && card.closest('.cards-grid')) {
+                    return { source: 'pool', id: card.dataset.id || '', name: card.dataset.name || '', isEngineering: card.dataset.engineering === 'true', profession: card.dataset.profession || '' };
+                }
                 const slotEl = card.closest('.battle-slot');
                 if (slotEl) {
                     const nm = card.dataset.name || getSlotCardName(slotEl);
