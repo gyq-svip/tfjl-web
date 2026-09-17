@@ -30483,6 +30483,16 @@ ${maSection}
             try { const c = localStorage.getItem(NEWS_CACHE_KEY); if (c) { const r = pick(JSON.parse(c)); if (r) return r; } } catch (e) {}
             // 3) 直接拉云端最新（确保管理员后台保存后立即全网生效，不被旧本地缓存拦截）
             try { const fresh = await fetchNewsFromGitHub(); const r = pick(fresh); if (r) return r; } catch (e) {}
+            // 4) 部署内置公开兜底（./welcome.json，同源、无需 token）：保证所有普通用户都能弹，不依赖 Gist/Token
+            try {
+                const wr = await fetch('./welcome.json', { cache: 'no-store' });
+                if (wr.ok) {
+                    const wj = await wr.json();
+                    if (wj && wj.content && wj.content.trim()) {
+                        return { title: wj.title || '欢迎来到塔防精灵助手', content: (wj.content || '').replace(/\r/g, '') };
+                    }
+                }
+            } catch (e) {}
             return null;
         };
 
