@@ -14925,19 +14925,23 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (icon) icon.textContent = '▲';
                 }
             }
-            // 恢复卡池停靠栏收起状态
-            if (localStorage.getItem('tdjl_pool_dock_collapsed') === '1') {
+            // 恢复卡池停靠栏收起状态（🔴 2026-09-18 默认收起：仅用户显式展开过(存'0')才展开）
+            if (localStorage.getItem('tdjl_pool_dock_collapsed') !== '0') {
                 const bar = document.getElementById('poolTabBar');
                 if (bar) {
                     bar.classList.add('collapsed');
                     const dockBtn = document.getElementById('poolDockToggleBtn');
                     if (dockBtn) dockBtn.textContent = '▶';
+                    // 默认收起时把可能已恢复展开的面板（如收藏）一并关掉，与 __togglePoolDock 行为一致
+                    document.querySelectorAll('.collapsible-section .collapsible-header.open').forEach(h => toggleSection(h));
+                    if (typeof closeProfDrawer === 'function') closeProfDrawer();
                 }
             }
-            // 收藏若恢复为展开，同步渲染职业抽屉与卡片框
+            // 收藏若恢复为展开（且停靠栏未收起），同步渲染职业抽屉与卡片框
             if (favoriteOpen === 'true' && typeof renderProfDrawer === 'function') {
                 const favSec = document.querySelector('.collapsible-section.favorite');
-                if (favSec) { applyProfFilter(favSec, poolProf.favorite || 'all'); renderProfDrawer(favSec, 'favorite'); }
+                const favHdr = favSec && favSec.querySelector('.collapsible-header.open');
+                if (favSec && favHdr) { applyProfFilter(favSec, poolProf.favorite || 'all'); renderProfDrawer(favSec, 'favorite'); }
             }
             if (typeof syncPoolBodyClass === 'function') syncPoolBodyClass();
             if (typeof syncPoolTabs === 'function') syncPoolTabs();
