@@ -254,7 +254,7 @@
         };
 
         function getBgOverlayForValue(val) {
-            if (!val || val === 'default') return 0;
+            if (!val || val === 'default') return 0.3; // 默认背景=内置「美女2」，按内置图系数压暗
             if (val.indexOf('grad:') === 0) return 0.35;
             if (val.indexOf('custom:') === 0) return 0.4;
             if (val.indexOf('img:') === 0) return 0.4;
@@ -276,13 +276,14 @@
         const BG_FROST_KEY = 'TFJL_FROST_ALPHA';
         function blurLevelToPx(v) { return Math.round((Math.max(0, Math.min(100, v)) / 100) * 30 * 10) / 10; }
         function frostLevelToAlpha(v) { return Math.round((Math.max(0, Math.min(100, v)) / 100) * 45) / 100; }
-        function readLevel(key) {
+        function readLevel(key, def) {
             const raw = localStorage.getItem(key);
-            return raw === null ? 0 : (parseFloat(raw) || 0);
+            // 🔴 2026-09-18 支持默认值：面板底色默认 30%、模糊默认 0%；用户拖过滑条后存了值，永远用用户的
+            return raw === null ? (def || 0) : (parseFloat(raw) || 0);
         }
         function applyBgBlur() {
             const lv = readLevel(BG_BLUR_KEY);
-            const fl = readLevel(BG_FROST_KEY);
+            const fl = readLevel(BG_FROST_KEY, 30);
             const px = blurLevelToPx(lv);
             const alpha = frostLevelToAlpha(fl);
             // 毛玻璃做在独立固定层上（与主面板同宽、垫在背景上/内容下）。
@@ -459,7 +460,18 @@
             layer.style.backgroundImage = '';
             layer.style.backgroundAttachment = '';
             const val = (localStorage.getItem(BG_KEY) || '').trim();
-            if (!val || val === 'default') { bgRevokeUrl(); stopBgVideo(); applyBgBlur(); return; }
+            if (!val || val === 'default') {
+                // 🔴 2026-09-18 默认背景改为内置「美女2」；用户自己改过背景后存了各自值，不再走到这里。
+                //    「↺ 恢复默认」按钮 = 回到这张图。若用户已删除该内置图，则回退深色渐变。
+                bgRevokeUrl(); stopBgVideo();
+                const girl2Gone = (typeof bgHiddenBuiltins === 'function' && bgHiddenBuiltins().indexOf('bg/bg-girl2.jpg') >= 0);
+                if (!girl2Gone) {
+                    layer.classList.add('bg-custom');
+                    layer.style.backgroundImage = 'url(bg/bg-girl2.jpg)';
+                }
+                applyBgBlur();
+                return;
+            }
             if (val.indexOf('img:') !== 0 && val.indexOf('video:') !== 0) bgRevokeUrl();
             if (val.indexOf('video:') !== 0) stopBgVideo();
             if (val.indexOf('video:') === 0) {
@@ -703,7 +715,7 @@
             }
             const overlayOn = localStorage.getItem(BG_OVERLAY_ON) === '1';
             const blurVal = readLevel(BG_BLUR_KEY);
-            const frostVal = readLevel(BG_FROST_KEY);
+            const frostVal = readLevel(BG_FROST_KEY, 30);
             const modal = document.createElement('div');
             modal.id = 'bgSettingsModal';
             modal.style.cssText = 'position:fixed;top:78px;right:18px;width:332px;max-width:92vw;z-index:100000;background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:14px 16px 16px;max-height:86vh;overflow:auto;box-shadow:0 12px 44px rgba(0,0,0,0.6);';
