@@ -1117,10 +1117,6 @@
             grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)) !important;
             gap: 6px !important;
         }
-        /* 宽屏：卡片框展开时把主内容整体右推，彻底不遮挡 */
-        @media (min-width: 1500px) {
-            body.pool-panel-open { padding-left: 530px; }
-        }
         @media (max-width: 768px) {
             #poolTabBar { left: 4px; padding: 5px 3px; gap: 4px; }
             .pool-tab { width: 46px; font-size: 0.6rem; padding: 5px 2px; }
