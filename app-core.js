@@ -30469,17 +30469,17 @@ ${maSection}
         // ==================== 欢迎弹窗文案（可后台编辑；存公告 Gist 的 category='welcome' 项） ====================
         // 普通用户端 showWelcomeGuide 经 window.getWelcomeGuideData() 读取（公开仓库/缓存，无需 token）
         window.getWelcomeGuideData = async function () {
-            let list = null;
-            try { if (typeof newsItems !== 'undefined' && Array.isArray(newsItems) && newsItems.length) list = newsItems; } catch (e) {}
-            if (!list) {
-                try { const c = localStorage.getItem(NEWS_CACHE_KEY); if (c) list = JSON.parse(c); } catch (e) {}
-            }
-            if (!list) {
-                try { list = await fetchNewsFromGitHub(); } catch (e) {}
-            }
-            if (!Array.isArray(list)) return null;
-            const w = list.find(n => n && n.category === 'welcome');
-            return w ? { title: w.name, content: (w.content || '').replace(/\r/g, '') } : null;
+            const pick = (arr) => {
+                const w = (Array.isArray(arr) ? arr : []).find(n => n && n.category === 'welcome');
+                return w ? { title: w.name, content: (w.content || '').replace(/\r/g, '') } : null;
+            };
+            // 1) 内存已加载的公告（公告系统加载完成后通常已是最新）
+            try { if (typeof newsItems !== 'undefined' && Array.isArray(newsItems) && newsItems.length) { const r = pick(newsItems); if (r) return r; } } catch (e) {}
+            // 2) 本地缓存兜底（旧缓存可能不含 welcome 项，找不到则继续往云端拉）
+            try { const c = localStorage.getItem(NEWS_CACHE_KEY); if (c) { const r = pick(JSON.parse(c)); if (r) return r; } } catch (e) {}
+            // 3) 直接拉云端最新（确保管理员后台保存后立即全网生效，不被旧本地缓存拦截）
+            try { const fresh = await fetchNewsFromGitHub(); const r = pick(fresh); if (r) return r; } catch (e) {}
+            return null;
         };
 
         function loadWelcomeEditor() {
