@@ -14289,6 +14289,45 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             });
         }
 
+        // ===== 二级抽屉：点分类 → 下拉职业 → 右侧卡片框 4 张一排 =====
+        let poolProf = {};
+        function closeProfDrawer() {
+            const d = document.getElementById('poolDrawer');
+            if (d) d.style.display = 'none';
+        }
+        function syncPoolBodyClass() {
+            const open = document.querySelector('.collapsible-section .collapsible-header.open');
+            document.body.classList.toggle('pool-panel-open', !!open);
+        }
+        function applyProfFilter(sec, key) {
+            sec.querySelectorAll('.profession-section').forEach(function (ps, i) {
+                ps.style.display = (key === 'all' || key === 'p' + i) ? '' : 'none';
+            });
+        }
+        function renderProfDrawer(sec, name) {
+            const box = document.getElementById('poolDrawer');
+            if (!box) return;
+            const list = [];
+            sec.querySelectorAll('.profession-section > h4').forEach(function (h) {
+                const t = (h.textContent || '').trim();
+                if (t) list.push(t);
+            });
+            if (!list.length) { closeProfDrawer(); return; }
+            const cur = poolProf[name] || 'all';
+            let html = '<button class="pool-prof' + (cur === 'all' ? ' active' : '') + '" onclick="window.__pickPoolProf(\'' + name + '\',\'all\')">全部</button>';
+            list.forEach(function (t, i) {
+                const key = 'p' + i;
+                html += '<button class="pool-prof' + (cur === key ? ' active' : '') + '" onclick="window.__pickPoolProf(\'' + name + '\',\'' + key + '\')">' + t.replace(/[<>&"]/g, '') + '</button>';
+            });
+            box.innerHTML = html;
+            box.style.display = 'flex';
+        }
+        window.__pickPoolProf = function (name, key) {
+            poolProf[name] = key;
+            const sec = document.querySelector('.collapsible-section.' + name);
+            if (sec) { applyProfFilter(sec, key); renderProfDrawer(sec, name); }
+        };
+
         function togglePoolTab(name) {
             const sec = document.querySelector('.collapsible-section.' + name);
             if (!sec) return;
@@ -14301,9 +14340,13 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (h !== header) toggleSection(h);
                 });
                 toggleSection(header);
+                applyProfFilter(sec, poolProf[name] || 'all');
+                renderProfDrawer(sec, name);
             } else {
                 toggleSection(header);
+                closeProfDrawer();
             }
+            syncPoolBodyClass();
             syncPoolTabs();
         }
         window.togglePoolTab = togglePoolTab;
@@ -14317,6 +14360,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (btn) btn.textContent = collapsed ? '▶' : '◀';
             if (collapsed) {
                 document.querySelectorAll('.collapsible-section .collapsible-header.open').forEach(h => toggleSection(h));
+                closeProfDrawer();
+                syncPoolBodyClass();
             }
             try { localStorage.setItem('tdjl_pool_dock_collapsed', collapsed ? '1' : '0'); } catch (e) {}
             syncPoolTabs();
@@ -14884,6 +14929,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (dockBtn) dockBtn.textContent = '▶';
                 }
             }
+            // 收藏若恢复为展开，同步渲染职业抽屉与卡片框
+            if (favoriteOpen === 'true' && typeof renderProfDrawer === 'function') {
+                const favSec = document.querySelector('.collapsible-section.favorite');
+                if (favSec) { applyProfFilter(favSec, poolProf.favorite || 'all'); renderProfDrawer(favSec, 'favorite'); }
+            }
+            if (typeof syncPoolBodyClass === 'function') syncPoolBodyClass();
             if (typeof syncPoolTabs === 'function') syncPoolTabs();
 
             // 恢复记事本折叠状态
