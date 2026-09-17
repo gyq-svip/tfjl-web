@@ -201,26 +201,20 @@
         }
 
         // ==================== 用户自定义背景 ====================
-        // 预设：明亮(浅色协调)/动漫(精致)/炫酷(保留极光·星河，用户认可)。实拍走「上传图片」。
-        // 另支持圆盘选色器多选浅色生成渐变（grad:）、上传图片（custom:）。
+        // 预设：只留用户认可的 深海 / 极光 / 星河（浅色组已删除）。
+        // 另支持：内置背景图（builtin:）、圆盘选色器多选渐变（grad:）、上传图片（img:/custom:）。
         const BG_PRESETS = {
-            bright: [
-                { name: '晨雾', css: 'linear-gradient(135deg,#e0eafc 0%,#cfdef3 100%)' },
-                { name: '薄暮', css: 'linear-gradient(135deg,#fdfbfb 0%,#ebedee 100%)' },
-                { name: '薰衣草', css: 'linear-gradient(135deg,#e6e6fa 0%,#d8d8f6 100%)' },
-                { name: '樱雾', css: 'linear-gradient(135deg,#ffeef8 0%,#ffd6e8 100%)' },
-                { name: '薄荷雾', css: 'linear-gradient(135deg,#e8f5e9 0%,#c8e6c9 100%)' }
-            ],
             anime: [
-                { name: '深海', css: 'linear-gradient(135deg,#2b5876 0%,#4e4376 100%)' },
-                { name: '樱霞', css: 'linear-gradient(135deg,#ff9a9e 0%,#fecfef 100%)' },
-                { name: '晴空蓝', css: 'linear-gradient(135deg,#89f7fe 0%,#66a6ff 100%)' }
+                { name: '深海', css: 'linear-gradient(135deg,#2b5876 0%,#4e4376 100%)' }
             ],
             cool: [
                 { name: '极光', css: 'linear-gradient(135deg,#0f2027 0%,#203a43 50%,#2c5364 100%)', anim: 'aurora' },
                 { name: '星河', css: 'radial-gradient(ellipse at 50% 0%,#1b2735 0%,#090a0f 100%)', anim: 'stars' }
             ]
         };
+        // 内置默认背景图（固化在仓库里，随网页分发；用户一键选用，不占本机存储）
+        // 格式：{ name: '名字', url: '相对/绝对图片地址' }。用户给图后在此追加即可（目标 5 个：深海/极光/星河 + 2 张图）
+        const BG_BUILTIN = [];
         // 随机渐变用的协调浅色板
         const SOFT_PALETTE = ['#e0eafc','#cfdef3','#e6e6fa','#d8d8f6','#ffeef8','#ffd6e8','#e8f5e9','#c8e6c9','#fdfbfb','#ebedee','#fbc2eb','#a6c1ee','#a1c4fd','#c2e9fb','#fff1eb','#ace0f9'];
         let bgSelectedColors = [];
@@ -238,19 +232,32 @@
             if (val.indexOf('grad:') === 0) return 0.35;
             if (val.indexOf('custom:') === 0) return 0.4;
             if (val.indexOf('img:') === 0) return 0.4;
+            if (val.indexOf('builtin:') === 0) return 0.3;
             if (val.indexOf('preset:') === 0) {
                 const key = val.slice(7);
                 for (const cat of Object.keys(BG_PRESETS)) {
                     const p = BG_PRESETS[cat].find(function (x) { return x.name === key; });
-                    if (p) {
-                        if (cat === 'bright') return 0.38;
-                        if (cat === 'anime') return key === '深海' ? 0.12 : 0.28;
-                        return 0;
-                    }
+                    if (p) return key === '深海' ? 0.12 : 0;
                 }
             }
             return 0;
         }
+
+        // 背景模糊程度（用户可调，作用在背景层上，不影响界面内容）
+        const BG_BLUR_KEY = 'TFJL_BG_BLUR';
+        function applyBgBlur() {
+            const raw = localStorage.getItem(BG_BLUR_KEY);
+            const px = raw === null ? 0 : (parseFloat(raw) || 0);
+            document.body.style.setProperty('--bg-blur', px + 'px');
+            return px;
+        }
+        window.__bgSetBlur = function (v) {
+            const px = Math.max(0, Math.min(20, parseFloat(v) || 0));
+            localStorage.setItem(BG_BLUR_KEY, String(px));
+            applyBgBlur();
+            const lab = document.getElementById('bgBlurVal');
+            if (lab) lab.textContent = px + 'px';
+        };
 
         // ===== 上传背景图片库（IndexedDB 存 blob，避免 localStorage 爆配额） =====
         const BG_DB = 'tfjl-bg-images';
@@ -356,6 +363,10 @@
             } else if (val.indexOf('custom:') === 0) {
                 document.body.classList.add('bg-custom');
                 document.body.style.backgroundImage = 'url(' + val.slice(7) + ')';
+            } else if (val.indexOf('builtin:') === 0) {
+                document.body.classList.add('bg-custom');
+                document.body.style.backgroundImage = 'url(' + val.slice(8) + ')';
+                document.body.style.backgroundAttachment = 'fixed';
             } else if (val.indexOf('grad:') === 0) {
                 document.body.style.background = val.slice(5);
                 document.body.style.backgroundAttachment = 'fixed';
@@ -363,6 +374,7 @@
             let ov = 0;
             if (localStorage.getItem(BG_OVERLAY_ON) === '1') ov = getBgOverlayForValue(val);
             document.body.style.setProperty('--bg-overlay', String(ov));
+            applyBgBlur();
         }
 
         // 上传图片：canvas 压缩到最长边 1920px、JPEG 0.8，避免超 localStorage 配额 / 拖慢加载
@@ -402,6 +414,12 @@
             };
             reader.readAsDataURL(file);
         }
+
+        window.__setBgBuiltin = function (url) {
+            localStorage.setItem(BG_KEY, 'builtin:' + url);
+            applyUserBackground();
+            try { if (typeof showToast === 'function') showToast('✅ 背景已切换'); } catch (e) {}
+        };
 
         window.__setBgPreset = function (name) {
             localStorage.setItem(BG_KEY, name === 'default' ? 'default' : 'preset:' + name);
@@ -515,15 +533,22 @@
             const old = document.getElementById('bgSettingsModal');
             if (old) old.remove();
             bgSelectedColors = [];
-            const labels = { bright: '☀️ 明亮（浅色）', anime: '🌸 动漫', cool: '✨ 炫酷' };
+            const labels = { anime: '🌌 内置配色', cool: '✨ 炫酷' };
             const rows = [];
-            for (const cat of ['bright', 'anime', 'cool']) {
+            for (const cat of ['anime', 'cool']) {
                 rows.push('<div style="color:rgba(255,255,255,0.55);font-size:0.78rem;margin:12px 0 6px;">' + labels[cat] + '</div>');
                 BG_PRESETS[cat].forEach(function (p) {
                     rows.push('<button onclick="window.__setBgPreset(\'' + p.name + '\')" style="margin:4px;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:' + p.css + ';color:' + (p.anim ? '#fff' : '#1a1a2e') + ';cursor:pointer;font-size:0.8rem;text-shadow:' + (p.anim ? '0 1px 2px rgba(0,0,0,0.5)' : 'none') + ';">' + p.name + '</button>');
                 });
             }
+            if (BG_BUILTIN.length) {
+                rows.push('<div style="color:rgba(255,255,255,0.55);font-size:0.78rem;margin:12px 0 6px;">🖼️ 内置背景图</div>');
+                BG_BUILTIN.forEach(function (b) {
+                    rows.push('<button onclick="window.__setBgBuiltin(\'' + b.url + '\')" style="margin:4px;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background-image:url(' + b.url + ');background-size:cover;background-position:center;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.85);cursor:pointer;font-size:0.8rem;min-width:96px;min-height:40px;">' + b.name + '</button>');
+                });
+            }
             const overlayOn = localStorage.getItem(BG_OVERLAY_ON) === '1';
+            const blurVal = (function () { const r = localStorage.getItem(BG_BLUR_KEY); return r === null ? 0 : (parseFloat(r) || 0); })();
             const modal = document.createElement('div');
             modal.id = 'bgSettingsModal';
             modal.style.cssText = 'position:fixed;top:78px;right:18px;width:332px;max-width:92vw;z-index:100000;background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:14px 16px 16px;max-height:86vh;overflow:auto;box-shadow:0 12px 44px rgba(0,0,0,0.6);';
@@ -535,6 +560,11 @@
                 '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.82rem;color:rgba(255,255,255,0.85);cursor:pointer;">' +
                 '  <input type="checkbox" id="bgOverlaySwitch"' + (overlayOn ? ' checked' : '') + ' onchange="window.__bgToggleOverlay(this.checked)">' +
                 '  背景协调压暗（开启后浅色背景自动压暗，深色不影响）</label>' +
+                '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.78rem;color:rgba(255,255,255,0.85);">' +
+                '  <span style="flex-shrink:0;">背景模糊</span>' +
+                '  <input type="range" id="bgBlurRange" min="0" max="20" step="1" value="' + blurVal + '" oninput="window.__bgSetBlur(this.value)" style="flex:1;min-width:0;">' +
+                '  <span id="bgBlurVal" style="min-width:34px;text-align:right;color:#ffd700;">' + blurVal + 'px</span>' +
+                '</div>' +
                 '<div style="color:rgba(255,255,255,0.5);font-size:0.74rem;margin-bottom:6px;">上传图片会自动压缩到最长边 1920px（无需操心尺寸），存在本机、每台设备独立。</div>' +
                 rows.join('') +
                 '  <div style="border-top:1px solid rgba(255,255,255,0.12);margin-top:14px;padding-top:12px;">' +
