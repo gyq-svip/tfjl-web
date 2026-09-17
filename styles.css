@@ -1112,17 +1112,9 @@
             gap: 6px !important;
         }
         .collapsible-section .card-item { width: auto !important; min-width: 0 !important; max-width: none !important; }
-        /* 收藏面板：加宽 + 2 列大卡（和卡池卡一个视觉尺寸） */
-        .collapsible-section.favorite:has(> .collapsible-header.open) { width: 252px; }
-        .collapsible-section #favoriteCardsGrid {
-            display: grid !important;
-            grid-template-columns: repeat(2, 1fr) !important;
-            gap: 8px !important;
-        }
-        .collapsible-section #favoriteCardsGrid .card-item {
-            min-height: 72px;
-            font-size: 0.82rem;
-        }
+        /* 🔴 2026-09-18 收藏面板不再特殊化（旧：252px 宽 + 卡片 min-height:72px + 字号 0.82rem），
+           那套规则让收藏卡比卡池卡「又高又窄」，视觉不一致。现在与卡池完全同规格：
+           面板 232px + 内层 .cards-grid 3 列 / 6px 间距，卡片尺寸/字号沿用上面的通用规则。 */
         /* 排序模式：卡片虚线框提示可拖动 */
         #favoriteCardsGrid.sort-mode .card-item {
             outline: 2px dashed rgba(255, 215, 0, 0.75);

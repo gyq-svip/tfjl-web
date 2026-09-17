@@ -11476,13 +11476,20 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             html += '</div>';
             
             grid.innerHTML = html;
-            // 🔴 JS 内联兜底（防 SW 旧 CSS 缓存吞掉新样式）：2 列大卡 + 卡高与卡池一致
-            // 注意必须带 important —— CSS 里有 repeat(3,1fr)!important 会压掉普通内联样式
-            grid.style.setProperty('grid-template-columns', 'repeat(2, 1fr)', 'important');
-            grid.style.setProperty('gap', '8px', 'important');
+            // 🔴 2026-09-18 收藏卡与卡池卡【同尺寸】：删掉旧的「2 列大卡 / min-height:72px / 字号放大」内联兜底
+            //    （那套让收藏卡显得又高又窄）。真正排卡的是这里面的内层 .cards-grid，与卡池同样 3 列 / 6px；
+            //    内联只为防 SW 旧 CSS 缓存，值必须与 styles.css 的 .collapsible-section .cards-grid 一致。
+            grid.style.removeProperty('grid-template-columns');
+            grid.style.removeProperty('gap');
+            const innerGrid = grid.querySelector('.cards-grid');
+            if (innerGrid) {
+                innerGrid.style.setProperty('grid-template-columns', 'repeat(3, 1fr)', 'important');
+                innerGrid.style.setProperty('gap', '6px', 'important');
+            }
             grid.querySelectorAll('.card-item').forEach(c => {
-                c.style.setProperty('min-height', '72px', 'important');
-                c.style.setProperty('font-size', '0.82rem', 'important');
+                // 清掉历史内联（老客户端可能残留 min-height/字号覆盖，导致同屏两种卡不同高）
+                c.style.removeProperty('min-height');
+                c.style.removeProperty('font-size');
             });
             
             // 添加事件监听
@@ -14226,8 +14233,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const bf = document.querySelector('.battle-field');
                 if (!bf) return;
                 const r = bf.getBoundingClientRect();
-                // 收藏面板宽一些（2 列大卡），JS 内联兜底防旧 CSS 缓存
-                sec.style.width = (sec.classList.contains('favorite') ? 252 : 232) + 'px';
+                // 🔴 2026-09-18 面板宽度统一 232px（收藏此前 252px，导致同屏两种卡宽度/高度不一致）
+                sec.style.width = '232px';
                 const w = sec.offsetWidth || 288;
                 let x = Math.round(r.left - w - 10);
                 if (x < 84) x = 84; // 至少在停靠栏右侧
