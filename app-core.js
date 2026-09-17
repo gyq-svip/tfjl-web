@@ -14309,7 +14309,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (!box) return;
             const list = [];
             sec.querySelectorAll('.profession-section > h4').forEach(function (h) {
-                const t = (h.textContent || '').trim();
+                const t = (h.textContent || '').replace('+ 添加', '').replace('+添加', '').trim();
                 if (t) list.push(t);
             });
             if (!list.length) { closeProfDrawer(); return; }
@@ -14320,6 +14320,17 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 html += '<button class="pool-prof' + (cur === key ? ' active' : '') + '" onclick="window.__pickPoolProf(\'' + name + '\',\'' + key + '\')">' + t.replace(/[<>&"]/g, '') + '</button>';
             });
             box.innerHTML = html;
+            // 职业列表锚定在停靠栏里当前分类按钮的正下方（像从该按钮往下排开），不消失
+            try {
+                const dock = document.getElementById('poolTabBar');
+                if (dock) {
+                    const dr = dock.getBoundingClientRect();
+                    box.style.left = dr.left + 'px';
+                    box.style.width = dr.width + 'px';
+                }
+                const activeBtn = document.querySelector('#poolTabBar .pool-tab.active');
+                if (activeBtn) box.style.top = (activeBtn.getBoundingClientRect().bottom + 4) + 'px';
+            } catch (e) {}
             box.style.display = 'flex';
         }
         window.__pickPoolProf = function (name, key) {
@@ -14664,27 +14675,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         
         // 添加按钮点击事件
         function setupAddCardButtons() {
-            document.querySelectorAll('.profession-section h4').forEach(h4 => {
-                const profMap = {'战士': 'warrior', '法师': 'mage', '射手': 'archer', '召唤': 'summoner', '牧师': 'priest', '术士': 'warlock', '熊猫': 'panda', '精灵球': 'pokeball', '工程': 'engineering'};
-                const section = h4.closest('.profession-section');
-                const collapsibleSection = section?.closest('.collapsible-section');
-                if (!collapsibleSection) return;
-                
-                const cardType = collapsibleSection.classList[1];
-                const professionText = h4.textContent.split(' ').pop().trim();
-                const profession = profMap[professionText];
-                
-                if (cardType && profession) {
-                    const btn = document.createElement('button');
-                    btn.className = 'add-card-btn';
-                    btn.textContent = '+ 添加';
-                    btn.onclick = (e) => {
-                        e.stopPropagation();
-                        showAddCardModal(cardType, profession);
-                    };
-                    h4.appendChild(btn);
-                }
-            });
+            // 🔴 2026-09-18 用户要求移除卡池职业标题上的「+ 添加」按钮：
+            // 英雄由管理员统一在后台添加，普通用户不用也不会用，留着占地方。
+            return;
         }
         
         // 卡牌拖动排序
