@@ -220,7 +220,7 @@
             { name: '美女1', url: 'bg/bg-girl1.jpg' },
             { name: '美女2', url: 'bg/bg-girl2.jpg' },
             { name: '美女3', url: 'bg/bg-girl3.jpg' },
-            { name: '星空', url: 'bg/bg-starry.png' }
+            { name: '星空', url: 'bg/bg-starry.jpg' }
         ];
         // 被用户删除的内置图（存 url 列表），渲染时过滤
         function bgHiddenBuiltins() {
