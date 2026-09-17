@@ -14294,6 +14294,50 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         //    （标题/公告/时钟，纯展示无功能控件），页面顶部就是「项目管理器工具栏」，
         //    向上滚自然到顶即停，零 JS 干预、零跳动。看全部公告仍可走 showNewsListModal()。
 
+        // ===== 迷你公告横幅：页头隐藏后，把滚动公告搬进「项目管理器工具栏」行尾 =====
+        // 不占额外版面（flex:1 填充行内空隙）、随页面顶；文本自动跟随 #newsMarquee
+        // （MutationObserver + 4s 轮询兜底）；点击看全部公告。
+        (function () {
+            function ensureMini() {
+                let box = document.getElementById('newsMarqueeMiniBox');
+                if (box) return box;
+                const sel = document.getElementById('projectScopeSelector');
+                const row = sel ? sel.parentElement : null; // 工具栏行（本地/深海/王城低配版 那排）
+                if (!row) return null;
+                box = document.createElement('div');
+                box.id = 'newsMarqueeMiniBox';
+                box.style.cssText = 'flex:1;min-width:140px;position:relative;overflow:hidden;height:26px;border-radius:6px;background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.18);cursor:pointer;';
+                box.title = '点击查看全部公告';
+                box.onclick = function () { if (typeof showNewsListModal === 'function') showNewsListModal(); };
+                const span = document.createElement('span');
+                span.id = 'newsMarqueeMini';
+                span.style.cssText = 'display:inline-block;white-space:nowrap;animation:marqueeScroll 60s linear infinite;color:#ffd700;font-size:0.8rem;line-height:26px;padding-left:100%;';
+                span.textContent = '暂无公告';
+                box.appendChild(span);
+                row.appendChild(box);
+                return box;
+            }
+            function sync() {
+                const box = ensureMini();
+                if (!box) return;
+                const span = document.getElementById('newsMarqueeMini');
+                const src = document.getElementById('newsMarquee');
+                const t = src ? (src.textContent || '') : '';
+                if (span && t && span.textContent !== t) span.textContent = t;
+            }
+            function boot() {
+                try { window.showNewsListModal = showNewsListModal; } catch (e) {} // 供 ☰ 菜单 inline onclick 使用
+                sync();
+                const src = document.getElementById('newsMarquee');
+                if (src && window.MutationObserver) {
+                    new MutationObserver(sync).observe(src, { childList: true, characterData: true, subtree: true });
+                }
+                setInterval(sync, 4000); // 兜底：公告异步刷新也能同步
+            }
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+            else boot();
+        })();
+
         // 收藏面板：排序模式开关（排序模式下按住卡片拖动调整顺序）
         window.__toggleFavSort = function () {
             const grid = document.getElementById('favoriteCardsGrid');
