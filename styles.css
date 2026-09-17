@@ -1112,11 +1112,24 @@
             gap: 6px !important;
         }
         .collapsible-section .card-item { width: auto !important; min-width: 0 !important; max-width: none !important; }
+        /* 收藏面板：加宽 + 2 列大卡（和卡池卡一个视觉尺寸） */
+        .collapsible-section.favorite:has(> .collapsible-header.open) { width: 252px; }
         .collapsible-section #favoriteCardsGrid {
             display: grid !important;
-            grid-template-columns: repeat(3, 1fr) !important;
-            gap: 6px !important;
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 8px !important;
         }
+        .collapsible-section #favoriteCardsGrid .card-item {
+            min-height: 72px;
+            font-size: 0.82rem;
+        }
+        /* 排序模式：卡片虚线框提示可拖动 */
+        #favoriteCardsGrid.sort-mode .card-item {
+            outline: 2px dashed rgba(255, 215, 0, 0.75);
+            outline-offset: -2px;
+            cursor: grab;
+        }
+        #favoriteCardsGrid .drag-over-card { outline: 2px solid #ffd700 !important; }
         @media (max-width: 768px) {
             #poolTabBar { left: 4px; padding: 5px 3px; gap: 4px; }
             .pool-tab { width: 46px; font-size: 0.6rem; padding: 5px 2px; }

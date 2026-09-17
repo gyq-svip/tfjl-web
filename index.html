@@ -1130,6 +1130,11 @@
             </div>
             <div class="collapsible-content">
                 <div class="collapsible-inner">
+                    <div id="favPanelTip" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px;font-size:0.72rem;color:rgba(255,255,255,0.75);">
+                        <span>💡 拖卡到右侧卡槽可直接上阵</span>
+                        <button id="favSortBtn" onclick="window.__toggleFavSort()" style="padding:4px 10px;border-radius:8px;border:1px solid rgba(255,215,0,0.4);background:rgba(255,215,0,0.12);color:#ffd700;cursor:pointer;font-size:0.72rem;">✏️ 排序</button>
+                        <span id="favSortHint" style="display:none;color:#ffd700;">拖动卡片调整顺序，改完点「完成」</span>
+                    </div>
                     <div id="favoriteCardsGrid">
                         <div class="no-favorites" id="noFavorites">暂无收藏，点击卡片上的⭐添加到收藏</div>
                     </div>
