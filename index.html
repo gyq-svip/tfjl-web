@@ -1117,6 +1117,9 @@
             <button class="pool-tab green" data-sec="green" onclick="togglePoolTab('green')" title="绿卡类">🌿<span>绿卡</span><span class="pool-skin-lock" data-rarity="green" onclick="togglePoolSkinLock(event,'green')" title="解锁后右键该分区卡牌可换皮">🔒</span></button>
         </div>
 
+        <!-- 二级抽屉：选中分类后下拉出职业列表；点职业 → 右侧卡片框显示该职业卡牌（4 张一排） -->
+        <div id="poolDrawer"></div>
+
         <div class="collapsible-section favorite">
             <div class="collapsible-header favorite" onclick="toggleSection(this)">
                 <h3><span>⭐</span> 收藏 <span class="small-text">（点击卡片上的⭐添加/删除）</span></h3>
