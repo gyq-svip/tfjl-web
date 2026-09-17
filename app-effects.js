@@ -243,20 +243,24 @@
             return 0;
         }
 
-        // 背景模糊程度（用户可调，作用在背景层上，不影响界面内容）
+        // 背景模糊程度（0~100 档位，作用在独立背景层 #bgLayer 上，界面内容不受影响）
+        // 0 = 背景完全清晰；100 = 模糊最重（约 35px），背景基本只剩色块，卡槽/文字最清楚
         const BG_BLUR_KEY = 'TFJL_BG_BLUR';
+        function blurLevelToPx(v) { return Math.round((Math.max(0, Math.min(100, v)) / 100) * 35 * 10) / 10; }
         function applyBgBlur() {
             const raw = localStorage.getItem(BG_BLUR_KEY);
-            const px = raw === null ? 0 : (parseFloat(raw) || 0);
+            const lv = raw === null ? 0 : (parseFloat(raw) || 0);
+            const px = blurLevelToPx(lv);
+            document.documentElement.style.setProperty('--bg-blur', px + 'px');
             document.body.style.setProperty('--bg-blur', px + 'px');
-            return px;
+            return lv;
         }
         window.__bgSetBlur = function (v) {
-            const px = Math.max(0, Math.min(20, parseFloat(v) || 0));
-            localStorage.setItem(BG_BLUR_KEY, String(px));
+            const lv = Math.max(0, Math.min(100, Math.round(parseFloat(v) || 0)));
+            localStorage.setItem(BG_BLUR_KEY, String(lv));
             applyBgBlur();
             const lab = document.getElementById('bgBlurVal');
-            if (lab) lab.textContent = px + 'px';
+            if (lab) lab.textContent = lv + '（' + blurLevelToPx(lv) + 'px）';
         };
 
         // ===== 上传背景图片库（IndexedDB 存 blob，避免 localStorage 爆配额） =====
@@ -308,10 +312,10 @@
                 bgRevokeUrl();
                 bgImgUrl = URL.createObjectURL(rec.blob);
                 bgImgId = id;
-                document.body.classList.add('bg-custom');
-                document.body.style.background = '';
-                document.body.style.backgroundImage = 'url(' + bgImgUrl + ')';
-                document.body.style.backgroundAttachment = 'fixed';
+                const layer = document.getElementById('bgLayer') || document.body;
+                layer.classList.add('bg-custom');
+                layer.style.background = '';
+                layer.style.backgroundImage = 'url(' + bgImgUrl + ')';
             });
         }
         // 老数据（custom:<dataURL>）迁移进图片库，之后统一走 img:<id>
@@ -332,19 +336,21 @@
 
         function applyUserBackground() {
             if (!bgMigrateTried) { bgMigrateTried = true; try { migrateLegacyCustomBg(); } catch (e) {} }
+            // 背景统一画在独立层 #bgLayer 上（支持 filter 模糊）；body 只留兜底底色
+            const layer = document.getElementById('bgLayer') || document.body;
             document.body.classList.remove('bg-custom', 'bg-anim-aurora', 'bg-anim-neon', 'bg-anim-stars');
-            document.body.style.background = '';
-            document.body.style.backgroundImage = '';
-            document.body.style.backgroundAttachment = '';
+            layer.classList.remove('bg-custom', 'bg-anim-aurora', 'bg-anim-neon', 'bg-anim-stars');
+            layer.style.background = '';
+            layer.style.backgroundImage = '';
+            layer.style.backgroundAttachment = '';
             const val = (localStorage.getItem(BG_KEY) || '').trim();
-            if (!val || val === 'default') { bgRevokeUrl(); return; }
+            if (!val || val === 'default') { bgRevokeUrl(); applyBgBlur(); return; }
             if (val.indexOf('img:') !== 0) bgRevokeUrl();
             if (val.indexOf('img:') === 0) {
                 const id = val.slice(4);
-                document.body.classList.add('bg-custom');
+                layer.classList.add('bg-custom');
                 if (bgImgId === id && bgImgUrl) {
-                    document.body.style.backgroundImage = 'url(' + bgImgUrl + ')';
-                    document.body.style.backgroundAttachment = 'fixed';
+                    layer.style.backgroundImage = 'url(' + bgImgUrl + ')';
                 } else {
                     bgApplyImage(id).catch(function () {});
                 }
@@ -356,20 +362,17 @@
                     if (p) { css = p.css; anim = p.anim; break; }
                 }
                 if (css) {
-                    document.body.style.background = css;
-                    document.body.style.backgroundAttachment = 'fixed';
-                    if (anim) document.body.classList.add('bg-anim-' + anim);
+                    layer.style.background = css;
+                    if (anim) layer.classList.add('bg-anim-' + anim);
                 }
             } else if (val.indexOf('custom:') === 0) {
-                document.body.classList.add('bg-custom');
-                document.body.style.backgroundImage = 'url(' + val.slice(7) + ')';
+                layer.classList.add('bg-custom');
+                layer.style.backgroundImage = 'url(' + val.slice(7) + ')';
             } else if (val.indexOf('builtin:') === 0) {
-                document.body.classList.add('bg-custom');
-                document.body.style.backgroundImage = 'url(' + val.slice(8) + ')';
-                document.body.style.backgroundAttachment = 'fixed';
+                layer.classList.add('bg-custom');
+                layer.style.backgroundImage = 'url(' + val.slice(8) + ')';
             } else if (val.indexOf('grad:') === 0) {
-                document.body.style.background = val.slice(5);
-                document.body.style.backgroundAttachment = 'fixed';
+                layer.style.background = val.slice(5);
             }
             let ov = 0;
             if (localStorage.getItem(BG_OVERLAY_ON) === '1') ov = getBgOverlayForValue(val);
@@ -453,8 +456,8 @@
         }
         function previewBgGrad() {
             if (!bgSelectedColors.length) return;
-            document.body.style.background = buildGrad(bgSelectedColors);
-            document.body.style.backgroundAttachment = 'fixed';
+            const layer = document.getElementById('bgLayer') || document.body;
+            layer.style.background = buildGrad(bgSelectedColors);
             document.body.style.setProperty('--bg-overlay', localStorage.getItem(BG_OVERLAY_ON) === '1' ? '0.35' : '0');
         }
         window.__bgRemoveColor = function (i) {
@@ -533,14 +536,16 @@
             const old = document.getElementById('bgSettingsModal');
             if (old) old.remove();
             bgSelectedColors = [];
-            const labels = { anime: '🌌 内置配色', cool: '✨ 炫酷' };
+            // 内置配色：不分组标题，深海/极光/星河 一排显示，省空间
             const rows = [];
-            for (const cat of ['anime', 'cool']) {
-                rows.push('<div style="color:rgba(255,255,255,0.55);font-size:0.78rem;margin:12px 0 6px;">' + labels[cat] + '</div>');
+            rows.push('<div style="color:rgba(255,255,255,0.55);font-size:0.78rem;margin:10px 0 6px;">🌌 内置背景</div>');
+            rows.push('<div style="display:flex;flex-wrap:wrap;gap:6px;">');
+            ['anime', 'cool'].forEach(function (cat) {
                 BG_PRESETS[cat].forEach(function (p) {
-                    rows.push('<button onclick="window.__setBgPreset(\'' + p.name + '\')" style="margin:4px;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:' + p.css + ';color:' + (p.anim ? '#fff' : '#1a1a2e') + ';cursor:pointer;font-size:0.8rem;text-shadow:' + (p.anim ? '0 1px 2px rgba(0,0,0,0.5)' : 'none') + ';">' + p.name + '</button>');
+                    rows.push('<button onclick="window.__setBgPreset(\'' + p.name + '\')" style="padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:' + p.css + ';color:' + (p.anim ? '#fff' : '#1a1a2e') + ';cursor:pointer;font-size:0.8rem;text-shadow:' + (p.anim ? '0 1px 2px rgba(0,0,0,0.5)' : 'none') + ';">' + p.name + '</button>');
                 });
-            }
+            });
+            rows.push('</div>');
             if (BG_BUILTIN.length) {
                 rows.push('<div style="color:rgba(255,255,255,0.55);font-size:0.78rem;margin:12px 0 6px;">🖼️ 内置背景图</div>');
                 BG_BUILTIN.forEach(function (b) {
@@ -562,8 +567,8 @@
                 '  背景协调压暗（开启后浅色背景自动压暗，深色不影响）</label>' +
                 '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.78rem;color:rgba(255,255,255,0.85);">' +
                 '  <span style="flex-shrink:0;">背景模糊</span>' +
-                '  <input type="range" id="bgBlurRange" min="0" max="20" step="1" value="' + blurVal + '" oninput="window.__bgSetBlur(this.value)" style="flex:1;min-width:0;">' +
-                '  <span id="bgBlurVal" style="min-width:34px;text-align:right;color:#ffd700;">' + blurVal + 'px</span>' +
+                '  <input type="range" id="bgBlurRange" min="0" max="100" step="1" value="' + blurVal + '" oninput="window.__bgSetBlur(this.value)" style="flex:1;min-width:0;">' +
+                '  <span id="bgBlurVal" style="min-width:56px;text-align:right;color:#ffd700;">' + blurVal + '（' + blurLevelToPx(blurVal) + 'px）</span>' +
                 '</div>' +
                 '<div style="color:rgba(255,255,255,0.5);font-size:0.74rem;margin-bottom:6px;">上传图片会自动压缩到最长边 1920px（无需操心尺寸），存在本机、每台设备独立。</div>' +
                 rows.join('') +
