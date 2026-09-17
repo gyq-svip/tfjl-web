@@ -1526,30 +1526,32 @@
             if (modal) modal.remove();
         }
 
-        // 网站功能说明弹窗（按大版本首次弹出；仅网页版，含下载桌面版引导）
-        // 文案（标题/功能列表）由管理员后台编辑，经 window.getWelcomeGuideData() 从云端读取；读取失败回退默认
+        // 网站功能说明弹窗（基于欢迎词内容指纹：文案一变即自动重弹；仅网页版，含下载桌面版引导）
+        // 文案（标题/功能列表）由管理员后台编辑，经 window.getWelcomeGuideData() 从云端读取（含失败兜底）
+        // 已读标记用「内容指纹」而非版本号：管理员重新发布（改文案）指纹即变，所有用户下次进入自动重看一次。
+
+        // 欢迎词内容指纹：标题+正文任一变化即改变，用于「改了文案就让所有用户立即重看」
+        function welcomeFingerprint(t, c) {
+            const s = JSON.stringify([t || '', c || '']);
+            let h = 5381;
+            for (let i = 0; i < s.length; i++) h = (((h << 5) + h) + s.charCodeAt(i)) >>> 0;
+            return 'fp' + h.toString(36);
+        }
+        let _welcomeFp = null; // 当前弹窗对应的指纹；关闭时写入已读标记
+
         async function showWelcomeGuide() {
             // 桌面版用户已在 APP 内，无需引导下载；仅网页版弹
             if (window.__TAURI__ || window.__TAURI_INTERNALS__) return;
-            // 每个大版本（SW CACHE_VERSION 的 sX.Y 两级）首次进入才弹
-            const key = 'TFJL_WelcomeRead_' + _welcomeBigVer();
-            try { if (localStorage.getItem(key)) return; } catch (e) {}
-            let title = '欢迎来到塔防精灵助手';
-            let items = [
-                '📂 项目管理 — 脚本分类存储，支持脚本、图片、阵容、记事本',
-                '📜 脚本文件 — 解析到手牌，支持拖拽、分享到需求墙',
-                '🔍 脚本解析与生成 — 自动生成活动/副本脚本，可手动微调',
-                '📢 需求墙 — 发布需求、分享脚本、互动交流'
-            ];
-            try {
-                if (typeof window.getWelcomeGuideData === 'function') {
-                    const w = await window.getWelcomeGuideData();
-                    if (w && w.title) title = w.title;
-                    if (w && w.content && w.content.trim()) {
-                        items = w.content.split('\n').map(s => s.trim()).filter(Boolean);
-                    }
-                }
-            } catch (e) {}
+            // 先取云端欢迎词（内容变化→指纹变化→自动判定未读）
+            let data = null;
+            try { if (typeof window.getWelcomeGuideData === 'function') data = await window.getWelcomeGuideData(); } catch (e) {}
+            if (!data || !data.content || !data.content.trim()) return; // 无文案不弹
+            const fp = welcomeFingerprint(data.title, data.content);
+            const readKey = 'TFJL_WelcomeRead_fp';
+            try { if (localStorage.getItem(readKey) === fp) return; } catch (e) {} // 已看过当前文案
+            _welcomeFp = fp;
+            const title = data.title || '欢迎来到塔防精灵助手';
+            const items = data.content.split('\n').map(s => s.trim()).filter(Boolean);
             const itemsHtml = items.map(t => '<div style="margin-bottom:8px;">' + escapeHtml(t) + '</div>').join('');
             const guideHtml = `
                 <div id="welcomeGuideModal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;">
@@ -1579,22 +1581,13 @@
         }
 
         function closeWelcomeGuide() {
-            try { localStorage.setItem('TFJL_WelcomeRead_' + _welcomeBigVer(), 'true'); } catch (e) {}
+            try { if (_welcomeFp) localStorage.setItem('TFJL_WelcomeRead_fp', _welcomeFp); } catch (e) {}
             const modal = document.getElementById('welcomeGuideModal');
             if (modal) modal.remove();
         }
 
-        // 解析当前大版本两级（SW CACHE_VERSION 的 sX.Y），用于「每个大版本首次进主页弹一次」引导。
-        // 优先读 #versionTag（线上为真实 s日期 · sX.Y.Z），本地 dev 回退 's1.1'。
-        function _welcomeBigVer() {
-            try {
-                const t = (document.getElementById('versionTag') || {}).textContent || '';
-                const m = t.match(/s(\d+)\.(\d+)\.\d+/);
-                if (m) return m[1] + '.' + m[2];
-            } catch (e) {}
-            return 's1.1';
-        }
-        // 主页加载后，仅网页版用户、按大版本首次弹出欢迎/下载引导（桌面版已在 APP 内，不弹）
+        // （已移除基于大版本的引导；现按欢迎词内容指纹自动重弹，见 welcomeFingerprint 与 TFJL_WelcomeRead_fp）
+        // 主页加载后，仅网页版用户、按欢迎词内容指纹（文案变自动重弹）弹出欢迎/下载引导（桌面版已在 APP 内，不弹）
         (function _initWelcomeGuide() {
             const fire = function () {
                 if (window.__TAURI__ || window.__TAURI_INTERNALS__) return;
