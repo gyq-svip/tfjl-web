@@ -990,30 +990,53 @@
             overflow: hidden;
         }
 
-        /* ===== 卡池分区紧凑 Tab（一行替代 5 条大标题栏） ===== */
+        /* ===== 卡池左侧停靠栏 + 弹出选卡浮层 ===== */
         #poolTabBar {
+            position: fixed;
+            left: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 9500;
             display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin: 2px 0 12px;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 5px;
+            background: rgba(18,18,38,0.78);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,215,0,0.28);
+            border-radius: 14px;
+            padding: 7px 5px;
+            margin: 0;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
         }
+        .pool-dock-toggle {
+            border: none;
+            background: rgba(255,255,255,0.1);
+            color: rgba(255,255,255,0.8);
+            border-radius: 8px;
+            font-size: 0.7rem;
+            padding: 3px 0;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .pool-dock-toggle:hover { background: rgba(255,255,255,0.22); }
         .pool-tab {
-            display: inline-flex;
+            display: flex;
+            flex-direction: column;
             align-items: center;
-            gap: 3px;
-            padding: 5px 13px;
-            border-radius: 999px;
-            border: 1px solid rgba(255,255,255,0.18);
-            background: rgba(255,255,255,0.07);
+            gap: 1px;
+            padding: 6px 4px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.14);
+            background: rgba(255,255,255,0.06);
             color: rgba(255,255,255,0.85);
-            font-size: 0.82rem;
+            font-size: 0.68rem;
             cursor: pointer;
             transition: all .2s ease;
             user-select: none;
-            min-height: 32px;
+            width: 56px;
         }
-        .pool-tab:hover { background: rgba(255,255,255,0.15); transform: translateY(-1px); }
+        .pool-tab:hover { background: rgba(255,255,255,0.16); transform: translateX(2px); }
         .pool-tab.active {
             background: linear-gradient(135deg, rgba(255,215,0,0.9), rgba(255,107,107,0.9));
             color: #1a1a2e;
@@ -1025,12 +1048,35 @@
         .pool-tab.purple.active { background: linear-gradient(135deg, #c471ed, #a020f0); color: #fff; }
         .pool-tab.blue.active { background: linear-gradient(135deg, #4fc3f7, #4169e1); color: #fff; }
         .pool-tab.green.active { background: linear-gradient(135deg, #7bed9f, #2ecc71); color: #1a1a2e; }
-        .pool-tab .pool-skin-lock { font-size: 0.72rem; margin-left: 2px; }
-        .pool-tab-hint { font-size: 0.68rem; color: rgba(255,255,255,0.35); margin-left: 4px; }
-        /* 隐藏原大标题栏（DOM 保留，JS 兼容）；分区只在其 Tab 展开时显示 */
+        .pool-tab .pool-skin-lock { font-size: 0.6rem; margin-left: 0; }
+        #poolTabBar.collapsed .pool-tab { display: none; }
+        #poolTabBar.collapsed { padding: 4px; }
+        /* 隐藏原大标题栏（DOM 保留，JS 兼容）；展开的分区以浮层形式显示，不再占页面流 */
         .collapsible-section > .collapsible-header { display: none !important; }
         .collapsible-section { display: none; }
-        .collapsible-section:has(> .collapsible-header.open) { display: block; }
+        .collapsible-section:has(> .collapsible-header.open) {
+            display: block;
+            position: fixed;
+            left: 84px;
+            top: 60px;
+            width: min(780px, calc(100vw - 104px));
+            max-height: calc(100vh - 120px);
+            overflow: auto;
+            z-index: 9400;
+            background: linear-gradient(135deg, rgba(20,20,42,0.96), rgba(14,20,42,0.96));
+            box-shadow: 0 16px 48px rgba(0,0,0,0.65);
+        }
+        .collapsible-section .collapsible-content.open { max-height: none; }
+        @media (max-width: 768px) {
+            #poolTabBar { left: 4px; padding: 5px 3px; gap: 4px; }
+            .pool-tab { width: 46px; font-size: 0.6rem; padding: 5px 2px; }
+            .collapsible-section:has(> .collapsible-header.open) {
+                left: 60px;
+                width: calc(100vw - 68px);
+                top: 54px;
+                max-height: calc(100vh - 110px);
+            }
+        }
 
         .collapsible-header {
             padding: 18px 25px;

@@ -14301,13 +14301,26 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (h !== header) toggleSection(h);
                 });
                 toggleSection(header);
-                setTimeout(() => { try { sec.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }, 80);
             } else {
                 toggleSection(header);
             }
             syncPoolTabs();
         }
         window.togglePoolTab = togglePoolTab;
+
+        // 收起/展开左侧卡池停靠栏（收起时同时关掉已展开的选卡浮层）
+        window.__togglePoolDock = function () {
+            const bar = document.getElementById('poolTabBar');
+            if (!bar) return;
+            const collapsed = bar.classList.toggle('collapsed');
+            const btn = document.getElementById('poolDockToggleBtn');
+            if (btn) btn.textContent = collapsed ? '▶' : '◀';
+            if (collapsed) {
+                document.querySelectorAll('.collapsible-section .collapsible-header.open').forEach(h => toggleSection(h));
+            }
+            try { localStorage.setItem('tdjl_pool_dock_collapsed', collapsed ? '1' : '0'); } catch (e) {}
+            syncPoolTabs();
+        };
 
         function toggleSection(header) {
             header.classList.toggle('open');
@@ -14860,6 +14873,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     favoriteContent.classList.add('open');
                     const icon = favoriteHeader.querySelector('.toggle-icon');
                     if (icon) icon.textContent = '▲';
+                }
+            }
+            // 恢复卡池停靠栏收起状态
+            if (localStorage.getItem('tdjl_pool_dock_collapsed') === '1') {
+                const bar = document.getElementById('poolTabBar');
+                if (bar) {
+                    bar.classList.add('collapsed');
+                    const dockBtn = document.getElementById('poolDockToggleBtn');
+                    if (dockBtn) dockBtn.textContent = '▶';
                 }
             }
             if (typeof syncPoolTabs === 'function') syncPoolTabs();
