@@ -30494,6 +30494,34 @@ ${maSection}
             if (c) c.value = w ? (w.content || '').replace(/\r/g, '') : '';
         }
 
+        // 双保险：把完整公告（含 welcome 项）同步到公开仓库 news.json（NEWS_URL 同源），
+        // 确保普通用户（无 token / 匿名读公告 Gist 失败时）走 NEWS_URL 兜底也能拿到 welcome，新 Web 用户才能弹窗。
+        async function saveNewsToPublicRepo(newsData) {
+            const token = getGistToken();
+            if (!token) return;
+            const fullData = {
+                title: currentConfig.title || '',
+                wechat: currentConfig.wechat || '',
+                game: currentConfig.game || '',
+                notice: currentConfig.notice || '',
+                open: currentConfig.open !== undefined ? currentConfig.open : true,
+                auctionNews: currentConfig.auctionNews !== undefined ? currentConfig.auctionNews : true,
+                data: newsData
+            };
+            const apiUrl = 'https://api.github.com/repos/gyq-svip/my-web-config/contents/news.json';
+            const headers = { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' };
+            const getResp = await fetch(apiUrl, { headers });
+            if (!getResp.ok) throw new Error('读取公开仓库 news.json 失败 HTTP ' + getResp.status);
+            const fileData = await getResp.json();
+            const newContent = btoa(unescape(encodeURIComponent(JSON.stringify(fullData, null, 2))));
+            const putResp = await fetch(apiUrl, {
+                method: 'PUT',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: 'chore: sync welcome news to public repo', content: newContent, sha: fileData.sha })
+            });
+            if (!putResp.ok) throw new Error('写入公开仓库失败 HTTP ' + putResp.status);
+        }
+
         async function adminSaveWelcome() {
             const tEl = document.getElementById('adminWelcomeTitle');
             const cEl = document.getElementById('adminWelcomeContent');
@@ -30501,6 +30529,7 @@ ${maSection}
             const title = tEl.value.trim();
             const content = cEl.value;
             if (!content.trim()) { showAdminStatus('请输入欢迎词内容', 'error'); return; }
+            showAdminStatus('保存中…', 'info');
             try {
                 const newsData = await adminFetchNewsFromGist();
                 const idx = newsData.findIndex(n => n.category === 'welcome');
@@ -30514,13 +30543,20 @@ ${maSection}
                 };
                 if (idx >= 0) newsData[idx] = item; else newsData.unshift(item);
                 await adminSaveNewsToGist(newsData);
+                // 双保险：同步完整公告到公开仓库，确保普通用户 / 新 Web 用户一定读到
+                let repoOk = false;
+                try { await saveNewsToPublicRepo(newsData); repoOk = true; } catch (e) { console.warn('[欢迎词] 同步公开仓库失败:', e); }
                 newsItems = newsData;
                 localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(newsItems));
                 initMarquee();
                 loadWelcomeEditor();
-                showAdminStatus('欢迎词已保存（全网生效）', 'success');
+                if (repoOk) {
+                    showAdminStatus('✅ 已保存并同步到公开仓库（全网生效，新用户打开即弹）', 'success');
+                } else {
+                    showAdminStatus('⚠️ 已保存到 Gist，但公开仓库同步失败，部分用户可能暂看不到', 'error');
+                }
             } catch (e) {
-                showAdminStatus('保存失败: ' + (e && e.message || e), 'error');
+                showAdminStatus('❌ 保存失败: ' + (e && e.message || e), 'error');
             }
         }
 
