@@ -14228,6 +14228,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             return sec.querySelector('.profession-section') ? 'p0' : 'all';
         }
         // 卡片框固定锚定在「我的卡槽」(battle-field) 左侧空白区，所有分类都在同一位置
+        // 面板等高缓存：行高(卡高+行距)/顶部内容高/整框高度（首次实测后全局复用，保证各分区等高）
+        let poolRowH = 68, poolGridTop = 60, poolPanelH = 0;
         function positionPoolPanel(sec) {
             try {
                 const bf = document.querySelector('.battle-field');
@@ -14246,21 +14248,25 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const dockTop = dock ? dock.getBoundingClientRect().top : r.top;
                 const top = Math.max(60, Math.round(dockTop));
                 sec.style.top = top + 'px';
-                // 🔴 2026-09-18 面板高度封顶：最多显示 7 排卡（再多在框内下拉滚动看），避免遮住下方手牌区。
-                //    行高按实际卡片量（卡高 + 行间距），7 排之外还受视口兜底（top 到底部留 140px）约束。
-                let maxH = Math.max(240, window.innerHeight - top - 140);
+                // 🔴 2026-09-18 所有卡组面板【固定等高】= 顶部内容 + 6 排卡：不再呼高呼低。
+                //    首次打开任一面板时实测（顶部提示条高 + 卡高 + 行距）并缓存，之后所有分区都用同一高度；
+                //    卡不足 6 排也保持这个高度（下方留空），超出 6 排在框内滚动。
                 try {
                     const grid = sec.querySelector('.cards-grid');
                     const card = grid && grid.querySelector('.card-item');
                     if (grid && card) {
                         const cs = getComputedStyle(grid);
                         const rowGap = parseFloat(cs.rowGap) || 6;
-                        const gridTop = Math.max(0, Math.round(grid.getBoundingClientRect().top - sec.getBoundingClientRect().top));
-                        const sevenRows = gridTop + Math.round((card.offsetHeight + rowGap) * 7) + 6;
-                        maxH = Math.min(maxH, Math.max(240, sevenRows));
+                        poolRowH = card.offsetHeight + rowGap;
+                        poolGridTop = Math.max(0, Math.round(grid.getBoundingClientRect().top - sec.getBoundingClientRect().top));
                     }
                 } catch (e) {}
-                sec.style.maxHeight = maxH + 'px';
+                if (!poolPanelH) {
+                    poolPanelH = Math.round(poolGridTop + poolRowH * 6) + 8;
+                }
+                const H = Math.min(poolPanelH, Math.max(240, window.innerHeight - top - 140));
+                sec.style.height = Math.max(240, H) + 'px';
+                sec.style.maxHeight = Math.max(240, H) + 'px';
             } catch (e) {}
         }
         window.addEventListener('resize', function () {
@@ -14284,29 +14290,43 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         window.positionPoolDock = positionPoolDock;
 
         // ===== 页面滚动下限：往上滚到「项目管理器工具栏」就是顶，不再滚到页头 =====
-        // 用户要求：页头（大标题/欢迎/时钟）不想再看到，向上滚动到 出战选择/项目管理器 那排就停。
-        // 只拦截【向上】滚——向下滚完全自由，避免从页头往下滚时被误拉跳。
+        // 🔴 2026-09-18 重写：上一版只监听 window——但本页真正的滚动容器是 #mainContent
+        //    （见 __tfjlScrollMain 的注释「优先 #mainContent，否则滚 window」），所以钳制完全没生效；
+        //    且 window.scrollTo(0, limit) 在 window 也有少量滚动空间时会把整个页面拽一下 → 反复跳。
+        //    现在两种滚动布局都挂钳制，各自只钳【向上】滚；钳制后把基准 lastY 设为 limit，避免连跳。
         (function () {
-            let lastY = window.scrollY, locking = false;
-            function floorY() {
+            let locking = false;
+            function floorFor(scroller) {
                 try {
-                    const el = document.getElementById('scheme1') || document.querySelector('.selection-area');
-                    if (!el) return -1;
-                    return Math.max(0, Math.round(el.getBoundingClientRect().top + window.scrollY) - 6);
+                    const t = document.getElementById('scheme1') || document.querySelector('.selection-area');
+                    if (!t) return -1;
+                    if (scroller) {
+                        return Math.max(0, Math.round(t.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop) - 6);
+                    }
+                    return Math.max(0, Math.round(t.getBoundingClientRect().top + window.scrollY) - 6);
                 } catch (e) { return -1; }
             }
-            window.addEventListener('scroll', function () {
-                const y = window.scrollY;
-                const goingUp = y < lastY - 1;
-                lastY = y;
-                if (locking || !goingUp) return;
-                const limit = floorY();
-                if (limit > 0 && y < limit) {
-                    locking = true;
-                    window.scrollTo(0, limit);
-                    requestAnimationFrame(function () { locking = false; });
-                }
-            }, { passive: true });
+            function attach(scroller) {
+                const isEl = !!scroller;
+                const target = isEl ? scroller : window;
+                let lastY = isEl ? scroller.scrollTop : window.scrollY;
+                target.addEventListener('scroll', function () {
+                    const y = isEl ? scroller.scrollTop : window.scrollY;
+                    const goingUp = y < lastY - 1;
+                    lastY = y;
+                    if (locking || !goingUp) return;
+                    const limit = floorFor(scroller);
+                    if (limit > 0 && y < limit) {
+                        locking = true;
+                        lastY = limit; // 钳制落点作为新基准，防止惯性滚动在边界反复拉跳
+                        if (isEl) scroller.scrollTop = limit; else window.scrollTo(0, limit);
+                        setTimeout(function () { locking = false; }, 60);
+                    }
+                }, { passive: true });
+            }
+            const mc = document.getElementById('mainContent');
+            if (mc) attach(mc);
+            attach(null);
         })();
 
         // 收藏面板：排序模式开关（排序模式下按住卡片拖动调整顺序）
