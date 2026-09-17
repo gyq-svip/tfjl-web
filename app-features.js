@@ -1527,28 +1527,43 @@
         }
 
         // 网站功能说明弹窗（按大版本首次弹出；仅网页版，含下载桌面版引导）
-        function showWelcomeGuide() {
+        // 文案（标题/功能列表）由管理员后台编辑，经 window.getWelcomeGuideData() 从云端读取；读取失败回退默认
+        async function showWelcomeGuide() {
             // 桌面版用户已在 APP 内，无需引导下载；仅网页版弹
             if (window.__TAURI__ || window.__TAURI_INTERNALS__) return;
             // 每个大版本（SW CACHE_VERSION 的 sX.Y 两级）首次进入才弹
             const key = 'TFJL_WelcomeRead_' + _welcomeBigVer();
             try { if (localStorage.getItem(key)) return; } catch (e) {}
+            let title = '欢迎来到塔防精灵助手';
+            let items = [
+                '📂 项目管理 — 脚本分类存储，支持脚本、图片、阵容、记事本',
+                '📜 脚本文件 — 解析到手牌，支持拖拽、分享到需求墙',
+                '🔍 脚本解析与生成 — 自动生成活动/副本脚本，可手动微调',
+                '🏪 拍卖行 — 闲置物品自由上架、交换、求购，完全免费',
+                '📢 需求墙 — 发布需求、分享脚本、互动交流'
+            ];
+            try {
+                if (typeof window.getWelcomeGuideData === 'function') {
+                    const w = await window.getWelcomeGuideData();
+                    if (w && w.title) title = w.title;
+                    if (w && w.content && w.content.trim()) {
+                        items = w.content.split('\n').map(s => s.trim()).filter(Boolean);
+                    }
+                }
+            } catch (e) {}
+            const itemsHtml = items.map(t => '<div style="margin-bottom:8px;">' + escapeHtml(t) + '</div>').join('');
             const guideHtml = `
                 <div id="welcomeGuideModal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;">
                     <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.5);border-radius:16px;padding:24px;max-width:460px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
                         <div style="text-align:center;margin-bottom:12px;">
                             <span style="font-size:1.5rem;">🎮</span>
-                            <span style="color:#ffd700;font-size:1.1rem;font-weight:bold;margin-left:8px;">欢迎来到塔防精灵助手</span>
+                            <span style="color:#ffd700;font-size:1.1rem;font-weight:bold;margin-left:8px;">${escapeHtml(title)}</span>
                         </div>
                         <div style="background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.4);border-radius:8px;padding:8px 12px;margin-bottom:14px;text-align:center;">
                             <span style="color:#fbbf24;font-size:0.85rem;font-weight:bold;">⚠️ 首次使用，请了解核心功能</span>
                         </div>
                         <div style="color:rgba(255,255,255,0.85);font-size:0.85rem;line-height:1.8;">
-                            <div style="margin-bottom:8px;">📂 <b>项目管理</b> — 脚本分类存储，支持脚本、图片、阵容、记事本</div>
-                            <div style="margin-bottom:8px;">📜 <b>脚本文件</b> — 解析到手牌，支持拖拽、分享到需求墙</div>
-                            <div style="margin-bottom:8px;">🔍 <b>脚本解析与生成</b> — 自动生成活动/副本脚本，可手动微调</div>
-                            <div style="margin-bottom:8px;">🏪 <b>拍卖行</b> — 闲置物品自由上架、交换、求购，完全免费</div>
-                            <div style="margin-bottom:8px;">📢 <b>需求墙</b> — 发布需求、分享脚本、互动交流</div>
+                            ${itemsHtml}
                         </div>
                         <div style="background:rgba(255,152,0,0.12);border:1px solid rgba(255,152,0,0.4);border-radius:8px;padding:8px 12px;margin-top:10px;text-align:center;">
                             <span style="color:#ffb74d;font-size:0.8rem;">📥 <b>下载桌面版</b>解锁：本地 OCR 识别、寒冰暗月连打、后台挂机自动操作</span>
