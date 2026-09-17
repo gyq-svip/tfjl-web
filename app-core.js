@@ -30525,10 +30525,12 @@ ${maSection}
         async function adminSaveWelcome() {
             const tEl = document.getElementById('adminWelcomeTitle');
             const cEl = document.getElementById('adminWelcomeContent');
+            const btn = document.getElementById('adminSaveWelcomeBtn');
             if (!tEl || !cEl) return;
             const title = tEl.value.trim();
             const content = cEl.value;
             if (!content.trim()) { showAdminStatus('请输入欢迎词内容', 'error'); return; }
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ 保存中…'; }
             showAdminStatus('保存中…', 'info');
             try {
                 const newsData = await adminFetchNewsFromGist();
@@ -30542,21 +30544,28 @@ ${maSection}
                     permanent: true
                 };
                 if (idx >= 0) newsData[idx] = item; else newsData.unshift(item);
+                // 主路径：写公告 Gist（gist 权限）。部署版所有用户的前端都自带注入 Token，
+                // 经 fetchNewsFromGitHub() 读此 Gist 即可拿到欢迎词 → 全网生效，与标题/公告机制完全一致。
                 await adminSaveNewsToGist(newsData);
-                // 双保险：同步完整公告到公开仓库，确保普通用户 / 新 Web 用户一定读到
+                // 尽力同步公开仓库兜底（仅覆盖「无 Token / 本地 dev」的极少数访问）。
+                // 需 Token 具备 repo 权限才会成功；失败不影响主流程（Gist 已生效）。
                 let repoOk = false;
-                try { await saveNewsToPublicRepo(newsData); repoOk = true; } catch (e) { console.warn('[欢迎词] 同步公开仓库失败:', e); }
+                try { await saveNewsToPublicRepo(newsData); repoOk = true; } catch (e) { console.warn('[欢迎词] 公开仓库兜底同步失败(不影响主流程):', e); }
                 newsItems = newsData;
                 localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(newsItems));
                 initMarquee();
                 loadWelcomeEditor();
-                if (repoOk) {
-                    showAdminStatus('✅ 已保存并同步到公开仓库（全网生效，新用户打开即弹）', 'success');
-                } else {
-                    showAdminStatus('⚠️ 已保存到 Gist，但公开仓库同步失败，部分用户可能暂看不到', 'error');
-                }
+                if (btn) { btn.disabled = false; btn.textContent = '✅ 已保存'; }
+                const msg = repoOk
+                    ? '✅ 已保存并同步到公开仓库（全网生效，新用户打开即弹）'
+                    : '✅ 已保存到 Gist，全网用户刷新即生效（公开仓库兜底未同步，仅影响极少数无 Token 访问）';
+                showAdminStatus(msg, 'success');
+                alert('✅ 欢迎词已保存成功！\n\n部署版用户刷新页面即可看到新欢迎词并自动重弹。');
             } catch (e) {
-                showAdminStatus('❌ 保存失败: ' + (e && e.message || e), 'error');
+                if (btn) { btn.disabled = false; btn.textContent = '💾 保存欢迎词'; }
+                const err = (e && e.message) || ('' + e);
+                showAdminStatus('❌ 保存失败: ' + err, 'error');
+                alert('❌ 欢迎词保存失败！\n\n' + err + '\n\n请检查网络和 Token 是否正常。');
             }
         }
 
