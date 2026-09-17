@@ -243,14 +243,21 @@
             return 0;
         }
 
-        // 面板模糊（0~100）：调的是主内容面板（.container，出战选择/卡槽/手牌那块）的毛玻璃程度
-        // 0 = 背景透过面板清晰可见；100 = 毛玻璃最重（约 30px），背景基本糊掉
+        // 主面板毛玻璃层（.container 区域，出战选择/卡槽/手牌那块）：模糊 + 底色浓度两个维度都可调
+        // 模糊 0 = 背景清晰；100 = 糊掉（约 30px）。底色 0 = 完全不遮挡（背景原样可见）；100 = 最浓（约 0.45 白）
         const BG_BLUR_KEY = 'TFJL_BG_BLUR';
+        const BG_FROST_KEY = 'TFJL_FROST_ALPHA';
         function blurLevelToPx(v) { return Math.round((Math.max(0, Math.min(100, v)) / 100) * 30 * 10) / 10; }
+        function frostLevelToAlpha(v) { return Math.round((Math.max(0, Math.min(100, v)) / 100) * 45) / 100; }
+        function readLevel(key) {
+            const raw = localStorage.getItem(key);
+            return raw === null ? 0 : (parseFloat(raw) || 0);
+        }
         function applyBgBlur() {
-            const raw = localStorage.getItem(BG_BLUR_KEY);
-            const lv = raw === null ? 0 : (parseFloat(raw) || 0);
+            const lv = readLevel(BG_BLUR_KEY);
+            const fl = readLevel(BG_FROST_KEY);
             const px = blurLevelToPx(lv);
+            const alpha = frostLevelToAlpha(fl);
             // 毛玻璃做在独立固定层上（与主面板同宽、垫在背景上/内容下）。
             // 🔴 不能直接给 .container 加 backdrop-filter：那会让它成为内部 fixed 元素（停靠栏/卡框）的定位基准，布局全乱。
             let frost = document.getElementById('panelFrost');
@@ -262,6 +269,7 @@
             }
             frost.style.backdropFilter = px > 0 ? 'blur(' + px + 'px)' : '';
             frost.style.webkitBackdropFilter = px > 0 ? 'blur(' + px + 'px)' : '';
+            frost.style.background = alpha > 0 ? 'rgba(255,255,255,' + alpha + ')' : 'transparent';
             return lv;
         }
         window.__bgSetBlur = function (v) {
@@ -270,6 +278,13 @@
             applyBgBlur();
             const lab = document.getElementById('bgBlurVal');
             if (lab) lab.textContent = lv + '%';
+        };
+        window.__bgSetFrost = function (v) {
+            const fl = Math.max(0, Math.min(100, Math.round(parseFloat(v) || 0)));
+            localStorage.setItem(BG_FROST_KEY, String(fl));
+            applyBgBlur();
+            const lab = document.getElementById('bgFrostVal');
+            if (lab) lab.textContent = fl + '%';
         };
 
         // ===== 上传背景图片库（IndexedDB 存 blob，避免 localStorage 爆配额） =====
@@ -575,7 +590,8 @@
                 });
             }
             const overlayOn = localStorage.getItem(BG_OVERLAY_ON) === '1';
-            const blurVal = (function () { const r = localStorage.getItem(BG_BLUR_KEY); return r === null ? 0 : (parseFloat(r) || 0); })();
+            const blurVal = readLevel(BG_BLUR_KEY);
+            const frostVal = readLevel(BG_FROST_KEY);
             const modal = document.createElement('div');
             modal.id = 'bgSettingsModal';
             modal.style.cssText = 'position:fixed;top:78px;right:18px;width:332px;max-width:92vw;z-index:100000;background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:14px 16px 16px;max-height:86vh;overflow:auto;box-shadow:0 12px 44px rgba(0,0,0,0.6);';
@@ -592,7 +608,12 @@
                 '  <input type="range" id="bgBlurRange" min="0" max="100" step="1" value="' + blurVal + '" oninput="window.__bgSetBlur(this.value)" style="flex:1;min-width:0;">' +
                 '  <span id="bgBlurVal" style="min-width:40px;text-align:right;color:#ffd700;">' + blurVal + '%</span>' +
                 '</div>' +
-                '<div style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-bottom:8px;">调的是出战选择/卡槽这块面板的毛玻璃：0=背景看清，100=背景糊掉</div>' +
+                '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.78rem;color:rgba(255,255,255,0.85);">' +
+                '  <span style="flex-shrink:0;">面板底色</span>' +
+                '  <input type="range" id="bgFrostRange" min="0" max="100" step="1" value="' + frostVal + '" oninput="window.__bgSetFrost(this.value)" style="flex:1;min-width:0;">' +
+                '  <span id="bgFrostVal" style="min-width:40px;text-align:right;color:#ffd700;">' + frostVal + '%</span>' +
+                '</div>' +
+                '<div style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-bottom:8px;">这两条调的是出战选择/卡槽这块面板：<b>模糊</b> 0=背景看清、100=糊掉；<b>底色</b> 0=完全不遮挡（背景原样可见）、100=最浓</div>' +
                 '<div style="color:rgba(255,255,255,0.5);font-size:0.74rem;margin-bottom:6px;">上传图片会自动压缩到最长边 1920px（无需操心尺寸），存在本机、每台设备独立。</div>' +
                 rows.join('') +
                 '  <div style="border-top:1px solid rgba(255,255,255,0.12);margin-top:14px;padding-top:12px;">' +
