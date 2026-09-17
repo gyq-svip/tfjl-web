@@ -57,6 +57,8 @@ jobs:
           [ -d scripts ] && cp -rv scripts _site/ || true
           # 默认项目（深海-王城低配版，支持皮肤；ensureDefaultProjectLoaded 启动时拉取）
           [ -d projects ] && cp -rv projects _site/ || true
+          # 🔴 内置背景图（设置窗「内置背景图」直链 bg/xxx.jpg，白名单漏拷会导致线上 404 → 图片显示不出来）
+          [ -d bg ] && cp -rv bg _site/ || true
 
           echo "=== staged size ==="
           du -sh _site
@@ -190,6 +192,13 @@ jobs:
             exit 1
           fi
           echo "✅ 无 exe 混入"
+
+          # 内置背景图资源（缺失只告警不阻塞；若这里告警说明上面 Stage 步骤漏拷）
+          if [ -d bg ]; then
+            for f in bg/*; do
+              if [ -f "_site/$f" ]; then echo "✅ _site/$f"; else echo "⚠️ 缺少 _site/$f"; fi
+            done
+          fi
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

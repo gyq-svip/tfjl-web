@@ -11628,103 +11628,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
         // 设置常用卡拖放到战斗槽
         function setupFavoriteCardDropToSlot(slot, handCardsArray, containerId) {
-            slot.addEventListener('dragover', (e) => {
-                e.preventDefault();
-            });
-            slot.addEventListener('drop', async (e) => {
-                e.preventDefault();
-                const source = e.dataTransfer.getData('text/source') || (window.__dragPayload && window.__dragPayload.source) || '';
-                if (source !== 'favorite') return;
-                
-                const cardId = e.dataTransfer.getData('text/id') || (window.__dragPayload && window.__dragPayload.id) || '';
-                const cardName = e.dataTransfer.getData('text/plain') || (window.__dragPayload && window.__dragPayload.name) || '';
-                const isEngineering = (e.dataTransfer.getData('text/engineer') === 'true') || !!(window.__dragPayload && window.__dragPayload.isEngineering);
-                const profession = e.dataTransfer.getData('text/profession') || (window.__dragPayload && window.__dragPayload.profession) || '';
-                const slotId = slot.dataset.slot;
-                const slotType = slot.dataset.type;
-                const isUserSlot = slotId.startsWith('u');
-                
-                // 验证工程卡位置
-                if (slotType === 'engineering' && !isEngineering) {
-                    slot.classList.add('invalid-drop');
-                    setTimeout(() => slot.classList.remove('invalid-drop'), 500);
-                    return;
-                }
-                if (isEngineering && slotType !== 'engineering') {
-                    slot.classList.add('invalid-drop');
-                    setTimeout(() => slot.classList.remove('invalid-drop'), 500);
-                    return;
-                }
-                
-                // 精灵球不能上阵
-                if (profession === 'pokeball') {
-                    slot.classList.add('invalid-drop');
-                    setTimeout(() => slot.classList.remove('invalid-drop'), 500);
-                    return;
-                }
-                
-                // 检查槽位是否已被占用
-                if (slot.classList.contains('filled')) {
-                    removeCardFromSlot(slotId);
-                }
-                
-                // 检查是否已在手牌中（含基础卡/融合形态同身份的不同卡）
-                const existingInHand = handCardsArray.findIndex(c => c.id === cardId);
-                if (existingInHand === -1 && handHasIdentity(handCardsArray, cardName)) {
-                    slot.classList.add('invalid-drop');
-                    setTimeout(() => slot.classList.remove('invalid-drop'), 500);
-                    if (typeof showToast === 'function') showToast('⚠️ 手牌已有同一张卡（含融合形态），不能重复上阵');
-                    return;
-                }
-                if (existingInHand === -1) {
-                    // 不在手牌中，先添加到手牌
-                    if (handCardsArray.length >= MAX_HAND_CARDS) return;
-                    
-                    if (isEngineering) {
-                        const engCount = handCardsArray.filter(c => c.isEngineering).length;
-                        if (engCount >= 2) return;
-                    } else {
-                        const normalCount = handCardsArray.filter(c => !c.isEngineering).length;
-                        if (normalCount >= 9) return;
-                    }
-                    
-                    handCardsArray.push({ id: cardId, name: cardName, placed: slotId, isEngineering, profession });
-                } else {
-                    // 已在手牌中，更新放置位置
-                    handCardsArray[existingInHand].placed = slotId;
-                }
-                
-                // 更新槽位显示
-                const slotCardType = findCardTypeById(cardId) || 'gold';
-                const slotHandType = isUserSlot ? 'my' : 'teammate';
-                const slotLevelBadge = createLevelBadgeHTML(cardId, slotCardType, slotHandType, cardName);
-                slot.innerHTML = `<span class="card-item" data-profession="${profession}">${slotLevelBadge}<span class="card-name">${cardName}</span></span>`;
-                slot.classList.add('filled');
-                slot.classList.remove('empty');
-                slot.dataset.cardId = cardId;
-                slot.dataset.handType = slotHandType;
-                slot.dataset.profession = profession;
-
-                // 应用皮肤背景
-                try { await applySkinBgToSlot(slot, cardName); } catch (e) {}
-                refreshSlotFusionControl(slot);
-
-                // 更新放置卡牌数组
-                const placedArray = isUserSlot ? myPlacedCards : teammatePlacedCards;
-                if (!Array.isArray(placedArray)) {
-                    if (isUserSlot) myPlacedCards = [];
-                    else teammatePlacedCards = [];
-                }
-                const existingPlacedIndex = placedArray.findIndex(c => c.id === cardId);
-                if (existingPlacedIndex > -1) {
-                    placedArray[existingPlacedIndex].slot = slotId;
-                } else {
-                    placedArray.push({ id: cardId, name: cardName, slot: slotId, isEngineering, profession });
-                }
-                
-                updateHandDisplay(isUserSlot ? 'my' : 'teammate');
-                updateDamageReductionDisplay(); // 拖放上卡后立即更新减伤显示
-            });
+            // 🔴 2026-09-18 停用（保留函数体签名，避免调用点报错）：
+            //    卡槽上的收藏卡落槽已由 handleSlotDrop（source 'favorite' 分支）统一处理。
+            //    从前的隐患：这里额外给每个槽绑了第二个 drop 监听 → 同一张收藏卡落下时两个监听都会执行：
+            //    handleSlotDrop 先把卡放进槽（槽变 filled），随后本监听又因槽已 filled 调 removeCardFromSlot
+            //    把刚放的卡清掉，再被「手牌已有同张卡」拦截 → 结果【卡只进了手牌、槽位空着】，
+            //    这正是用户反馈的"收藏卡拖不进卡槽/只到手牌"。dragover 的 preventDefault 由
+            //    handleSlotDragOver（已绑定在槽上）提供，不受本函数停用影响。
+            void slot; void handCardsArray; void containerId;
+            return;
         }
 
         // 处理卡池卡牌点击（添加到手牌）
@@ -12395,56 +12307,73 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
             if (source === 'pool' || source === 'favorite') {
                 const targetHand = isUserSlot ? myHandCards : teammateHandCards;
-                if (targetHand.length >= MAX_HAND_CARDS) return;
-                
-                // 检查是否已存在相同卡牌（含基础卡/融合形态同身份）
-                if (targetHand.some(c => c.id === cardId) || handHasIdentity(targetHand, cardName)) {
-                    this.classList.add('invalid-drop');
-                    setTimeout(() => this.classList.remove('invalid-drop'), 500);
-                    return;
+                if (!Array.isArray(myPlacedCards)) myPlacedCards = [];
+                if (!Array.isArray(teammatePlacedCards)) teammatePlacedCards = [];
+                const placedArr = isUserSlot ? myPlacedCards : teammatePlacedCards;
+
+                // 🔴 2026-09-18 修复「收藏卡拖不进卡槽 / 只进手牌」：
+                //    手牌里已有这张卡（同 id 或同身份：基础卡与融合形态算同一张）时，旧逻辑直接
+                //    invalid-drop 拦截 → 收藏卡（通常本就在手牌里）永远拖不上。现在改为直接上卡。
+                const _ident = (typeof cardIdentity === 'function') ? cardIdentity(cardName) : cardName;
+                let handCard = targetHand.find(c => c.id === cardId) ||
+                    targetHand.find(c => (typeof cardIdentity === 'function' ? cardIdentity(c.name) : c.name) === _ident);
+
+                if (!handCard) {
+                    if (targetHand.length >= MAX_HAND_CARDS) return;
+
+                    if (isEngineering) {
+                        const engCount = targetHand.filter(c => c.isEngineering).length;
+                        if (engCount >= 2) return;
+                    } else {
+                        const normalCount = targetHand.filter(c => !c.isEngineering).length;
+                        if (normalCount >= 9) return;
+                    }
+
+                    const poolCard = document.querySelector('.card-item[data-id="' + cardId + '"]');
+                    const cardType = poolCard ? poolCard.dataset.type : '';
+                    handCard = { id: cardId, name: cardName, placed: slotId, isEngineering, profession, type: cardType };
+                    targetHand.push(handCard);
                 }
-                
-                if (isEngineering) {
-                    const engCount = targetHand.filter(c => c.isEngineering).length;
-                    if (engCount >= 2) return;
-                } else {
-                    const normalCount = targetHand.filter(c => !c.isEngineering).length;
-                    if (normalCount >= 9) return;
+
+                // 🔴 上卡原则：同一张卡只能占一个槽位——先清掉它原来的槽（含 placedArray 记录）
+                if (handCard.placed && handCard.placed !== slotId) {
+                    const prevSlotEl = document.querySelector('.battle-slot[data-slot="' + handCard.placed + '"]');
+                    const prevIdx = placedArr.findIndex(c => c.slot === handCard.placed);
+                    if (prevIdx > -1) placedArr.splice(prevIdx, 1);
+                    if (prevSlotEl) clearSlotVisual(prevSlotEl);
                 }
-                
-                const poolCard = document.querySelector('.card-item[data-id="' + cardId + '"]');
-                const cardType = poolCard ? poolCard.dataset.type : '';
-                
-                targetHand.push({ id: cardId, name: cardName, placed: slotId, isEngineering, profession, type: cardType });
-                
-                // 添加等级徽章
-                const levelBadge = cardType ? createLevelBadgeHTML(cardId, cardType, isUserSlot ? 'my' : 'teammate', cardName) : '';
-                this.innerHTML = '<span class="card-item" data-profession="' + profession + '">' + levelBadge + '<span class="card-name">' + cardName + '</span></span>';
+                handCard.placed = slotId;
+
+                const placeId = handCard.id, placeName = handCard.name, placeProf = handCard.profession || profession;
+                const placeType = handCard.type || (typeof findCardTypeById === 'function' ? findCardTypeById(placeId) : '');
+                const levelBadge = placeType ? createLevelBadgeHTML(placeId, placeType, isUserSlot ? 'my' : 'teammate', placeName) : '';
+                this.innerHTML = '<span class="card-item" data-profession="' + placeProf + '">' + levelBadge + '<span class="card-name">' + placeName + '</span></span>';
                 this.classList.add('filled');
                 this.classList.remove('empty');
-                this.dataset.cardId = cardId;
+                this.dataset.cardId = placeId;
                 this.dataset.handType = isUserSlot ? 'my' : 'teammate';
-                this.dataset.profession = profession;
+                this.dataset.profession = placeProf;
 
-                try { await applySkinBgToSlot(this, cardName); } catch (e) {}
+                try { await applySkinBgToSlot(this, placeName); } catch (e) {}
                 refreshSlotFusionControl(this);
 
-                const placedArray = isUserSlot ? myPlacedCards : teammatePlacedCards;
-                if (!Array.isArray(placedArray)) {
-                    if (isUserSlot) myPlacedCards = [];
-                    else teammatePlacedCards = [];
+                // placedArray 去重：同一张卡只保留本槽这一条记录
+                for (let i = placedArr.length - 1; i >= 0; i--) {
+                    if (placedArr[i].id === placeId) placedArr.splice(i, 1);
                 }
-                placedArray.push({ id: cardId, name: cardName, slot: slotId, isEngineering, profession });
-                
+                placedArr.push({ id: placeId, name: placeName, slot: slotId, isEngineering: !!handCard.isEngineering, profession: placeProf });
+
                 updateHandDisplay(isUserSlot ? 'my' : 'teammate');
                 updateDamageReductionDisplay(); // 更新减伤显示
             } else if (source === 'hand') {
                 const handType = e.dataTransfer.getData('text/hand') || (window.__dragPayload && window.__dragPayload.handType) || '';
                 const handCards = handType === 'my' ? myHandCards : teammateHandCards;
-                const placedArray = handType === 'my' ? myPlacedCards : teammatePlacedCards;
+                let placedArray = handType === 'my' ? myPlacedCards : teammatePlacedCards;
                 if (!Array.isArray(placedArray)) {
-                    if (handType === 'my') myPlacedCards = [];
-                    else teammatePlacedCards = [];
+                    // 🔴 修复：原来只重建全局数组、局部变量仍指向旧的非数组值 → 后续 findIndex/splice 会抛错
+                    placedArray = [];
+                    if (handType === 'my') myPlacedCards = placedArray;
+                    else teammatePlacedCards = placedArray;
                 }
                 
                 const cardIndex = handCards.findIndex(c => c.id === cardId);
