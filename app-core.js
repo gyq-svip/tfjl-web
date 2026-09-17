@@ -15187,6 +15187,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             // 根据保存的偏好控制特效开关
             updateEffectsVisibility();
 
+            // 应用用户自定义背景 + 在用户菜单注入「🎨 背景」入口
+            if (typeof window.applyUserBackground === 'function') window.applyUserBackground();
+            if (typeof window.injectBackgroundMenu === 'function') window.injectBackgroundMenu();
+
             // 重新扫描皮肤目录，让日志在浮动控制台可见（app-local.js 初始化时控制台捕获器尚未启动）
             setTimeout(async () => {
                 if (window.scanSkins) {

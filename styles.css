@@ -2027,7 +2027,25 @@
                 opacity: 0;
             }
         }
-        
+
+        /* ========== 用户自定义背景 ========== */
+        body.bg-custom {
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
+        @keyframes bgAuroraShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        body.bg-anim-aurora, body.bg-anim-neon {
+            background-size: 200% 200% !important;
+            animation: bgAuroraShift 12s ease infinite;
+        }
+        body.bg-anim-neon { animation-duration: 6s; }
+        body.bg-anim-stars { background-size: cover; }
+
         /* 移动端响应式样式 */
         @media (max-width: 768px) {
             body {
