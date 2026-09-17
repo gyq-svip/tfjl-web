@@ -11477,9 +11477,13 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             
             grid.innerHTML = html;
             // 🔴 JS 内联兜底（防 SW 旧 CSS 缓存吞掉新样式）：2 列大卡 + 卡高与卡池一致
-            grid.style.gridTemplateColumns = 'repeat(2, 1fr)';
-            grid.style.gap = '8px';
-            grid.querySelectorAll('.card-item').forEach(c => { c.style.minHeight = '72px'; c.style.fontSize = '0.82rem'; });
+            // 注意必须带 important —— CSS 里有 repeat(3,1fr)!important 会压掉普通内联样式
+            grid.style.setProperty('grid-template-columns', 'repeat(2, 1fr)', 'important');
+            grid.style.setProperty('gap', '8px', 'important');
+            grid.querySelectorAll('.card-item').forEach(c => {
+                c.style.setProperty('min-height', '72px', 'important');
+                c.style.setProperty('font-size', '0.82rem', 'important');
+            });
             
             // 添加事件监听
             grid.querySelectorAll('.card-item').forEach(card => {

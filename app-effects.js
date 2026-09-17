@@ -279,6 +279,14 @@
                 sa.style.backdropFilter = blur;
                 sa.style.webkitBackdropFilter = blur;
             });
+            // 头部（标题+公告栏）毛玻璃也跟随底色滑条：0=很透看背景，100=原样的深色毛玻璃
+            const hdr = document.getElementById('fixedHeader');
+            if (hdr) {
+                hdr.style.background = 'rgba(15,15,35,' + (0.1 + 0.32 * f).toFixed(3) + ')';
+                const hBlur = 'blur(' + Math.round(4 + 10 * f) + 'px)';
+                hdr.style.backdropFilter = hBlur;
+                hdr.style.webkitBackdropFilter = hBlur;
+            }
             return lv;
         }
         window.__bgSetBlur = function (v) {
