@@ -14280,6 +14280,35 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
         }
 
+        // ===== 卡池分区紧凑 Tab：点标签展开/收起对应分区（手风琴式，同时只开一个） =====
+        function syncPoolTabs() {
+            document.querySelectorAll('#poolTabBar .pool-tab').forEach(tab => {
+                const sec = document.querySelector('.collapsible-section.' + tab.dataset.sec);
+                const open = !!(sec && sec.querySelector('.collapsible-header.open'));
+                tab.classList.toggle('active', open);
+            });
+        }
+
+        function togglePoolTab(name) {
+            const sec = document.querySelector('.collapsible-section.' + name);
+            if (!sec) return;
+            const header = sec.querySelector('.collapsible-header');
+            if (!header) return;
+            const willOpen = !header.classList.contains('open');
+            if (willOpen) {
+                // 手风琴：先收起其它已展开分区
+                document.querySelectorAll('.collapsible-section .collapsible-header.open').forEach(h => {
+                    if (h !== header) toggleSection(h);
+                });
+                toggleSection(header);
+                setTimeout(() => { try { sec.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }, 80);
+            } else {
+                toggleSection(header);
+            }
+            syncPoolTabs();
+        }
+        window.togglePoolTab = togglePoolTab;
+
         function toggleSection(header) {
             header.classList.toggle('open');
             const content = header.nextElementSibling;
@@ -14310,6 +14339,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     localStorage.setItem('tdjl_notepad_open', isOpen);
                 }
             }
+
+            if (typeof syncPoolTabs === 'function') syncPoolTabs();
         }
 
         let customCards = {};
@@ -14831,6 +14862,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (icon) icon.textContent = '▲';
                 }
             }
+            if (typeof syncPoolTabs === 'function') syncPoolTabs();
 
             // 恢复记事本折叠状态
             const notepadOpen = localStorage.getItem('tdjl_notepad_open');
