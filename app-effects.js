@@ -243,18 +243,25 @@
             return 0;
         }
 
-        // 背景模糊程度（0~100 档位，作用在独立背景层 #bgLayer 上，界面内容不受影响）
-        // 0 = 背景完全清晰；100 = 模糊最重（约 35px），背景基本只剩色块，卡槽/文字最清楚
+        // 面板模糊（0~100）：调的是主内容面板（.container，出战选择/卡槽/手牌那块）的毛玻璃程度
+        // 0 = 背景透过面板清晰可见；100 = 毛玻璃最重（约 30px），背景基本糊掉
         const BG_BLUR_KEY = 'TFJL_BG_BLUR';
-        function blurLevelToPx(v) { return Math.round((Math.max(0, Math.min(100, v)) / 100) * 35 * 10) / 10; }
+        function blurLevelToPx(v) { return Math.round((Math.max(0, Math.min(100, v)) / 100) * 30 * 10) / 10; }
         function applyBgBlur() {
             const raw = localStorage.getItem(BG_BLUR_KEY);
             const lv = raw === null ? 0 : (parseFloat(raw) || 0);
             const px = blurLevelToPx(lv);
-            document.documentElement.style.setProperty('--bg-blur', px + 'px');
-            document.body.style.setProperty('--bg-blur', px + 'px');
-            const layer = ensureBgLayer();
-            if (layer) layer.style.filter = 'blur(' + px + 'px)'; // 内联兜底，不依赖 CSS 变量/新样式表
+            // 毛玻璃做在独立固定层上（与主面板同宽、垫在背景上/内容下）。
+            // 🔴 不能直接给 .container 加 backdrop-filter：那会让它成为内部 fixed 元素（停靠栏/卡框）的定位基准，布局全乱。
+            let frost = document.getElementById('panelFrost');
+            if (!frost) {
+                frost = document.createElement('div');
+                frost.id = 'panelFrost';
+                frost.style.cssText = 'position:fixed;top:0;bottom:0;left:50%;transform:translateX(-50%);width:min(1400px,100%);z-index:-1;pointer-events:none;border-radius:18px;';
+                document.body.appendChild(frost);
+            }
+            frost.style.backdropFilter = px > 0 ? 'blur(' + px + 'px)' : '';
+            frost.style.webkitBackdropFilter = px > 0 ? 'blur(' + px + 'px)' : '';
             return lv;
         }
         window.__bgSetBlur = function (v) {
@@ -262,7 +269,7 @@
             localStorage.setItem(BG_BLUR_KEY, String(lv));
             applyBgBlur();
             const lab = document.getElementById('bgBlurVal');
-            if (lab) lab.textContent = lv + '（' + blurLevelToPx(lv) + 'px）';
+            if (lab) lab.textContent = lv + '%';
         };
 
         // ===== 上传背景图片库（IndexedDB 存 blob，避免 localStorage 爆配额） =====
@@ -581,10 +588,11 @@
                 '  <input type="checkbox" id="bgOverlaySwitch"' + (overlayOn ? ' checked' : '') + ' onchange="window.__bgToggleOverlay(this.checked)">' +
                 '  背景协调压暗（开启后浅色背景自动压暗，深色不影响）</label>' +
                 '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.78rem;color:rgba(255,255,255,0.85);">' +
-                '  <span style="flex-shrink:0;">背景模糊</span>' +
+                '  <span style="flex-shrink:0;">面板模糊</span>' +
                 '  <input type="range" id="bgBlurRange" min="0" max="100" step="1" value="' + blurVal + '" oninput="window.__bgSetBlur(this.value)" style="flex:1;min-width:0;">' +
-                '  <span id="bgBlurVal" style="min-width:56px;text-align:right;color:#ffd700;">' + blurVal + '（' + blurLevelToPx(blurVal) + 'px）</span>' +
+                '  <span id="bgBlurVal" style="min-width:40px;text-align:right;color:#ffd700;">' + blurVal + '%</span>' +
                 '</div>' +
+                '<div style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-bottom:8px;">调的是出战选择/卡槽这块面板的毛玻璃：0=背景看清，100=背景糊掉</div>' +
                 '<div style="color:rgba(255,255,255,0.5);font-size:0.74rem;margin-bottom:6px;">上传图片会自动压缩到最长边 1920px（无需操心尺寸），存在本机、每台设备独立。</div>' +
                 rows.join('') +
                 '  <div style="border-top:1px solid rgba(255,255,255,0.12);margin-top:14px;padding-top:12px;">' +
