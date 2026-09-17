@@ -306,8 +306,26 @@
                 sa.style.backdropFilter = blur;
                 sa.style.webkitBackdropFilter = blur;
             });
-            // 🔴 2026-09-18 已撤销「头部毛玻璃跟随底色滑条」：头部恢复原始不透明深色渐变，
-            //    底色滑条只管 .selection-area 和 panelFrost，不再碰头部。
+            // 🔴 2026-09-18 头部黑色跟随「面板底色」滑条（应乘客要求重做）：只改颜色透明度+背景模糊，
+            //    布局/sticky 完全不动。0% ≈ 几乎全透看背景；100% = 原始不透明深色渐变原样。
+            const hdr = document.getElementById('fixedHeader');
+            if (hdr) {
+                const a = (0.08 + 0.92 * f).toFixed(3);
+                hdr.style.background = 'linear-gradient(135deg,rgba(15,15,35,' + a + '),rgba(26,26,46,' + a + '),rgba(22,33,62,' + a + '))';
+                const hBlur = f > 0 ? 'blur(' + Math.round(10 * f) + 'px)' : 'none';
+                hdr.style.backdropFilter = hBlur;
+                hdr.style.webkitBackdropFilter = hBlur;
+            }
+            // 项目工具栏行（本地/深海/王城低配版那排）同样跟随底色：原来 0.05 白偏黑不协调，
+            // 现在 0%=原样，100%=更亮的毛玻璃条，与主面板一致
+            const pSel = document.getElementById('projectScopeSelector');
+            const prow = pSel ? pSel.parentElement : null;
+            if (prow) {
+                prow.style.background = 'rgba(255,255,255,' + (0.05 + 0.2 * f).toFixed(3) + ')';
+                const pBlur = f > 0 ? 'blur(' + Math.round(10 * f) + 'px)' : 'none';
+                prow.style.backdropFilter = pBlur;
+                prow.style.webkitBackdropFilter = pBlur;
+            }
             return lv;
         }
         window.__bgSetBlur = function (v) {
