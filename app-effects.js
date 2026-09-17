@@ -226,6 +226,24 @@
         let bgSelectedColors = [];
         const BG_KEY = 'TFJL_User_BG';
 
+        function getBgOverlayForValue(val) {
+            if (!val || val === 'default') return 0;
+            if (val.indexOf('grad:') === 0) return 0.35;
+            if (val.indexOf('custom:') === 0) return 0.4;
+            if (val.indexOf('preset:') === 0) {
+                const key = val.slice(7);
+                for (const cat of Object.keys(BG_PRESETS)) {
+                    const p = BG_PRESETS[cat].find(function (x) { return x.name === key; });
+                    if (p) {
+                        if (cat === 'bright') return 0.38;
+                        if (cat === 'anime') return key === '深海' ? 0.12 : 0.28;
+                        return 0;
+                    }
+                }
+            }
+            return 0;
+        }
+
         function applyUserBackground() {
             document.body.classList.remove('bg-custom', 'bg-anim-aurora', 'bg-anim-neon', 'bg-anim-stars');
             document.body.style.background = '';
@@ -252,6 +270,7 @@
                 document.body.style.background = val.slice(5);
                 document.body.style.backgroundAttachment = 'fixed';
             }
+            document.body.style.setProperty('--bg-overlay', String(getBgOverlayForValue(val)));
         }
 
         // 上传图片：canvas 压缩到最长边 1920px、JPEG 0.8，避免超 localStorage 配额 / 拖慢加载
@@ -315,6 +334,7 @@
             if (!bgSelectedColors.length) return;
             document.body.style.background = buildGrad(bgSelectedColors);
             document.body.style.backgroundAttachment = 'fixed';
+            document.body.style.setProperty('--bg-overlay', '0.35');
         }
         window.__bgRemoveColor = function (i) {
             bgSelectedColors.splice(i, 1);

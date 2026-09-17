@@ -31,6 +31,21 @@
             -moz-osx-font-smoothing: grayscale;
         }
 
+        /* 背景协调遮罩：浅色背景上自动加一层黑色半透明，让主面板和背景融合、文字可读。
+           透明度由 JS 通过 CSS 变量 --bg-overlay 控制（0~0.5）。 */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, var(--bg-overlay, 0));
+            pointer-events: none;
+            z-index: -1;
+            transition: background 0.3s ease;
+        }
+
         /* ========== 移动端适配样式 ========== */
         @media (max-width: 768px) {
             body {
