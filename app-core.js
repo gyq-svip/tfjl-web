@@ -11463,47 +11463,17 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 return;
             }
             
-            // 按职业分组
-            const professionGroups = {};
-            const professionNames = {
-                'warrior': '⚔️ 战士',
-                'mage': '🔮 法师',
-                'archer': '🏹 射手',
-                'summoner': '🐉 召唤',
-                'priest': '⛪ 牧师',
-                'warlock': '😈 术士',
-                'panda': '🐼 熊猫',
-                'engineering': '🔧 工程',
-                'pokeball': '🔴 精灵球'
-            };
-            
+            // 🔴 2026-09-18 用户要求：收藏不再按职业分组，平铺全部；顺序 = favoriteCards 数组序，
+            // 支持在面板内拖动排序（常用卡拖最前，setupFavoriteCardSortDrag 落盘）。
+            let html = '<div class="cards-grid">';
             favoriteCards.forEach(card => {
-                if (!professionGroups[card.profession]) {
-                    professionGroups[card.profession] = [];
-                }
-                professionGroups[card.profession].push(card);
+                // 添加等级徽章
+                const levelBadge = createLevelBadgeHTML(card.id, card.type, 'my', card.name);
+                // 带上 data-fusion，融合卡才能正确铺「主卡整皮 + 副卡右下角小图」
+                const isFusion = !!(window.cloudFusions && window.cloudFusions[card.name]);
+                html += '<div class="card-item favorite-card"' + (isFusion ? ' data-fusion="true"' : '') + ' data-id="' + card.id + '" data-name="' + card.name + '" data-type="' + card.type + '" data-engineering="' + card.isEngineering + '" data-profession="' + card.profession + '">' + levelBadge + card.name + '</div>';
             });
-            
-            let html = '';
-            
-            // 按添加顺序显示职业
-            const allProfessions = [...new Set([...professionOrder, ...Object.keys(professionGroups)])];
-            
-            allProfessions.forEach(profession => {
-                if (professionGroups[profession] && professionGroups[profession].length > 0) {
-                    html += '<div class="favorite-group">';
-                    html += '<div class="favorite-group-header">' + professionNames[profession] + '</div>';
-                    html += '<div class="cards-grid">';
-                    professionGroups[profession].forEach(card => {
-                        // 添加等级徽章
-                        const levelBadge = createLevelBadgeHTML(card.id, card.type, 'my', card.name);
-                        // 带上 data-fusion，融合卡才能正确铺「主卡整皮 + 副卡右下角小图」
-                        const isFusion = !!(window.cloudFusions && window.cloudFusions[card.name]);
-                        html += '<div class="card-item favorite-card"' + (isFusion ? ' data-fusion="true"' : '') + ' data-id="' + card.id + '" data-name="' + card.name + '" data-type="' + card.type + '" data-engineering="' + card.isEngineering + '" data-profession="' + card.profession + '">' + levelBadge + card.name + '</div>';
-                    });
-                    html += '</div></div>';
-                }
-            });
+            html += '</div>';
             
             grid.innerHTML = html;
             

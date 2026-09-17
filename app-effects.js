@@ -270,6 +270,14 @@
             frost.style.backdropFilter = px > 0 ? 'blur(' + px + 'px)' : '';
             frost.style.webkitBackdropFilter = px > 0 ? 'blur(' + px + 'px)' : '';
             frost.style.background = alpha > 0 ? 'rgba(255,255,255,' + alpha + ')' : 'transparent';
+            // 「面板底色」同时控制出战选择面板（.selection-area）的透明度：0=全透明看得见背景，100=原来的白底+毛玻璃
+            const f = Math.max(0, Math.min(100, fl)) / 100;
+            document.querySelectorAll('.selection-area').forEach(function (sa) {
+                sa.style.background = 'rgba(255,255,255,' + (0.1 * f).toFixed(3) + ')';
+                const blur = f > 0 ? 'blur(' + Math.round(10 * f) + 'px)' : 'none';
+                sa.style.backdropFilter = blur;
+                sa.style.webkitBackdropFilter = blur;
+            });
             return lv;
         }
         window.__bgSetBlur = function (v) {
@@ -613,7 +621,7 @@
                 '  <input type="range" id="bgFrostRange" min="0" max="100" step="1" value="' + frostVal + '" oninput="window.__bgSetFrost(this.value)" style="flex:1;min-width:0;">' +
                 '  <span id="bgFrostVal" style="min-width:40px;text-align:right;color:#ffd700;">' + frostVal + '%</span>' +
                 '</div>' +
-                '<div style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-bottom:8px;">这两条调的是出战选择/卡槽这块面板：<b>模糊</b> 0=背景看清、100=糊掉；<b>底色</b> 0=完全不遮挡（背景原样可见）、100=最浓</div>' +
+                '<div style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-bottom:8px;">这两条调的是主面板：<b>模糊</b> 0=背景看清、100=糊掉；<b>底色</b> 0=面板全透明（背景原样可见）、100=最浓（含「出战选择」面板）</div>' +
                 '<div style="color:rgba(255,255,255,0.5);font-size:0.74rem;margin-bottom:6px;">上传图片会自动压缩到最长边 1920px（无需操心尺寸），存在本机、每台设备独立。</div>' +
                 rows.join('') +
                 '  <div style="border-top:1px solid rgba(255,255,255,0.12);margin-top:14px;padding-top:12px;">' +
