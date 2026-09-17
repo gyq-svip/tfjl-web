@@ -237,6 +237,7 @@
             if (!val || val === 'default') return 0;
             if (val.indexOf('grad:') === 0) return 0.35;
             if (val.indexOf('custom:') === 0) return 0.4;
+            if (val.indexOf('img:') === 0) return 0.4;
             if (val.indexOf('preset:') === 0) {
                 const key = val.slice(7);
                 for (const cat of Object.keys(BG_PRESETS)) {
@@ -251,14 +252,96 @@
             return 0;
         }
 
+        // ===== 上传背景图片库（IndexedDB 存 blob，避免 localStorage 爆配额） =====
+        const BG_DB = 'tfjl-bg-images';
+        const BG_STORE = 'images';
+        let bgImgUrl = null, bgImgId = null, bgMigrateTried = false, bgThumbUrls = [];
+
+        function bgOpenDb() {
+            return new Promise(function (res, rej) {
+                if (!window.indexedDB) { rej('no idb'); return; }
+                const req = indexedDB.open(BG_DB, 1);
+                req.onupgradeneeded = function () {
+                    const db = req.result;
+                    if (!db.objectStoreNames.contains(BG_STORE)) db.createObjectStore(BG_STORE, { keyPath: 'id' });
+                };
+                req.onsuccess = function () { res(req.result); };
+                req.onerror = function () { rej(req.error); };
+            });
+        }
+        function bgIdb(mode, fn) {
+            return bgOpenDb().then(function (db) {
+                return new Promise(function (res, rej) {
+                    const tx = db.transaction(BG_STORE, mode);
+                    const store = tx.objectStore(BG_STORE);
+                    let out;
+                    try { out = fn(store); } catch (e) { rej(e); return; }
+                    tx.oncomplete = function () { res(out && out.result !== undefined ? out.result : out); };
+                    tx.onerror = function () { rej(tx.error); };
+                });
+            });
+        }
+        function bgSaveImage(blob, name) {
+            const rec = { id: 'bg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), name: name || '背景图', ts: Date.now(), blob: blob };
+            return bgIdb('readwrite', function (s) { return s.put(rec); }).then(function () { return rec.id; });
+        }
+        function bgGetImage(id) { return bgIdb('readonly', function (s) { return s.get(id); }); }
+        function bgAllImages() {
+            return bgIdb('readonly', function (s) { return s.getAll(); })
+                .then(function (r) { return (r || []).slice().sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); }); });
+        }
+        function bgDelImage(id) { return bgIdb('readwrite', function (s) { return s.delete(id); }); }
+        function bgRevokeUrl() {
+            if (bgImgUrl) { try { URL.revokeObjectURL(bgImgUrl); } catch (e) {} }
+            bgImgUrl = null; bgImgId = null;
+        }
+        function bgApplyImage(id) {
+            return bgGetImage(id).then(function (rec) {
+                if (!rec || !rec.blob) throw new Error('image not found');
+                bgRevokeUrl();
+                bgImgUrl = URL.createObjectURL(rec.blob);
+                bgImgId = id;
+                document.body.classList.add('bg-custom');
+                document.body.style.background = '';
+                document.body.style.backgroundImage = 'url(' + bgImgUrl + ')';
+                document.body.style.backgroundAttachment = 'fixed';
+            });
+        }
+        // 老数据（custom:<dataURL>）迁移进图片库，之后统一走 img:<id>
+        function migrateLegacyCustomBg() {
+            const val = (localStorage.getItem(BG_KEY) || '').trim();
+            if (val.indexOf('custom:') !== 0) return;
+            if (localStorage.getItem('TFJL_BG_MIGRATED') === '1') return;
+            const dataUrl = val.slice(7);
+            if (!dataUrl) return;
+            fetch(dataUrl).then(function (r) { return r.blob(); })
+                .then(function (blob) { return bgSaveImage(blob, '旧背景'); })
+                .then(function (id) {
+                    localStorage.setItem(BG_KEY, 'img:' + id);
+                    localStorage.setItem('TFJL_BG_MIGRATED', '1');
+                    applyUserBackground();
+                }).catch(function () { localStorage.setItem('TFJL_BG_MIGRATED', '1'); });
+        }
+
         function applyUserBackground() {
+            if (!bgMigrateTried) { bgMigrateTried = true; try { migrateLegacyCustomBg(); } catch (e) {} }
             document.body.classList.remove('bg-custom', 'bg-anim-aurora', 'bg-anim-neon', 'bg-anim-stars');
             document.body.style.background = '';
             document.body.style.backgroundImage = '';
             document.body.style.backgroundAttachment = '';
             const val = (localStorage.getItem(BG_KEY) || '').trim();
-            if (!val || val === 'default') return;
-            if (val.indexOf('preset:') === 0) {
+            if (!val || val === 'default') { bgRevokeUrl(); return; }
+            if (val.indexOf('img:') !== 0) bgRevokeUrl();
+            if (val.indexOf('img:') === 0) {
+                const id = val.slice(4);
+                document.body.classList.add('bg-custom');
+                if (bgImgId === id && bgImgUrl) {
+                    document.body.style.backgroundImage = 'url(' + bgImgUrl + ')';
+                    document.body.style.backgroundAttachment = 'fixed';
+                } else {
+                    bgApplyImage(id).catch(function () {});
+                }
+            } else if (val.indexOf('preset:') === 0) {
                 const key = val.slice(7);
                 let css = null, anim = null;
                 for (const cat of Object.keys(BG_PRESETS)) {
@@ -297,11 +380,23 @@
                     canvas.width = cw; canvas.height = ch;
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, cw, ch);
-                    let dataUrl;
+                    let dataUrl = '';
                     try { dataUrl = canvas.toDataURL('image/jpeg', 0.8); } catch (e) { dataUrl = reader.result; }
-                    localStorage.setItem(BG_KEY, 'custom:' + dataUrl);
-                    applyUserBackground();
-                    try { if (typeof showToast === 'function') showToast('✅ 背景已更新'); } catch (e) {}
+                    const fallback = function () {
+                        localStorage.setItem(BG_KEY, 'custom:' + dataUrl);
+                        applyUserBackground();
+                        try { if (typeof showToast === 'function') showToast('✅ 背景已更新（未进图片库）'); } catch (e) {}
+                    };
+                    if (!canvas.toBlob) { fallback(); return; }
+                    canvas.toBlob(function (blob) {
+                        if (!blob) { fallback(); return; }
+                        bgSaveImage(blob, file.name).then(function (id) {
+                            localStorage.setItem(BG_KEY, 'img:' + id);
+                            applyUserBackground();
+                            if (typeof renderBgImageList === 'function') renderBgImageList();
+                            try { if (typeof showToast === 'function') showToast('✅ 已保存到我的背景图'); } catch (e) {}
+                        }).catch(fallback);
+                    }, 'image/jpeg', 0.8);
                 };
                 img.src = reader.result;
             };
@@ -349,6 +444,53 @@
             renderBgColorList();
             if (bgSelectedColors.length) previewBgGrad(); else applyUserBackground();
         };
+        // ---------- 我的背景图：切换 / 删除（IndexedDB 图片库） ----------
+        function renderBgImageList() {
+            const box = document.getElementById('bgImageList');
+            if (!box) return;
+            const cur = (localStorage.getItem(BG_KEY) || '').trim();
+            try { bgThumbUrls.forEach(function (u) { URL.revokeObjectURL(u); }); } catch (e) {}
+            bgThumbUrls = [];
+            bgAllImages().then(function (list) {
+                if (!list.length) {
+                    box.innerHTML = '<span style="font-size:0.72rem;color:rgba(255,255,255,0.4);">还没有保存的背景图，点下方「📤 上传并保存」添加</span>';
+                    return;
+                }
+                box.innerHTML = '';
+                list.forEach(function (rec) {
+                    const u = URL.createObjectURL(rec.blob);
+                    bgThumbUrls.push(u);
+                    const name = String(rec.name || '背景图').replace(/[<>&"']/g, '');
+                    const active = cur === 'img:' + rec.id;
+                    const wrap = document.createElement('div');
+                    wrap.style.cssText = 'position:relative;width:78px;text-align:center;';
+                    wrap.innerHTML =
+                        '<div onclick="window.__bgUseImage(\'' + rec.id + '\')" title="点击切换到这张背景" style="width:78px;height:52px;border-radius:8px;background-image:url(' + u + ');background-size:cover;background-position:center;border:2px solid ' + (active ? '#ffd700' : 'rgba(255,255,255,0.28)') + ';box-shadow:' + (active ? '0 0 10px rgba(255,215,0,0.55)' : 'none') + ';cursor:pointer;"></div>' +
+                        '<button onclick="window.__bgDeleteImage(\'' + rec.id + '\')" title="删除这张背景图" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#e53935;border:none;color:#fff;font-size:0.66rem;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.5);">✕</button>' +
+                        '<div style="font-size:0.6rem;color:' + (active ? '#ffd700' : 'rgba(255,255,255,0.55)') + ';margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (active ? '使用中 ' : '') + name + '</div>';
+                    box.appendChild(wrap);
+                });
+            }).catch(function () {
+                box.innerHTML = '<span style="font-size:0.72rem;color:rgba(255,255,255,0.4);">读取背景图失败</span>';
+            });
+        }
+        window.__bgUseImage = function (id) {
+            localStorage.setItem(BG_KEY, 'img:' + id);
+            applyUserBackground();
+            renderBgImageList();
+            try { if (typeof showToast === 'function') showToast('✅ 已切换背景'); } catch (e) {}
+        };
+        window.__bgDeleteImage = function (id) {
+            if (!window.confirm('删除这张背景图？（只会从本机图片库移除）')) return;
+            const cur = (localStorage.getItem(BG_KEY) || '').trim();
+            bgDelImage(id).then(function () {
+                if (bgImgId === id) bgRevokeUrl();
+                if (cur === 'img:' + id) { localStorage.setItem(BG_KEY, 'default'); applyUserBackground(); }
+                renderBgImageList();
+                try { if (typeof showToast === 'function') showToast('🗑️ 已删除'); } catch (e) {}
+            }).catch(function () { try { if (typeof showToast === 'function') showToast('删除失败'); } catch (e) {} });
+        };
+
         window.__bgClearColors = function () { bgSelectedColors = []; renderBgColorList(); applyUserBackground(); };
         window.__bgApplyGrad = function () {
             if (bgSelectedColors.length < 2) { try { if (typeof showToast === 'function') showToast('至少选 2 个颜色'); } catch (e) {} return; }
@@ -396,6 +538,10 @@
                 '<div style="color:rgba(255,255,255,0.5);font-size:0.74rem;margin-bottom:6px;">上传图片会自动压缩到最长边 1920px（无需操心尺寸），存在本机、每台设备独立。</div>' +
                 rows.join('') +
                 '  <div style="border-top:1px solid rgba(255,255,255,0.12);margin-top:14px;padding-top:12px;">' +
+                '    <div style="color:rgba(255,255,255,0.6);font-size:0.78rem;margin-bottom:8px;">📁 我的背景图（点缩略图切换，右上角 ✕ 删除）</div>' +
+                '    <div id="bgImageList" style="display:flex;flex-wrap:wrap;gap:10px;"></div>' +
+                '  </div>' +
+                '  <div style="border-top:1px solid rgba(255,255,255,0.12);margin-top:14px;padding-top:12px;">' +
                 '    <div style="color:rgba(255,255,255,0.6);font-size:0.78rem;margin-bottom:8px;">🎨 圆盘自选渐变：用现有圆盘选色器，拖到亮处选浅色，松手即加入（最多 5 个）</div>' +
                 '    <div style="position:relative;width:132px;height:132px;margin:0 auto 9px;">' +
                 '      <canvas id="bgWheel_wheel" style="width:132px;height:132px;border-radius:50%;display:block;cursor:crosshair;box-shadow:0 0 0 1px rgba(255,255,255,0.28),0 4px 14px rgba(0,0,0,0.55);"></canvas>' +
@@ -416,7 +562,7 @@
                 '  </div>' +
                 '  <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">' +
                 '    <label style="padding:8px 14px;border-radius:8px;background:linear-gradient(135deg,#4facfe,#00f2fe);color:#1a1a2e;cursor:pointer;font-weight:600;font-size:0.85rem;">' +
-                '      📤 上传图片<input type="file" accept="image/*" style="display:none;" onchange="window.__bgFile(this.files[0])">' +
+                '      📤 上传并保存<input type="file" accept="image/*" style="display:none;" onchange="window.__bgFile(this.files[0])">' +
                 '    </label>' +
                 '    <button onclick="window.__setBgPreset(\'default\')" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.85rem;">↺ 恢复默认</button>' +
                 '    <button onclick="toggleVisualEffects()" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.85rem;">✨ 炫酷特效</button>' +
@@ -441,6 +587,7 @@
                 window.addEventListener('touchend', function () { dragging = false; });
             } catch (e) {}
             renderBgColorList();
+            renderBgImageList();
             try {
                 if (window.NBPC && NBPC.Wheel) {
                     if (NBPC.Wheel.injectStyles) NBPC.Wheel.injectStyles();
