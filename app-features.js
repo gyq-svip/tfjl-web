@@ -697,27 +697,158 @@
             grid.innerHTML = referenceImages.map((img, i) => `
                 <div style="position:relative;background:rgba(0,0,0,0.3);border-radius:8px;overflow:hidden;cursor:pointer;"
                      onclick="openRefViewer(${i})">
-                    <img src="${img.data}" style="width:100%;height:180px;object-fit:cover;display:block;"
-                         title="点击查看大图">
+                    <img src="${img.data}" data-rvidx="${i}" style="width:100%;height:180px;object-fit:cover;object-position:center top;display:block;"
+                         title="点击打开放大查看（支持缩放/平移，长图可完整查看）">
                     <button onclick="deleteRefImage(${i});event.stopPropagation();" style="position:absolute;top:5px;right:5px;background:rgba(244,67,54,0.9);border:none;color:white;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:0.8rem;">×</button>
+                    <span class="ref-dim" style="position:absolute;left:5px;bottom:5px;background:rgba(0,0,0,0.65);color:#ffd700;font-size:0.62rem;padding:1px 5px;border-radius:4px;pointer-events:none;">…</span>
                 </div>
             `).join('');
+            // 异步补尺寸角标 + 长图标记（长图缩略图置顶显示，一眼认出是哪张）
+            grid.querySelectorAll('img[data-rvidx]').forEach(im => {
+                const probe = new Image();
+                probe.onload = function () {
+                    const card = im.parentElement;
+                    const badge = card.querySelector('.ref-dim');
+                    const tall = probe.naturalHeight >= probe.naturalWidth * 2;
+                    if (badge) badge.textContent = probe.naturalWidth + '×' + probe.naturalHeight + (tall ? ' · 长图' : '');
+                    if (tall) im.style.objectPosition = 'center top';
+                };
+                probe.src = im.src;
+            });
+        }
+
+        // 🔴 2026-09-18 参考图查看器重做：全屏浮层 + 滚轮缩放(以鼠标为锚) + 拖拽平移 + 适应宽度/适应屏幕/1:1 + 前后翻页 + 键盘。
+        //    痛点：旧查看器把图塞进 max-height:50vh 的 contain 框——长图完全没法看。
+        //    新默认：长图（高≥2×宽）自动「适应宽度」宽度贴满、纵向滚/拖从上看到底；普通图「适应屏幕」。
+        let _rvState = { idx: 0, zoom: 1, px: 0, py: 0 };
+        const _rvBtnCss = 'background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:5px 10px;font-size:0.75rem;cursor:pointer;white-space:nowrap;';
+
+        function _rvImgEl() { return document.getElementById('refViewFullImg'); }
+
+        function _rvApply() {
+            const img = _rvImgEl();
+            if (!img) return;
+            img.style.transform = 'translate(' + _rvState.px + 'px,' + _rvState.py + 'px) scale(' + _rvState.zoom + ')';
+            const lab = document.getElementById('refViewFullZoom');
+            if (lab) lab.textContent = Math.round(_rvState.zoom * 100) + '%';
+        }
+
+        function _rvSetMode(mode) {
+            const img = _rvImgEl();
+            if (!img || !img.naturalWidth) return;
+            const vw = window.innerWidth, vh = window.innerHeight;
+            if (mode === 'fitw') _rvState.zoom = vw / img.naturalWidth;
+            else if (mode === 'fits') _rvState.zoom = Math.min(vw / img.naturalWidth, vh / img.naturalHeight);
+            else if (mode === '100') _rvState.zoom = 1;
+            else if (mode === 'in') _rvState.zoom = Math.min(10, _rvState.zoom * 1.25);
+            else if (mode === 'out') _rvState.zoom = Math.max(0.1, _rvState.zoom / 1.25);
+            _rvState.px = (vw - img.naturalWidth * _rvState.zoom) / 2;
+            _rvState.py = (mode === 'fitw') ? 0 : (vh - img.naturalHeight * _rvState.zoom) / 2;
+            _rvApply();
+            const tip = document.getElementById('refViewFullModeTip');
+            if (tip) tip.textContent = mode === 'fitw' ? '（适应宽度）' : mode === 'fits' ? '（适应屏幕）' : mode === '100' ? '（原始大小）' : '';
+        }
+
+        function _rvShow(idx) {
+            if (!referenceImages.length) return;
+            _rvState.idx = ((idx % referenceImages.length) + referenceImages.length) % referenceImages.length;
+            const it = referenceImages[_rvState.idx];
+            const img = _rvImgEl();
+            img.onload = function () {
+                _rvSetMode(img.naturalHeight >= img.naturalWidth * 2 ? 'fitw' : 'fits');
+            };
+            img.src = it.data;
+            const t = document.getElementById('refViewFullTitle');
+            if (t) t.textContent = (it.name || '') + '　' + (_rvState.idx + 1) + '/' + referenceImages.length;
         }
 
         function openRefViewer(index) {
             if (!referenceImages[index]) return;
-            var viewer = document.getElementById('refImageViewer');
-            var img = document.getElementById('refViewerImg');
-            var title = document.getElementById('refViewerTitle');
-            img.src = referenceImages[index].data;
-            title.textContent = referenceImages[index].name || '';
-            viewer.style.display = 'block';
-            // 滚动到查看器位置
-            viewer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            let overlay = document.getElementById('refViewFull');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'refViewFull';
+                overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(5,5,14,0.94);z-index:300000;display:none;overflow:hidden;';
+                overlay.innerHTML =
+                    '<div style="position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:6px;padding:8px 12px;background:rgba(10,10,24,0.88);border-bottom:1px solid rgba(255,215,0,0.25);z-index:2;flex-wrap:wrap;">' +
+                      '<span id="refViewFullTitle" style="color:#ffd700;font-size:0.8rem;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:32%;"></span>' +
+                      '<button data-act="prev" style="' + _rvBtnCss + '">◀ 上一张</button>' +
+                      '<button data-act="next" style="' + _rvBtnCss + '">下一张 ▶</button>' +
+                      '<span style="width:1px;height:18px;background:rgba(255,255,255,0.2);"></span>' +
+                      '<button data-act="fitw" style="' + _rvBtnCss + '">↔ 适应宽度</button>' +
+                      '<button data-act="fits" style="' + _rvBtnCss + '">🔲 适应屏幕</button>' +
+                      '<button data-act="100" style="' + _rvBtnCss + '">🔍 1:1</button>' +
+                      '<button data-act="in" style="' + _rvBtnCss + '">＋</button>' +
+                      '<button data-act="out" style="' + _rvBtnCss + '">－</button>' +
+                      '<span id="refViewFullZoom" style="color:#9a9ab0;font-size:0.74rem;min-width:44px;text-align:right;"></span>' +
+                      '<span id="refViewFullModeTip" style="color:rgba(255,255,255,0.4);font-size:0.72rem;"></span>' +
+                      '<span style="flex:1;"></span>' +
+                      '<button data-act="close" style="' + _rvBtnCss + 'background:rgba(244,67,54,0.75);border-color:rgba(244,67,54,0.5);">✕ 关闭 (Esc)</button>' +
+                    '</div>' +
+                    '<div id="refViewFullStage" style="position:absolute;top:44px;left:0;right:0;bottom:0;overflow:hidden;cursor:grab;">' +
+                      '<img id="refViewFullImg" style="transform-origin:0 0;position:absolute;top:0;left:0;max-width:none;max-height:none;user-select:none;-webkit-user-drag:none;" alt="">' +
+                    '</div>' +
+                    '<div style="position:absolute;bottom:8px;left:0;right:0;text-align:center;color:rgba(255,255,255,0.35);font-size:0.7rem;pointer-events:none;">滚轮缩放 · 按住拖动 · ← → 翻页 · Esc 关闭</div>';
+                document.body.appendChild(overlay);
+                overlay.addEventListener('click', function (e) {
+                    const b = e.target.closest('button[data-act]');
+                    if (!b) return;
+                    const act = b.getAttribute('data-act');
+                    if (act === 'close') closeRefViewer();
+                    else if (act === 'prev') _rvShow(_rvState.idx - 1);
+                    else if (act === 'next') _rvShow(_rvState.idx + 1);
+                    else _rvSetMode(act);
+                });
+                const stage = overlay.querySelector('#refViewFullStage');
+                stage.addEventListener('wheel', function (e) {
+                    e.preventDefault();
+                    const img = _rvImgEl(); if (!img) return;
+                    const rect = stage.getBoundingClientRect();
+                    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+                    const oldZ = _rvState.zoom;
+                    const nz = Math.max(0.1, Math.min(10, oldZ * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+                    if (nz === oldZ) return;
+                    _rvState.px = mx - (mx - _rvState.px) * (nz / oldZ);
+                    _rvState.py = my - (my - _rvState.py) * (nz / oldZ);
+                    _rvState.zoom = nz;
+                    _rvApply();
+                }, { passive: false });
+                let drag = null;
+                stage.addEventListener('pointerdown', function (e) {
+                    drag = { x: e.clientX, y: e.clientY, px: _rvState.px, py: _rvState.py };
+                    stage.style.cursor = 'grabbing';
+                    try { stage.setPointerCapture(e.pointerId); } catch (err) {}
+                });
+                stage.addEventListener('pointermove', function (e) {
+                    if (!drag) return;
+                    _rvState.px = drag.px + (e.clientX - drag.x);
+                    _rvState.py = drag.py + (e.clientY - drag.y);
+                    _rvApply();
+                });
+                const _rvEnd = function () { drag = null; stage.style.cursor = 'grab'; };
+                stage.addEventListener('pointerup', _rvEnd);
+                stage.addEventListener('pointercancel', _rvEnd);
+                document.addEventListener('keydown', function (e) {
+                    const ov = document.getElementById('refViewFull');
+                    if (!ov || ov.style.display === 'none') return;
+                    if (e.key === 'Escape') closeRefViewer();
+                    else if (e.key === 'ArrowLeft') _rvShow(_rvState.idx - 1);
+                    else if (e.key === 'ArrowRight') _rvShow(_rvState.idx + 1);
+                    else if (e.key === '+' || e.key === '=') _rvSetMode('in');
+                    else if (e.key === '-') _rvSetMode('out');
+                    else if (e.key === '0') _rvSetMode('fits');
+                    else if (e.key === '1') _rvSetMode('fitw');
+                    else if (e.key === '2') _rvSetMode('100');
+                });
+            }
+            overlay.style.display = 'block';
+            _rvShow(index);
+            if (window.trackFeature) window.trackFeature('参考图查看器');
         }
 
         function closeRefViewer() {
-            document.getElementById('refImageViewer').style.display = 'none';
+            const ov = document.getElementById('refViewFull');
+            if (ov) ov.style.display = 'none';
         }
 
         function handleRefImageUpload(input) {
