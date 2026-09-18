@@ -8827,6 +8827,16 @@
             }
         }
 
+        // 分享图可选背景图片加载
+        function _loadShareBgImage(dataUrl) {
+            return new Promise(function (res, rej) {
+                const img = new Image();
+                img.onload = function () { res(img); };
+                img.onerror = function () { rej(new Error('背景图加载失败')); };
+                img.src = dataUrl;
+            });
+        }
+
         // 生成分享图 canvas（含标题/两行阵容+手牌/8位项目短码/品牌脚注）
         // qrText：传入项目短链（#pg=）时右下角绘制二维码（扫码直达网页版并自动弹导入）
         // shortCode：8 位项目分享短码（整个项目已上传 Gist，导入方输码即得完整项目）
@@ -8888,11 +8898,25 @@
             const canvas = document.createElement('canvas');
             canvas.width = W; canvas.height = H;
             const ctx = canvas.getContext('2d');
-            // 背景
-            const bg = ctx.createLinearGradient(0, 0, W, H);
-            bg.addColorStop(0, '#1a1a2e'); bg.addColorStop(1, '#141426');
-            ctx.fillStyle = bg;
-            ctx.fillRect(0, 0, W, H);
+            // 背景：可选背景图片（cover 铺满 + 45% 压暗，保证卡面/文字清晰），否则默认深色渐变
+            const _drawDefBg = function () {
+                const bg = ctx.createLinearGradient(0, 0, W, H);
+                bg.addColorStop(0, '#1a1a2e'); bg.addColorStop(1, '#141426');
+                ctx.fillStyle = bg;
+                ctx.fillRect(0, 0, W, H);
+            };
+            if (opts.bgDataUrl) {
+                try {
+                    const _bgImg = await _loadShareBgImage(opts.bgDataUrl);
+                    const _s = Math.max(W / _bgImg.width, H / _bgImg.height);
+                    const _dw = _bgImg.width * _s, _dh = _bgImg.height * _s;
+                    ctx.drawImage(_bgImg, (W - _dw) / 2, (H - _dh) / 2, _dw, _dh);
+                    ctx.fillStyle = 'rgba(10,10,24,0.45)';
+                    ctx.fillRect(0, 0, W, H);
+                } catch (e) { _drawDefBg(); }
+            } else {
+                _drawDefBg();
+            }
             // 标题 = 阵容名字（一眼看出打什么，最显眼）；副标题 = 品牌 + 分类(金) + 日期 + 作者（小一号）
             // 🔴 2026-09-06 卡片名称自定义：opts.cardName 优先（分享者填写的主题），否则用项目名兜底，再否则「当前阵容」
             ctx.textBaseline = 'alphabetic';
@@ -9491,6 +9515,19 @@
                           ((window.WALL_CATEGORIES || ['未分类']).map(function (c) { return '<option value="' + c + '" style="background:#1a1a2e;">' + c + '</option>'; }).join('')) +
                         '</select>' +
                       '</div>' +
+                      '<div style="margin-top:12px;background:rgba(156,80,221,0.1);border:1px solid rgba(156,80,221,0.3);border-radius:8px;padding:8px 10px;">' +
+                        '<div style="display:flex;align-items:center;gap:8px;">' +
+                          '<input id="lineupShareBgChk" type="checkbox" style="accent-color:#ce93d8;width:16px;height:16px;cursor:pointer;flex-shrink:0;">' +
+                          '<label for="lineupShareBgChk" style="color:rgba(255,255,255,0.8);font-size:0.78rem;cursor:pointer;line-height:1.4;">🖼️ 分享图使用背景图片（自动压暗，卡面/文字依旧清晰）</label>' +
+                        '</div>' +
+                        '<div id="lineupShareBgRow" style="margin-top:8px;">' +
+                          '<label id="lineupShareBgPick" style="display:inline-block;padding:6px 10px;border-radius:6px;background:linear-gradient(135deg,#ce93d8,#7b1fa2);color:#fff;font-size:0.76rem;cursor:pointer;font-weight:600;">📷 选择图片</label>' +
+                          '<button id="lineupShareBgClear" style="margin-left:8px;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);font-size:0.76rem;cursor:pointer;">🗑 清除已选</button>' +
+                          '<span id="lineupShareBgState" style="margin-left:8px;color:rgba(255,255,255,0.5);font-size:0.72rem;"></span>' +
+                          '<input id="lineupShareBgFile" type="file" accept="image/*" style="display:none;">' +
+                        '</div>' +
+                        '<div style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-top:6px;">自动压缩到最长边 1280 并压暗 45%；选择会记住，下次分享默认带上（可随时清除）</div>' +
+                      '</div>' +
                       '<div style="display:flex;align-items:center;gap:8px;margin-top:12px;background:rgba(92,107,192,0.1);border:1px solid rgba(92,107,192,0.3);border-radius:8px;padding:8px 10px;">' +
                         '<input id="lineupShareHomeQrChk" type="checkbox" style="accent-color:#5c6bc0;width:16px;height:16px;cursor:pointer;flex-shrink:0;">' +
                         '<label for="lineupShareHomeQrChk" style="color:rgba(255,255,255,0.8);font-size:0.78rem;cursor:pointer;line-height:1.4;">🏠 图上加我的主页二维码（扫码进我主页，看我所有分享的作品）</label>' +
@@ -9547,6 +9584,49 @@
                     const lastForProj = localStorage.getItem('TFJL_ShareCardNameProj') || '';
                     cardNameInput.value = (lastCardName && lastForProj === curProj) ? lastCardName : curProj;
                 } catch (e) {}
+                // 🔴 2026-09-18 背景图片（可选）：压缩到最长边 1280/JPEG0.78 存本地，勾选即用、记住上次
+                const bgChk = modal.querySelector('#lineupShareBgChk');
+                const bgState = modal.querySelector('#lineupShareBgState');
+                const bgPick = modal.querySelector('#lineupShareBgPick');
+                const bgClearBtn = modal.querySelector('#lineupShareBgClear');
+                const bgFileInput = modal.querySelector('#lineupShareBgFile');
+                let bgHasData = false;
+                try {
+                    bgHasData = !!(localStorage.getItem('TFJL_ShareBgData') || '');
+                    bgChk.checked = bgHasData && localStorage.getItem('TFJL_ShareBgOn') !== '0';
+                    bgState.textContent = bgHasData ? '已选图片 ✓（点「📷 选择图片」可更换）' : '未选择';
+                } catch (e) {}
+                if (bgPick) bgPick.onclick = function () { bgFileInput.click(); };
+                if (bgClearBtn) bgClearBtn.onclick = function () {
+                    try { localStorage.removeItem('TFJL_ShareBgData'); } catch (e) {}
+                    bgHasData = false; bgChk.checked = false; bgState.textContent = '已清除';
+                };
+                if (bgFileInput) bgFileInput.onchange = function () {
+                    const f = bgFileInput.files && bgFileInput.files[0];
+                    if (!f) return;
+                    bgState.textContent = '处理中…';
+                    const reader = new FileReader();
+                    reader.onload = function () {
+                        const img = new Image();
+                        img.onload = function () {
+                            try {
+                                const maxSide = 1280;
+                                const s = Math.min(1, maxSide / Math.max(img.width, img.height));
+                                const c = document.createElement('canvas');
+                                c.width = Math.max(1, Math.round(img.width * s));
+                                c.height = Math.max(1, Math.round(img.height * s));
+                                c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+                                const dataUrl = c.toDataURL('image/jpeg', 0.78);
+                                localStorage.setItem('TFJL_ShareBgData', dataUrl);
+                                bgHasData = true; bgChk.checked = true;
+                                bgState.textContent = '已选图片 ✓（' + c.width + '×' + c.height + '）';
+                            } catch (e) { bgState.textContent = '处理失败，换一张试试'; }
+                        };
+                        img.onerror = function () { bgState.textContent = '图片读取失败'; };
+                        img.src = reader.result;
+                    };
+                    reader.readAsDataURL(f);
+                };
                 // 加密分享不参与复用（无法安全判断密码是否与上次一致），勾了密码就藏起「强制新建」，免得勾了没效果
                 const forceNewBox = modal.querySelector('#lineupShareForceNewBox');
                 const forceNewChk = modal.querySelector('#lineupShareForceNewChk');
@@ -9581,7 +9661,15 @@
                     // 主页二维码勾选持久化 + 传出
                     const homeQr = !!(homeQrChk && homeQrChk.checked);
                     try { localStorage.setItem('TFJL_ShareHomeQr', homeQr ? '1' : '0'); } catch (e) {}
-                    finish({ days: days, pw: pw, wall: !!(wallChk && wallChk.checked), msg: msg, cat: cat, homeQr: homeQr, forceNew: !!(forceNewChk && forceNewChk.checked), cardName: cardName });
+                    // 🔴 背景图片（可选）：勾选且本地有已选图 → 传给画布铺底
+                    let bgDataUrl = null;
+                    try {
+                        const _bgOn = !!(bgChk && bgChk.checked);
+                        localStorage.setItem('TFJL_ShareBgOn', _bgOn ? '1' : '0');
+                        const _bgData = localStorage.getItem('TFJL_ShareBgData') || '';
+                        if (_bgOn && _bgData) { bgDataUrl = _bgData; if (window.trackFeature) window.trackFeature('分享图加背景图'); }
+                    } catch (e) {}
+                    finish({ days: days, pw: pw, wall: !!(wallChk && wallChk.checked), msg: msg, cat: cat, homeQr: homeQr, forceNew: !!(forceNewChk && forceNewChk.checked), cardName: cardName, bgDataUrl: bgDataUrl });
                 };
             });
         }
