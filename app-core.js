@@ -12326,6 +12326,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 if (!Array.isArray(myPlacedCards)) myPlacedCards = [];
                 if (!Array.isArray(teammatePlacedCards)) teammatePlacedCards = [];
                 const placedArr = isUserSlot ? myPlacedCards : teammatePlacedCards;
+                if (window.trackFeature) window.trackFeature(source === 'favorite' ? '收藏拖卡上槽' : '卡池拖卡上槽');
 
                 // 🔴 2026-09-18 修复「收藏卡拖不进卡槽 / 只进手牌」：
                 //    手牌里已有这张卡（同 id 或同身份：基础卡与融合形态算同一张）时，旧逻辑直接
@@ -15285,6 +15286,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 slot.addEventListener('dragover', handleSlotDragOver);
                 slot.addEventListener('dragleave', handleSlotDragLeave);
                 slot.addEventListener('drop', handleSlotDrop);
+                // 🔴 2026-09-18 卡槽悬浮提示：明确告知支持拖拽（走统一 data-tip 提示框，不弹原生 title）
+                if (!slot.getAttribute('data-tip')) {
+                    slot.setAttribute('data-tip', '💡 支持拖拽：卡池/收藏的卡可直接拖到这里上阵；已上阵的卡可拖到其他槽换位、拖回手牌区取下');
+                }
                 slot.addEventListener('click', handleSlotClick);
                 /* [SKIN log muted] */ void (0) && console.log('[SKIN] binding battle-slot contextmenu:', slot.dataset.slot);
                 slot.addEventListener('contextmenu', handleSlotRightClick);
@@ -16975,6 +16980,49 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         //    死条目，绝不可能清掉 1 周(在线阈值)内的活人。展示口径不受影响（各视图仍按真实
         //    online_timeout 计数，_olAlive 不变）。
         function _olPruneWindow(base) { return Math.max(base || 0, 86400000); }
+
+        // ===== 功能使用埋点（新功能采用情况）：按设备计数存 counterData.feature_usage_dev，
+        //      展示端跨设备求和（feature_usage）。随既有心跳/同步链路落 Gist，零额外请求。
+        //      同名事件 2s 节流（滑条 oninput 连发防刷）。
+        const _featLastTs = {};
+        function trackFeature(name) {
+            try {
+                if (!name) return;
+                const now = Date.now();
+                if (_featLastTs[name] && now - _featLastTs[name] < 2000) return;
+                _featLastTs[name] = now;
+                if (!counterData || typeof counterData !== 'object') return;
+                if (!counterData.feature_usage_dev || typeof counterData.feature_usage_dev !== 'object') counterData.feature_usage_dev = {};
+                const dev = getDeviceId();
+                if (!counterData.feature_usage_dev[dev] || typeof counterData.feature_usage_dev[dev] !== 'object') counterData.feature_usage_dev[dev] = {};
+                counterData.feature_usage_dev[dev][name] = (counterData.feature_usage_dev[dev][name] || 0) + 1;
+                const agg = {};
+                for (const d in counterData.feature_usage_dev) {
+                    const dd = counterData.feature_usage_dev[d];
+                    if (!dd || typeof dd !== 'object') continue;
+                    for (const k in dd) agg[k] = (agg[k] || 0) + (dd[k] || 0);
+                }
+                counterData.feature_usage = agg;
+            } catch (e) {}
+        }
+        window.trackFeature = trackFeature;
+
+        // 🔴 新功能埋点（包装既有 window 入口，延迟 1.5s 确保全部定义完成；__tracked 防重复包装）
+        setTimeout(function () {
+            try {
+                const wrap = function (key, label) {
+                    const orig = window[key];
+                    if (typeof orig !== 'function' || orig.__tracked) return;
+                    const tracked = function () { if (window.trackFeature) window.trackFeature(label); return orig.apply(this, arguments); };
+                    tracked.__tracked = true;
+                    window[key] = tracked;
+                };
+                wrap('togglePoolTab', '卡池分类切换');
+                wrap('__togglePoolDock', '卡池栏收展');
+                wrap('__pickPoolProf', '职业筛选');
+                wrap('__toggleFavSort', '收藏排序模式');
+            } catch (e) {}
+        }, 1500);
         // 合并在线用户：按设备取"最新活跃时间戳"的并集（解决多设备同步互相覆盖、在线数漏算），并保留昵称/来源
         function mergeOnlineUsers(target, src) {
             if (!src || !src.online_users) return;
@@ -17169,6 +17217,25 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             mergeDailyDeviceVisits(target, src);
             // 离线记录：按设备取较新离线时间并集，30天自动清除
             mergeOfflineHistory(target, src);
+            // 🔴 功能使用埋点：按设备合并（每 key 取最大——设备自身计数单调递增，跨端不丢），并重算汇总
+            if (src.feature_usage_dev && typeof src.feature_usage_dev === 'object') {
+                if (!target.feature_usage_dev || typeof target.feature_usage_dev !== 'object') target.feature_usage_dev = {};
+                for (const dev in src.feature_usage_dev) {
+                    const sd = src.feature_usage_dev[dev];
+                    if (!sd || typeof sd !== 'object') continue;
+                    if (!target.feature_usage_dev[dev] || typeof target.feature_usage_dev[dev] !== 'object') target.feature_usage_dev[dev] = {};
+                    for (const k in sd) target.feature_usage_dev[dev][k] = Math.max(target.feature_usage_dev[dev][k] || 0, sd[k] || 0);
+                }
+            }
+            if (target.feature_usage_dev && typeof target.feature_usage_dev === 'object') {
+                const agg = {};
+                for (const dev in target.feature_usage_dev) {
+                    const dd = target.feature_usage_dev[dev];
+                    if (!dd || typeof dd !== 'object') continue;
+                    for (const k in dd) agg[k] = (agg[k] || 0) + (dd[k] || 0);
+                }
+                target.feature_usage = agg;
+            }
             return target;
         }
 
@@ -31526,6 +31593,25 @@ ${maSection}
             html += analyticsCard('今日 APP 访问', todayAppVisits, '📱', activeApp > 0 ? '#4ade80' : 'rgba(255,255,255,0.5)');
             html += analyticsCard('今日 网页 访问', todayWebVisits, '🌐', activeWeb > 0 ? '#4ade80' : 'rgba(255,255,255,0.5)');
             html += `</div>`;
+
+            // 🔴 功能使用统计（新功能埋点）：跨设备求和，按次数倒序取前 12，条形图展示
+            try {
+                const fuSrc = (data && data.feature_usage) || (counterData && counterData.feature_usage) || {};
+                const fuEntries = Object.keys(fuSrc).map(k => [k, fuSrc[k] || 0]).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 12);
+                if (fuEntries.length) {
+                    html += `<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:14px;margin-bottom:20px;">`;
+                    html += `<div style="color:#ffd700;font-size:0.9rem;font-weight:bold;margin-bottom:10px;">🧭 新功能使用统计（累计次数 · 前十二）</div>`;
+                    const _maxFu = fuEntries[0][1] || 1;
+                    fuEntries.forEach(([k, v]) => {
+                        const pct = Math.max(4, Math.round(v / _maxFu * 100));
+                        html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">` +
+                            `<span style="width:150px;flex-shrink:0;color:rgba(255,255,255,0.75);font-size:0.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${k}</span>` +
+                            `<div style="flex:1;height:10px;background:rgba(255,255,255,0.08);border-radius:5px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:linear-gradient(90deg,#ffd700,#ff9800);"></div></div>` +
+                            `<span style="width:52px;text-align:right;color:#ffd700;font-size:0.78rem;font-weight:bold;">${v}</span></div>`;
+                    });
+                    html += `</div>`;
+                }
+            } catch (e) {}
 
             // 最近7天摘要
             let last7AppVisits = 0, last7WebVisits = 0;

@@ -679,6 +679,30 @@
         };
 
         window.__bgClearColors = function () { bgSelectedColors = []; renderBgColorList(); applyUserBackground(); };
+
+        // 🔴 2026-09-18 新功能埋点：统一包装背景系统入口（延迟 1.5s 确保全部定义完成；2s 节流在 trackFeature 内）
+        setTimeout(function () {
+            try {
+                const wrap = function (key, label) {
+                    const orig = window[key];
+                    if (typeof orig !== 'function' || orig.__tracked) return;
+                    const tracked = function () { if (window.trackFeature) window.trackFeature(label); return orig.apply(this, arguments); };
+                    tracked.__tracked = true;
+                    window[key] = tracked;
+                };
+                wrap('__bgToggleOverlay', '背景压暗开关');
+                wrap('__bgSetBlur', '面板模糊调节');
+                wrap('__bgSetFrost', '面板底色调节');
+                wrap('__setBgPreset', '背景预设');
+                wrap('__setBgBuiltin', '内置背景图');
+                wrap('__bgRandomGrad', '随机渐变');
+                wrap('__bgApplyGrad', '应用自选渐变');
+                wrap('__bgUseImage', '背景图切换');
+                wrap('__bgDeleteImage', '背景图删除');
+                wrap('__bgClearColors', '清空渐变色');
+                wrap('__bgFile', '上传背景');
+            } catch (e) {}
+        }, 1500);
         window.__bgApplyGrad = function () {
             if (bgSelectedColors.length < 2) { try { if (typeof showToast === 'function') showToast('至少选 2 个颜色'); } catch (e) {} return; }
             const css = buildGrad(bgSelectedColors);
