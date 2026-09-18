@@ -80,8 +80,10 @@ async function main() {
   const files = gist.files || {};
 
   // 2) 遍历 diag-*.json（排除聚合文件自身）
+  // 🔴 2026-09-18 拆分 写入/非写入(GET)：entries 带 method 字段（历史无 method 的按写入算），
+  //    perUser 记 {w, r}，总操数 = w + r。
   const perUser = {}, perGist = {}, perFn = {};
-  let totalWrites = 0, fileCount = 0, onlineCount = 0;
+  let totalWrites = 0, totalReads = 0, fileCount = 0, onlineCount = 0;
   const now = Date.now();
   for (const [name, f] of Object.entries(files)) {
     if (!name.startsWith('diag-') || name === AGG_FILE || name === ID_FILE) continue;
@@ -89,30 +91,32 @@ async function main() {
     let p; try { p = JSON.parse(f.content || '{}'); } catch (e) { continue; }
     const who = (p.nick ? p.nick + '(' + (p.anonId || '?') + ')' : (p.anonId || '?'));
     const entries = Array.isArray(p.entries) ? p.entries : [];
-    let userSum = 0;
+    let userW = 0, userR = 0;
     for (const e of entries) {
       // 跳过脏条目：gistId 是 URL 片段或非法格式（历史 _gistIdOf bug 产生），避免 TOP 出现链接字符串
       const rawGid = typeof e.gistId === 'string' ? e.gistId : '';
       if (!rawGid || rawGid === 'unknown' || rawGid.indexOf('http') === 0 || rawGid.indexOf('/') !== -1) continue;
       const c = e.count || 0;
-      userSum += c; totalWrites += c;
+      const isRead = e.method === 'GET';
+      if (isRead) { userR += c; totalReads += c; }
+      else { userW += c; totalWrites += c; }
       const gid = e.gistId;
       perGist[gid] = (perGist[gid] || 0) + c;
       const key = gid + '|' + (e.fn || '?');
       perFn[key] = (perFn[key] || 0) + c;
     }
-    perUser[who] = (perUser[who] || 0) + userSum;
+    perUser[who] = { w: (perUser[who] ? perUser[who].w : 0) + userW, r: (perUser[who] ? perUser[who].r : 0) + userR };
     if (p.lastUpload && (now - p.lastUpload) < ALIVE_MS) onlineCount++;
   }
 
-  // 3) 排序 TOP（保留前 30，避免聚合文件过大）
-  const topN = (obj, n = 30) => Object.entries(obj).sort((a, b) => b[1] - a[1]).slice(0, n)
-    .map(([k, v]) => ({ k, v }));
+  // 3) 排序 TOP（保留前 30，避免聚合文件过大）；perUser 条目 {k, v=总操数, w=写入, r=非写入}（v 兼容旧消费端）
+  const topN = (obj, n = 30) => Object.entries(obj).sort((a, b) => (b[1].w + b[1].r) - (a[1].w + a[1].r)).slice(0, n)
+    .map(([k, x]) => ({ k, v: x.w + x.r, w: x.w, r: x.r }));
 
   const agg = {
     generatedAt: new Date().toISOString(),
     note: '由 diag-aggregate.yml 定时聚合，面板用 gist.githubusercontent.com raw 公开读取本文件（替代拉全量私有 Gist，降 API）',
-    fileCount, totalWrites, onlineCount,
+    fileCount, totalWrites, totalReads, totalOps: totalWrites + totalReads, onlineCount,
     perUser: topN(perUser),
     perGist: topN(perGist),
     perFn: topN(perFn)
@@ -127,7 +131,7 @@ async function main() {
     body: JSON.stringify({ files: { [AGG_FILE]: { content: JSON.stringify(agg, null, 2) } } })
   });
   if (!put.ok) { console.error('❌ 写回聚合公开 Gist 失败:', put.status, await put.text()); process.exit(1); }
-  console.log(`✅ 聚合完成：扫描 ${fileCount} 个上报文件，总写 ${totalWrites} 次，在线 ${onlineCount} 人，已写回公开 Gist ${aggGistId} 的 ${AGG_FILE}`);
+  console.log(`✅ 聚合完成：扫描 ${fileCount} 个上报文件，总写 ${totalWrites} 次 · 非写入 ${totalReads} 次 · 总操数 ${totalWrites + totalReads} 次，在线 ${onlineCount} 人，已写回公开 Gist ${aggGistId} 的 ${AGG_FILE}`);
 }
 
 main().catch(e => { console.error('❌ 异常:', e); process.exit(1); });
