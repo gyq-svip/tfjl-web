@@ -8836,6 +8836,15 @@
                 img.src = dataUrl;
             });
         }
+        // 解析分享背景来源：'lib:<id>' → 从 IndexedDB 图库取 blob 转 objectURL（用完 revoke）；否则原样（dataURL）
+        async function _resolveShareBgSrc(val) {
+            if (val && String(val).indexOf('lib:') === 0 && typeof window.__bgLibGet === 'function') {
+                const rec = await window.__bgLibGet(String(val).slice(4));
+                if (rec && rec.blob) return URL.createObjectURL(rec.blob);
+                throw new Error('背景图不存在（可能已在图库删除）');
+            }
+            return val;
+        }
 
         // 生成分享图 canvas（含标题/两行阵容+手牌/8位项目短码/品牌脚注）
         // qrText：传入项目短链（#pg=）时右下角绘制二维码（扫码直达网页版并自动弹导入）
@@ -8906,14 +8915,17 @@
                 ctx.fillRect(0, 0, W, H);
             };
             if (opts.bgDataUrl) {
+                let _u = null;
                 try {
-                    const _bgImg = await _loadShareBgImage(opts.bgDataUrl);
+                    _u = await _resolveShareBgSrc(opts.bgDataUrl);
+                    const _bgImg = await _loadShareBgImage(_u);
                     const _s = Math.max(W / _bgImg.width, H / _bgImg.height);
                     const _dw = _bgImg.width * _s, _dh = _bgImg.height * _s;
                     ctx.drawImage(_bgImg, (W - _dw) / 2, (H - _dh) / 2, _dw, _dh);
                     ctx.fillStyle = 'rgba(10,10,24,0.45)';
                     ctx.fillRect(0, 0, W, H);
                 } catch (e) { _drawDefBg(); }
+                try { if (_u && _u.indexOf('blob:') === 0) URL.revokeObjectURL(_u); } catch (e) {}
             } else {
                 _drawDefBg();
             }
@@ -9476,6 +9488,53 @@
 
         // 分享选项小窗：有效期下拉 + 可选密码加密（复用需求墙 PBKDF2+AES-GCM）
         // cfg.kind === 'project' 时切换为「分享项目」文案（阵容分享/项目分享共用一个选项窗）
+        // 🔴 2026-09-18 背景图库选择器：列出 IndexedDB 媒体库里的图片（视频做不了 canvas 背景不列），点选回调
+        function _shareBgLibPicker(cb) {
+            const old = document.getElementById('shareBgLibModal');
+            if (old) old.remove();
+            const modal = document.createElement('div');
+            modal.id = 'shareBgLibModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.62);z-index:' + (200003 + (window.topWinZIndex || 0)) + ';display:flex;align-items:center;justify-content:center;padding:16px;';
+            modal.innerHTML =
+                '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(206,147,216,0.45);border-radius:14px;padding:16px;max-width:560px;width:94%;max-height:80vh;overflow:auto;">' +
+                  '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+                    '<span style="color:#ce93d8;font-weight:bold;">🎞️ 从我的背景图库选择（仅图片）</span>' +
+                    '<button id="shareBgLibClose" style="background:none;border:none;color:#fff;font-size:1.2rem;cursor:pointer;">✕</button>' +
+                  '</div>' +
+                  '<div id="shareBgLibGrid" style="display:flex;flex-wrap:wrap;gap:10px;"><span style="color:rgba(255,255,255,0.5);font-size:0.78rem;">加载中…</span></div>' +
+                  '<div style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-top:10px;">点一张即设为分享图默认背景；没有想要的先去「🎨 背景」上传</div>' +
+                '</div>';
+            document.body.appendChild(modal);
+            const _urls = [];
+            const close = function () {
+                _urls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} });
+                modal.remove();
+            };
+            modal.querySelector('#shareBgLibClose').onclick = close;
+            modal.onclick = function (e) { if (e.target === modal) close(); };
+            const grid = modal.querySelector('#shareBgLibGrid');
+            const render = function (list) {
+                if (!list || !list.length) { grid.innerHTML = '<span style="color:rgba(255,255,255,0.5);font-size:0.78rem;">图库还是空的——先去「🎨 背景」上传几张</span>'; return; }
+                grid.innerHTML = '';
+                list.forEach(function (rec) {
+                    const u = URL.createObjectURL(rec.blob);
+                    _urls.push(u);
+                    const name = String(rec.name || '背景图').replace(/[<>&"']/g, '');
+                    const wrap = document.createElement('div');
+                    wrap.style.cssText = 'width:96px;text-align:center;cursor:pointer;';
+                    wrap.innerHTML = '<div style="width:96px;height:64px;border-radius:8px;background-image:url(' + u + ');background-size:cover;background-position:center;border:2px solid rgba(255,255,255,0.25);"></div>' +
+                        '<div style="font-size:0.66rem;color:rgba(255,255,255,0.6);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + name + '</div>';
+                    wrap.onclick = function () { const r = rec; close(); cb(r); };
+                    grid.appendChild(wrap);
+                });
+            };
+            if (typeof window.__bgLibImages === 'function') {
+                window.__bgLibImages().then(render).catch(function () { grid.innerHTML = '<span style="color:#ff8a80;font-size:0.78rem;">读取图库失败</span>'; });
+            } else {
+                grid.innerHTML = '<span style="color:#ff8a80;font-size:0.78rem;">图库组件未就绪，稍后再试</span>';
+            }
+        }
+
         function _lineupShareOptionsDialog(cfg) {
             cfg = cfg || {};
             const isProj = cfg.kind === 'project';
@@ -9522,11 +9581,12 @@
                         '</div>' +
                         '<div id="lineupShareBgRow" style="margin-top:8px;">' +
                           '<label id="lineupShareBgPick" style="display:inline-block;padding:6px 10px;border-radius:6px;background:linear-gradient(135deg,#ce93d8,#7b1fa2);color:#fff;font-size:0.76rem;cursor:pointer;font-weight:600;">📷 选择图片</label>' +
+                          '<label id="lineupShareBgLib" style="display:inline-block;margin-left:8px;padding:6px 10px;border-radius:6px;background:rgba(156,80,221,0.22);border:1px solid rgba(206,147,216,0.5);color:#e1bee7;font-size:0.76rem;cursor:pointer;font-weight:600;">🎞️ 从背景图库选</label>' +
                           '<button id="lineupShareBgClear" style="margin-left:8px;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);font-size:0.76rem;cursor:pointer;">🗑 清除已选</button>' +
                           '<span id="lineupShareBgState" style="margin-left:8px;color:rgba(255,255,255,0.5);font-size:0.72rem;"></span>' +
                           '<input id="lineupShareBgFile" type="file" accept="image/*" style="display:none;">' +
                         '</div>' +
-                        '<div style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-top:6px;">自动压缩到最长边 1280 并压暗 45%；选择会记住，下次分享默认带上（可随时清除）</div>' +
+                        '<div style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-top:6px;">自动压缩并压暗 45%；<b>选中即为默认</b>，每次分享自动带上；可随时更换或清除</div>' +
                       '</div>' +
                       '<div style="display:flex;align-items:center;gap:8px;margin-top:12px;background:rgba(92,107,192,0.1);border:1px solid rgba(92,107,192,0.3);border-radius:8px;padding:8px 10px;">' +
                         '<input id="lineupShareHomeQrChk" type="checkbox" style="accent-color:#5c6bc0;width:16px;height:16px;cursor:pointer;flex-shrink:0;">' +
@@ -9591,12 +9651,24 @@
                 const bgClearBtn = modal.querySelector('#lineupShareBgClear');
                 const bgFileInput = modal.querySelector('#lineupShareBgFile');
                 let bgHasData = false;
+                const bgLib = modal.querySelector('#lineupShareBgLib');
                 try {
-                    bgHasData = !!(localStorage.getItem('TFJL_ShareBgData') || '');
+                    const _cur = localStorage.getItem('TFJL_ShareBgData') || '';
+                    bgHasData = !!_cur;
                     bgChk.checked = bgHasData && localStorage.getItem('TFJL_ShareBgOn') !== '0';
-                    bgState.textContent = bgHasData ? '已选图片 ✓（点「📷 选择图片」可更换）' : '未选择';
+                    bgState.textContent = bgHasData ? (_cur.indexOf('lib:') === 0 ? '已设为默认 ✓（来自背景图库）' : '已设为默认 ✓（本地上传，点「📷」可更换）') : '未选择（选中即为默认）';
                 } catch (e) {}
                 if (bgPick) bgPick.onclick = function () { bgFileInput.click(); };
+                if (bgLib) bgLib.onclick = function () {
+                    _shareBgLibPicker(function (rec) {
+                        try {
+                            localStorage.setItem('TFJL_ShareBgData', 'lib:' + rec.id);
+                            bgHasData = true; bgChk.checked = true;
+                            bgState.textContent = '已设为默认 ✓（图库：' + (rec.name || '背景图') + '）';
+                            if (window.trackFeature) window.trackFeature('分享背景从图库选');
+                        } catch (e) {}
+                    });
+                };
                 if (bgClearBtn) bgClearBtn.onclick = function () {
                     try { localStorage.removeItem('TFJL_ShareBgData'); } catch (e) {}
                     bgHasData = false; bgChk.checked = false; bgState.textContent = '已清除';
@@ -9619,7 +9691,7 @@
                                 const dataUrl = c.toDataURL('image/jpeg', 0.78);
                                 localStorage.setItem('TFJL_ShareBgData', dataUrl);
                                 bgHasData = true; bgChk.checked = true;
-                                bgState.textContent = '已选图片 ✓（' + c.width + '×' + c.height + '）';
+                                bgState.textContent = '已设为默认 ✓（本地上传 ' + c.width + '×' + c.height + '）';
                             } catch (e) { bgState.textContent = '处理失败，换一张试试'; }
                         };
                         img.onerror = function () { bgState.textContent = '图片读取失败'; };
