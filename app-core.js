@@ -15903,6 +15903,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         function getNewsMarqueeText() {
             const now = new Date();
             const activeItems = newsItems.filter(item => {
+                if (item.category === 'welcome') return false; // 🔴 欢迎词不属于公告：只在欢迎弹窗展示，不进跑马灯
                 if (item.active_time && new Date(item.active_time) > now) return false;
                 if (item.expire_time && new Date(item.expire_time) <= now) return false;
                 return true;
@@ -16069,6 +16070,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
 
             const now = new Date();
             const activeItems = newsItems.filter(item => {
+                if (item.category === 'welcome') return false; // 🔴 欢迎词不属于公告：公告列表不显示
                 if (item.active_time && new Date(item.active_time) > now) return false;
                 if (item.expire_time && new Date(item.expire_time) <= now) return false;
                 return true;

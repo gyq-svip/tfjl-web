@@ -1539,16 +1539,18 @@
         }
         let _welcomeFp = null; // 当前弹窗对应的指纹；关闭时写入已读标记
 
-        async function showWelcomeGuide() {
+        async function showWelcomeGuide(force) {
             // 桌面版用户已在 APP 内，无需引导下载；仅网页版弹
             if (window.__TAURI__ || window.__TAURI_INTERNALS__) return;
+            if (document.getElementById('welcomeGuideModal')) return; // 已开着不重复弹
             // 先取云端欢迎词（内容变化→指纹变化→自动判定未读）
             let data = null;
             try { if (typeof window.getWelcomeGuideData === 'function') data = await window.getWelcomeGuideData(); } catch (e) {}
             if (!data || !data.content || !data.content.trim()) return; // 无文案不弹
             const fp = welcomeFingerprint(data.title, data.content);
             const readKey = 'TFJL_WelcomeRead_fp';
-            try { if (localStorage.getItem(readKey) === fp) return; } catch (e) {} // 已看过当前文案
+            // force=true = 手动触发（菜单「📖 功能说明」），无视已读强制展示
+            if (!force) { try { if (localStorage.getItem(readKey) === fp) return; } catch (e) {} }
             _welcomeFp = fp;
             const title = data.title || '欢迎来到塔防精灵助手';
             const items = data.content.split('\n').map(s => s.trim()).filter(Boolean);
@@ -1589,10 +1591,21 @@
         // （已移除基于大版本的引导；现按欢迎词内容指纹自动重弹，见 welcomeFingerprint 与 TFJL_WelcomeRead_fp）
         // 主页加载后，仅网页版用户、按欢迎词内容指纹（文案变自动重弹）弹出欢迎/下载引导（桌面版已在 APP 内，不弹）
         (function _initWelcomeGuide() {
+            // 🔴 2026-09-18 修复「欢迎弹窗无法触发」：getWelcomeGuideData 定义在 app-core.js，
+            //    脚本/懒加载顺序不定——app-features 先执行时它还不存在，原一次性 fire 直接 return 且永不重试。
+            //    现改为等待就绪（最多 30 次 × 1s）；并暴露到 window 供菜单手动触发。
+            let tries = 0;
             const fire = function () {
                 if (window.__TAURI__ || window.__TAURI_INTERNALS__) return;
+                if (typeof window.getWelcomeGuideData !== 'function' && tries < 30) {
+                    tries++;
+                    setTimeout(fire, 1000);
+                    return;
+                }
                 showWelcomeGuide();
             };
+            window.showWelcomeGuide = showWelcomeGuide;   // force 参数：true=无视已读强制弹
+            window.closeWelcomeGuide = closeWelcomeGuide; // 弹窗按钮 inline onclick 需要
             if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fire);
             else fire();
         })();
