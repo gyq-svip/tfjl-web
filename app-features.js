@@ -1552,6 +1552,7 @@
             // force=true = 手动触发（菜单「📖 功能说明」），无视已读强制展示
             if (!force) { try { if (localStorage.getItem(readKey) === fp) return; } catch (e) {} }
             _welcomeFp = fp;
+            if (window.trackFeature) window.trackFeature(force ? '功能说明手动打开' : '欢迎弹窗展示');
             const title = data.title || '欢迎来到塔防精灵助手';
             const items = data.content.split('\n').map(s => s.trim()).filter(Boolean);
             const itemsHtml = items.map(t => '<div style="margin-bottom:8px;">' + escapeHtml(t) + '</div>').join('');
