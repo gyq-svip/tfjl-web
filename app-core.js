@@ -14247,6 +14247,18 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const r = bf.getBoundingClientRect();
                 // 🔴 2026-09-18 面板宽度统一 232px（收藏此前 252px，导致同屏两种卡宽度/高度不一致）
                 sec.style.width = '232px';
+                // 🔴 每个职业标题行加小字提示（右键收藏 · 可拖上卡槽）；内联样式防旧 CSS 缓存。
+                //    注意不能污染 h4.textContent —— 职业抽屉的按钮文字就是从 h4 文本读的，所以用独立 span。
+                try {
+                    sec.querySelectorAll('.profession-section h4').forEach(function (h) {
+                        if (h.querySelector('.prof-hint')) return;
+                        const s = document.createElement('span');
+                        s.className = 'prof-hint';
+                        s.style.cssText = 'float:right;font-size:0.6rem;font-weight:normal;color:rgba(255,255,255,0.42);margin-top:4px;white-space:nowrap;';
+                        s.textContent = '右键收藏 · 可拖上卡槽';
+                        h.appendChild(s);
+                    });
+                } catch (e) {}
                 const w = sec.offsetWidth || 288;
                 let x = Math.round(r.left - w - 10);
                 if (x < 84) x = 84; // 至少在停靠栏右侧
@@ -14328,7 +14340,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (!box) return;
             const list = [];
             sec.querySelectorAll('.profession-section > h4').forEach(function (h) {
-                const t = (h.textContent || '').replace('+ 添加', '').replace('+添加', '').trim();
+                // 🔴 克隆剔除辅助元素（.prof-hint 提示 / 旧 +添加按钮），只取纯职业名，避免抽屉按钮文字被污染
+                const clone = h.cloneNode(true);
+                clone.querySelectorAll('.prof-hint, .add-card-btn').forEach(function (x) { x.remove(); });
+                const t = (clone.textContent || '').replace('+ 添加', '').replace('+添加', '').trim();
                 if (t) list.push(t);
             });
             if (!list.length) { closeProfDrawer(); return; }
