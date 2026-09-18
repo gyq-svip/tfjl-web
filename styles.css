@@ -2188,6 +2188,35 @@
         }
 
         /* ========== 用户自定义背景 ========== */
+        /* 🔴 2026-09-18 手牌编辑模式：长按进入，卡片虚线框 + 小红 × 批量下卡 */
+        .hand-edit-mode .selected-card:not(.empty) {
+            outline: 2px dashed rgba(255, 82, 82, 0.55);
+            outline-offset: -2px;
+        }
+        .hand-edit-mode .selected-card.placed {
+            outline-color: rgba(255, 152, 0, 0.55);
+        }
+        .hand-del-btn {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #e53935;
+            color: #fff;
+            border: 2px solid #1a1a2e;
+            font-size: 0.7rem;
+            line-height: 1;
+            cursor: pointer;
+            z-index: 6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 1px 5px rgba(0, 0, 0, 0.6);
+        }
+        .hand-del-btn:hover { background: #ff6b6b; }
+
         /* 背景层（独立元素，可模糊；四周外扩避免模糊后边缘透白） */
         #bgLayer {
             position: fixed;

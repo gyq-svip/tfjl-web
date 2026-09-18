@@ -11624,6 +11624,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 e.preventDefault();
                 const source = e.dataTransfer.getData('text/source') || (window.__dragPayload && window.__dragPayload.source) || '';
                 if (source !== 'favorite' && source !== 'pool') return;
+                // 🔴 2026-09-18 修复「toast 说已加入但手牌里没有」：handCardsArray 参数是 init 时捕获的
+                //    旧数组引用——项目加载会重新赋值 myHandCards/teammateCards，push 进了孤儿数组。
+                //    每次 drop 时重新解析最新数组。
+                handCardsArray = containerId === 'myHandContainer' ? myHandCards : teammateHandCards;
 
                 const cardId = e.dataTransfer.getData('text/id') || (window.__dragPayload && window.__dragPayload.id) || '';
                 const cardName = e.dataTransfer.getData('text/plain') || (window.__dragPayload && window.__dragPayload.name) || '';
@@ -12086,6 +12090,117 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
         }
 
+        // ==================== 🔴 2026-09-18 手牌编辑模式：长按任意手牌卡进入/退出 ====================
+        // 所有手牌卡右上角出现小红 ×，点 × 直接下卡（已上阵的连槽一起清），可连续批量操作；
+        // 免去「右键 → 二次确认」一张张下的麻烦。编辑态随手牌重渲染自动恢复（MutationObserver）。
+        window.__handEditMode = false;
+        function _handEditRemove(cardEl) {
+            try {
+                const handType = cardEl.dataset.handType || 'my';
+                const cardId = cardEl.dataset.id;
+                const handCards = handType === 'my' ? myHandCards : teammateHandCards;
+                const idx = handCards.findIndex(c => c.id === cardId);
+                if (idx === -1) return;
+                const card = handCards[idx];
+                if (card.placed) removeCardFromSlot(card.placed); // 已上阵的连槽一起清
+                handCards.splice(idx, 1);
+                const placedCards = handType === 'my' ? myPlacedCards : teammatePlacedCards;
+                if (Array.isArray(placedCards)) {
+                    const pi = placedCards.findIndex(c => c.id === cardId);
+                    if (pi > -1) placedCards.splice(pi, 1);
+                }
+                updateHandDisplay(handType);
+                updateDamageReductionDisplay();
+                if (typeof autoSaveProject === 'function') autoSaveProject();
+            } catch (e) {}
+        }
+        function applyHandEditMode() {
+            ['myHandContainer', 'teammateHandContainer'].forEach(function (id) {
+                const box = document.getElementById(id);
+                if (!box) return;
+                box.classList.toggle('hand-edit-mode', !!window.__handEditMode);
+                box.querySelectorAll('.selected-card:not(.empty)').forEach(function (card) {
+                    let btn = card.querySelector('.hand-del-btn');
+                    if (window.__handEditMode) {
+                        if (!btn) {
+                            btn = document.createElement('button');
+                            btn.className = 'hand-del-btn';
+                            btn.textContent = '×';
+                            btn.setAttribute('data-tip', '点这里把这张卡从手牌下掉（已上阵的连槽一起清）');
+                            card.appendChild(btn);
+                        }
+                    } else if (btn) btn.remove();
+                });
+                let tip = box.querySelector('.hand-edit-tip');
+                if (window.__handEditMode) {
+                    if (!tip) {
+                        tip = document.createElement('div');
+                        tip.className = 'hand-edit-tip';
+                        tip.style.cssText = 'grid-column:1/-1;text-align:center;color:#ff8a80;font-size:0.72rem;padding:2px 0;';
+                        tip.textContent = '✏️ 编辑手牌：点 × 下卡 · 长按卡片或点「完成」退出';
+                        box.prepend(tip);
+                    }
+                } else if (tip) tip.remove();
+                let done = box.querySelector('.hand-edit-done');
+                if (window.__handEditMode) {
+                    if (!done) {
+                        done = document.createElement('button');
+                        done.className = 'hand-edit-done';
+                        done.textContent = '✅ 完成编辑';
+                        done.style.cssText = 'grid-column:1/-1;margin-top:4px;padding:6px;border:none;border-radius:8px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;cursor:pointer;font-size:0.78rem;font-weight:bold;';
+                        done.onclick = function () { window.__toggleHandEditMode(); };
+                        box.appendChild(done);
+                    }
+                } else if (done) done.remove();
+            });
+        }
+        window.__toggleHandEditMode = function () {
+            window.__handEditMode = !window.__handEditMode;
+            applyHandEditMode();
+            try { if (window.trackFeature && window.__handEditMode) window.trackFeature('手牌编辑模式'); } catch (e) {}
+            if (typeof showToast === 'function') showToast(window.__handEditMode ? '✏️ 手牌编辑模式：点 × 下卡，长按或点「完成」退出' : '已退出手牌编辑模式');
+        };
+        // × 点击（捕获阶段委托，重渲染不丢；并阻止触发出卡的原生行为）
+        document.addEventListener('click', function (e) {
+            const btn = e.target.closest('.hand-del-btn');
+            if (!btn || !window.__handEditMode) return;
+            e.stopPropagation(); e.preventDefault();
+            const card = btn.closest('.selected-card');
+            if (card) _handEditRemove(card);
+        }, true);
+        // 长按（委托绑定在手牌容器，重渲染不丢；移动 >10px 视为拖拽不触发）
+        function _handEditBind() {
+            let timer = null, sp = null;
+            const clear = function () { if (timer) { clearTimeout(timer); timer = null; } };
+            ['myHandContainer', 'teammateHandContainer'].forEach(function (id) {
+                const box = document.getElementById(id);
+                if (!box) return;
+                box.addEventListener('pointerdown', function (e) {
+                    if (e.button !== undefined && e.button !== 0) return;
+                    if (!e.target.closest('.selected-card:not(.empty)')) return;
+                    sp = { x: e.clientX, y: e.clientY };
+                    clear();
+                    timer = setTimeout(function () {
+                        timer = null;
+                        window.__toggleHandEditMode();
+                        if (navigator.vibrate) { try { navigator.vibrate(30); } catch (err) {} }
+                    }, 550);
+                });
+                box.addEventListener('pointermove', function (e) {
+                    if (timer && sp && Math.hypot(e.clientX - sp.x, e.clientY - sp.y) > 10) clear();
+                });
+                ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) { box.addEventListener(ev, clear); });
+            });
+            // 重渲染后恢复编辑态
+            const mo = new MutationObserver(function () { if (window.__handEditMode) applyHandEditMode(); });
+            ['myHandContainer', 'teammateHandContainer'].forEach(function (id) {
+                const el = document.getElementById(id);
+                if (el) mo.observe(el, { childList: true });
+            });
+        }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _handEditBind);
+        else _handEditBind();
+
         // 更新手牌显示
         function updateHandDisplay(handType) {
             const container = handType === 'my' 
@@ -12249,8 +12364,17 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const oldLayer = slot.querySelector('.skin-layer'); if (oldLayer) oldLayer.remove();
         }
 
+        // 🔴 2026-09-18 槽位绘制串行化：快速连续互换/放卡时，多个异步 paint（innerHTML+皮肤）并发完成
+        //    顺序不定，后完成者覆盖先完成者 → 「两张不同的卡变成同一张」的视觉错乱。
+        //    所有槽位绘制排队串行执行——顺序=数据变更顺序，最终视觉与数据一致。
+        function _slotPaintChain(job) {
+            window.__slotPaintChain = (window.__slotPaintChain || Promise.resolve()).then(job).catch(function (err) { console.warn('[paint]', err); });
+            return window.__slotPaintChain;
+        }
+
         async function handleSlotDrop(e) {
             e.preventDefault();
+            const self = this;
             this.classList.remove('drag-over');
             
             const source = e.dataTransfer.getData('text/source') || (window.__dragPayload && window.__dragPayload.source) || '';
@@ -12358,12 +12482,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 toPlaced.push({ id: fromCard.id, name: fromCard.name, slot: slotId, isEngineering: !!fromCard.isEngineering, profession: fromCard.profession });
                 if (toCard) fromPlaced.push({ id: toCard.id, name: toCard.name, slot: fromSlotId, isEngineering: !!toCard.isEngineering, profession: toCard.profession });
                 // 🔴 2026-08-30 互换渲染：目标槽(this)画移过来的 fromCard，来源槽画换过去的 toCard
-                await paintSlotCard(this, fromCard, toIsU);
-                if (toCard) {
-                    await paintSlotCard(fromSlot, toCard, fromIsU);
-                } else {
-                    clearSlotVisual(fromSlot);
-                }
+                // 🔴 2026-09-18 两次绘制入串行链，快速连续互换不再乱序
+                await _slotPaintChain(function () {
+                    return paintSlotCard(self, fromCard, toIsU).then(function () {
+                        return toCard ? paintSlotCard(fromSlot, toCard, fromIsU) : clearSlotVisual(fromSlot);
+                    });
+                });
                 updateHandDisplay(toIsU ? 'my' : 'teammate');
                 updateHandDisplay(fromIsU ? 'my' : 'teammate');
                 updateDamageReductionDisplay();
@@ -12419,15 +12543,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const placeId = handCard.id, placeName = handCard.name, placeProf = handCard.profession || profession;
                 const placeType = handCard.type || (typeof findCardTypeById === 'function' ? findCardTypeById(placeId) : '');
                 const levelBadge = placeType ? createLevelBadgeHTML(placeId, placeType, isUserSlot ? 'my' : 'teammate', placeName) : '';
-                this.innerHTML = '<span class="card-item" data-profession="' + placeProf + '">' + levelBadge + '<span class="card-name">' + placeName + '</span></span>';
-                this.classList.add('filled');
-                this.classList.remove('empty');
-                this.dataset.cardId = placeId;
-                this.dataset.handType = isUserSlot ? 'my' : 'teammate';
-                this.dataset.profession = placeProf;
-
-                try { await applySkinBgToSlot(this, placeName); } catch (e) {}
-                refreshSlotFusionControl(this);
+                await _slotPaintChain(function () {
+                    self.innerHTML = '<span class="card-item" data-profession="' + placeProf + '">' + levelBadge + '<span class="card-name">' + placeName + '</span></span>';
+                    self.classList.add('filled');
+                    self.classList.remove('empty');
+                    self.dataset.cardId = placeId;
+                    self.dataset.handType = isUserSlot ? 'my' : 'teammate';
+                    self.dataset.profession = placeProf;
+                    return applySkinBgToSlot(self, placeName).catch(function (e) {}).then(function () { refreshSlotFusionControl(self); });
+                });
 
                 // placedArray 去重：同一张卡只保留本槽这一条记录
                 for (let i = placedArr.length - 1; i >= 0; i--) {
@@ -12492,16 +12616,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     const prof = _mv.profession;
                     const cardType = _mv.type || findCardTypeById(cardId);
                     const levelBadge = cardType ? createLevelBadgeHTML(cardId, cardType, targetHandType, cardName) : '';
-                    this.innerHTML = '<span class="card-item" data-profession="' + prof + '">' + levelBadge + '<span class="card-name">' + cardName + '</span></span>';
-                    this.classList.add('filled');
-                    this.classList.remove('empty');
-                    this.dataset.cardId = cardId;
-                    // 🔴 2026-08-30 我方/队友同卡皮肤独立：handType 必须写目标侧
-                    this.dataset.handType = targetHandType;
-                    this.dataset.profession = prof;
-
-                    try { await applySkinBgToSlot(this, cardName); } catch (e) {}
-                    refreshSlotFusionControl(this);
+                    await _slotPaintChain(function () {
+                        self.innerHTML = '<span class="card-item" data-profession="' + prof + '">' + levelBadge + '<span class="card-name">' + cardName + '</span></span>';
+                        self.classList.add('filled');
+                        self.classList.remove('empty');
+                        self.dataset.cardId = cardId;
+                        // 🔴 2026-08-30 我方/队友同卡皮肤独立：handType 必须写目标侧
+                        self.dataset.handType = targetHandType;
+                        self.dataset.profession = prof;
+                        return applySkinBgToSlot(self, cardName).catch(function (e) {}).then(function () { refreshSlotFusionControl(self); });
+                    });
 
                     const existingIndex = placedArray.findIndex(c => c.id === cardId);
                     if (existingIndex > -1) {
