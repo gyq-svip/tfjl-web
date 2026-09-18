@@ -279,16 +279,6 @@
                             window.__recordDiagWrite(_gistIdOf(url), _inferDiagFn(url, method, bodyHint), method, _gistWriteSource());
                         } catch (e) {}
                     }
-                    // 🔴 2026-09-18 非写入（GET 读）操作也计数：面板「写入/非写入/总操数」拆列。
-                    //    诊断 Gist 自身的读不记（自指噪声：config 轮询/上传回读）。
-                    else if (method === 'GET' && typeof window.__recordDiagRead === 'function') {
-                        try {
-                            const id2 = _gistIdOf(url);
-                            if (id2 && id2.length >= 8 && id2 !== DIAG_GIST_ID) {
-                                window.__recordDiagRead(id2, _inferDiagFn(url, method, ''), _gistWriteSource());
-                            }
-                        } catch (e) {}
-                    }
                 } catch (e) {}
             }
             window.getGistIOReport = function () {
@@ -454,22 +444,6 @@
                 _saveDiagBuffer(b);
             } catch (e) {}
         }
-        // 🔴 2026-09-18 非写入（GET 读）操作计数：与写共用 buffer，method='GET' 区分。
-        //    面板「写入 / 非写入 / 总操数」三列的数据源。诊断 Gist 自身的读不记（自指噪声）。
-        window.__recordDiagRead = function _recordDiagRead(gistId, fn, src) {
-            try {
-                if (!gistId || gistId.length < 8) return;
-                const b = _loadDiagBuffer();
-                const key = gistId + '|' + (fn || 'unknown') + '|GET';
-                const now = Date.now();
-                if (!b[key]) b[key] = { gistId, fn: fn || 'unknown', method: 'GET', count: 0, first: now, last: now, samples: [], src: src || '' };
-                b[key].count++;
-                b[key].last = now;
-                _bumpDiagDay(['reads', 'ops']);
-                if (b[key].samples.length < 5) b[key].samples.push(now);
-                _saveDiagBuffer(b);
-            } catch (e) {}
-        };
         // 功能使用埋点：记录用户主动使用了哪个功能（如保存项目/发需求/分享脚本/识别阵容等）。
         // 与 Gist 写操作共用同一 buffer（gistId 固定为 'feature'），随心跳/周期上报，
         // 让管理员能在「按 Gist×功能 TOP」看到大家最常使用哪些功能，便于优化。
@@ -932,7 +906,6 @@
                 day: _dayStat.date,
                 dayUploads: _dayStat.uploads,
                 dayWrites: _dayStat.writes,
-                dayReads: _dayStat.reads,
                 dayOps: _dayStat.ops,
                 entries: entries,
                 // 管理员工具箱：用户对本机 notify 的「知道了」+ 会话回复，回带到诊断 Gist 供管理员在回复信箱查看
@@ -27333,11 +27306,14 @@ ${maSection}
                             let p; try { p = JSON.parse(d.files[fn].content); } catch (e) { return; }
                             const who = (p.nick ? p.nick + '(' + p.anonId + ')' : p.anonId);
                             const last = p.lastUpload || 0;
-                            // 🔴 2026-09-18 写入/非写入拆分：count=写（非GET），reads=非写入（GET），总操数=两者之和
+                            // 🔴 2026-09-18 写入/非写入拆分（语义=是否写 Gist）：
+                            //    count(写入) = 真实 Gist 写操作（gistId 存在且非 feature 埋点）
+                            //    local(非写入) = 本地操作（功能使用埋点等不碰 Gist 的，gistId='feature'）
+                            //    总操数 = 两者之和
                             const _entAll = (p.entries || []);
-                            const _wCnt = _entAll.reduce((s, e) => s + ((e.method === 'GET') ? 0 : (e.count || 0)), 0);
-                            const _rCnt = _entAll.reduce((s, e) => s + ((e.method === 'GET') ? (e.count || 0) : 0), 0);
-                            fileMetas.push({ fn, who, anonId: p.anonId || '', nick: p.nick || '', last, count: _wCnt, reads: _rCnt, heartbeat: !!p.heartbeat, writeOk: (p.writeOk === true), ver: p.appVersion || '', plat: p.platform || '', err: p.err || '', payload: p });
+                            const _wCnt = _entAll.reduce((s, e) => s + ((e.gistId && e.gistId !== 'feature') ? (e.count || 0) : 0), 0);
+                            const _lCnt = _entAll.reduce((s, e) => s + ((!e.gistId || e.gistId === 'feature') ? (e.count || 0) : 0), 0);
+                            fileMetas.push({ fn, who, anonId: p.anonId || '', nick: p.nick || '', last, count: _wCnt, local: _lCnt, heartbeat: !!p.heartbeat, writeOk: (p.writeOk === true), ver: p.appVersion || '', plat: p.platform || '', err: p.err || '', payload: p });
                             perUser[who] = (perUser[who] || 0);
                             detailByUser[who] = detailByUser[who] || [];
                             detailByUser[who].push(fileMetas[fileMetas.length - 1]);
@@ -27647,8 +27623,8 @@ ${maSection}
                             + '<th style="text-align:left;padding:4px 6px;color:#60a5fa;">小版本(前端)</th>'
                             + '<th style="text-align:left;padding:4px 6px;color:#a78bfa;">大版本(桌面)</th>'
                             + '<th style="text-align:left;padding:4px 6px;">平台</th>'
-                            + '<th style="text-align:right;padding:4px 6px;color:#fbbf24;">写入</th>'
-                            + '<th style="text-align:right;padding:4px 6px;color:#7dd3fc;">非写入</th>'
+                            + '<th style="text-align:right;padding:4px 6px;color:#fbbf24;">Gist写入</th>'
+                            + '<th style="text-align:right;padding:4px 6px;color:#7dd3fc;">非写入(本地)</th>'
                             + '<th style="text-align:right;padding:4px 6px;color:#4ade80;">总操数</th>'
                             + '<th style="text-align:left;padding:4px 6px;">最后上报</th>'
                             + '<th style="text-align:left;padding:4px 6px;">封禁</th>'
@@ -27672,8 +27648,8 @@ ${maSection}
                                 + '<td style="padding:3px 6px;color:#a78bfa;">' + _ev + '</td>'
                                 + '<td style="padding:3px 6px;color:#94a3b8;">' + (m.plat || '?') + '</td>'
                                 + '<td style="padding:3px 6px;text-align:right;color:#fbbf24;font-weight:700;">' + m.count + '</td>'
-                                + '<td style="padding:3px 6px;text-align:right;color:#7dd3fc;">' + (m.reads || 0) + '</td>'
-                                + '<td style="padding:3px 6px;text-align:right;color:#4ade80;font-weight:700;">' + ((m.count || 0) + (m.reads || 0)) + '</td>'
+                                + '<td style="padding:3px 6px;text-align:right;color:#7dd3fc;">' + (m.local || 0) + '</td>'
+                                + '<td style="padding:3px 6px;text-align:right;color:#4ade80;font-weight:700;">' + ((m.count || 0) + (m.local || 0)) + '</td>'
                                 + '<td style="padding:3px 6px;color:#94a3b8;">' + ts + ' <span style="color:#64748b;">(' + min + '分钟前)</span></td>'
                                 + '<td style="padding:3px 6px;">' + _bl + '</td>'
                                 + '</tr>';
@@ -27808,7 +27784,7 @@ ${maSection}
                                         const topList = (arr, render) => (Array.isArray(arr) ? arr : []).slice(0, 10).map((x, i) => '<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.05);"><span style="color:#cbd5e1;">' + (i + 1) + '. ' + render(x.k) + '</span><span style="color:#fca5a5;font-weight:600;">' + x.v + '</span></div>').join('');
                                         const snap = '<div style="margin:14px 0;padding:14px;border:1px solid rgba(96,165,250,0.35);border-radius:10px;background:rgba(96,165,250,0.06);">' +
                                             '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><span style="color:#60a5fa;font-size:0.86rem;font-weight:600;">📊 聚合快照（自动每10分钟生成 · ' + (agg.generatedAt ? new Date(agg.generatedAt).toLocaleString('zh-CN') : '?') + '）</span>' +
-                                            '<span style="color:#94a3b8;font-size:0.72rem;">扫描 ' + (agg.fileCount || 0) + ' 文件 · 总写 ' + (agg.totalWrites || 0) + ' · 非写入 ' + (agg.totalReads || 0) + ' · 总操数 ' + (agg.totalOps || 0) + ' · 在线 ' + (agg.onlineCount || 0) + ' 人</span></div>' +
+                                            '<span style="color:#94a3b8;font-size:0.72rem;">扫描 ' + (agg.fileCount || 0) + ' 文件 · Gist写 ' + (agg.totalWrites || 0) + ' · 本地操作 ' + (agg.totalLocal || 0) + ' · 总操数 ' + (agg.totalOps || 0) + ' · 在线 ' + (agg.onlineCount || 0) + ' 人</span></div>' +
                                             '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">' +
                                             '<div><div style="color:#fbbf24;font-size:0.76rem;margin-bottom:4px;">👤 谁吃 API 最多</div>' + topList(agg.perUser, (k) => k) + '</div>' +
                                             '<div><div style="color:#fbbf24;font-size:0.76rem;margin-bottom:4px;">📦 按 Gist 写入 TOP</div>' + topList(agg.perGist, (k) => _gistLabel(k).label) + '</div>' +
