@@ -11614,7 +11614,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             });
         }
 
-        // 设置常用卡拖放到手牌
+        // 设置卡池/收藏卡拖放到手牌（🔴 2026-09-18 扩展：卡池的卡也能拖进手牌，只进手牌不上阵）
         function setupFavoriteCardDropToHand(containerId, handCardsArray) {
             const container = document.getElementById(containerId);
             container.addEventListener('dragover', (e) => {
@@ -11623,7 +11623,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             container.addEventListener('drop', (e) => {
                 e.preventDefault();
                 const source = e.dataTransfer.getData('text/source') || (window.__dragPayload && window.__dragPayload.source) || '';
-                if (source !== 'favorite') return;
+                if (source !== 'favorite' && source !== 'pool') return;
 
                 const cardId = e.dataTransfer.getData('text/id') || (window.__dragPayload && window.__dragPayload.id) || '';
                 const cardName = e.dataTransfer.getData('text/plain') || (window.__dragPayload && window.__dragPayload.name) || '';
@@ -11632,13 +11632,28 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
                 const existingIndex = handCardsArray.findIndex(c => c.id === cardId);
                 const blockedByIdentity = (existingIndex === -1) && handHasIdentity(handCardsArray, cardName);
-                if (!blockedByIdentity && existingIndex === -1 && handCardsArray.length < MAX_HAND_CARDS) {
-                    handCardsArray.push({ id: cardId, name: cardName, placed: null, isEngineering, profession });
-                    updateHandDisplay(containerId === 'myHandContainer' ? 'my' : 'teammate');
-                } else if (blockedByIdentity) {
+                if (existingIndex > -1) {
+                    if (typeof showToast === 'function') showToast('⚠️ 手牌已有这张卡');
+                    return;
+                }
+                if (blockedByIdentity) {
                     // 手牌已有同一张卡（含融合形态），同一张卡只能带 1 张
                     if (typeof showToast === 'function') showToast('⚠️ 手牌已有「' + cardName + '」（含融合形态），同一张卡只能带 1 张');
+                    return;
                 }
+                if (handCardsArray.length >= MAX_HAND_CARDS) {
+                    if (typeof showToast === 'function') showToast('⚠️ 手牌已满（' + MAX_HAND_CARDS + ' 张）');
+                    return;
+                }
+                const engOk = isEngineering === true || isEngineering === 'true';
+                if (engOk ? handCardsArray.filter(c => c.isEngineering).length >= 2 : handCardsArray.filter(c => !c.isEngineering).length >= 9) {
+                    if (typeof showToast === 'function') showToast('⚠️ 手牌数量已满（工程≤2 / 普通≤9）');
+                    return;
+                }
+                handCardsArray.push({ id: cardId, name: cardName, placed: null, isEngineering: engOk, profession });
+                updateHandDisplay(containerId === 'myHandContainer' ? 'my' : 'teammate');
+                if (window.trackFeature) window.trackFeature(source === 'pool' ? '卡池拖进手牌' : '收藏拖进手牌');
+                if (typeof showToast === 'function') showToast('✅ 已加入' + (containerId === 'myHandContainer' ? '我' : '队友') + '方手牌');
             });
         }
 
@@ -12274,46 +12289,86 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 if (isTeammateSlot && handType !== 'teammate') return;
             }
 
-            // ===== 卡槽卡 → 卡槽：互换位置 =====
+            // ===== 卡槽卡 → 卡槽：互换位置（🔴 支持跨阵营：我↔队友互换卡，遵守「同边不能有同样的卡」）=====
             if (source === 'slot') {
                 const fromSlotId = (window.__dragPayload && window.__dragPayload.slotId) || '';
                 if (!fromSlotId || fromSlotId === slotId) return;
                 const fromSlot = document.querySelector('.battle-slot[data-slot="' + fromSlotId + '"]');
                 if (!fromSlot || !fromSlot.classList.contains('filled')) return;
-                // 阵营约束：u 槽只与 u 槽换，t 槽只与 t 槽换
-                if (slotId.charAt(0) !== fromSlotId.charAt(0)) {
-                    this.classList.add('invalid-drop'); setTimeout(() => this.classList.remove('invalid-drop'), 500); return;
-                }
                 const fromIsEng = fromSlot.dataset.type === 'engineering';
                 const toIsEng = slotType === 'engineering';
                 if (fromIsEng !== toIsEng) {
                     this.classList.add('invalid-drop'); setTimeout(() => this.classList.remove('invalid-drop'), 500); return;
                 }
-                const isUser = slotId.startsWith('u');
-                const placedArray = isUser ? myPlacedCards : teammatePlacedCards;
-                if (!Array.isArray(placedArray)) return;
-                const fromCard = placedArray.find(c => c.slot === fromSlotId);
-                const toCard = placedArray.find(c => c.slot === slotId);
-                if (fromCard) fromCard.slot = slotId;
-                if (toCard) toCard.slot = fromSlotId;
-                const handCards = isUser ? myHandCards : teammateHandCards;
-                if (fromCard) { const h = handCards.find(c => c.id === fromCard.id); if (h) h.placed = slotId; }
-                if (toCard) { const h = handCards.find(c => c.id === toCard.id); if (h) h.placed = fromSlotId; }
-                // 🔴 2026-08-30 互换渲染修复：数据已交换（fromCard→本槽 / toCard→来源槽），
-                //    渲染必须跟着数据走：目标槽(this)画移过来的 fromCard，来源槽画换过去的 toCard。
-                //    旧代码两处参数传反（this 画 toCard、fromSlot 画 fromCard）→ 视觉停留在原位，
-                //    但数据已互换 → 视觉与数据脱节：右键切皮按槽位从 placedArray 找卡拿到的是另一张卡，
-                //    「原A位置切皮显示B的皮」即此因；拖到空槽时还因 paintSlotCard(this,undefined)
-                //    把目标槽清空，卡凭空消失。
-                await paintSlotCard(this, fromCard, isUser);
+                const fromIsU = fromSlotId.charAt(0) === 'u';
+                const toIsU = slotId.startsWith('u');
+                const crossSide = fromIsU !== toIsU;
+                const fromHand = fromIsU ? myHandCards : teammateHandCards;
+                const toHand = toIsU ? myHandCards : teammateHandCards;
+                const fromPlaced = fromIsU ? myPlacedCards : teammatePlacedCards;
+                const toPlaced = toIsU ? myPlacedCards : teammatePlacedCards;
+                const fromCard = fromPlaced.find(c => c.slot === fromSlotId);
+                const toCard = toPlaced.find(c => c.slot === slotId);
+                if (!fromCard) return;
+                // 🔴 上卡规则：换完后同一边不能出现同样的卡（身份=主卡名，基础/融合形态同身份）
+                const _idOf = function (n) { return (typeof cardIdentity === 'function') ? cardIdentity(n) : n; };
+                if (crossSide) {
+                    const fromIdent = _idOf(fromCard.name);
+                    if (toHand.some(c => (!toCard || c.id !== toCard.id) && _idOf(c.name) === fromIdent)) {
+                        this.classList.add('invalid-drop'); setTimeout(() => this.classList.remove('invalid-drop'), 500);
+                        if (typeof showToast === 'function') showToast('⚠️ 对面已有同一张卡（同边不能重复），换不了');
+                        return;
+                    }
+                    if (toCard) {
+                        const toIdent = _idOf(toCard.name);
+                        if (fromHand.some(c => c.id !== fromCard.id && _idOf(c.name) === toIdent)) {
+                            this.classList.add('invalid-drop'); setTimeout(() => this.classList.remove('invalid-drop'), 500);
+                            if (typeof showToast === 'function') showToast('⚠️ 这边已有对面那张卡（同边不能重复），换不了');
+                            return;
+                        }
+                    }
+                }
+                if (crossSide) {
+                    // 卡在两侧手牌数组间转移（type 跟着走，等级徽章不掉）
+                    const fhRec = fromHand.find(c => c.id === fromCard.id);
+                    const fType = fhRec ? (fhRec.type || '') : '';
+                    const fi = fromHand.findIndex(c => c.id === fromCard.id);
+                    if (fi > -1) fromHand.splice(fi, 1);
+                    fromCard.slot = slotId;
+                    toHand.push({ id: fromCard.id, name: fromCard.name, placed: slotId, isEngineering: !!fromCard.isEngineering, profession: fromCard.profession, type: fType });
+                    if (toCard) {
+                        const thRec = toHand.find(c => c.id === toCard.id);
+                        const tType = thRec ? (thRec.type || '') : '';
+                        const ti = toHand.findIndex(c => c.id === toCard.id);
+                        if (ti > -1) toHand.splice(ti, 1);
+                        toCard.slot = fromSlotId;
+                        fromHand.push({ id: toCard.id, name: toCard.name, placed: fromSlotId, isEngineering: !!toCard.isEngineering, profession: toCard.profession, type: tType });
+                    }
+                } else {
+                    if (fromCard) fromCard.slot = slotId;
+                    if (toCard) toCard.slot = fromSlotId;
+                    const handCards = toIsU ? myHandCards : teammateHandCards;
+                    if (fromCard) { const h = handCards.find(c => c.id === fromCard.id); if (h) h.placed = slotId; }
+                    if (toCard) { const h = handCards.find(c => c.id === toCard.id); if (h) h.placed = fromSlotId; }
+                }
+                // placed 记录：来源槽记录移除，目标槽写入（跨边时分别写进两侧 placedArray）
+                const fi2 = fromPlaced.findIndex(c => c.slot === fromSlotId);
+                if (fi2 > -1) fromPlaced.splice(fi2, 1);
+                if (toCard) { const ti2 = toPlaced.findIndex(c => c.slot === slotId); if (ti2 > -1) toPlaced.splice(ti2, 1); }
+                toPlaced.push({ id: fromCard.id, name: fromCard.name, slot: slotId, isEngineering: !!fromCard.isEngineering, profession: fromCard.profession });
+                if (toCard) fromPlaced.push({ id: toCard.id, name: toCard.name, slot: fromSlotId, isEngineering: !!toCard.isEngineering, profession: toCard.profession });
+                // 🔴 2026-08-30 互换渲染：目标槽(this)画移过来的 fromCard，来源槽画换过去的 toCard
+                await paintSlotCard(this, fromCard, toIsU);
                 if (toCard) {
-                    await paintSlotCard(fromSlot, toCard, isUser);
+                    await paintSlotCard(fromSlot, toCard, fromIsU);
                 } else {
                     clearSlotVisual(fromSlot);
                 }
-                updateHandDisplay(isUser ? 'my' : 'teammate');
+                updateHandDisplay(toIsU ? 'my' : 'teammate');
+                updateHandDisplay(fromIsU ? 'my' : 'teammate');
                 updateDamageReductionDisplay();
                 if (typeof autoSaveProject === 'function') autoSaveProject();
+                if (window.trackFeature) window.trackFeature(crossSide ? '跨阵营换卡' : '卡槽互换');
                 return;
             }
 
@@ -12384,39 +12439,65 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 updateDamageReductionDisplay(); // 更新减伤显示
             } else if (source === 'hand') {
                 const handType = e.dataTransfer.getData('text/hand') || (window.__dragPayload && window.__dragPayload.handType) || '';
-                const handCards = handType === 'my' ? myHandCards : teammateHandCards;
-                let placedArray = handType === 'my' ? myPlacedCards : teammatePlacedCards;
+                // 🔴 2026-09-18 支持跨阵营上阵：我方手牌可拖到队友槽（反之亦然）——卡在两侧手牌数组间转移
+                const targetHandType = isUserSlot ? 'my' : 'teammate';
+                const srcHand = handType === 'my' ? myHandCards : teammateHandCards;
+                const dstHand = targetHandType === 'my' ? myHandCards : teammateHandCards;
+                const cardIndex = srcHand.findIndex(c => c.id === cardId);
+                if (cardIndex === -1) return;
+                const _moving = srcHand[cardIndex];
+                // 🔴 上卡规则：目标边不能已有同一张卡（身份重复；排除正在移动的这张）
+                const _ident = (typeof cardIdentity === 'function') ? cardIdentity(cardName || _moving.name) : (cardName || _moving.name);
+                if (dstHand.some(c => c.id !== cardId && (typeof cardIdentity === 'function' ? cardIdentity(c.name) : c.name) === _ident)) {
+                    this.classList.add('invalid-drop'); setTimeout(() => this.classList.remove('invalid-drop'), 500);
+                    if (typeof showToast === 'function') showToast('⚠️ 这边已有同一张卡（同边不能重复）');
+                    return;
+                }
+                const crossSide = handType !== targetHandType;
+                if (crossSide) {
+                    // 先清掉它在来源边占据的槽（若有）
+                    const prevSlot0 = _moving.placed;
+                    if (prevSlot0 && prevSlot0 !== slotId) {
+                        const srcPlaced = handType === 'my' ? myPlacedCards : teammatePlacedCards;
+                        const pi0 = srcPlaced.findIndex(c => c.slot === prevSlot0);
+                        if (pi0 > -1) srcPlaced.splice(pi0, 1);
+                        const prevSlotEl0 = document.querySelector('.battle-slot[data-slot="' + prevSlot0 + '"]');
+                        if (prevSlotEl0) clearSlotVisual(prevSlotEl0);
+                    }
+                    srcHand.splice(cardIndex, 1);
+                    dstHand.push(_moving);
+                }
+                const handCards = dstHand;
+                let placedArray = targetHandType === 'my' ? myPlacedCards : teammatePlacedCards;
                 if (!Array.isArray(placedArray)) {
                     // 🔴 修复：原来只重建全局数组、局部变量仍指向旧的非数组值 → 后续 findIndex/splice 会抛错
                     placedArray = [];
-                    if (handType === 'my') myPlacedCards = placedArray;
+                    if (targetHandType === 'my') myPlacedCards = placedArray;
                     else teammatePlacedCards = placedArray;
                 }
-                
-                const cardIndex = handCards.findIndex(c => c.id === cardId);
-                if (cardIndex > -1) {
+
+                const idx2 = handCards.findIndex(c => c.id === cardId);
+                if (idx2 > -1) {
+                    const _mv = handCards[idx2];
                     // 【修复】一张卡在同一边只能占据一个槽位：放下前先从它已有的槽位移除，
                     // 避免同一张卡被拖到多个卡槽形成重复上阵。
-                    const prevSlot = handCards[cardIndex].placed;
+                    const prevSlot = _mv.placed;
                     if (prevSlot && prevSlot !== slotId) {
                         const prevSlotEl = document.querySelector('.battle-slot[data-slot="' + prevSlot + '"]');
                         const prevIdx = placedArray.findIndex(c => c.slot === prevSlot);
                         if (prevIdx > -1) placedArray.splice(prevIdx, 1);
                         if (prevSlotEl) clearSlotVisual(prevSlotEl);
                     }
-                    handCards[cardIndex].placed = slotId;
-                    const prof = handCards[cardIndex].profession;
-                    const cardType = handCards[cardIndex].type || findCardTypeById(cardId);
-                    const levelBadge = cardType ? createLevelBadgeHTML(cardId, cardType, handType, cardName) : '';
+                    _mv.placed = slotId;
+                    const prof = _mv.profession;
+                    const cardType = _mv.type || findCardTypeById(cardId);
+                    const levelBadge = cardType ? createLevelBadgeHTML(cardId, cardType, targetHandType, cardName) : '';
                     this.innerHTML = '<span class="card-item" data-profession="' + prof + '">' + levelBadge + '<span class="card-name">' + cardName + '</span></span>';
                     this.classList.add('filled');
                     this.classList.remove('empty');
                     this.dataset.cardId = cardId;
-                    // 🔴 2026-08-30 我方/队友同卡皮肤独立修复：手牌拖放上卡漏设 handType，
-                    //    槽位渲染（applySkinBgToSlot）读 dataset.handType → undefined → 兜底 'my'
-                    //    → 队友槽读到 cardSkins['my_卡id'] 的皮：我方切皮队友跟着变 / 队友切皮看似无效。
-                    //    （手牌点击上卡 10446、卡池拖放 10826、项目恢复 9757 均已设置，唯独此路径漏了）
-                    this.dataset.handType = handType;
+                    // 🔴 2026-08-30 我方/队友同卡皮肤独立：handType 必须写目标侧
+                    this.dataset.handType = targetHandType;
                     this.dataset.profession = prof;
 
                     try { await applySkinBgToSlot(this, cardName); } catch (e) {}
@@ -12428,9 +12509,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     } else {
                         placedArray.push({ id: cardId, name: cardName, slot: slotId, isEngineering, profession: prof });
                     }
-                    
-                    updateHandDisplay(handType);
+
+                    updateHandDisplay(targetHandType);
+                    if (crossSide) updateHandDisplay(handType);
                     updateDamageReductionDisplay(); // 更新减伤显示
+                    if (crossSide && window.trackFeature) window.trackFeature('跨阵营上卡');
                 }
             }
 
@@ -15243,6 +15326,27 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         // 从卡槽拖到手牌区 = 取下回手牌
                         const hand = el && (el.closest('#myHandContainer') || el.closest('#teammateHandContainer'));
                         if (hand) { window.__dragPayload = pd.payload; removeCardFromSlot(pd.payload.slotId); }
+                    } else if (pd.payload && pd.payload.source === 'pool' && el) {
+                        // 🔴 2026-09-18 卡池卡拖进手牌区 = 只进手牌不上阵
+                        const handBox = el.closest('#myHandContainer') || el.closest('#teammateHandContainer');
+                        if (handBox) {
+                            const side = handBox.id === 'myHandContainer' ? 'my' : 'teammate';
+                            const arr = side === 'my' ? myHandCards : teammateHandCards;
+                            const p = pd.payload;
+                            const engOk = p.isEngineering === true || p.isEngineering === 'true';
+                            if (arr.some(c => c.id === p.id) || (typeof handHasIdentity === 'function' && handHasIdentity(arr, p.name))) {
+                                if (typeof showToast === 'function') showToast('⚠️ 手牌已有「' + p.name + '」（含融合形态），同一张卡只能带 1 张');
+                            } else if (arr.length >= MAX_HAND_CARDS) {
+                                if (typeof showToast === 'function') showToast('⚠️ 手牌已满（' + MAX_HAND_CARDS + ' 张）');
+                            } else if (engOk ? arr.filter(c => c.isEngineering).length >= 2 : arr.filter(c => !c.isEngineering).length >= 9) {
+                                if (typeof showToast === 'function') showToast('⚠️ 手牌数量已满（工程≤2 / 普通≤9）');
+                            } else {
+                                arr.push({ id: p.id, name: p.name, placed: null, isEngineering: engOk, profession: p.profession || '' });
+                                updateHandDisplay(side);
+                                if (window.trackFeature) window.trackFeature('卡池拖进手牌');
+                                if (typeof showToast === 'function') showToast('✅ 已加入' + (side === 'my' ? '我' : '队友') + '方手牌');
+                            }
+                        }
                     }
                 }, true);
                 document.addEventListener('click', (e) => {
@@ -15303,7 +15407,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 slot.addEventListener('drop', handleSlotDrop);
                 // 🔴 2026-09-18 卡槽悬浮提示：明确告知支持拖拽（走统一 data-tip 提示框，不弹原生 title）
                 if (!slot.getAttribute('data-tip')) {
-                    slot.setAttribute('data-tip', '💡 支持拖拽：卡池/收藏的卡可直接拖到这里上阵；已上阵的卡可拖到其他槽换位、拖回手牌区取下');
+                    slot.setAttribute('data-tip', '💡 支持拖拽：卡池/收藏的卡可拖来上阵或拖进手牌；已上阵的卡可换位、跨阵营与队友互换（同边不能有重复卡）、拖回手牌');
                 }
                 slot.addEventListener('click', handleSlotClick);
                 /* [SKIN log muted] */ void (0) && console.log('[SKIN] binding battle-slot contextmenu:', slot.dataset.slot);
