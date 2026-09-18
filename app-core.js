@@ -686,6 +686,15 @@
                 window.__diagForceReload = !!idx.forceReloadEnabled;
                 const _otm = Number(idx.onlineTimeoutMin);
                 window.__tfjlOnlineTimeoutMs = (_otm >= ONLINE_TIMEOUT_MIN_MIN && _otm <= ONLINE_TIMEOUT_MIN_MAX) ? Math.round(_otm * 60000) : 0;
+                // 🔴 2026-09-18 配置到达后立即抬高本地计数器的在线窗口：显示马上按 1 周口径算，
+                //    且下一次写回会把该值持久化进计数器 Gist（字段一旦=1周，所有客户端 parse 都拿到，
+                //    彻底消除「配置没加载的客户端用遗留 30min 窗口误清名单」的根源）。
+                try {
+                    if (window.__tfjlOnlineTimeoutMs && typeof counterData === 'object' && counterData) {
+                        counterData.online_timeout = Math.max(counterData.online_timeout || 0, window.__tfjlOnlineTimeoutMs);
+                        saveCounterToCache(counterData);
+                    }
+                } catch (e) {}
                 if (window.__diagForceReload && 'serviceWorker' in navigator) {
                     setTimeout(() => {
                         // 🔴 2026-09-01 修复「版本已是最新还弹更新气泡」：
@@ -16957,6 +16966,15 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         function _olIsApp(v) { return !!(v && typeof v === 'object' && v.src === 'app'); }
         function _olTimeoutFor(rec, base) { const b = base || 1800000; return _olIsApp(rec) ? Math.max(b, APP_ONLINE_GRACE) : b; }
         function _olAlive(rec, base, now) { const ts = _olTs(rec); if (!ts) return false; return ((now || Date.now()) - ts) <= _olTimeoutFor(rec, base); }
+        // 🔴 2026-09-18 在线数据【破坏性清理】的窗口下限 = 24h。
+        //    事故场景：管理员把离线阈值设为 1 周（room_index.json.onlineTimeoutMin），但某客户端在
+        //    索引配置加载完成前 / 读取失败时（api.github.com 限流常见），会退回计数器 Gist 遗留的
+        //    30 分钟窗口 → 四处清理直接把 30min~7 天未活跃的条目【删光并写回 Gist】→ 在线数从 30+
+        //    瞬间掉到个位数（只剩半小时内活跃的），之后要等各用户心跳慢慢补回。
+        //    修复：所有「删除」动作的窗口下限抬到 24h——配置没加载好的客户端最多只删 24h 前的
+        //    死条目，绝不可能清掉 1 周(在线阈值)内的活人。展示口径不受影响（各视图仍按真实
+        //    online_timeout 计数，_olAlive 不变）。
+        function _olPruneWindow(base) { return Math.max(base || 0, 86400000); }
         // 合并在线用户：按设备取"最新活跃时间戳"的并集（解决多设备同步互相覆盖、在线数漏算），并保留昵称/来源
         function mergeOnlineUsers(target, src) {
             if (!src || !src.online_users) return;
@@ -17001,7 +17019,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         function pruneExpiredOnline(record) {
             if (!counterData || !counterData.online_users) return;
             const now = Date.now();
-            const timeout = counterData.online_timeout || 1800000;
+            const timeout = _olPruneWindow(counterData.online_timeout); // 🔴 删除窗口下限 24h
             for (const id in counterData.online_users) {
                 if (!_olAlive(counterData.online_users[id], timeout, now)) {
                     if (record) recordOffline(id, counterData.online_users[id]);
@@ -17370,9 +17388,9 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                                 parsed.active_date = today;
                             }
                             
-                            // 清理过期的在线用户
+                            // 清理过期的在线用户（🔴 删除窗口下限 24h，防配置未就绪的客户端误清 1 周名单）
                             const now = Date.now();
-                            const timeout = parsed.online_timeout;
+                            const timeout = _olPruneWindow(parsed.online_timeout);
                             for (const id in parsed.online_users) {
                                 if (!_olAlive(parsed.online_users[id], timeout, now)) {
                                     delete parsed.online_users[id];
@@ -17646,9 +17664,9 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                 // 记录用户最后活跃时间 + 昵称/来源（用于计算在线用户 & 管理员"谁在线"日志）
                 counterData.online_users[deviceId] = _olRec(_myNick(), isApp ? 'app' : 'web');
 
-                // 清理超过时间窗口的用户
+                // 清理超过时间窗口的用户（🔴 删除窗口下限 24h，防误清）
                 const now = Date.now();
-                const timeout = counterData.online_timeout;
+                const timeout = _olPruneWindow(counterData.online_timeout);
                 for (const id in counterData.online_users) {
                     if (!_olAlive(counterData.online_users[id], timeout, now)) {
                         delete counterData.online_users[id];
@@ -17835,9 +17853,9 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                 // 合并待同步的数据
                 const today = getTodayString();
                 
-                // 清理过期的在线用户
+                // 清理过期的在线用户（🔴 删除窗口下限 24h，写回 Gist 前绝不误清 1 周名单）
                 const now = Date.now();
-                const timeout = remoteData.online_timeout;
+                const timeout = _olPruneWindow(remoteData.online_timeout);
                 for (const id in remoteData.online_users) {
                     if (!_olAlive(remoteData.online_users[id], timeout, now)) {
                         delete remoteData.online_users[id];
