@@ -12054,7 +12054,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
                     const box = document.createElement('div');
                     box.style.cssText = 'background:#1b1e29;border:1px solid rgba(255,215,0,0.4);border-radius:10px;padding:18px 20px;max-width:280px;color:#fff;font-size:0.9rem;box-shadow:0 8px 30px rgba(0,0,0,0.6);';
-                    box.innerHTML = '<div style="margin-bottom:12px;">确定要把「' + (card.name || '这张卡') + '」从手牌下掉吗？</div>';
+                    box.innerHTML = '<div style="margin-bottom:12px;">确定要把「' + (card.name || '这张卡') + '」从手牌下掉吗？</div>' +
+                        '<div style="margin-bottom:12px;color:rgba(255,255,255,0.45);font-size:0.74rem;">💡 小技巧：<b style="color:#ffd700;">长按</b>任意手牌卡可进入编辑模式，出现小红 × 批量快速下卡</div>';
                     const btnRow = document.createElement('div');
                     btnRow.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;';
                     const cancel = document.createElement('button');
