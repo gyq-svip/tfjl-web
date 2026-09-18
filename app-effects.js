@@ -412,6 +412,13 @@
             return bgIdb('readwrite', function (s) { return s.put(rec); }).then(function () { return rec.id; });
         }
         function bgGetImage(id) { return bgIdb('readonly', function (s) { return s.get(id); }); }
+        // 🔴 2026-09-18 供分享图「从背景图库选择默认背景」使用：仅列出图片类（视频做不了 canvas 背景）
+        window.__bgLibImages = function () {
+            return bgAllImages().then(function (list) {
+                return (list || []).filter(function (x) { return x && x.blob && x.blob.type && x.blob.type.indexOf('image/') === 0; });
+            });
+        };
+        window.__bgLibGet = bgGetImage;
         function bgAllImages() {
             return bgIdb('readonly', function (s) { return s.getAll(); })
                 .then(function (r) { return (r || []).slice().sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); }); });
