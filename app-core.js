@@ -5931,6 +5931,85 @@
             openScriptNotebook({ name: txtFiles[index].name, content: txtFiles[index].content, fileIndex: index });
         }
 
+        // ==================== 🎨 皮肤自检（2026-09-19）====================
+        // 一键列出「上阵/手牌里没铺出皮肤画」的卡，并给出具体原因：
+        //   ①注册表没有该英雄（本地皮肤目录缺）②有皮肤但取不到 URL ③URL 存在但图片加载失败 ④能加载但没铺上（渲染时序）
+        window.diagnoseSkins = async function () {
+            const out = [];
+            const targets = [];
+            document.querySelectorAll('.battle-slot.filled').forEach(function (el) {
+                const nm = (typeof getSlotCardName === 'function') ? getSlotCardName(el) : '';
+                if (nm) targets.push({ el: el, name: nm, where: '卡槽' + (el.dataset.slot || '') });
+            });
+            document.querySelectorAll('#myHandContainer .selected-card:not(.empty), #teammateHandContainer .selected-card:not(.empty)').forEach(function (el) {
+                const nm = el.dataset.name || '';
+                if (nm) targets.push({ el: el, name: nm, where: '手牌' });
+            });
+            for (const t of targets) {
+                const el = t.el;
+                if (el.querySelector('.skin-layer') || el.querySelector('.skin-layer-fused')) continue; // 已有画
+                const base = (typeof getMainCardName === 'function') ? getMainCardName(t.name) : t.name;
+                let skins = [];
+                try { skins = (typeof getHeroSkins === 'function' ? getHeroSkins(t.name) : (window.skinRegistry && window.skinRegistry[base])) || []; } catch (e) {}
+                let url = '';
+                try { if (window.resolveHeroSkinUrl) url = await window.resolveHeroSkinUrl(base, '默认'); } catch (e) {}
+                let why = '';
+                if (!skins.length) why = '❌ 注册表里没有这个英雄的皮肤 → 本地皮肤目录缺少该英雄（或文件夹名和游戏内英雄名不一致）';
+                else if (!url) why = '⚠ 注册表里有 ' + skins.length + ' 张皮，但取不到可用 URL（远程未下载/路径失效）';
+                else {
+                    const ok = await new Promise(function (res) {
+                        let done = false;
+                        const im = new Image();
+                        const fin = function (v) { if (!done) { done = true; res(v); } };
+                        im.onload = function () { fin(true); };
+                        im.onerror = function () { fin(false); };
+                        im.src = url;
+                        setTimeout(function () { fin(false); }, 6000);
+                    });
+                    why = ok ? '⚠ 图片能加载但槽位没铺上（渲染时序，右键该卡切一次皮可强制重绘）' : '❌ 图片 URL 存在但加载失败（皮肤文件缺失/损坏）';
+                }
+                out.push({ where: t.where, name: t.name, base: base, n: skins.length, names: skins.slice(0, 6).map(function (s) { return s.name; }).join('/'), url: (url || '').slice(0, 100), why: why });
+            }
+            const text = out.length
+                ? out.map(function (r, i) {
+                    return (i + 1) + '. [' + r.where + '] ' + r.name + '（主卡:' + r.base + '）\n   注册表皮肤数: ' + r.n + (r.names ? '　[' + r.names + ']' : '') + '\n   URL: ' + (r.url || '（无）') + '\n   原因: ' + r.why;
+                }).join('\n\n')
+                : '✅ 所有已上阵的卡和手牌都已铺出皮肤，没有缺失。';
+            // 弹窗展示（可复制）
+            const old = document.getElementById('skinDiagModal');
+            if (old) old.remove();
+            const modal = document.createElement('div');
+            modal.id = 'skinDiagModal';
+            modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:320000;display:flex;align-items:center;justify-content:center;padding:16px;';
+            modal.innerHTML =
+                '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.4);border-radius:14px;padding:16px;max-width:640px;width:95%;max-height:84vh;display:flex;flex-direction:column;">' +
+                  '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+                    '<span style="color:#ffd700;font-weight:bold;">🎨 皮肤自检结果（' + out.length + ' 张缺画）</span>' +
+                    '<button id="skinDiagClose" style="background:none;border:none;color:#fff;font-size:1.3rem;cursor:pointer;">✕</button>' +
+                  '</div>' +
+                  '<div style="color:rgba(255,255,255,0.45);font-size:0.72rem;margin-bottom:8px;">建议先做一次：☰ 菜单 → 🛠 皮肤异常修复（清缓存→重扫本地→重拉远程→重绘），再回来自检对比。</div>' +
+                  '<pre id="skinDiagText" style="flex:1;overflow:auto;white-space:pre-wrap;word-break:break-all;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:10px;color:#e2e8f0;font-size:0.74rem;margin:0 0 10px 0;"></pre>' +
+                  '<div style="display:flex;gap:8px;">' +
+                    '<button id="skinDiagCopy" style="flex:1;background:linear-gradient(135deg,#4fc3f7,#0288d1);color:#fff;border:none;border-radius:8px;padding:9px;cursor:pointer;font-weight:bold;font-size:0.8rem;">📋 复制结果</button>' +
+                    '<button id="skinDiagClose2" style="flex:1;background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:8px;padding:9px;cursor:pointer;font-size:0.8rem;">关闭</button>' +
+                  '</div>' +
+                '</div>';
+            document.body.appendChild(modal);
+            const ta = modal.querySelector('#skinDiagText');
+            ta.textContent = text;
+            const close = function () { modal.remove(); };
+            modal.querySelector('#skinDiagClose').onclick = close;
+            modal.querySelector('#skinDiagClose2').onclick = close;
+            modal.querySelector('#skinDiagCopy').onclick = function () {
+                try {
+                    if (navigator.clipboard) navigator.clipboard.writeText(text);
+                    else { const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); }
+                    if (typeof showToast === 'function') showToast('📋 已复制，可直接发给我排查');
+                } catch (e) {}
+            };
+            return text;
+        };
+
         // ==================== 网页版文本查找替换 ====================
 
         function webToggleFindReplace(windowId, forceOpen) {
