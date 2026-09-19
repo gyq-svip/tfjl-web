@@ -2188,6 +2188,14 @@
         }
 
         /* ========== 用户自定义背景 ========== */
+        /* 🔴 2026-09-18 脚本 A/B 对比视图 */
+        .cmp-line:hover { background: rgba(255, 255, 255, 0.05); }
+        .cmp-line.cmp-active {
+            background: rgba(255, 215, 0, 0.22) !important;
+            box-shadow: inset 0 0 0 1px rgba(255, 215, 0, 0.45);
+        }
+        .cmp-line.cmp-unmatched { opacity: 0.75; }
+
         /* 🔴 2026-09-18 手牌编辑模式：长按进入，卡片虚线框 + 小红 × 批量下卡 */
         .hand-edit-mode .selected-card:not(.empty) {
             outline: 2px dashed rgba(255, 82, 82, 0.55);
