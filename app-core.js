@@ -674,6 +674,9 @@
         const ONLINE_TIMEOUT_MIN_MIN = 1;
         const ONLINE_TIMEOUT_MIN_MAX = 10080;
         window.__tfjlOnlineTimeoutMs = 0; // 🔴 先声明默认未配置态：即使启动配置请求慢/失败也是明确的 0（与 undefined 行为等价，但语义清晰、便于诊断）
+        // 🔴 2026-09-20 启动即用「本机记忆的阈值」兜底：room_index 配置请求慢/被限流/离线启动时，
+        //    在线口径不再退回 30 分钟（那是"3天前活跃的人被判离线"的根源）。
+        try { const _otCached = Number(localStorage.getItem('TFJL_OnlineTimeoutMs')) || 0; if (_otCached > 0) window.__tfjlOnlineTimeoutMs = _otCached; } catch (e) {}
         function _applyOnlineTimeoutCfg(data) {
             try {
                 if (window.__tfjlOnlineTimeoutMs && data && typeof data === 'object') data.online_timeout = window.__tfjlOnlineTimeoutMs;
@@ -686,6 +689,12 @@
                 window.__diagForceReload = !!idx.forceReloadEnabled;
                 const _otm = Number(idx.onlineTimeoutMin);
                 window.__tfjlOnlineTimeoutMs = (_otm >= ONLINE_TIMEOUT_MIN_MIN && _otm <= ONLINE_TIMEOUT_MIN_MAX) ? Math.round(_otm * 60000) : 0;
+                // 🔴 2026-09-20 把权威阈值写进本机记忆：下次启动/限流/离线时也能按 1 周口径判定，
+                //    绝不因"配置没加载"而退回 30 分钟误判离线。管理员清空配置时同步清记忆。
+                try {
+                    if (window.__tfjlOnlineTimeoutMs) localStorage.setItem('TFJL_OnlineTimeoutMs', String(window.__tfjlOnlineTimeoutMs));
+                    else localStorage.removeItem('TFJL_OnlineTimeoutMs');
+                } catch (e) {}
                 // 🔴 2026-09-18 配置到达后立即抬高本地计数器的在线窗口：显示马上按 1 周口径算，
                 //    且下一次写回会把该值持久化进计数器 Gist（字段一旦=1周，所有客户端 parse 都拿到，
                 //    彻底消除「配置没加载的客户端用遗留 30min 窗口误清名单」的根源）。
@@ -17269,7 +17278,34 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         
         // 保存统计数据到缓存
         // 清理异常数据（修复历史累加bug导致的超大数值）
+        // 🔴 2026-09-20 修复「误判离线」存量：判定窗口内的条目被错误删进 offline_history（并写回了 Gist）。
+        //    按当前口径它们仍是"在线"——迁回 online_users（保留各自最后活跃时间戳/昵称/来源）并从离线记录移除；
+        //    只有真正超过判定窗口的才留在离线记录里。幂等，可在每次保存/展示前安全执行。
+        function _repairOfflineWithinWindow(data) {
+            try {
+                if (!data || typeof data !== 'object') return;
+                const now = Date.now();
+                const win = _olPruneWindow(data.online_timeout);
+                if (!win) return;
+                if (!data.online_users || typeof data.online_users !== 'object') data.online_users = {};
+                if (!Array.isArray(data.offline_history) || !data.offline_history.length) return;
+                const keep = [];
+                for (const e of data.offline_history) {
+                    if (!e || !e.id) continue;
+                    const ls = e.lastSeen || 0;
+                    if (ls && (now - ls) <= win) {
+                        if (_olTs(data.online_users[e.id]) < ls) {
+                            data.online_users[e.id] = { t: ls, nick: e.nick || '', src: e.src === 'app' ? 'app' : 'web' };
+                        }
+                        continue; // 判定窗口内 = 在线，不进离线列表
+                    }
+                    keep.push(e);
+                }
+                data.offline_history = keep;
+            } catch (e) {}
+        }
         function sanitizeCounterData(data) {
+            _repairOfflineWithinWindow(data); // 🔴 先修离线误判（不依赖 daily_stats 是否存在）
             if (!data || !data.daily_stats) return data;
             for (const date in data.daily_stats) {
                 const s = data.daily_stats[date];
@@ -17364,7 +17400,22 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         //    修复：所有「删除」动作的窗口下限抬到 24h——配置没加载好的客户端最多只删 24h 前的
         //    死条目，绝不可能清掉 1 周(在线阈值)内的活人。展示口径不受影响（各视图仍按真实
         //    online_timeout 计数，_olAlive 不变）。
-        function _olPruneWindow(base) { return Math.max(base || 0, 86400000); }
+        // 🔴 2026-09-20 在线窗口【统一解析器】：显式传入值 / 本次配置 / 本机记忆 三者取最大。
+        //    事故复盘：管理员阈值=1 周，但客户端在 room_index 配置返回前（api.github.com 限流、离线启动）
+        //    __tfjlOnlineTimeoutMs 仍为 0 → 判定退回遗留 30 分钟、删除窗口退回 24h 下限 →
+        //    "3~7 天前活跃"的活人被判离线：进 offline_history + 从 online_users 删除并写回 Gist，
+        //    在线数从 30+ 掉到个位数（用户所见"本来7天后离线，现在3天就离线"）。
+        function _olEffWindow(base) {
+            const cfg = Number(window.__tfjlOnlineTimeoutMs) || 0;
+            return Math.max(base || 0, cfg);
+        }
+        function _olPruneWindow(base) {
+            const cfg = Number(window.__tfjlOnlineTimeoutMs) || 0;
+            const win = Math.max(base || 0, cfg);
+            // cfg 未知（首次访问/配置还没回来）→ 删除窗口按"最大允许配置"7 天兜底：宁可不删死条目，
+            // 也绝不误删活人；cfg 已知 → 删除窗口=配置值（管理员下调阈值立即生效，另保 24h 下限）。
+            return cfg ? Math.max(win, 86400000) : Math.max(win, 604800000);
+        }
 
         // ===== 功能使用埋点（新功能采用情况）：按设备计数存 counterData.feature_usage_dev，
         //      展示端跨设备求和（feature_usage）。随既有心跳/同步链路落 Gist，零额外请求。
@@ -19115,7 +19166,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             let onlineCount = 0;
             if (counterData.online_users) {
                 const now = Date.now();
-                const timeout = counterData.online_timeout || 1800000;
+                const timeout = _olEffWindow(counterData.online_timeout) || 1800000; // 🔴 按配置口径（含本机记忆兜底），不再退回 30min
                 for (const id in counterData.online_users) {
                     if (_olAlive(counterData.online_users[id], timeout, now)) {
                         onlineCount++;
@@ -26004,14 +26055,14 @@ ${maSection}
             let onlineCount = 0;
             if (counterData.online_users) {
                 const now = Date.now();
-                const timeout = counterData.online_timeout || 1800000;
+                const timeout = _olEffWindow(counterData.online_timeout) || 1800000; // 🔴 配置口径（含本机记忆兜底）
                 for (const id in counterData.online_users) {
                     if (_olAlive(counterData.online_users[id], timeout, now)) {
                         onlineCount++;
                     }
                 }
             }
-            const onlineTimeoutMinutes = Math.round((counterData.online_timeout || 3600000) / 60000);
+            const onlineTimeoutMinutes = Math.round((_olEffWindow(counterData.online_timeout) || 3600000) / 60000);
             
             let statsHtml = `
                 <div style="text-align:left;line-height:1.8;">
@@ -31884,6 +31935,7 @@ ${maSection}
             // App 写入的是 App 自己的 localStorage，两者不互通 → 导致 Gist 上真实在线的设备被漏算、显示 0。
             // 现改为 Gist 最新拉取的 online_users 直接作为主数据源，本地仅补充本机自身这一条。
             {
+                try { _repairOfflineWithinWindow(data); } catch (e) {} // 🔴 2026-09-20 修存量误判：窗口内的离线记录迁回在线名单
                 const _src = (data && data.online_users) ? data.online_users : {};
                 const _local = (counterData && counterData.online_users) ? counterData.online_users : {};
                 const _merged = {};
@@ -31910,7 +31962,7 @@ ${maSection}
             _localActive.forEach(id => _activeSet.add(id));
             const activeToday = _activeSet.size;
             const _onNow = Date.now();
-            const _onTo = data.online_timeout || 1800000;
+            const _onTo = _olEffWindow(data.online_timeout) || 1800000; // 🔴 配置口径（含本机记忆兜底）
             let onlineCount = 0;
             if (data.online_users) {
                 for (const _oid in data.online_users) {
@@ -32173,7 +32225,10 @@ ${maSection}
             html += `<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;margin-bottom:20px;">`;
             html += `<div style="color:#4ecdc4;font-size:0.9rem;margin-bottom:10px;">📡 在线 / 访问日志（数据源：GitHub Gist 计数器）</div>`;
             // 当前在线列表（含昵称/来源/最后活跃）
-            const _onTo2 = data.online_timeout || 1800000;
+            // 🔴 2026-09-20 判定窗口按配置口径（含本机记忆兜底）；渲染前先修存量误判——
+            //    判定窗口内的"离线记录"迁回在线名单，列表口径才与"1 周内都算在线"一致。
+            try { _repairOfflineWithinWindow(data); } catch (e) {}
+            const _onTo2 = _olEffWindow(data.online_timeout) || 1800000;
             const _now2 = Date.now();
             const _onlineList = [];
             if (data.online_users) {
@@ -32268,14 +32323,14 @@ ${maSection}
             let onlineCount = 0;
             if (counterData.online_users) {
                 const now = Date.now();
-                const timeout = counterData.online_timeout || 1800000;
+                const timeout = _olEffWindow(counterData.online_timeout) || 1800000; // 🔴 配置口径（含本机记忆兜底）
                 for (const id in counterData.online_users) {
                     if (_olAlive(counterData.online_users[id], timeout, now)) {
                         onlineCount++;
                     }
                 }
             }
-            const onlineTimeoutMinutes = Math.round((counterData.online_timeout || 3600000) / 60000);
+            const onlineTimeoutMinutes = Math.round((_olEffWindow(counterData.online_timeout) || 3600000) / 60000);
 
             // 计算本周/本月新增用户
             const now = new Date();
