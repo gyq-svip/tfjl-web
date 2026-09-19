@@ -6010,6 +6010,42 @@
             return text;
         };
 
+        // ==================== 🎨 皮肤缺画自愈（2026-09-19）====================
+        // 背景：用户实测「部分卡没铺出皮肤画，点一次『🛠 皮肤异常修复』就正常」——说明是启动期
+        //   注册表/缓存未同步干净导致个别槽位没补绘。这里在注册表就绪后自动做「补绘扫描」：
+        //   凡是【槽位没有皮肤层 且 注册表里其实有该英雄皮肤】的，自动重绘一次，免手动修复。
+        //   只处理上阵槽位（手牌走各自的渲染器，不动）；applySkinBgToSlot 本身幂等+双缓冲，安全。
+        (function () {
+            function healMissingSkins(tag) {
+                try {
+                    if (!window._skinRegistryReady) return;
+                    const targets = Array.prototype.slice.call(document.querySelectorAll('.battle-slot.filled'));
+                    let i = 0, fixed = 0;
+                    const step = function () {
+                        if (i >= targets.length) {
+                            if (fixed && typeof showToast === 'function') showToast('🎨 已自动补绘 ' + fixed + ' 张卡的皮肤');
+                            return;
+                        }
+                        const el = targets[i++];
+                        if (!el || !el.isConnected) { step(); return; }
+                        if (el.querySelector('.skin-layer') || el.querySelector('.skin-layer-fused')) { step(); return; }
+                        const nm = (typeof getSlotCardName === 'function') ? getSlotCardName(el) : '';
+                        if (!nm) { step(); return; }
+                        const base = (typeof getMainCardName === 'function') ? getMainCardName(nm) : nm;
+                        let skins = [];
+                        try { skins = (typeof getHeroSkins === 'function' ? getHeroSkins(nm) : (window.skinRegistry && window.skinRegistry[base])) || []; } catch (e) {}
+                        if (!skins.length) { step(); return; } // 真没皮肤：不折腾
+                        try {
+                            applySkinBgToSlot(el, nm).then(function () { fixed++; step(); }).catch(function () { step(); });
+                        } catch (e) { step(); }
+                    };
+                    step();
+                } catch (e) {}
+            }
+            // 注册表就绪后多轮兜底（远程皮肤可能还在陆续下载）：3s / 9s / 20s 各扫一次
+            [3000, 9000, 20000].forEach(function (ms) { setTimeout(function () { healMissingSkins(ms); }, ms); });
+        })();
+
         // ==================== 网页版文本查找替换 ====================
 
         function webToggleFindReplace(windowId, forceOpen) {
