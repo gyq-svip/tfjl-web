@@ -5604,7 +5604,7 @@
             const names = txtFiles.map((f, i) => '<option value="' + i + '">' + (f.name || ('脚本' + (i + 1))) + '</option>').join('');
             const modal = document.createElement('div');
             modal.id = 'scriptCompareModal';
-            modal.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(4,4,12,0.94);z-index:310000;display:flex;flex-direction:column;padding:10px;box-sizing:border-box;';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(4,4,12,0.985);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:310000;display:flex;flex-direction:column;padding:10px;box-sizing:border-box;';
             modal.innerHTML =
                 '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">' +
                   '<span style="color:#ffd700;font-weight:bold;">🅰️🅱️ 脚本 A/B 同步对比</span>' +
@@ -5667,8 +5667,9 @@
             st[side] = { fileIdx, lines, a0: lines.slice() };
             const title = document.getElementById('cmpTitle' + side);
             if (title) title.textContent = side + ' · ' + (f.name || ('脚本' + (fileIdx + 1))) + '（' + lines.length + ' 行）';
-            // 若 A/B 选了同一个文件，提示（允许但没意义）
-            _cmpRenderSide(side);
+            // 🔴 加载任一幕后两侧一起重绘（只绘自己那一侧会读到空的另一侧抛异常 → 两边都空白）
+            if (st.A) _cmpRenderSide('A');
+            if (st.B) _cmpRenderSide('B');
         }
 
         function _cmpRenderSide(side) {
@@ -5677,8 +5678,9 @@
             if (!col) return;
             const other = side === 'A' ? 'B' : 'A';
             // 另一侧键 → 行号队列（顺序配对，重复键按出现顺序一一对应）
+            // 🔴 对侧还没加载时直接按“无配对”渲染（否则读 st[other].lines 抛错 → 空白）
             const oq = {};
-            st[other].lines.forEach((l, i) => {
+            if (st[other]) st[other].lines.forEach((l, i) => {
                 const k = _cmpKey(l);
                 if (k === null) return;
                 (oq[k] = oq[k] || []).push(i);
