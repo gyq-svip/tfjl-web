@@ -5947,7 +5947,13 @@
             });
             for (const t of targets) {
                 const el = t.el;
-                if (el.querySelector('.skin-layer') || el.querySelector('.skin-layer-fused')) continue; // 已有画
+                // 🔴 2026-09-19 修误报：手牌的皮肤层是 .hand-skin-layer（+skin-bg 类），卡槽才是 .skin-layer。
+                //    旧判断只找 .skin-layer → 所有手牌都被误判"没铺上"（用户实测 20 张手牌全误报）。
+                const _isHandCard = el.classList.contains('selected-card');
+                const _hasArt = _isHandCard
+                    ? (el.classList.contains('skin-bg') || el.querySelector('.hand-skin-layer') || el.querySelector('.hand-skin-fused'))
+                    : (el.querySelector('.skin-layer') || el.querySelector('.skin-layer-fused'));
+                if (_hasArt) continue; // 已有画
                 const base = (typeof getMainCardName === 'function') ? getMainCardName(t.name) : t.name;
                 let skins = [];
                 try { skins = (typeof getHeroSkins === 'function' ? getHeroSkins(t.name) : (window.skinRegistry && window.skinRegistry[base])) || []; } catch (e) {}
@@ -5966,7 +5972,7 @@
                         im.src = url;
                         setTimeout(function () { fin(false); }, 6000);
                     });
-                    why = ok ? '⚠ 图片能加载但槽位没铺上（渲染时序，右键该卡切一次皮可强制重绘）' : '❌ 图片 URL 存在但加载失败（皮肤文件缺失/损坏）';
+                    why = ok ? '⚠ 图片能加载但没铺上（渲染时序，稍等自动补绘或重开面板即可）' : '❌ 图片 URL 存在但加载失败（皮肤文件缺失/损坏）';
                 }
                 out.push({ where: t.where, name: t.name, base: base, n: skins.length, names: skins.slice(0, 6).map(function (s) { return s.name; }).join('/'), url: (url || '').slice(0, 100), why: why });
             }
@@ -6040,6 +6046,26 @@
                         } catch (e) { step(); }
                     };
                     step();
+                    // 🔴 2026-09-19 手牌缺画也补：判断标记是 .hand-skin-layer / skin-bg（与卡槽的 .skin-layer 不同）。
+                    //    处理方式=整手牌重渲染（走 updateHandDisplay 官方渲染器，皮肤/等级徽章/融合显示保持一致），
+                    //    仅在「该卡注册表里确实有皮」时才重渲染，避免真没皮的卡反复空转。
+                    ['my', 'teammate'].forEach(function (ht) {
+                        const box = document.getElementById(ht === 'my' ? 'myHandContainer' : 'teammateHandContainer');
+                        if (!box) return;
+                        let need = false;
+                        box.querySelectorAll('.selected-card:not(.empty)').forEach(function (el) {
+                            if (need) return;
+                            if (el.classList.contains('skin-bg') || el.querySelector('.hand-skin-layer') || el.querySelector('.hand-skin-fused')) return;
+                            const nm = el.dataset.name || '';
+                            if (!nm) return;
+                            let skins = [];
+                            try { skins = (typeof getHeroSkins === 'function' ? getHeroSkins(nm) : null) || []; } catch (e) {}
+                            if (skins.length) need = true;
+                        });
+                        if (need && typeof updateHandDisplay === 'function') {
+                            try { updateHandDisplay(ht); fixed++; } catch (e) {}
+                        }
+                    });
                 } catch (e) {}
             }
             // 注册表就绪后多轮兜底（远程皮肤可能还在陆续下载）：3s / 9s / 20s 各扫一次
