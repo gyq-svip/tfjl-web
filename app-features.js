@@ -5686,24 +5686,39 @@
             if (st.B) _cmpRenderSide('B');
         }
 
+        // 🔴 统一配对表：A 行 ←→ B 行（键相同按出现顺序一一配对），两边渲染共用同一 pid。
+        //    旧 bug：A/B 各自渲染时各生成 "A0_0" / "B0_0" 式 pid → 字符串对不上 → 对侧永远高亮不到。
+        function _cmpBuildPairs() {
+            const st = _cmpState;
+            if (!st || !st.A || !st.B) return;
+            const q = {};
+            st.B.lines.forEach((l, i) => {
+                const k = _cmpKey(l);
+                if (k === null) return;
+                (q[k] = q[k] || []).push(i);
+            });
+            st.pairA = {}; st.pairB = {};
+            st.A.lines.forEach((l, i) => {
+                const k = _cmpKey(l);
+                if (k === null || !q[k] || !q[k].length) return;
+                const b = q[k].shift();
+                const pid = 'P' + i + '_' + b;
+                st.pairA[i] = { b: b, pid: pid };
+                st.pairB[b] = { a: i, pid: pid };
+            });
+        }
+
         function _cmpRenderSide(side) {
             const st = _cmpState; if (!st || !st[side]) return;
             const col = document.getElementById('cmpCol' + side);
             if (!col) return;
-            const other = side === 'A' ? 'B' : 'A';
-            // 另一侧键 → 行号队列（顺序配对，重复键按出现顺序一一对应）
-            // 🔴 对侧还没加载时直接按“无配对”渲染（否则读 st[other].lines 抛错 → 空白）
-            const oq = {};
-            if (st[other]) st[other].lines.forEach((l, i) => {
-                const k = _cmpKey(l);
-                if (k === null) return;
-                (oq[k] = oq[k] || []).push(i);
-            });
+            _cmpBuildPairs(); // 每次渲染前统一重建配对（编辑改键后也保持最新），两边 pid 完全一致
+            const map = side === 'A' ? st.pairA : st.pairB;
             let html = '';
             st[side].lines.forEach((text, i) => {
                 const k = _cmpKey(text);
-                let pid = '';
-                if (k !== null && oq[k] && oq[k].length) pid = side + i + '_' + oq[k].shift();
+                const _pair = map ? map[i] : null;
+                const pid = _pair ? _pair.pid : '';
                 const edited = (side === 'A' && st.A && st.A.a0[i] !== undefined && st.A.a0[i] !== text);
                 const unmatched = k === null || !pid;
                 html += '<div class="cmp-line' + (unmatched ? ' cmp-unmatched' : '') + '" data-side="' + side + '" data-idx="' + i + '"' + (pid ? ' data-pid="' + pid + '"' : '') +
