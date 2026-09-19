@@ -5617,6 +5617,18 @@
                   '<button id="cmpClose" style="background:rgba(244,67,54,0.8);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:0.76rem;cursor:pointer;">✕ 关闭</button>' +
                 '</div>' +
                 '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-bottom:6px;">规则：每行「第一个逗号前」的文字/数字 = 键，键相同 = 同一波。点任意一行 → 对侧同键行滚动定位并<b style="color:#ffd700;">同底色高亮</b>；双击行可直接编辑；换卡后在配对操作条点「🤖 同步A的改动到B」自动替换对应对面的卡名。</div>' +
+                '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap;background:rgba(156,80,221,0.1);border:1px solid rgba(206,147,216,0.35);border-radius:10px;padding:7px 10px;">' +
+                  '<span style="color:#e1bee7;font-size:0.78rem;font-weight:bold;">🔀 全局卡名互换（所有波数一起换）</span>' +
+                  '<span style="color:#4fc3f7;font-size:0.74rem;">A方卡名</span>' +
+                  '<input id="cmpSwapX" placeholder="如：天使" style="width:110px;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(79,195,247,0.45);border-radius:6px;padding:5px 8px;font-size:0.78rem;outline:none;">' +
+                  '<span style="color:#ce93d8;font-size:0.8rem;">↔</span>' +
+                  '<span style="color:#ce93d8;font-size:0.74rem;">B方卡名</span>' +
+                  '<input id="cmpSwapY" placeholder="如：水灵" style="width:110px;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(206,147,216,0.45);border-radius:6px;padding:5px 8px;font-size:0.78rem;outline:none;">' +
+                  '<button id="cmpSwapPreview" style="background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:6px;padding:5px 10px;font-size:0.74rem;cursor:pointer;">👁 预览</button>' +
+                  '<button id="cmpSwapApply" style="background:linear-gradient(135deg,#ce93d8,#7b1fa2);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:0.74rem;cursor:pointer;font-weight:bold;">✅ 执行互换</button>' +
+                  '<span id="cmpSwapInfo" style="color:rgba(255,255,255,0.55);font-size:0.72rem;"></span>' +
+                  '<div style="width:100%;color:rgba(255,255,255,0.4);font-size:0.68rem;">说明：把 A 里所有「A方卡名」换成 B 的卡、B 里所有「B方卡名」换成 A 的卡（含 169/158 等不同行、上/下/满/1级 等后缀一起替换）；改完检查无误再点 💾保存A / 💾保存B。</div>' +
+                '</div>' +
                 '<div style="flex:1;display:flex;gap:8px;min-height:0;">' +
                   '<div style="flex:1;display:flex;flex-direction:column;min-width:0;border:1px solid rgba(79,195,247,0.4);border-radius:10px;overflow:hidden;">' +
                     '<div id="cmpTitleA" style="padding:6px 10px;background:rgba(79,195,247,0.12);color:#4fc3f7;font-size:0.78rem;font-weight:bold;">A</div>' +
@@ -5651,6 +5663,8 @@
             modal.querySelector('#cmpEditB').onclick = function () { _cmpEditLine('B'); };
             modal.querySelector('#cmpCopyA2B').onclick = function () { _cmpCopyA2B(); };
             modal.querySelector('#cmpAutoSync').onclick = function () { _cmpAutoSync(); };
+            modal.querySelector('#cmpSwapPreview').onclick = function () { _cmpGlobalSwap(false); };
+            modal.querySelector('#cmpSwapApply').onclick = function () { _cmpGlobalSwap(true); };
             // 默认 A=第一个，B=第二个（不同文件）
             const selA = modal.querySelector('#cmpSelA'), selB = modal.querySelector('#cmpSelB');
             selA.value = '0';
@@ -5824,6 +5838,46 @@
             _cmpRenderSide('B');
             if (window.trackFeature) window.trackFeature('换卡自动同步到B');
             if (typeof showToast === 'function') showToast('🤖 已把 A 的换卡改动同步到 B 行（' + diff.removed.join('/') + ' → ' + (diff.added.join('/') || '∅') + '），检查后💾保存B');
+        }
+
+        // 🔴 2026-09-18 全局卡名互换（用户核心需求：两边换卡、所有波数一起换、不同行也换）
+        //    A 里所有 X → Y；B 里所有 Y → X。用占位符做「同时替换」，避免 A 换出的 Y 又被换成 X。
+        //    纯字符串交叉替换 = 确定性操作（比 AI 可靠：不漏行、不乱改），带预览确认。
+        function _cmpGlobalSwap(apply) {
+            const st = _cmpState;
+            const info = document.getElementById('cmpSwapInfo');
+            if (!st || !st.A || !st.B) { if (typeof showToast === 'function') showToast('先加载 A/B 两个脚本', 'error'); return; }
+            const x = (document.getElementById('cmpSwapX').value || '').trim();
+            const y = (document.getElementById('cmpSwapY').value || '').trim();
+            if (!x || !y) { if (typeof showToast === 'function') showToast('把 A方卡名 和 B方卡名 都填上', 'error'); return; }
+            if (x === y) { if (typeof showToast === 'function') showToast('两个卡名一样，不用换', 'info'); return; }
+            const PH = '\u0000TFJL_SWAP\u0000';
+            const swapAll = function (lines) {
+                let changed = 0; const samples = [];
+                const out = lines.map(function (l) {
+                    const before = l;
+                    let t = l.split(x).join(PH);
+                    t = t.split(y).join(x);
+                    t = t.split(PH).join(y);
+                    if (t !== before) { changed++; if (samples.length < 3) samples.push(before.trim() + '  →  ' + t.trim()); }
+                    return t;
+                });
+                return { out: out, changed: changed, samples: samples };
+            };
+            const ra = swapAll(st.A.lines);
+            const rb = swapAll(st.B.lines);
+            const msg = 'A：' + ra.changed + ' 行含「' + x + '」（→' + y + '）；B：' + rb.changed + ' 行含「' + y + '」（→' + x + '）';
+            if (!apply) {
+                const sp = (ra.samples[0] || rb.samples[0] || '');
+                info.innerHTML = (ra.changed || rb.changed) ? (msg + (sp ? '<br><span style="color:rgba(255,255,255,0.4);">示例：' + sp.replace(/</g, '&lt;') + '</span>' : '')) : '<span style="color:#f87171;">两边都没找到这两个卡名（检查拼写）</span>';
+                return;
+            }
+            if (!ra.changed && !rb.changed) { info.innerHTML = '<span style="color:#f87171;">两边都没找到这两个卡名（检查拼写）</span>'; return; }
+            st.A.lines = ra.out; st.B.lines = rb.out;
+            _cmpRenderSide('A'); _cmpRenderSide('B');
+            info.innerHTML = '✅ 已互换：' + msg + '　<b style="color:#ffd700;">记得点 💾保存A / 💾保存B 落盘</b>';
+            if (window.trackFeature) window.trackFeature('脚本卡名互换');
+            if (typeof showToast === 'function') showToast('🔀 已交换 ' + x + ' ↔ ' + y + '（共 ' + (ra.changed + rb.changed) + ' 行），检查后点保存');
         }
 
         function _cmpSaveSide(side) {
