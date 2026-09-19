@@ -5542,6 +5542,19 @@
                 // 自动静默扫描并刷新列表（setTimeout 确保浏览器先绘制标签切换 UI，再渲染列表）
                 if (window.silentScanFiles) { window.silentScanFiles().then(() => { setTimeout(() => { renderScriptFileCategoryFilter(); if (typeof filterTxtFilesList === 'function') filterTxtFilesList(); }, 0); }); }
                 else { renderScriptFileCategoryFilter(); }
+                // 🔴 2026-09-18 A/B 对比入口（幂等注入到搜索框旁）
+                try {
+                    const si = document.getElementById('txtFileSearchInput');
+                    if (si && !document.getElementById('scriptCompareBtn')) {
+                        const btn = document.createElement('button');
+                        btn.id = 'scriptCompareBtn';
+                        btn.textContent = '🅰️🅱️ 对比';
+                        btn.setAttribute('data-tip', 'A/B 脚本对比：按每行第一个逗号前的键同步定位，点行互相跳转+同底色高亮，支持行编辑与换卡自动同步到 B');
+                        btn.style.cssText = 'margin-left:6px;padding:6px 10px;border-radius:6px;border:1px solid rgba(206,147,216,0.5);background:rgba(156,80,221,0.2);color:#e1bee7;font-size:0.75rem;cursor:pointer;white-space:nowrap;';
+                        btn.onclick = function () { openScriptCompare(); };
+                        si.parentElement.appendChild(btn);
+                    }
+                } catch (e) {}
             } else {
                 filesTab.style.display = 'none';
                 parserTab.style.display = 'flex';
@@ -5557,6 +5570,271 @@
                 filesBtn.style.borderBottom = 'none';
             }
         }
+
+        // ==================== 🅰️🅱️ 脚本 A/B 同步对比（2026-09-18） ====================
+        // 场景：两边换卡/互换——A 里某波换了卡，要在 B 的同一波做对应修改。
+        // 规则：每行「第一个逗号前的文字/数字」= 键（如 "120" / "暗月雷神1号球同色"），键相同 = 同一波。
+        // 点一行 → 两侧同键行互相滚动定位 + 同底色高亮；支持行编辑；🤖 自动把 A 行相对打开时的
+        // 改动（换掉的卡名 → 换上的卡名）按序替换到 B 行（确定性规则替换，非 AI）。
+        function _cmpKey(line) {
+            const t = String(line || '').trim();
+            if (!t) return null;
+            const k = t.split(/[,，]/)[0].trim();
+            return k || null;
+        }
+        // 多重集差：a0 有而 a 没有的 token（被换掉的），a 有而 a0 没有的（换上的）
+        function _cmpTokenDiff(a0, a) {
+            const cnt0 = {}, cntA = {};
+            a0.forEach(t => { cnt0[t] = (cnt0[t] || 0) + 1; });
+            a.forEach(t => { cntA[t] = (cntA[t] || 0) + 1; });
+            const removed = [], added = [];
+            Object.keys(cnt0).forEach(t => { const d = cnt0[t] - (cntA[t] || 0); for (let i = 0; i < d; i++) removed.push(t); });
+            Object.keys(cntA).forEach(t => { const d = cntA[t] - (cnt0[t] || 0); for (let i = 0; i < d; i++) added.push(t); });
+            return { removed, added };
+        }
+        function _cmpTokenize(line) {
+            return String(line || '').split(/[,，]/).map(t => t.trim()).filter(t => t !== '');
+        }
+        let _cmpState = null;
+
+        function openScriptCompare() {
+            if (!Array.isArray(txtFiles) || txtFiles.length < 1) { if (typeof showToast === 'function') showToast('没有脚本文件，先在脚本面板新建/导入', 'error'); return; }
+            if (document.getElementById('scriptCompareModal')) return;
+            if (window.trackFeature) window.trackFeature('脚本A/B对比');
+            const names = txtFiles.map((f, i) => '<option value="' + i + '">' + (f.name || ('脚本' + (i + 1))) + '</option>').join('');
+            const modal = document.createElement('div');
+            modal.id = 'scriptCompareModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(4,4,12,0.94);z-index:310000;display:flex;flex-direction:column;padding:10px;box-sizing:border-box;';
+            modal.innerHTML =
+                '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">' +
+                  '<span style="color:#ffd700;font-weight:bold;">🅰️🅱️ 脚本 A/B 同步对比</span>' +
+                  '<span style="color:#e1bee7;font-size:0.78rem;">A</span><select id="cmpSelA" style="background:#2a2a4a;color:#fff;border:1px solid rgba(255,215,0,0.35);border-radius:6px;padding:5px 8px;font-size:0.78rem;cursor:pointer;">' + names + '</select>' +
+                  '<button id="cmpSwapAB" style="background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:6px;padding:5px 8px;font-size:0.72rem;cursor:pointer;">🔁 交换A/B</button>' +
+                  '<span style="color:#e1bee7;font-size:0.78rem;">B</span><select id="cmpSelB" style="background:#2a2a4a;color:#fff;border:1px solid rgba(255,215,0,0.35);border-radius:6px;padding:5px 8px;font-size:0.78rem;cursor:pointer;">' + names + '</select>' +
+                  '<span style="flex:1;"></span>' +
+                  '<button id="cmpSaveA" style="background:linear-gradient(135deg,#4fc3f7,#0288d1);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:0.76rem;cursor:pointer;font-weight:bold;">💾 保存A</button>' +
+                  '<button id="cmpSaveB" style="background:linear-gradient(135deg,#ce93d8,#7b1fa2);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:0.76rem;cursor:pointer;font-weight:bold;">💾 保存B</button>' +
+                  '<button id="cmpClose" style="background:rgba(244,67,54,0.8);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:0.76rem;cursor:pointer;">✕ 关闭</button>' +
+                '</div>' +
+                '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-bottom:6px;">规则：每行「第一个逗号前」的文字/数字 = 键，键相同 = 同一波。点任意一行 → 对侧同键行滚动定位并<b style="color:#ffd700;">同底色高亮</b>；双击行可直接编辑；换卡后在配对操作条点「🤖 同步A的改动到B」自动替换对应对面的卡名。</div>' +
+                '<div style="flex:1;display:flex;gap:8px;min-height:0;">' +
+                  '<div style="flex:1;display:flex;flex-direction:column;min-width:0;border:1px solid rgba(79,195,247,0.4);border-radius:10px;overflow:hidden;">' +
+                    '<div id="cmpTitleA" style="padding:6px 10px;background:rgba(79,195,247,0.12);color:#4fc3f7;font-size:0.78rem;font-weight:bold;">A</div>' +
+                    '<div id="cmpColA" style="flex:1;overflow:auto;font-family:monospace;font-size:0.76rem;line-height:1.5;"></div>' +
+                  '</div>' +
+                  '<div style="flex:1;display:flex;flex-direction:column;min-width:0;border:1px solid rgba(206,147,216,0.4);border-radius:10px;overflow:hidden;">' +
+                    '<div id="cmpTitleB" style="padding:6px 10px;background:rgba(206,147,216,0.12);color:#ce93d8;font-size:0.78rem;font-weight:bold;">B</div>' +
+                    '<div id="cmpColB" style="flex:1;overflow:auto;font-family:monospace;font-size:0.76rem;line-height:1.5;"></div>' +
+                  '</div>' +
+                '</div>' +
+                '<div id="cmpActionBar" style="display:none;margin-top:8px;background:rgba(20,20,40,0.92);border:1px solid rgba(255,215,0,0.35);border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
+                  '<span id="cmpPairInfo" style="color:#ffd700;font-size:0.78rem;"></span>' +
+                  '<span style="flex:1;"></span>' +
+                  '<button id="cmpEditA" style="background:rgba(79,195,247,0.2);color:#4fc3f7;border:1px solid rgba(79,195,247,0.5);border-radius:6px;padding:5px 10px;font-size:0.74rem;cursor:pointer;">✏️ 编辑A行</button>' +
+                  '<button id="cmpEditB" style="background:rgba(206,147,216,0.2);color:#ce93d8;border:1px solid rgba(206,147,216,0.5);border-radius:6px;padding:5px 10px;font-size:0.74rem;cursor:pointer;">✏️ 编辑B行</button>' +
+                  '<button id="cmpCopyA2B" style="background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:6px;padding:5px 10px;font-size:0.74rem;cursor:pointer;">📋 用A行覆盖B行</button>' +
+                  '<button id="cmpAutoSync" style="background:linear-gradient(135deg,#ffd700,#ff9800);color:#1a1a2e;border:none;border-radius:6px;padding:5px 12px;font-size:0.74rem;cursor:pointer;font-weight:bold;">🤖 同步A的改动到B</button>' +
+                '</div>';
+            document.body.appendChild(modal);
+            modal.querySelector('#cmpClose').onclick = function () { modal.remove(); _cmpState = null; };
+            modal.querySelector('#cmpSelA').onchange = function () { _cmpLoadSide('A', parseInt(this.value, 10) || 0); };
+            modal.querySelector('#cmpSelB').onchange = function () { _cmpLoadSide('B', parseInt(this.value, 10) || 0); };
+            modal.querySelector('#cmpSwapAB').onclick = function () {
+                const a = modal.querySelector('#cmpSelA'), b = modal.querySelector('#cmpSelB');
+                const t = a.value; a.value = b.value; b.value = t;
+                _cmpLoadSide('A', parseInt(a.value, 10) || 0);
+                _cmpLoadSide('B', parseInt(b.value, 10) || 0);
+            };
+            modal.querySelector('#cmpSaveA').onclick = function () { _cmpSaveSide('A'); };
+            modal.querySelector('#cmpSaveB').onclick = function () { _cmpSaveSide('B'); };
+            modal.querySelector('#cmpEditA').onclick = function () { _cmpEditLine('A'); };
+            modal.querySelector('#cmpEditB').onclick = function () { _cmpEditLine('B'); };
+            modal.querySelector('#cmpCopyA2B').onclick = function () { _cmpCopyA2B(); };
+            modal.querySelector('#cmpAutoSync').onclick = function () { _cmpAutoSync(); };
+            // 默认 A=第一个，B=第二个（不同文件）
+            const selA = modal.querySelector('#cmpSelA'), selB = modal.querySelector('#cmpSelB');
+            selA.value = '0';
+            selB.value = txtFiles.length > 1 ? '1' : '0';
+            _cmpLoadSide('A', parseInt(selA.value, 10) || 0);
+            _cmpLoadSide('B', parseInt(selB.value, 10) || 0);
+        }
+
+        function _cmpLoadSide(side, fileIdx) {
+            const st = _cmpState || (_cmpState = { A: null, B: null, sel: null });
+            const f = txtFiles[fileIdx];
+            if (!f) return;
+            const lines = String(f.content || '').split('\n');
+            st[side] = { fileIdx, lines, a0: lines.slice() };
+            const title = document.getElementById('cmpTitle' + side);
+            if (title) title.textContent = side + ' · ' + (f.name || ('脚本' + (fileIdx + 1))) + '（' + lines.length + ' 行）';
+            // 若 A/B 选了同一个文件，提示（允许但没意义）
+            _cmpRenderSide(side);
+        }
+
+        function _cmpRenderSide(side) {
+            const st = _cmpState; if (!st || !st[side]) return;
+            const col = document.getElementById('cmpCol' + side);
+            if (!col) return;
+            const other = side === 'A' ? 'B' : 'A';
+            // 另一侧键 → 行号队列（顺序配对，重复键按出现顺序一一对应）
+            const oq = {};
+            st[other].lines.forEach((l, i) => {
+                const k = _cmpKey(l);
+                if (k === null) return;
+                (oq[k] = oq[k] || []).push(i);
+            });
+            let html = '';
+            st[side].lines.forEach((text, i) => {
+                const k = _cmpKey(text);
+                let pid = '';
+                if (k !== null && oq[k] && oq[k].length) pid = side + i + '_' + oq[k].shift();
+                const edited = (side === 'A' && st.A && st.A.a0[i] !== undefined && st.A.a0[i] !== text);
+                const unmatched = k === null || !pid;
+                html += '<div class="cmp-line' + (unmatched ? ' cmp-unmatched' : '') + '" data-side="' + side + '" data-idx="' + i + '"' + (pid ? ' data-pid="' + pid + '"' : '') +
+                    ' style="display:flex;gap:6px;padding:2px 8px;border-left:3px solid ' + (unmatched ? 'rgba(248,113,113,0.5)' : 'transparent') + ';cursor:pointer;' + (edited ? 'background:rgba(255,152,0,0.08);' : '') + '">' +
+                    '<span style="width:30px;flex-shrink:0;color:rgba(255,255,255,0.3);text-align:right;">' + (i + 1) + '</span>' +
+                    (k !== null ? '<span style="flex-shrink:0;color:#7dd3fc;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + k.replace(/</g, '&lt;') + '</span>' : '<span style="flex-shrink:0;color:rgba(255,255,255,0.2);">—</span>') +
+                    '<span style="flex:1;white-space:pre-wrap;word-break:break-all;color:rgba(255,255,255,0.85);">' + String(text).replace(/</g, '&lt;') + '</span>' +
+                    (edited ? '<span style="flex-shrink:0;color:#ff9800;font-size:0.62rem;">已改</span>' : '') +
+                    '</div>';
+            });
+            col.innerHTML = html;
+            col.onclick = function (e) {
+                const line = e.target.closest('.cmp-line');
+                if (!line || line.querySelector('textarea')) return;
+                _cmpSelect(line);
+            };
+            col.ondblclick = function (e) {
+                const line = e.target.closest('.cmp-line');
+                if (!line || line.querySelector('textarea')) return;
+                _cmpEditLine(line.dataset.side, parseInt(line.dataset.idx, 10));
+            };
+            if (st.sel) {
+                const keep = col.querySelector('.cmp-line[data-idx="' + st.sel[side] + '"]');
+                if (keep) keep.classList.add('cmp-active');
+            }
+        }
+
+        function _cmpSelect(lineEl) {
+            const st = _cmpState; if (!st) return;
+            const side = lineEl.dataset.side, idx = parseInt(lineEl.dataset.idx, 10);
+            st.sel = st.sel || {}; st.sel[side] = idx;
+            document.querySelectorAll('#scriptCompareModal .cmp-active').forEach(x => x.classList.remove('cmp-active'));
+            lineEl.classList.add('cmp-active');
+            // 对侧同 pid 定位
+            const pid = lineEl.dataset.pid;
+            const other = side === 'A' ? 'B' : 'A';
+            st.sel[other] = null;
+            if (pid) {
+                const oLine = document.querySelector('#scriptCompareModal .cmp-line[data-pid="' + pid + '"][data-side="' + other + '"]');
+                if (oLine) {
+                    oLine.classList.add('cmp-active');
+                    st.sel[other] = parseInt(oLine.dataset.idx, 10);
+                    oLine.scrollIntoView({ block: 'center' });
+                }
+            }
+            lineEl.scrollIntoView({ block: 'center' });
+            _cmpUpdateActionBar();
+        }
+
+        function _cmpCurPair() {
+            const st = _cmpState; if (!st || !st.sel) return null;
+            const aIdx = st.sel.A, bIdx = st.sel.B;
+            if (aIdx === undefined || aIdx === null || bIdx === undefined || bIdx === null) return null;
+            if (_cmpKey(st.A.lines[aIdx]) !== _cmpKey(st.B.lines[bIdx])) return null;
+            return { aIdx, bIdx, aLine: st.A.lines[aIdx], bLine: st.B.lines[bIdx], key: _cmpKey(st.A.lines[aIdx]) };
+        }
+
+        function _cmpUpdateActionBar() {
+            const bar = document.getElementById('cmpActionBar');
+            if (!bar) return;
+            const pair = _cmpCurPair();
+            if (!pair) { bar.style.display = 'none'; return; }
+            bar.style.display = 'flex';
+            const aEdited = _cmpState.A.a0[pair.aIdx] !== undefined && _cmpState.A.a0[pair.aIdx] !== pair.aLine;
+            document.getElementById('cmpPairInfo').textContent = '配对键：' + pair.key + '（A 第' + (pair.aIdx + 1) + '行 ↔ B 第' + (pair.bIdx + 1) + '行）' + (aEdited ? ' · A 行有改动' : '');
+            const autoBtn = document.getElementById('cmpAutoSync');
+            if (autoBtn) autoBtn.style.display = aEdited ? 'inline-block' : 'none';
+        }
+
+        function _cmpEditLine(side, idx) {
+            const st = _cmpState; if (!st || !st[side]) return;
+            if (idx === undefined) {
+                const pair = _cmpCurPair(); if (!pair) return;
+                idx = side === 'A' ? pair.aIdx : pair.bIdx;
+            }
+            const col = document.getElementById('cmpCol' + side);
+            const lineEl = col && col.querySelector('.cmp-line[data-idx="' + idx + '"]');
+            if (!lineEl || lineEl.querySelector('textarea')) return;
+            const old = st[side].lines[idx];
+            lineEl.innerHTML = '';
+            const ta = document.createElement('textarea');
+            ta.value = old;
+            ta.style.cssText = 'flex:1;min-height:52px;background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,215,0,0.4);border-radius:6px;padding:6px;font-family:monospace;font-size:0.76rem;resize:vertical;';
+            const btns = document.createElement('div');
+            btns.style.cssText = 'display:flex;flex-direction:column;gap:4px;flex-shrink:0;';
+            const ok = document.createElement('button');
+            ok.textContent = '✓'; ok.style.cssText = 'background:#4caf50;color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;';
+            const no = document.createElement('button');
+            no.textContent = '✕'; no.style.cssText = 'background:#666;color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;';
+            btns.appendChild(ok); btns.appendChild(no);
+            lineEl.appendChild(ta); lineEl.appendChild(btns);
+            ta.focus();
+            const done = function (save) {
+                if (save && ta.value !== old) {
+                    st[side].lines[idx] = ta.value;
+                    if (window.trackFeature) window.trackFeature('脚本对比行编辑:' + side);
+                }
+                _cmpRenderSide('A'); _cmpRenderSide('B');
+                const keep = document.querySelector('#cmpCol' + side + ' .cmp-line[data-idx="' + idx + '"]');
+                if (keep) _cmpSelect(keep);
+            };
+            ok.onclick = function (e) { e.stopPropagation(); done(true); };
+            no.onclick = function (e) { e.stopPropagation(); done(false); };
+        }
+
+        function _cmpCopyA2B() {
+            const st = _cmpState, pair = _cmpCurPair();
+            if (!st || !pair) { if (typeof showToast === 'function') showToast('先点选一对同键行', 'error'); return; }
+            st.B.lines[pair.bIdx] = pair.aLine;
+            _cmpRenderSide('B');
+            if (typeof showToast === 'function') showToast('✅ 已用 A 行覆盖 B 行（记得💾保存B）');
+        }
+
+        function _cmpAutoSync() {
+            const st = _cmpState, pair = _cmpCurPair();
+            if (!st || !pair) return;
+            const a0 = st.A.a0[pair.aIdx];
+            const aNow = pair.aLine;
+            if (a0 === aNow) { if (typeof showToast === 'function') showToast('A 行没有改动', 'info'); return; }
+            const diff = _cmpTokenDiff(_cmpTokenize(a0), _cmpTokenize(aNow));
+            if (!diff.removed.length) { if (typeof showToast === 'function') showToast('没识别到被换掉的卡（A 行只是新增内容），请手动编辑 B 行', 'info'); return; }
+            // 在 B 行 token 里按序替换：removed[i] → added[i]（数量不等时多余 removed 仅删除）
+            const toks = _cmpTokenize(pair.bLine);
+            const used = {};
+            diff.removed.forEach(function (rm, i) {
+                const add = diff.added[i] || '';
+                for (let t = 0; t < toks.length; t++) {
+                    if (toks[t] === rm && !used[t]) { toks[t] = add; used[t] = 1; break; }
+                }
+            });
+            st.B.lines[pair.bIdx] = toks.join(',');
+            _cmpRenderSide('B');
+            if (window.trackFeature) window.trackFeature('换卡自动同步到B');
+            if (typeof showToast === 'function') showToast('🤖 已把 A 的换卡改动同步到 B 行（' + diff.removed.join('/') + ' → ' + (diff.added.join('/') || '∅') + '），检查后💾保存B');
+        }
+
+        function _cmpSaveSide(side) {
+            const st = _cmpState; if (!st || !st[side]) return;
+            const f = txtFiles[st[side].fileIdx];
+            if (!f) return;
+            f.content = st[side].lines.join('\n');
+            if (typeof autoSaveProject === 'function') autoSaveProject();
+            if (window.trackFeature) window.trackFeature('脚本对比保存:' + side);
+            if (typeof showToast === 'function') showToast('💾 已保存到脚本「' + (f.name || '') + '」');
+        }
+
+        window.openScriptCompare = openScriptCompare;
 
         // 搜索脚本按钮 - 打开脚本面板并聚焦搜索框
         function focusScriptSearch() {
