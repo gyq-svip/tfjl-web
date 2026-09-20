@@ -67,9 +67,15 @@ const NEVER_CACHE = [
     'api.github.com',
     'gist.githubusercontent.com',
     'raw.githubusercontent.com',
-    'avatars.githubusercontent.com',
-    'gyq-svip.github.io'   // 放行线上 sw.js 自身的版本轮询 fetch（SW 主动探测最新版用）
+    'avatars.githubusercontent.com'
+    // 🔴 2026-09-20 移除 'gyq-svip.github.io'：本站在 github.io 上，加这一条 = 【整域豁免】，
+    //    站内所有资产（JS/CSS/图片，含"背景设置里的默认背景图"）全部绕过 SW 缓存 → 每次打开都从远端重下。
+    //    真正要放行的只有「SW 主动轮询线上 sw.js」那一个请求，改由下方 pathname 精确判断（见 fetch 处理）。
 ];
+
+// 🔴 2026-09-20 稳定静态资源专用缓存（不带版本号）：activate 只清 '-runtime' 结尾的缓存，
+//    故本缓存跨版本保留 —— 内置背景图这类不变资源不再因每次部署 CACHE_VERSION +1 而全部重下。
+const CACHE_ASSETS = 'tfjl-assets';
 
 // 线上 sw.js 地址（与本站同源，仅主机不同）。SW 主动轮询它提取 CACHE_VERSION，
 // 实现「页面一直开着不 reload 也能自动升级」（弥补 register.update() 只在 load 时触发、开着不动不升的缺口）。
@@ -306,8 +312,18 @@ self.addEventListener('fetch', (event) => {
 
     const url = new URL(request.url);
 
+    // 放行「SW 主动轮询线上 sw.js」这一个请求（SW 自己发的 fetch 本不会过自己的 fetch 事件，这里再精确兜一层，
+    // 避免以后又写成整域豁免）。其余同源资产照常走缓存。
+    if (url.hostname.includes('gyq-svip.github.io') && url.pathname.endsWith('/sw.js')) return;
+
     // 不缓存 API 请求
     if (NEVER_CACHE.some(pattern => url.hostname.includes(pattern))) {
+        return;
+    }
+
+    // 🔴 内置背景图（bg/…）：走"跨版本保留"的 CACHE_ASSETS —— 首拉后无论多少次部署/升级都不再重下。
+    if (url.pathname.indexOf('/bg/') >= 0) {
+        event.respondWith(staleWhileRevalidate(request, CACHE_ASSETS));
         return;
     }
 

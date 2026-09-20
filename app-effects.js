@@ -238,6 +238,7 @@
             if (typeof openBackgroundSettings === 'function') openBackgroundSettings();
         };
         window.__bgCloseSettings = function () {
+            try { bgRevokeBuiltinThumbs(); } catch (e) {} // 释放缩略图 blob
             const m = document.getElementById('bgSettingsModal');
             if (m) m.remove();
         };
@@ -346,6 +347,12 @@
         // ===== 上传背景图片库（IndexedDB 存 blob，避免 localStorage 爆配额） =====
         const BG_DB = 'tfjl-bg-images';
         const BG_STORE = 'images';
+        // 🔴 2026-09-20 内置背景图本地缓存（独立 store，不混进"我的背景图"列表）：
+        //    首次联网拉到后把图片写进 IndexedDB（浏览器 / WebView2 都会落盘），此后永远本地读取、断网可用，
+        //    **不再每次启动/每次打开设置窗都从远端拉**。桌面版没有 SW，这一步就是它对"缓存到本地磁盘"的正解。
+        const BG_ASSET_STORE = 'assets';
+        let bgBuiltinBlobUrl = null;      // 当前内置图使用的本地 blob URL（切换时 revoke，防泄漏）
+        let bgBuiltinThumbUrls = [];      // 设置窗里内置图缩略图的 blob URL（关闭/重开时 revoke）
         let bgImgUrl = null, bgImgId = null, bgMigrateTried = false, bgThumbUrls = [];
         let bgVideoUrl = null, bgVideoId = null;
 
@@ -386,26 +393,36 @@
         function bgOpenDb() {
             return new Promise(function (res, rej) {
                 if (!window.indexedDB) { rej('no idb'); return; }
-                const req = indexedDB.open(BG_DB, 1);
+                const req = indexedDB.open(BG_DB, 2); // 🔴 v2：新增 assets store（内置资源本地缓存）
                 req.onupgradeneeded = function () {
                     const db = req.result;
                     if (!db.objectStoreNames.contains(BG_STORE)) db.createObjectStore(BG_STORE, { keyPath: 'id' });
+                    if (!db.objectStoreNames.contains(BG_ASSET_STORE)) db.createObjectStore(BG_ASSET_STORE, { keyPath: 'url' });
                 };
                 req.onsuccess = function () { res(req.result); };
                 req.onerror = function () { rej(req.error); };
             });
         }
-        function bgIdb(mode, fn) {
+        function bgIdbStore(storeName, mode, fn) {
             return bgOpenDb().then(function (db) {
                 return new Promise(function (res, rej) {
-                    const tx = db.transaction(BG_STORE, mode);
-                    const store = tx.objectStore(BG_STORE);
+                    const tx = db.transaction(storeName, mode);
+                    const store = tx.objectStore(storeName);
                     let out;
                     try { out = fn(store); } catch (e) { rej(e); return; }
                     tx.oncomplete = function () { res(out && out.result !== undefined ? out.result : out); };
                     tx.onerror = function () { rej(tx.error); };
                 });
             });
+        }
+        function bgIdb(mode, fn) { return bgIdbStore(BG_STORE, mode, fn); }
+        // 内置资源本地缓存读写（IndexedDB 落盘 = "缓存到本地磁盘"；网页/桌面版同一套）
+        function bgAssetGet(url) {
+            return bgIdbStore(BG_ASSET_STORE, 'readonly', function (s) { return s.get(url); })
+                .then(function (r) { return (r && r.blob) ? r.blob : null; });
+        }
+        function bgAssetPut(url, blob) {
+            return bgIdbStore(BG_ASSET_STORE, 'readwrite', function (s) { return s.put({ url: url, ts: Date.now(), blob: blob }); });
         }
         function bgSaveImage(blob, name) {
             const rec = { id: 'bg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), name: name || '背景图', ts: Date.now(), blob: blob };
@@ -427,6 +444,35 @@
         function bgRevokeUrl() {
             if (bgImgUrl) { try { URL.revokeObjectURL(bgImgUrl); } catch (e) {} }
             bgImgUrl = null; bgImgId = null;
+        }
+        function bgRevokeBuiltinUrl() {
+            if (bgBuiltinBlobUrl) { try { URL.revokeObjectURL(bgBuiltinBlobUrl); } catch (e) {} }
+            bgBuiltinBlobUrl = null;
+        }
+        function bgRevokeBuiltinThumbs() {
+            bgBuiltinThumbUrls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} });
+            bgBuiltinThumbUrls = [];
+        }
+        // 🔴 2026-09-20 内置背景图统一应用入口：**本地缓存优先（零网络）**；未命中才联网一次并落盘，
+        //    下次启动直接本地读取（断网也能显示）。失败兜底直连原 URL。
+        function bgApplyAsset(url) {
+            const layer = ensureBgLayer() || document.body;
+            layer.classList.add('bg-custom');
+            layer.style.background = '';
+            const setLocal = function (blob) {
+                bgRevokeBuiltinUrl();
+                bgBuiltinBlobUrl = URL.createObjectURL(blob);
+                layer.style.backgroundImage = 'url(' + bgBuiltinBlobUrl + ')';
+            };
+            return bgAssetGet(url).catch(function () { return null; }).then(function (blob) {
+                if (blob) { setLocal(blob); return true; }
+                return fetch(url).then(function (r) { return r.ok ? r.blob() : null; }).then(function (b) {
+                    if (!b) { layer.style.backgroundImage = 'url(' + url + ')'; return false; }
+                    setLocal(b);
+                    bgAssetPut(url, b).catch(function () {});   // 落盘，后续不再联网
+                    return true;
+                }).catch(function () { layer.style.backgroundImage = 'url(' + url + ')'; return false; });
+            });
         }
         function bgApplyImage(id) {
             return bgGetImage(id).then(function (rec) {
@@ -485,12 +531,15 @@
                 bgRevokeUrl(); stopBgVideo();
                 const girl2Gone = (typeof bgHiddenBuiltins === 'function' && bgHiddenBuiltins().indexOf('bg/bg-girl2.jpg') >= 0);
                 if (!girl2Gone) {
-                    layer.classList.add('bg-custom');
-                    layer.style.backgroundImage = 'url(bg/bg-girl2.jpg)';
+                    // 🔴 2026-09-20 走本地缓存（首拉落盘后永久本地读取，不再每次启动都远端拉取）
+                    bgApplyAsset('bg/bg-girl2.jpg');
+                } else {
+                    bgRevokeBuiltinUrl();
                 }
                 applyBgBlur();
                 return;
             }
+            if (val.indexOf('builtin:') !== 0) bgRevokeBuiltinUrl(); // 离开内置图 → 释放其本地 blob
             if (val.indexOf('img:') !== 0 && val.indexOf('video:') !== 0) bgRevokeUrl();
             if (val.indexOf('video:') !== 0) stopBgVideo();
             if (val.indexOf('video:') === 0) {
@@ -525,8 +574,8 @@
                 layer.classList.add('bg-custom');
                 layer.style.backgroundImage = 'url(' + val.slice(7) + ')';
             } else if (val.indexOf('builtin:') === 0) {
-                layer.classList.add('bg-custom');
-                layer.style.backgroundImage = 'url(' + val.slice(8) + ')';
+                // 🔴 2026-09-20 选中的内置图同样走本地缓存（零网络；首拉落盘）
+                bgApplyAsset(val.slice(8));
             } else if (val.indexOf('grad:') === 0) {
                 layer.style.background = val.slice(5);
             }
@@ -750,7 +799,9 @@
                 BG_BUILTIN.forEach(function (b) {
                     if (hidden.indexOf(b.url) >= 0) return;
                     rows.push('<div style="position:relative;">' +
-                        '<button onclick="window.__setBgBuiltin(\'' + b.url + '\')" style="padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background-image:url(' + b.url + ');background-size:cover;background-position:center;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.85);cursor:pointer;font-size:0.8rem;min-width:96px;min-height:40px;">' + b.name + '</button>' +
+                        // 🔴 2026-09-20 缩略图不直接写远端 URL（那会每次打开设置窗都联网下 6 张图）：
+                        //    先占位，随后 data-bgthumb 走本地缓存填充（首拉落盘，之后零网络）。
+                        '<button data-bgthumb="' + b.url + '" onclick="window.__setBgBuiltin(\'' + b.url + '\')" style="padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);background-size:cover;background-position:center;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.85);cursor:pointer;font-size:0.8rem;min-width:96px;min-height:40px;">' + b.name + '</button>' +
                         '<button onclick="window.__bgHideBuiltin(\'' + b.url + '\')" title="删除" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#e53935;border:none;color:#fff;font-size:0.66rem;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.5);">✕</button>' +
                         '</div>');
                 });
@@ -814,6 +865,25 @@
                 '  </div>' +
                 '  <div style="margin-top:12px;color:rgba(255,255,255,0.4);font-size:0.72rem;">提示：极光/星河为动态渐变背景；浅色背景可能让部分浅色文字变淡，可勾选上方「背景协调压暗」。</div>';
             document.body.appendChild(modal);
+            // 🔴 2026-09-20 内置图缩略图填充：本地缓存优先（首拉落盘 → 以后打开设置窗零网络）
+            try {
+                bgRevokeBuiltinThumbs();
+                document.querySelectorAll('#bgSettingsModal [data-bgthumb]').forEach(function (btn) {
+                    const u = btn.getAttribute('data-bgthumb');
+                    if (!u) return;
+                    const useBlob = function (blob) {
+                        try { const bu = URL.createObjectURL(blob); bgBuiltinThumbUrls.push(bu); btn.style.backgroundImage = 'url(' + bu + ')'; } catch (e) {}
+                    };
+                    bgAssetGet(u).catch(function () { return null; }).then(function (blob) {
+                        if (blob) { useBlob(blob); return; }
+                        fetch(u).then(function (r) { return r.ok ? r.blob() : null; }).then(function (b) {
+                            if (!b) { btn.style.backgroundImage = 'url(' + u + ')'; return; }
+                            useBlob(b);
+                            bgAssetPut(u, b).catch(function () {});
+                        }).catch(function () { btn.style.backgroundImage = 'url(' + u + ')'; });
+                    });
+                });
+            } catch (e) {}
             // 悬浮窗拖拽（仅标题栏空白区拖动；按钮内点击不触发拖拽，避免关闭时窗体被拖走）
             try {
                 const hdr = document.getElementById('bgSettingsHeader');
