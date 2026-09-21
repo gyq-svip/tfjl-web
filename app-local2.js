@@ -5678,13 +5678,17 @@ if (true) {
                     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
                         <button onclick="gmImTestDeck()" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🃏 只切卡（测试）</button>
                         <button onclick="gmImTestCart()" style="background:linear-gradient(135deg,#ff9800,#e65100);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🚂 只切车（测试）</button>
-                        <button onclick="gmImCalibCart()" title="一次性标定：把战车列表拉到最左，然后在截图上点第 1 格和第 6 格的中心" style="background:linear-gradient(135deg,#607d8b,#37474f);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🎯 标定战车位</button>
+                        <button onclick="gmImAutoCalibCart()" title="全自动：程序自己点+识别，扫出第1位x/间距/行高并保存（约30~50秒，期间别动游戏）" style="background:linear-gradient(135deg,#8e24aa,#4a148c);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🔬 自动扫描标定</button>
+                        <button onclick="gmImCalibCart()" title="手动标定（备用）：在截图上点第 1 格和第 6 格的中心" style="background:linear-gradient(135deg,#607d8b,#37474f);color:#fff;border:none;padding:8px 12px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🎯 手动标定</button>
                         <button onclick="gmImCalibCartClear()" title="清掉战车位的标定值，回到内置默认坐标（标定后反而点不到格子时用）" style="background:rgba(255,255,255,0.08);color:#ffcc80;border:1px solid rgba(255,183,77,0.4);padding:8px 12px;border-radius:7px;cursor:pointer;font-size:0.78rem;">↺ 清除标定</button>
                         <button onclick="gmImCalibCartName()" title="框选右侧详情里的战车名那一行（如 熔岩巨兽号 Lv1）——切车时用它复核是否选对，选错自动纠正" style="background:linear-gradient(135deg,#00897b,#004d40);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;">📐 框选战车名</button>
                         <button onclick="gmImTestCartName()" title="自检：现在读一次详情区的战车名" style="background:rgba(0,137,123,0.25);color:#4dd0b1;border:1px solid rgba(0,137,123,0.5);padding:8px 12px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🔎 读名字</button>
                         <button onclick="gmImCheckCartRow()" title="一次性定位：自动试出能点中格子的行高 y 并保存（点不到格子/切车无效时先点它）" style="background:linear-gradient(135deg,#00897b,#004d40);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🛠 自动定位战车行</button>
                         <label style="display:flex;align-items:center;gap:5px;color:rgba(255,255,255,0.75);font-size:0.76rem;cursor:pointer;" title="默认开：切车动作不变（查表+固定手势），点完再读一次名字，偏 1~3 格会按实测编号补点相邻格（多花 2~3 秒）">
                             <input type="checkbox" id="gmImCartVerify" onchange="gmImSetCartVerify(this.checked)" checked> 切完校验并纠正
+                        </label>
+                        <label style="display:flex;align-items:center;gap:5px;color:rgba(255,255,255,0.75);font-size:0.76rem;cursor:pointer;" title="默认开：如果发现'点了选中没变'（坐标点不中格子），自动扫描标定一次并重试切车（约 30~50 秒，一次性）">
+                            <input type="checkbox" id="gmImAutoCalib" onchange="gmImSetAutoCalib(this.checked)" checked> 点不中自动扫描
                         </label>
                         <button onclick="gmImRunOnce()" style="background:linear-gradient(135deg,#9c27b0,#6a1b9a);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🔥 完整连打一次</button>
                         <button id="gmImAutoBtn" onclick="gmImToggleAuto()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;font-weight:bold;">▶ 开始连打监控</button>
@@ -6099,6 +6103,8 @@ if (true) {
         set('gmImCooldown', c.cooldown || 15);
         const vcb = document.getElementById('gmImCartVerify');   // 复核开关（默认开：切完校验并纠正±1~3格）
         if (vcb) vcb.checked = (c.cartVerify !== false);
+        const acb = document.getElementById('gmImAutoCalib');    // 点不中自动扫描（默认开）
+        if (acb) acb.checked = (c.autoCalib !== false);
         _gmImCartWatchStart();   // 👁 启动"当前战车"实时识别（面板关掉自动停）
         // 窗口下拉：先用已有列表填充并保留上次选择，再异步枚举一次补全（老马窗口常需深度扫描）
         const fillWins = () => {
@@ -6312,7 +6318,9 @@ if (true) {
     // 🔴 2026-09-21 v3（用户明确要求，别再改成自适应）：**固定流程、固定手势、固定次数**，不识别、不多滑、不自动改坐标。
     //    k 与位次完全按用户页表：页首 = min(1+5k, 17)，位次 = N − 页首 + 1（末页第 7 位 = 23）。
     //    识别（战车名校验）仅作为可选开关（默认关），勾了才在点完读一次名字复核。
-    async function gmImSwitchCart(hwnd, cartNo) {
+    function _gmImAutoCalibOn() { try { return _gmImLoadCfg().autoCalib !== false; } catch (e) { return true; } }
+
+    async function gmImSwitchCart(hwnd, cartNo, noRetry) {
         const mode = _gmImMode();
         cartNo = Math.max(1, Math.min(23, cartNo | 0));
         // 1) 返回（从卡组界面回到可打开战车选择的界面）
@@ -6366,7 +6374,20 @@ if (true) {
             } else if (beforeIdx !== null && got.index === beforeIdx && beforeIdx !== cartNo) {
                 // 🔴 关键诊断：点完选中一点没变（还是点之前那辆）→ 坐标根本没落到格子上（y 偏了 / 换过窗口尺寸）
                 fixLog = ' ｜ ❌ 点了没反应：选中仍是 ' + got.index + '号(' + got.name + ')，和目标 ' + cartNo + ' 号不符 —— '
-                    + '这是【坐标点不到格子】。请点「🛠 自动定位战车行」（会自动试出能点中的行高并保存）或「🎯 标定战车位」重标一次';
+                    + '这是【坐标点不到格子】';
+                _gmImLog('❌ 点了没反应：选中仍是 ' + got.index + '号（' + got.name + '）≠ 目标 ' + cartNo + ' 号 → 判定为坐标点不中格子');
+                // 🔴 自愈：自动扫描标定（自己点+识别扫出行高与格子坐标）→ 用新坐标重试一次
+                if (!noRetry && _gmImAutoCalibOn()) {
+                    _gmImLog('🛠 坐标点不中 → 自动扫描标定（约 30~50 秒，请不要动游戏）…');
+                    const okScan = await window.gmImAutoCalibCart(true);
+                    if (okScan) {
+                        _gmImLog('🔁 已用新坐标重试切车 ' + cartNo + ' 号');
+                        return await gmImSwitchCart(hwnd, cartNo, true);
+                    }
+                    fixLog += '；自动扫描也没成功（请点「🛠 自动定位战车行」或检查点击方式=真实鼠标）';
+                } else {
+                    fixLog += '。请点「🛠 自动定位战车行」或「🎯 标定战车位」重标一次';
+                }
                 _gmImCartNowIdx = got.index;
             } else {
                 // 🔴 修复定位：按"实测编号 - 目标编号"的差补点相邻格（只补 1~3 格、且在 1~6/7 位范围内）
@@ -6445,6 +6466,102 @@ if (true) {
             });
         } catch (e) { _gmImLog('❌ 截图失败：' + ((e && e.message) || e)); }
     };
+    // 纯算法（便于离线测试）：samples=[{x,idx}] → {x1, pitch, cells:[{idx,cx,w}]}
+    //   把"点同一个 x 得到的编号"分组 → 每格中心 = 该组 x 的均值中心；相邻格中心差的中位数 = 间距。
+    function _gmImDeriveGrid(samples) {
+        if (!Array.isArray(samples)) return null;
+        const groups = [];
+        for (const s of samples) {
+            if (s.idx === null || s.idx === undefined) continue;
+            const last = groups[groups.length - 1];
+            if (last && last.idx === s.idx) { last.xmax = s.x; last.n++; }
+            else groups.push({ idx: s.idx, xmin: s.x, xmax: s.x, n: 1 });
+        }
+        const cells = groups.filter(g => g.n >= 2).map(g => ({ idx: g.idx, cx: (g.xmin + g.xmax) / 2, w: g.xmax - g.xmin }));
+        if (cells.length < 4) return null;
+        const diffs = [];
+        for (let i = 1; i < cells.length; i++) diffs.push(cells[i].cx - cells[i - 1].cx);
+        const sorted = diffs.slice().sort((a, b) => a - b);
+        const pitch = sorted[Math.floor(sorted.length / 2)];
+        if (!(pitch > 0.04 && pitch < 0.2)) return null;
+        return { x1: cells[0].cx, pitch: pitch, cells: cells };
+    }
+    window.gmImDeriveGrid = _gmImDeriveGrid;
+
+    // 🔬 自动扫描标定（2026-09-21，用户要求"程序自己测"）：全程不用人工点图 ——
+    //   ① 找能点中的行高 y：在两个相距很远的 x 各点一次，只有"编号确实变了"才算这一行能点；
+    //   ② 拉回最左（保证最左格 = 第 1 位）→ **横扫 x**（每 0.025 点一次并读名字）→ 得出每格范围与中心；
+    //   ③ 用相邻格中心差的中位数当"间距"、最左格中心当"第 1 位 x"；
+    //   ④ 立刻用扫出的坐标点第 1~6 位做连续性验证，并保存。
+    window.gmImAutoCalibCart = async function (force) {
+        if (!_gmImGuardApp()) return false;
+        const hwnd = _gmImHwnd();
+        if (!hwnd) { _gmImLog('⚠️ 请先在上方「🎮 游戏窗口」里选好窗口'); return false; }
+        if (!force && _gmImBusy) { _gmImLog('⏭ 正在执行其它操作（连打/切车），稍后再点自动扫描'); return false; }
+        const mode = _gmImMode();
+        const wasBusy = _gmImBusy;
+        if (!force) _gmImBusy = true;
+        try {
+            _gmImLog('🔬 自动扫描开始（约 30~50 秒，期间请不要动游戏）：先找能点中的行高…');
+            let yOK = null;
+            for (const y of [0.84, 0.80, 0.82, 0.86, 0.78, 0.76, 0.88]) {
+                await window.gmClick(hwnd, 0.26, y, 1, 200, mode); await _gmImSleep(400);
+                const a = await _gmImReadCartName(hwnd);
+                await window.gmClick(hwnd, 0.66, y, 1, 200, mode); await _gmImSleep(400);
+                const b = await _gmImReadCartName(hwnd);
+                if (a && b && a.index !== b.index) {
+                    yOK = y;
+                    _gmImLog('  ✔ 行高 y=' + y.toFixed(2) + ' 能点中（点左 → ' + a.index + '号，点右 → ' + b.index + '号）');
+                    break;
+                }
+                _gmImLog('  y=' + y.toFixed(2) + ' 点两处编号不变（' + (a ? a.index + '号' : '读不到') + '）→ 换下一个');
+            }
+            if (yOK === null) {
+                _gmImLog('❌ 找不到能点中的行高。请确认：①游戏里「战车」面板已打开 ②点击方式=真实鼠标 ③「📐 框选战车名」读得到名字');
+                return false;
+            }
+            // 拉回最左（用扫出的行高）→ 最左格即"第 1 位"
+            for (let i = 0; i < 4; i++) { await window.gmSwipe(hwnd, 0.24, yOK, 0.69, yOK, 400, mode); await _gmImSleep(320); }
+            await _gmImSleep(350);
+            // 横扫 x
+            const samples = [];
+            for (let x = 0.18; x <= 0.861; x += 0.025) {
+                const xx = Math.round(x * 1000) / 1000;
+                await window.gmClick(hwnd, xx, yOK, 1, 200, mode);
+                await _gmImSleep(330);
+                const m = await _gmImReadCartName(hwnd);
+                samples.push({ x: xx, idx: m ? m.index : null });
+                if (samples.length % 6 === 0) _gmImLog('  …已扫 ' + samples.length + ' 点（最新 x=' + xx + ' → ' + (m ? m.index + '号' : '读不到') + '）');
+            }
+            const grid = _gmImDeriveGrid(samples);
+            if (!grid) { _gmImLog('❌ 扫描点太少/读不到编号，无法推算格子（先把「📐 框选战车名」弄准再扫）'); return; }
+            _gmImLog('  📐 推算：第1位 x=' + grid.x1.toFixed(3) + '｜间距=' + grid.pitch.toFixed(4) + '｜识别到 ' + grid.cells.length + ' 格：'
+                + grid.cells.map(c => c.idx + '@' + c.cx.toFixed(3)).join(' '));
+            _gmImSaveCfg({ cartX1: grid.x1, cartPitch: grid.pitch, cartY: yOK });
+            _gmImCalBadLogged = false;
+            // 验证：用扫出的坐标依次点第 1~6 位，编号应连续
+            const got = [];
+            for (let p = 1; p <= 6; p++) {
+                await window.gmClick(hwnd, _gmImCartSlotX(p, false), yOK, 1, 200, mode);
+                await _gmImSleep(360);
+                const m = await _gmImReadCartName(hwnd);
+                got.push(m ? m.index : null);
+            }
+            const okLine = got.every((v, i) => v !== null && (i === 0 || v === got[i - 1] + 1));
+            if (okLine) {
+                _gmImLog('✅ 自动标定完成并已保存：第1位 x=' + grid.x1.toFixed(3) + '｜间距 ' + grid.pitch.toFixed(4) + '｜行 y=' + yOK.toFixed(3)
+                    + '（实测第1~6位 = ' + got.join('/') + '，连续 ✔）');
+            } else {
+                _gmImLog('⚠️ 已保存（第1位 x=' + grid.x1.toFixed(3) + '｜间距 ' + grid.pitch.toFixed(4) + '｜y=' + yOK.toFixed(3) + '），'
+                    + '但第1~6位实测 = ' + got.join('/') + ' 不连续 → 请再扫一次，或把这条日志发我');
+            }
+            return true;   // 🔴 必须返回 true：调用方（点不中自愈）靠它决定是否用新坐标重试（曾经漏写导致重试被跳过）
+        } catch (e) {
+            _gmImLog('❌ 自动扫描出错：' + ((e && e.message) || e));
+            return false;
+        } finally { if (!force) _gmImBusy = wasBusy; }
+    };
+
     // 📐 框选「战车名」区域（闭环校验用）：框住右侧详情里那行名字（如 熔岩巨兽号 Lv1）
     window.gmImCalibCartName = async function () {
         if (!_gmImGuardApp()) return;
@@ -6520,7 +6637,12 @@ if (true) {
     // 名校验开关（默认开）：关掉后只按算术定位、不做纠正
     window.gmImSetCartVerify = function (on) {
         _gmImSaveCfg({ cartVerify: !!on });
-        _gmImLog(on ? '已开启「战车名校验」（点完自动复核并纠正±1~2格）' : '已关闭「战车名校验」（只按算术定位）');
+        _gmImLog(on ? '已开启「切完校验并纠正」（点完复核，偏 1~3 格自动补点）' : '已关闭「切完校验并纠正」（只按计划表执行）');
+    };
+    // 点不中自动扫描开关（默认开）
+    window.gmImSetAutoCalib = function (on) {
+        _gmImSaveCfg({ autoCalib: !!on });
+        _gmImLog(on ? '已开启「点不中自动扫描」：万一坐标点不中格子，会自动扫描标定并重试一次' : '已关闭「点不中自动扫描」');
     };
     // 清除标定（回到写死的坐标表）
     window.gmImCalibCartClear = function () {
