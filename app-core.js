@@ -1118,7 +1118,12 @@
                     try { executed = localStorage.getItem(_FR_KEY) || ''; } catch (e) {}
                     if (executed === sigStr) return; // 同一指令已执行过，跳过
                     const myDev = (typeof getDeviceId === 'function') ? getDeviceId() : '';
-                    const hitAll = (sigStr === '*' || sigStr === 'all' || sigStr === 'true');
+                    // 🔴 2026-09-21 修「远程强刷广播一直是失效的」：管理员下发的值实际形如
+                    //    "all@1787851274170"（带时间戳：便于重复下发 + 上面那条 7 天过期判断），
+                    //    但旧代码只认**正好等于** all/*/true → 带时间戳的广播永远匹配不到、静默失效。
+                    //    改为前缀匹配：all@ / *@ / true@ 也算全网。时间戳仍用于过期判断与"同一指令只执行一次"。
+                    const hitAll = (sigStr === '*' || sigStr === 'all' || sigStr === 'true'
+                        || sigStr.indexOf('all@') === 0 || sigStr.indexOf('*@') === 0 || sigStr.indexOf('true@') === 0);
                     const hitMe = (!hitAll && myDev && sigStr === myDev);
                     if (!hitAll && !hitMe) return; // 不是全部、也不是我这台
                     try { localStorage.setItem(_FR_KEY, sigStr); } catch (e) {}
