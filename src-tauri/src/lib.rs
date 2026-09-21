@@ -761,42 +761,65 @@ fn publish_skins(token: Option<String>) -> Result<String, String> {
     }
 }
 
-/// 自增 index.html 的 versionTag 与 sw.js 的 CACHE_VERSION
+/// 自增前端版本号（sw.js 的 CACHE_VERSION）
+/// 🔴 2026-09-21 修「小版本不自动 +1（皮肤制作一键推送 → 版本号自增跳过）」：
+///    ① index.html 的 versionTag 本地现在是占位符 **`dev`**（真实版本号由 app-picker.js 启动后从
+///       线上 version.json 拉取填充），旧代码写死去找 `>s` **永远找不到** → 用户看到
+///       「• 版本号自增跳过（未找到版本前缀）」→ **不再 bump index.html**（它已不由本地维护）。
+///    ② sw.js 的 CACHE_VERSION 曾写死前缀 `'s1.0.`，版本升到 s1.1.x 后同样匹配不到 →
+///       改为通用解析 `s<数字>.<数字>.<数字>`，只自增末段补丁号。
+///    ③ 注意：CI（deploy.yml）每次部署成功也会自动 +1 并 commit 回 main，这里只是**本地双保险**；
+///       所以本函数失败不影响版本前进（推送成功后 CI 照样 +1）。
 fn bump_skin_versions(repo: &str) -> Result<(), String> {
-    bump_in_file(&format!("{}\\index.html", repo), "id=\"versionTag\"", ">s", '<')?;
-    bump_in_file(&format!("{}\\sw.js", repo), "CACHE_VERSION = 's1.0.", "s1.0.", '\'')?;
+    bump_sw_cache_version(&format!("{}\\sw.js", repo))
+}
+
+/// 找 `const CACHE_VERSION = 'sX.Y.Z'` 并把补丁号（末段）自增
+fn bump_sw_cache_version(path: &str) -> Result<(), String> {
+    let mut content = fs::read_to_string(path).map_err(|e| format!("读取失败: {}", e))?;
+    let marker = "const CACHE_VERSION";
+    let pos = content.find(marker).ok_or("未找到 CACHE_VERSION")?;
+    // 只在标记后一小段里找版本号，避免误改文件里其它 sX.Y.Z（如注释里的示例）
+    let window_end = (pos + 200).min(content.len());
+    let after = &content[pos..window_end];
+    let (vs, ve, ver) = find_semver(after).ok_or("未找到版本号（形如 s1.1.76）")?;
+    let new_ver = inc_semver_patch(&ver)?;
+    content.replace_range((pos + vs)..(pos + ve), &new_ver);
+    fs::write(path, content).map_err(|e| format!("写回失败: {}", e))?;
     Ok(())
 }
 
-/// 在文件中定位 marker，找到 token_prefix 后的数字（或 日期-数字），自增其末位序号。
-/// 容忍 token 末尾附加字符（如 versionTag 的 " · sw-vXXX"），只替换数字序号部分。
-fn bump_in_file(path: &str, marker: &str, prefix: &str, end_char: char) -> Result<(), String> {
-    let mut content = fs::read_to_string(path).map_err(|e| format!("读取失败: {}", e))?;
-    let pos = content.find(marker).ok_or("未找到版本标记")?;
-    let after = &content[pos..];
-    let vpos = after.find(prefix).ok_or("未找到版本前缀")?;
-    let start = pos + vpos + prefix.len();
-    let rest = &content[start..];
-    let end = rest.find(end_char).ok_or("未找到版本结束符")?;
-    let token = &rest[..end];
-    if let Some(dash) = token.find('-') {
-        // 形如 v260804-224 · sw-v341：只取 dash 后前导数字，其余附加字符原样保留
-        let tail = &token[dash + 1..];
-        let num_str: String = tail.chars().take_while(|c| c.is_ascii_digit()).collect();
-        if num_str.is_empty() { return Err("版本号解析失败".into()); }
-        let num = num_str.parse::<u32>().map_err(|_| "版本号解析失败")?;
-        let num_start = start + dash + 1;
-        let num_end = num_start + num_str.len();
-        content.replace_range(num_start..num_end, &(num + 1).to_string());
-    } else {
-        let num_str: String = token.chars().take_while(|c| c.is_ascii_digit()).collect();
-        if num_str.is_empty() { return Err("版本号解析失败".into()); }
-        let num = num_str.parse::<u32>().map_err(|_| "版本号解析失败")?;
-        let num_end = start + num_str.len();
-        content.replace_range(start..num_end, &(num + 1).to_string());
+/// 在文本里找第一个 s<数字>.<数字>.<数字>，返回 (起始, 结束, "sX.Y.Z")
+fn find_semver(s: &str) -> Option<(usize, usize, String)> {
+    let b = s.as_bytes();
+    let mut i = 0usize;
+    while i + 1 < b.len() {
+        if b[i] == b's' && b[i + 1].is_ascii_digit() {
+            let mut j = i + 1;
+            while j < b.len() && (b[j].is_ascii_digit() || b[j] == b'.') {
+                j += 1;
+            }
+            let cand = &s[i..j];
+            if cand.matches('.').count() == 2 && !cand.ends_with('.') {
+                return Some((i, j, cand.to_string()));
+            }
+            i = j;
+            continue;
+        }
+        i += 1;
     }
-    fs::write(path, content).map_err(|e| format!("写回失败: {}", e))?;
-    Ok(())
+    None
+}
+
+/// s1.1.76 → s1.1.77（只动末段） 
+fn inc_semver_patch(v: &str) -> Result<String, String> {
+    let body = v.trim_start_matches('s');
+    let parts: Vec<&str> = body.split('.').collect();
+    if parts.len() != 3 {
+        return Err("版本号格式不是 sX.Y.Z".into());
+    }
+    let last = parts[2].parse::<u32>().map_err(|_| "补丁号解析失败")?;
+    Ok(format!("s{}.{}.{}", parts[0], parts[1], last + 1))
 }
 
 /// 系统托盘图标闪动（需求墙新未读提醒）：on=true 启动闪动，on=false 停止
