@@ -5597,15 +5597,17 @@ if (true) {
                         <button onclick="gmImCalibCartName()" title="框选右侧详情里的战车名那一行（如 熔岩巨兽号 Lv1）——切车时用它复核是否选对，选错自动纠正" style="background:linear-gradient(135deg,#00897b,#004d40);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;">📐 框选战车名</button>
                         <button onclick="gmImTestCartName()" title="自检：现在读一次详情区的战车名" style="background:rgba(0,137,123,0.25);color:#4dd0b1;border:1px solid rgba(0,137,123,0.5);padding:8px 12px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🔎 读名字</button>
                         <button onclick="gmImCheckCartRow()" title="自检：点第1格/第2格各一次，验证这一行点得到格子（y 不对会自动试并保存）" style="background:rgba(0,137,123,0.25);color:#4dd0b1;border:1px solid rgba(0,137,123,0.5);padding:8px 12px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🔎 行校验</button>
-                        <label style="display:flex;align-items:center;gap:5px;color:rgba(255,255,255,0.75);font-size:0.76rem;cursor:pointer;" title="开启后：点完战车会 OCR 复核，选错按差格自动纠正">
-                            <input type="checkbox" id="gmImCartVerify" onchange="gmImSetCartVerify(this.checked)" checked> 战车名校验
+                        <label style="display:flex;align-items:center;gap:5px;color:rgba(255,255,255,0.75);font-size:0.76rem;cursor:pointer;" title="默认关：切车只走固定流程（拉回最左×4 → 左滑 k 次 → 点对应格）。勾上后才会多读一次名字复核并按差格纠正（多花 2~3 秒）">
+                            <input type="checkbox" id="gmImCartVerify" onchange="gmImSetCartVerify(this.checked)"> 战车名校验（可选）
                         </label>
                         <button onclick="gmImRunOnce()" style="background:linear-gradient(135deg,#9c27b0,#6a1b9a);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🔥 完整连打一次</button>
                         <button id="gmImAutoBtn" onclick="gmImToggleAuto()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;font-weight:bold;">▶ 开始连打监控</button>
                     </div>
                     <div style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-bottom:8px;line-height:1.5;">
-                        切车流程：返回(0.86,0.11) → 等1秒 → 战车(0.61,0.75) → 拉回最左×6（第1位↔第6位来回滑，已在最左时多余滑动无效）→ 按编号向左翻页（每次+5；末页滑到底会夹在 17 号）→ 点战车位 → 确定(0.63,0.73)。每步之间随机延迟 500~1000ms。<br>
-                        <b style="color:#ffd700;">⚠️ 若选车总偏 1~2 格：把战车列表拉到最左（1 号在最前），点「🎯 标定战车位」，在截图上依次点第 1 格、第 6 格的中心 —— 一次性标定，之后所有车位按实测坐标推算（越靠右越准）。</b>
+                        切车流程（固定）：返回(0.86,0.11) → 等1秒 → 战车(0.61,0.75) → <b>拉回最左×4</b>（第1位滑到第6位）→ <b>左滑 k 次</b>（每次第6位滑到第1位，固定 -5）；页首 = min(1+5k, 17)，点第 <b>N−页首+1</b> 位 → 确定(0.63,0.73)。每步之间随机延迟 500~1000ms。<br>
+                        例：13 → 滑2次、页首11、第3位；20 → 滑3次、页首16、第5位；23 → 滑4次、页首17、第7位（末页夹住）。<br>
+                        <b style="color:#ffd700;">⚠️ 「🎯 标定战车位」只在换过窗口尺寸/分辨率后才需要重做（点第1格、第6格中心）。<br>
+                        「战车名校验（可选）」默认关 —— 切车只走上面的固定流程；勾上才会额外读一次名字复核（多花 2~3 秒）。</b>
                     </div>
                     <div id="gmImLog" style="background:rgba(0,0,0,0.3);border:1px solid rgba(78,205,196,0.2);border-radius:6px;padding:8px 10px;min-height:60px;max-height:150px;overflow:auto;color:rgba(255,255,255,0.6);font-size:0.7rem;line-height:1.6;">等待操作。先在 ① 勾选游戏窗口，再用「只切卡 / 只切车」单步测试。</div>
                 </div>
@@ -5861,6 +5863,12 @@ if (true) {
     function _gmImCartCal() {
         try {
             const c = _gmImLoadCfg();
+            // 🔴 2026-09-21 一次性清理：只有「🎯 标定战车位」会同时写 cartX1/cartPitch/cartY。
+            //    若只有 cartY 而没有 cartX1 → 那是上一版"自动定位"写进去的（不可信，会让滑动/点击落在格子外）→ 删掉。
+            if (c && c.cartY != null && (c.cartX1 == null || c.cartX1 <= 0)) {
+                try { delete c.cartY; localStorage.setItem(GM_IM_CFG_KEY, JSON.stringify(c)); } catch (e2) {}
+                try { _gmImLog('🧹 已丢弃上一版自动写入的行高 y（不是用「🎯 标定战车位」标的那个），回到默认 y=' + GM_IM_CART_Y); } catch (e2) {}
+            }
             // 🔴 2026-09-21 标定值【合理性校验】：真实间距≈0.09、首位 x≈0.24、行 y 0.68~0.93。
             //    一次点歪就可能存进 "间距 0.02 / y 0.88" 这类坏值 → 之后所有滑动/点击都落空（"不会滑动"事故）。
             //    超出范围一律忽略（回默认表）并提示，宁可回到旧行为也不能被坏标定毒住。
@@ -5980,8 +5988,8 @@ if (true) {
         set('gmImCart', c.cart || 1);
         set('gmImInterval', c.interval || 2);
         set('gmImCooldown', c.cooldown || 15);
-        const vcb = document.getElementById('gmImCartVerify');   // 名校验开关（默认开）
-        if (vcb) vcb.checked = (c.cartVerify !== false);
+        const vcb = document.getElementById('gmImCartVerify');   // 名校验开关（默认关＝纯固定流程）
+        if (vcb) vcb.checked = (c.cartVerify === true);
         // 窗口下拉：先用已有列表填充并保留上次选择，再异步枚举一次补全（老马窗口常需深度扫描）
         const fillWins = () => {
             const list = (_gmImWins && _gmImWins.length) ? _gmImWins : (function () {
@@ -6152,8 +6160,8 @@ if (true) {
         for (const y of [0.80, 0.82, 0.84, 0.86, 0.78, 0.88]) {
             const r2 = await _gmImProbeRow(hwnd, mode, y);
             if (r2.ok) {
-                _gmImSaveCfg({ cartY: y });
-                _gmImLog('✅ 战车行已定位：y=' + y + '（第1格 ' + r2.a.index + '号 → 第2格 ' + r2.b.index + '号）');
+                // 🔴 只报告不落盘：行高 y 一律由「🎯 标定战车位」显式写入（自动写会让滑动跑到格子外）
+                _gmImLog('✅ 战车行可用：y=' + y + '（第1格 ' + r2.a.index + '号 → 第2格 ' + r2.b.index + '号）—— 如需固定用这个 y，请点「🎯 标定战车位」重新标一次');
                 return r2;
             }
             if (r2.why === 'step') _gmImLog('  y=' + y.toFixed(2) + '：第1格 ' + (r2.a ? r2.a.index : '?') + '号 / 第2格 ' + (r2.b ? r2.b.index : '?') + '号（不是相邻两辆 ✗）');
@@ -6180,11 +6188,8 @@ if (true) {
             const m = await _gmImProbeCart(hwnd, mode);
             const idx = m ? m.index : null;
             if (idx !== null && idx !== curIdx) {
-                _gmImSwipeYOK = y;
-                if (i > 0) {
-                    _gmImSaveCfg({ cartY: y });
-                    _gmImLog('✅ 滑动行自动纠正：y=' + y + '（' + curIdx + ' → ' + idx + ' 号，列表动了）');
-                }
+                _gmImSwipeYOK = y;   // 仅本次运行内缓存，不写盘（y 一律由「🎯 标定战车位」显式写入）
+                if (i > 0) _gmImLog('ℹ️ 本次运行改用能滑动的行高 y=' + y + '（' + curIdx + ' → ' + idx + ' 号）；要固请点「🎯 标定战车位」');
                 return { moved: true, idx: idx, y: y };
             }
             if (i === 0) _gmImLog('⚠️ 滑动后列表没动（y=' + y.toFixed(3) + '）→ 换其它行高再试…');
@@ -6204,6 +6209,8 @@ if (true) {
         await window.gmClick(hwnd, GM_IM_CART_ENTRY.x, GM_IM_CART_ENTRY.y, 1, 200, mode);
         await _gmImDelay();
         const startOf = kk => Math.min(1 + 5 * kk, GM_IM_CART_LAST_START);
+        // 🔴 用户给的页表（唯一算法）：k 次滑动 → 页首 min(1+5k, 17)；目标位次 = N - 页首 + 1（末页第 7 位=23）
+        //    例：13 → k=2、页首 11、第 3 位；20 → k=3、页首 16、第 5 位；23 → k=4、页首 17、第 7 位。
         const arith = () => {
             let k = 0;
             for (;;) {
@@ -6213,76 +6220,38 @@ if (true) {
                 k++;
             }
             const st = startOf(k);
-            return { start: st, times: (st >= GM_IM_CART_LAST_START) ? Math.max(k, 6) : k };
+            return { start: st, times: k };   // 🔴 固定 k 次（22/23 也是 4 次；滑到底自己会夹在 17，不再多加）
         };
-        const verifyOn = (function () { try { const c = _gmImLoadCfg(); return c.cartVerify !== false; } catch (e) { return true; } })();
+        // 🔴 2026-09-21 v3：默认【纯固定流程】—— 不识别、不变动滑动次数。
+        //    「战车名校验」勾上（默认关）才会读名字复核并按差格纠正。
+        const verifyOn = (function () { try { const c = _gmImLoadCfg(); return c.cartVerify === true; } catch (e) { return false; } })();
         const canVerify = verifyOn && _gmImCartNames().length > 0;
-        let cur = null, pos = 0, posMax = 6, isLastPage = false, swipeTimes = 0, probes = 0, usedArith = false, reach = true;
-        const py = _gmImCartY();
-        const cal = _gmImCartCal();
-        _gmImLog('📐 坐标：第1位 x=' + _gmImCartSlotX(1, false).toFixed(3) + '｜间距 ' + (cal ? cal.cartPitch.toFixed(3) + '（已标定）' : '0.090（默认）') + '｜行 y=' + py.toFixed(3) + (cal ? '（已标定）' : ''));
-        if (!canVerify && verifyOn) _gmImLog('ℹ️ 战车名表未就绪（window.CHARIOT_LIST）→ 本次只按算术定位');
-        if (canVerify) {
-            // 3) 拉回最左：先快速盲滑 6 次（多滑无害），再 probe 校验；没到最左就用"带校验的滑动"继续拉（自带 y 自愈）
-            const y0 = (_gmImSwipeYOK != null) ? _gmImSwipeYOK : _gmImCartSwipeY();
-            for (let i = 0; i < 6; i++) { await _gmImRawSwipe(hwnd, mode, 'right', y0); }
-            const m0 = await _gmImProbeCart(hwnd, mode); probes++;
-            cur = m0 ? m0.index : null;
-            if (cur === null) {
-                _gmImLog('⚠️ 拉回最左后战车名读不到 → 本次走算术定位（先「📐 框选战车名」+「🔎 读名字」排查）');
-            } else {
-                let g = 0;
-                while (cur > 1 && g++ < 6) {
-                    const r = await _gmImSwipeProbe(hwnd, mode, 'right', cur);
-                    probes++;
-                    if (!r.moved) break;
-                    cur = r.idx;
-                }
-                _gmImLog('↩️ 已到最左：实测左端 = ' + cur + ' 号');
-                // 4) 闭环定位：朝目标方向滑，直到目标落在当前屏
-                for (let g2 = 0; g2 < 12; g2++) {
-                    isLastPage = cur >= GM_IM_CART_LAST_START;
-                    posMax = isLastPage ? 7 : 6;
-                    const p = cartNo - cur + 1;
-                    if (p >= 1 && p <= posMax) { pos = p; break; }
-                    if (p > posMax && cur >= GM_IM_CART_LAST_START) { pos = posMax; reach = false; break; }  // 已到底还超出（不该发生）
-                    const dir = (cartNo < cur) ? 'right' : 'left';
-                    const r = await _gmImSwipeProbe(hwnd, mode, dir, cur);
-                    probes++;
-                    if (!r.moved) {
-                        reach = false;
-                        _gmImLog('❌ 滑动无效（列表不动）：目标 ' + cartNo + ' 号，当前屏从 ' + cur + ' 号起 —— 请点「↺ 清除标定」或重做「🎯 标定战车位」');
-                        break;
-                    }
-                    swipeTimes++;
-                    cur = r.idx;
-                    _gmImLog('↔️ 滑一屏 → 左端 ' + cur + ' 号');
-                }
-            }
+        const py = _gmImCartY(), swY = _gmImCartSwipeY();
+        const cal0 = _gmImCartCal();
+        _gmImLog('📐 坐标：第1位 x=' + _gmImCartSlotX(1, false).toFixed(3) + '｜间距 ' + (cal0 ? cal0.cartPitch.toFixed(3) + '（已标定）' : '0.090（默认）') + '｜行 y=' + py.toFixed(3) + (cal0 ? '（已标定）' : '') + '｜名校验 ' + (canVerify ? '开' : '关'));
+        // 3) 拉回最左 ×4（固定手势：第1位滑到第6位；已在最左时多滑无效）
+        for (let i = 0; i < 4; i++) {
+            await window.gmSwipe(hwnd, _gmImCartSlotX(1, false), swY, _gmImCartSlotX(6, false), swY, 400, mode);
+            await _gmImSleep(350);
         }
-        if (!canVerify || cur === null || !reach || pos < 1 || pos > posMax) {
-            // 兜底：算术定位（含"实测失败"的情况），并在日志里明确标记，绝不静默点错
-            if (canVerify && cur !== null && !reach) _gmImLog('⚠️ 实测定位失败 → 退回算术定位（结果可能不准）');
-            else if (canVerify && cur === null) _gmImLog('⚠️ 实测不可用 → 退回算术定位（结果可能不准）');
-            usedArith = true;
-            const a = arith();
-            for (let i = 0; i < a.times; i++) {
-                await _gmImRawSwipe(hwnd, mode, 'left', (_gmImSwipeYOK != null) ? _gmImSwipeYOK : _gmImCartSwipeY());
-                swipeTimes++;
-            }
-            cur = a.start;
-            isLastPage = cur >= GM_IM_CART_LAST_START;
-            posMax = isLastPage ? 7 : 6;
-            const p2 = cartNo - cur + 1;
-            pos = Math.min(Math.max(1, p2), posMax);
-            if (p2 > posMax) _gmImLog('❌ 目标 ' + cartNo + ' 超出算术可达范围（起始 ' + cur + '）→ 请修坐标');
+        await _gmImSleep(400);
+        // 4) 左滑 k 次（每次都是"第6位滑到第1位"，位移固定=一页 5 辆）
+        const A = arith();
+        for (let i = 0; i < A.times; i++) {
+            await window.gmSwipe(hwnd, _gmImCartSlotX(6, false), swY, _gmImCartSlotX(1, false), swY, 400, mode);
+            await _gmImSleep(400);
         }
+        let cur = A.start, swipeTimes = A.times, probes = 0;
+        let isLastPage = cur >= GM_IM_CART_LAST_START;
+        let posMax = isLastPage ? 7 : 6;
+        let pos = Math.min(Math.max(1, cartNo - cur + 1), posMax);
+        _gmImLog('🧭 固定流程：滑 ' + A.times + ' 次 → 页首 ' + cur + '，点第 ' + pos + ' 位' + (isLastPage ? '（末页）' : ''));
         // 5) 点目标格（第 7 位只在末页可用）
         await window.gmClick(hwnd, _gmImCartSlotX(pos, isLastPage), py, 1, 200, mode);
         await _gmImSleep(450);
-        // 6) 闭环纠正：读实际选中的编号，与目标不符就按差格点相邻格
+        // 6)【可选】名校验（默认关）：勾了「战车名校验」才读名字复核，与目标不符按差格点相邻格
         let fixLog = '';
-        if (canVerify && !usedArith) {
+        if (canVerify) {
             const got = await _gmImReadCartName(hwnd);
             if (!got) {
                 fixLog = ' ｜ ⚠️ 复核没读到名字（可点「📐 框选战车名」重新标定）';
@@ -6307,8 +6276,8 @@ if (true) {
         await window.gmClick(hwnd, GM_IM_CART_OK.x, GM_IM_CART_OK.y, 1, 200, mode);
         await _gmImDelay();
         const px = _gmImCartSlotX(pos, isLastPage);
-        return '🚂 战车' + cartNo + '（滑' + swipeTimes + '次·' + (usedArith ? '算术' : '实测') + ' → 起始' + cur + ' 第' + pos + '位 @x' + px.toFixed(3) + ' y' + py.toFixed(3) +
-            (isLastPage ? '，末页' : '') + (_gmImCartCal() ? '，已标定' : '，未标定') + '，probe' + probes + '次）' + fixLog;
+        return '🚂 战车' + cartNo + '（固定流程：滑' + swipeTimes + '次 → 页首' + cur + ' 第' + pos + '位 @x' + px.toFixed(3) + ' y' + py.toFixed(3) +
+            (isLastPage ? '，末页' : '') + (_gmImCartCal() ? '，已标定' : '，未标定') + '）' + fixLog;
     }
 
     // 🎯 标定战车位（一次性）：截游戏窗口图 → 点第 1 位中心 → 再点第 6 位中心 → 存 x1/间距/y。
