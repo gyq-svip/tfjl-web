@@ -103,17 +103,37 @@
         let _actTabsCache = null;
         async function loadActivityTabs(force) {
             if (_actTabsCache && !force) return _actTabsCache;
+            let tabs = null;
             try {
                 const token = (typeof getGistToken === 'function') ? getGistToken() : '';
                 if (token && typeof wallReadGistFile === 'function' && typeof GIST_ID !== 'undefined') {
                     const c = await wallReadGistFile(GIST_ID, ACTIVITY_TABS_FILE, token);
                     if (c) {
                         const d = JSON.parse(c);
-                        if (d && Array.isArray(d.tabs) && d.tabs.length) { _actTabsCache = d.tabs; return _actTabsCache; }
+                        if (d && Array.isArray(d.tabs) && d.tabs.length) tabs = d.tabs;
                     }
                 }
             } catch (e) {}
-            _actTabsCache = JSON.parse(JSON.stringify(ACTIVITY_TABS_DEFAULT));
+            if (!tabs) {
+                _actTabsCache = JSON.parse(JSON.stringify(ACTIVITY_TABS_DEFAULT));
+                return _actTabsCache;
+            }
+            // 🔴 2026-09-21 用户反馈「活动·状元商店是空的」→ 云端 activity_tabs.json 可能"存在但缺字段/被写空过"。
+            //    这里做**与内置默认合并**：items 为空就用内置默认的 items；params 缺失用默认补；
+            //    云端缺的 tab 用默认补上 → 任何情况下都不会出现"空活动"。
+            const merged = tabs.map(function (t) {
+                const def = ACTIVITY_TABS_DEFAULT.find(function (d) { return d.id === t.id; }) || {};
+                return {
+                    id: t.id || def.id,
+                    name: t.name || def.name || '未命名活动',
+                    items: (Array.isArray(t.items) && t.items.length) ? t.items : (def.items || []),
+                    params: Object.assign({}, def.params || {}, t.params || {})
+                };
+            });
+            ACTIVITY_TABS_DEFAULT.forEach(function (d) {
+                if (!merged.some(function (t) { return t.id === d.id; })) merged.push(JSON.parse(JSON.stringify(d)));
+            });
+            _actTabsCache = merged;
             return _actTabsCache;
         }
         function getActTab(id) {
@@ -202,7 +222,12 @@
             if (!box) return;
             await loadActivityTabs();
             const tab = getActTab('shop');
-            const all = (tab && tab.items) || [];
+            let all = (tab && tab.items) || [];
+            // 🔴 兜底（同 loadActivityTabs 的合并逻辑）：任何情况下都不显示"空活动"
+            if (!all.length) {
+                const def = ACTIVITY_TABS_DEFAULT.find(function (t) { return t.id === 'shop'; }) || {};
+                all = def.items || [];
+            }
             const cats = Array.from(new Set(all.map(function (s) { return Number(s.cost) || 0; }))).sort(function (a, b) { return a - b; });
             _shopItemsFlat = [];
             let html = '';
