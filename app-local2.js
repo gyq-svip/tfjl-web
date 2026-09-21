@@ -5414,6 +5414,88 @@ if (true) {
         return '';
     }
 
+    // 🔴 2026-09-21 悬浮窗：可拖动（拖标题栏）+ 可缩放（右下角原生手柄）；位置/尺寸存 localStorage 下次沿用；
+    //    窗口缩小时自动把面板拉回可视区。监听器在面板被移除后自动解绑（防每次开关泄漏）。
+    function _gmWireFloatingPanel() {
+        const panel = document.getElementById('gmFloatPanel');
+        const hdr = document.getElementById('gmFloatHeader');
+        if (!panel || !hdr || panel.__floatingWired) return;
+        panel.__floatingWired = true;
+        const KEY = 'tfjl_gm_panel_rect';
+        const saveRect = () => {
+            try {
+                const r = panel.getBoundingClientRect();
+                localStorage.setItem(KEY, JSON.stringify({ left: Math.round(r.left), top: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) }));
+            } catch (e) {}
+        };
+        const clampInto = () => {
+            if (!panel.isConnected) return;
+            const r = panel.getBoundingClientRect();
+            const w = window.innerWidth, h = window.innerHeight;
+            if (r.left < 0) panel.style.left = '0px';
+            if (r.top < 0) panel.style.top = '0px';
+            if (r.left > w - 60) panel.style.left = Math.max(0, w - r.width) + 'px';
+            if (r.top > h - 40) panel.style.top = Math.max(0, h - 40) + 'px';
+            panel.style.right = 'auto'; panel.style.bottom = 'auto';
+        };
+        // 恢复上次位置/尺寸（首次打开：居中偏上，不挡住中间的游戏区域）
+        try {
+            const s = JSON.parse(localStorage.getItem(KEY) || 'null');
+            if (s && s.w > 200) {
+                panel.style.left = (s.left || 40) + 'px'; panel.style.top = (s.top || 40) + 'px';
+                panel.style.width = Math.min(s.w, window.innerWidth - 20) + 'px';
+                panel.style.height = (s.h || 700) + 'px';
+            } else {
+                panel.style.left = Math.max(8, Math.round((window.innerWidth - 660) / 2)) + 'px';
+                panel.style.top = '36px';
+            }
+        } catch (e) { panel.style.left = '40px'; panel.style.top = '36px'; }
+        panel.style.right = 'auto'; panel.style.bottom = 'auto';
+        clampInto();
+        let dragging = false, offX = 0, offY = 0;
+        const startDrag = (cx, cy) => {
+            const r = panel.getBoundingClientRect();
+            offX = cx - r.left; offY = cy - r.top; dragging = true;
+            panel.style.right = 'auto'; panel.style.bottom = 'auto';
+        };
+        const onMove = (e) => {
+            if (!panel.isConnected) { unbind(); return; }
+            if (!dragging) return;
+            panel.style.left = Math.max(0, e.clientX - offX) + 'px';
+            panel.style.top = Math.max(0, e.clientY - offY) + 'px';
+        };
+        const onUp = () => { if (dragging) { dragging = false; saveRect(); } };
+        const unbind = () => {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+            window.removeEventListener('resize', clampInto);
+            window.removeEventListener('touchmove', onTouchMove);
+            window.removeEventListener('touchend', onUp);
+        };
+        const onTouchMove = (e) => {
+            if (!panel.isConnected) { unbind(); return; }
+            if (!dragging) return;
+            const t = e.touches[0];
+            panel.style.left = Math.max(0, t.clientX - offX) + 'px';
+            panel.style.top = Math.max(0, t.clientY - offY) + 'px';
+        };
+        hdr.addEventListener('mousedown', (e) => { if (e.target.closest('button')) return; startDrag(e.clientX, e.clientY); e.preventDefault(); });
+        hdr.addEventListener('touchstart', (e) => { if (e.target.closest('button')) return; const t = e.touches[0]; startDrag(t.clientX, t.clientY); }, { passive: true });
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+        window.addEventListener('touchmove', onTouchMove, { passive: true });
+        window.addEventListener('touchend', onUp);
+        window.addEventListener('resize', clampInto);
+        // 原生缩放手柄没有事件：用鼠标抬起 / 观察尺寸变化来落盘
+        panel.addEventListener('mouseup', saveRect);
+        try {
+            if (window.ResizeObserver) {
+                new ResizeObserver(() => saveRect()).observe(panel);
+            }
+        } catch (e) {}
+        _gmLog('🪟 悬浮窗已就绪：拖标题栏移动、右下角拉伸缩放（位置会自动记住）');
+    }
+
     function openGameMonitor() {
         // 🔴 2026-09-08：网页版也打开面板（仅预览界面）；依赖 Tauri 的动作（枚举窗口 / 恢复状态）在下方按平台跳过
         const _isApp = _isTauriRuntime();
@@ -5423,12 +5505,14 @@ if (true) {
         if (old) old.remove();
         const modal = document.createElement('div');
         modal.id = 'gameMonitorModal';
-        modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;justify-content:center;align-items:center;';
+        // 🔴 2026-09-21 改成【悬浮小窗】：外层不再遮暗、也不拦截鼠标（pointer-events:none），
+        //    点在面板外的操作直接穿透到游戏窗口，不会挡住游戏。
+        modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:transparent;z-index:99999;pointer-events:none;';
         modal.innerHTML = `
-            <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,152,0,0.5);border-radius:12px;padding:22px;width:640px;max-width:94vw;max-height:88vh;overflow:auto;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                    <h3 style="color:#fff;margin:0;font-size:1.15rem;">🎮 游戏波数监控</h3>
-                    <button onclick="closeGameMonitor()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;width:30px;height:30px;border-radius:5px;cursor:pointer;font-size:1.2rem;">×</button>
+            <div id="gmFloatPanel" style="pointer-events:auto;position:fixed;left:40px;top:40px;background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,152,0,0.5);border-radius:12px;padding:14px 16px 16px;width:640px;height:min(88vh,760px);min-width:360px;min-height:220px;resize:both;overflow:auto;box-shadow:0 8px 32px rgba(0,0,0,0.55);">
+                <div id="gmFloatHeader" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;cursor:move;user-select:none;">
+                    <h3 style="color:#fff;margin:0;font-size:1.15rem;">🎮 游戏监控 <span style="color:rgba(255,255,255,0.35);font-size:0.68rem;font-weight:normal;">（拖标题移动 · 右下角拉伸缩放 · 面板外不挡游戏）</span></h3>
+                    <button onclick="closeGameMonitor()" onmousedown="event.stopPropagation()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;width:30px;height:30px;border-radius:5px;cursor:pointer;font-size:1.2rem;">×</button>
                 </div>
                 <div style="color:rgba(255,255,255,0.45);font-size:0.72rem;margin-bottom:12px;line-height:1.5;">
                     多选游戏窗口 → 定时识别波数 → 变化时语音播报 + <b style="color:#ffd700;">到波自动点击 / 识别到指定文字自动点击</b>。<b style="color:#ffd700;">每个窗口独立配置</b>。<br>
@@ -5604,16 +5688,17 @@ if (true) {
                         <button id="gmImAutoBtn" onclick="gmImToggleAuto()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;font-weight:bold;">▶ 开始连打监控</button>
                     </div>
                     <div style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-bottom:8px;line-height:1.5;">
-                        切车流程（固定）：返回(0.86,0.11) → 等1秒 → 战车(0.61,0.75) → <b>拉回最左×4</b>（第1位滑到第6位）→ <b>左滑 k 次</b>（每次第6位滑到第1位，固定 -5）；页首 = min(1+5k, 17)，点第 <b>N−页首+1</b> 位 → 确定(0.63,0.73)。每步之间随机延迟 500~1000ms。<br>
-                        例：13 → 滑2次、页首11、第3位；20 → 滑3次、页首16、第5位；23 → 滑4次、页首17、第7位（末页夹住）。<br>
-                        <b style="color:#ffd700;">⚠️ 「🎯 标定战车位」只在换过窗口尺寸/分辨率后才需要重做（点第1格、第6格中心）。<br>
-                        「战车名校验（可选）」默认关 —— 切车只走上面的固定流程；勾上才会额外读一次名字复核（多花 2~3 秒）。</b>
+                        切车流程（固定+查表）：返回(0.86,0.11) → 等1秒 → 战车(0.61,0.75) → <b>拉回最左×4</b>（第1位滑到第6位）→ <b>按计划表左滑 N 次</b>（每次第6位滑到第1位，固定 -5）→ <b>点计划表里的第 M 位</b> → 确定(0.63,0.73)。每步之间随机延迟 500~1000ms。<br>
+                        <b style="color:#ffd700;">1~23 的「滑动次数·位次」已预先算好写死在代码里（启动后日志会打印整张表）</b>，运行时只查表不做推算。<br>
+                        例：13 → 滑2次·第3位；20 → 滑3次·第5位；23 → 滑4次·第7位（末页第7位）。<br>
+                        <b style="color:#9CCC65;">「🎯 标定战车位」只在换过窗口尺寸/分辨率后才需要重做；「战车名校验（可选）」默认关，勾上才会额外读一次名字复核。</b>
                     </div>
                     <div id="gmImLog" style="background:rgba(0,0,0,0.3);border:1px solid rgba(78,205,196,0.2);border-radius:6px;padding:8px 10px;min-height:60px;max-height:150px;overflow:auto;color:rgba(255,255,255,0.6);font-size:0.7rem;line-height:1.6;">等待操作。先在 ① 勾选游戏窗口，再用「只切卡 / 只切车」单步测试。</div>
                 </div>
             </div>
         `;
         document.body.appendChild(modal);
+        _gmWireFloatingPanel();   // 🪟 悬浮窗：可拖动/可缩放 + 记忆位置
         // 恢复全局配置
         const intervalInput = modal.querySelector('#gmIntervalInput');
         if (cfg.interval && intervalInput) intervalInput.value = cfg.interval;
@@ -5854,6 +5939,27 @@ if (true) {
     const GM_IM_CART_X_LAST = [0.24, 0.33, 0.42, 0.51, 0.60, 0.67, 0.76];
     const GM_IM_CART_TOTAL = 23;                 // 战车总数
     const GM_IM_CART_LAST_START = GM_IM_CART_TOTAL - 6; // 17：滑到底那一屏的首个编号
+    // 🔴 2026-09-21 按用户要求：**1~23 每辆车的「滑动次数 + 位次」预先算好写死**，运行时只查表、不做任何推算。
+    //    页表（用户给的）：k 次滑动 → 页首 = min(1+5k, 17)；位次 = N − 页首 + 1；取"能覆盖 N 的最少滑动次数"。
+    //    例（用户已核对）：13 → 滑2次·第3位；20 → 滑3次·第5位；23 → 滑4次·第7位（末页第7位半露，特殊）。
+    const GM_IM_CART_PLAN = [
+        { sw: 0, slot: 1 }, { sw: 0, slot: 2 }, { sw: 0, slot: 3 }, { sw: 0, slot: 4 }, { sw: 0, slot: 5 }, { sw: 0, slot: 6 }, // 1-6
+        { sw: 1, slot: 2 }, { sw: 1, slot: 3 }, { sw: 1, slot: 4 }, { sw: 1, slot: 5 }, { sw: 1, slot: 6 },                  // 7-11
+        { sw: 2, slot: 2 }, { sw: 2, slot: 3 }, { sw: 2, slot: 4 }, { sw: 2, slot: 5 }, { sw: 2, slot: 6 },                  // 12-16
+        { sw: 3, slot: 2 }, { sw: 3, slot: 3 }, { sw: 3, slot: 4 }, { sw: 3, slot: 5 }, { sw: 3, slot: 6 },                  // 17-21
+        { sw: 4, slot: 6 }, { sw: 4, slot: 7 }                                                                             // 22-23
+    ];
+    let _gmImPlanLogged = false;
+    function _gmImLogCartPlan() {
+        if (_gmImPlanLogged) return;
+        _gmImPlanLogged = true;
+        const txt = GM_IM_CART_PLAN.map((p, i) => (i + 1) + '→' + p.sw + '·' + p.slot).join('  ');
+        _gmImLog('📋 战车计划表（编号→滑动次数·位次）：' + txt);
+    }
+    function _gmImCartPlanOf(n) {
+        const p = GM_IM_CART_PLAN[(n | 0) - 1];
+        return p ? p : { sw: 0, slot: 1 };
+    }
     const GM_IM_CART_Y = 0.77;
     // 🔴 2026-09-21 战车位【实测标定】（用户反馈"错一个或错2个位置"）：
     //    写死的比例坐标是"某次窗口尺寸下"量的；游戏 UI 的格子间距若不完全随窗口等比缩放，
@@ -6210,20 +6316,9 @@ if (true) {
         // 2) 打开战车选择
         await window.gmClick(hwnd, GM_IM_CART_ENTRY.x, GM_IM_CART_ENTRY.y, 1, 200, mode);
         await _gmImDelay();
-        const startOf = kk => Math.min(1 + 5 * kk, GM_IM_CART_LAST_START);
-        // 🔴 用户给的页表（唯一算法）：k 次滑动 → 页首 min(1+5k, 17)；目标位次 = N - 页首 + 1（末页第 7 位=23）
-        //    例：13 → k=2、页首 11、第 3 位；20 → k=3、页首 16、第 5 位；23 → k=4、页首 17、第 7 位。
-        const arith = () => {
-            let k = 0;
-            for (;;) {
-                const s = startOf(k);
-                const maxCovered = (s >= GM_IM_CART_LAST_START) ? GM_IM_CART_TOTAL : s + 5;
-                if (cartNo <= maxCovered || k >= 4) break;
-                k++;
-            }
-            const st = startOf(k);
-            return { start: st, times: k };   // 🔴 固定 k 次（22/23 也是 4 次；滑到底自己会夹在 17，不再多加）
-        };
+        // 🔴 查表执行（用户要求）：1~23 的「滑动几次 + 第几位」全部预先写死在 GM_IM_CART_PLAN，运行时不算。
+        const plan = _gmImCartPlanOf(cartNo);
+        _gmImLogCartPlan();
         // 🔴 2026-09-21 v3：默认【纯固定流程】—— 不识别、不变动滑动次数。
         //    「战车名校验」勾上（默认关）才会读名字复核并按差格纠正。
         const verifyOn = (function () { try { const c = _gmImLoadCfg(); return c.cartVerify === true; } catch (e) { return false; } })();
@@ -6237,17 +6332,17 @@ if (true) {
             await _gmImSleep(350);
         }
         await _gmImSleep(400);
-        // 4) 左滑 k 次（每次都是"第6位滑到第1位"，位移固定=一页 5 辆）
-        const A = arith();
-        for (let i = 0; i < A.times; i++) {
+        // 4) 左滑 plan.sw 次（每次都是"第6位滑到第1位"，位移固定=一页 5 辆）
+        for (let i = 0; i < plan.sw; i++) {
             await window.gmSwipe(hwnd, _gmImCartSlotX(6, false), swY, _gmImCartSlotX(1, false), swY, 400, mode);
             await _gmImSleep(400);
         }
-        let cur = A.start, swipeTimes = A.times, probes = 0;
-        let isLastPage = cur >= GM_IM_CART_LAST_START;
-        let posMax = isLastPage ? 7 : 6;
-        let pos = Math.min(Math.max(1, cartNo - cur + 1), posMax);
-        _gmImLog('🧭 固定流程：滑 ' + A.times + ' 次 → 页首 ' + cur + '，点第 ' + pos + ' 位' + (isLastPage ? '（末页）' : ''));
+        let cur = Math.min(1 + 5 * plan.sw, GM_IM_CART_LAST_START);   // 仅用于日志展示
+        let swipeTimes = plan.sw;
+        let isLastPage = plan.slot === 7;                             // 只有 23 号（末页第7位）走末页坐标
+        let posMax = 7;
+        let pos = plan.slot;
+        _gmImLog('🧭 按计划表执行：' + cartNo + ' 号 → 拉回最左×4 + 左滑 ' + plan.sw + ' 次 + 点第 ' + plan.slot + ' 位');
         // 5) 点目标格（第 7 位只在末页可用）
         await window.gmClick(hwnd, _gmImCartSlotX(pos, isLastPage), py, 1, 200, mode);
         await _gmImSleep(450);
