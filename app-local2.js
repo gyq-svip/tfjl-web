@@ -5593,6 +5593,7 @@ if (true) {
                         <button onclick="gmImTestDeck()" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🃏 只切卡（测试）</button>
                         <button onclick="gmImTestCart()" style="background:linear-gradient(135deg,#ff9800,#e65100);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🚂 只切车（测试）</button>
                         <button onclick="gmImCalibCart()" title="一次性标定：把战车列表拉到最左，然后在截图上点第 1 格和第 6 格的中心" style="background:linear-gradient(135deg,#607d8b,#37474f);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🎯 标定战车位</button>
+                        <button onclick="gmImCalibCartClear()" title="清掉战车位的标定值，回到内置默认坐标（标定后反而点不到格子时用）" style="background:rgba(255,255,255,0.08);color:#ffcc80;border:1px solid rgba(255,183,77,0.4);padding:8px 12px;border-radius:7px;cursor:pointer;font-size:0.78rem;">↺ 清除标定</button>
                         <button onclick="gmImCalibCartName()" title="框选右侧详情里的战车名那一行（如 熔岩巨兽号 Lv1）——切车时用它复核是否选对，选错自动纠正" style="background:linear-gradient(135deg,#00897b,#004d40);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;">📐 框选战车名</button>
                         <button onclick="gmImTestCartName()" title="自检：现在读一次详情区的战车名" style="background:rgba(0,137,123,0.25);color:#4dd0b1;border:1px solid rgba(0,137,123,0.5);padding:8px 12px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🔎 读名字</button>
                         <button onclick="gmImCheckCartRow()" title="自检：点第1格/第2格各一次，验证这一行点得到格子（y 不对会自动试并保存）" style="background:rgba(0,137,123,0.25);color:#4dd0b1;border:1px solid rgba(0,137,123,0.5);padding:8px 12px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🔎 行校验</button>
@@ -5856,10 +5857,23 @@ if (true) {
     //    写死的比例坐标是"某次窗口尺寸下"量的；游戏 UI 的格子间距若不完全随窗口等比缩放，
     //    越靠右的格子累积偏差越大 → 点第 6 位可能落到第 5 位、末页第 7 位落到第 6 位（=错1~2个位置）。
     //    标定一次后改用「第1位中心 + 相邻间距×(p-1)」线性推算，所有格子都用实测值；未标定则回退上面的常量表。
+    let _gmImCalBadLogged = false;
     function _gmImCartCal() {
         try {
             const c = _gmImLoadCfg();
-            if (c && c.cartX1 > 0 && c.cartPitch > 0.01 && c.cartY > 0) return c;
+            // 🔴 2026-09-21 标定值【合理性校验】：真实间距≈0.09、首位 x≈0.24、行 y 0.68~0.93。
+            //    一次点歪就可能存进 "间距 0.02 / y 0.88" 这类坏值 → 之后所有滑动/点击都落空（"不会滑动"事故）。
+            //    超出范围一律忽略（回默认表）并提示，宁可回到旧行为也不能被坏标定毒住。
+            if (c && c.cartX1 > 0 && c.cartPitch > 0 && c.cartY > 0) {
+                const ok = c.cartX1 >= 0.10 && c.cartX1 <= 0.40 && c.cartPitch >= 0.07 && c.cartPitch <= 0.12 && c.cartY >= 0.68 && c.cartY <= 0.93;
+                if (ok) return c;
+                if (!_gmImCalBadLogged) {
+                    _gmImCalBadLogged = true;
+                    try {
+                        _gmImLog('⚠️ 标定值不合理已忽略（x1=' + c.cartX1 + ' 间距=' + c.cartPitch + ' y=' + c.cartY + '，应是 x1≈0.24/间距≈0.09/y 0.68~0.93）→ 改用默认坐标；可点「↺ 清除标定」');
+                    } catch (e) {}
+                }
+            }
         } catch (e) {}
         return null;
     }
@@ -6111,8 +6125,8 @@ if (true) {
         await _gmImSleep(450);
         return await _gmImReadCartName(hwnd);
     }
-    // 🔴 2026-09-21 行探测：点第 1 格、第 2 格各一次，若两次读到【不同】战车 → 说明这一行点得到格子
-    //    （能同时暴露 y 不对的情况：y 偏了两次都点不中 → 读到同一辆 = 选中没变）。
+    // 🔴 2026-09-21 行探测（v2 严格版）：点第 1 格、第 2 格各一次 → 必须读到【相邻两辆】(step=1) 才算"这一行点得到"。
+    //    旧版只要求"两个不同"→ 可能因点在别处/OCR 噪声把错的 y 落盘 → 之后所有滑动都点不中格子（表现为"会不会滑动"）。
     async function _gmImProbeRow(hwnd, mode, yOverride) {
         const py = (yOverride != null) ? yOverride : _gmImCartY();
         await window.gmClick(hwnd, _gmImCartSlotX(1, false), py, 1, 200, mode);
@@ -6121,26 +6135,61 @@ if (true) {
         await window.gmClick(hwnd, _gmImCartSlotX(2, false), py, 1, 200, mode);
         await _gmImSleep(480);
         const b = await _gmImReadCartName(hwnd);
-        if (!a || !b) return { ok: false, why: 'name' };
-        if (a.index === b.index) return { ok: false, why: 'same', a: a, b: b };
-        return { ok: true, a: a, b: b, step: b.index - a.index, y: py };
+        if (!a || !b) return { ok: false, why: 'name', a: a, b: b, y: py };
+        if (b.index - a.index !== 1) return { ok: false, why: 'step', a: a, b: b, y: py };
+        return { ok: true, a: a, b: b, step: 1, y: py };
     }
-    // 行校验 + y 自动定位：两次点击必须能切出不同战车，否则依次试常见 y（0.80~0.88）直到成功并落盘
+    // 行校验 + y 自愈：当前 y 不过 → **先清掉可能存错的 y**，再依次试 0.80~0.88（必须 step=1 才采纳并落盘）
     async function _gmImEnsureCartRow(hwnd, mode) {
         let r = await _gmImProbeRow(hwnd, mode);
         if (r.ok) return r;
         const oldY = _gmImCartY();
-        const cands = [0.80, 0.82, 0.84, 0.86, 0.78, 0.88];
-        for (const y of cands) {
+        try {
+            const c = _gmImLoadCfg();
+            if (c && c.cartY != null) { delete c.cartY; localStorage.setItem(GM_IM_CFG_KEY, JSON.stringify(c)); }
+        } catch (e) {}
+        _gmImLog('⚠️ 战车行校验未通过（点两格没切出相邻两辆）→ 试其它行高（原 y=' + oldY.toFixed(3) + '）');
+        for (const y of [0.80, 0.82, 0.84, 0.86, 0.78, 0.88]) {
             const r2 = await _gmImProbeRow(hwnd, mode, y);
             if (r2.ok) {
                 _gmImSaveCfg({ cartY: y });
-                _gmImLog('✅ 自动定位战车行：y=' + y + '（原 y=' + oldY.toFixed(3) + ' 点不中格子，已保存新值）');
+                _gmImLog('✅ 战车行已定位：y=' + y + '（第1格 ' + r2.a.index + '号 → 第2格 ' + r2.b.index + '号）');
                 return r2;
             }
+            if (r2.why === 'step') _gmImLog('  y=' + y.toFixed(2) + '：第1格 ' + (r2.a ? r2.a.index : '?') + '号 / 第2格 ' + (r2.b ? r2.b.index : '?') + '号（不是相邻两辆 ✗）');
         }
-        _gmImLog('⚠️ 点格子没能改变选中（名字读不到或位置完全不对）→ 请点「🎯 标定战车位」在截图上点第 1 格、第 6 格的中心');
-        return { ok: false };
+        _gmImLog('❌ 找不到能点的战车行：请「🎯 标定战车位」（点第1格/第6格中心）+「📐 框选战车名」后重试');
+        return { ok: false, why: 'none' };
+    }
+    // —— 滑动原语 + "滑动有没有生效"校验（列表不动就换行高 y 再试，成功后落盘）——
+    let _gmImSwipeYOK = null;   // 本次运行实测能滑动的 y
+    async function _gmImRawSwipe(hwnd, mode, dir, y) {
+        const a = _gmImCartSlotX(dir === 'left' ? 6 : 1, false);
+        const b = _gmImCartSlotX(dir === 'left' ? 1 : 6, false);
+        await window.gmSwipe(hwnd, a, y, b, y, 600, mode);
+        await _gmImSleep(420);
+    }
+    async function _gmImSwipeProbe(hwnd, mode, dir, curIdx) {
+        const list = [];
+        const add = v => { if (list.indexOf(v) < 0) list.push(v); };
+        add(_gmImSwipeYOK != null ? _gmImSwipeYOK : _gmImCartSwipeY());
+        [0.80, 0.84, 0.82, 0.78, 0.86, 0.88].forEach(add);
+        for (let i = 0; i < list.length; i++) {
+            const y = list[i];
+            await _gmImRawSwipe(hwnd, mode, dir, y);
+            const m = await _gmImProbeCart(hwnd, mode);
+            const idx = m ? m.index : null;
+            if (idx !== null && idx !== curIdx) {
+                _gmImSwipeYOK = y;
+                if (i > 0) {
+                    _gmImSaveCfg({ cartY: y });
+                    _gmImLog('✅ 滑动行自动纠正：y=' + y + '（' + curIdx + ' → ' + idx + ' 号，列表动了）');
+                }
+                return { moved: true, idx: idx, y: y };
+            }
+            if (i === 0) _gmImLog('⚠️ 滑动后列表没动（y=' + y.toFixed(3) + '）→ 换其它行高再试…');
+        }
+        return { moved: false, idx: curIdx, y: null };
     }
 
     // —— 切车：cartNo 1-23。返回 → 战车入口 → 拉回最左 → （实测锚点）逐页推进 → 点目标格 → 读名字纠正 → 确定
@@ -6154,20 +6203,7 @@ if (true) {
         // 2) 打开战车选择
         await window.gmClick(hwnd, GM_IM_CART_ENTRY.x, GM_IM_CART_ENTRY.y, 1, 200, mode);
         await _gmImDelay();
-        const swFrom = _gmImCartSlotX(1, false), swTo = _gmImCartSlotX(6, false), swY = _gmImCartSwipeY();
-        const resetLeft = async () => {   // 拉回最左：×6（多滑无害，能抹平"某次少走一格"）
-            for (let i = 0; i < 6; i++) {
-                await window.gmSwipe(hwnd, swFrom, swY, swTo, swY, 600, mode);
-                await _gmImSleep(400);
-            }
-            await _gmImSleep(350);
-        };
-        const swipeLeft = async () => {
-            await window.gmSwipe(hwnd, swTo, swY, swFrom, swY, 600, mode);
-            await _gmImSleep(400);
-        };
         const startOf = kk => Math.min(1 + 5 * kk, GM_IM_CART_LAST_START);
-        // 算术兜底（OCR 不可用时的原逻辑）
         const arith = () => {
             let k = 0;
             for (;;) {
@@ -6179,66 +6215,69 @@ if (true) {
             const st = startOf(k);
             return { start: st, times: (st >= GM_IM_CART_LAST_START) ? Math.max(k, 6) : k };
         };
-        // 3) 拉回最左
-        await resetLeft();
-        // 4) 定位：实测优先
         const verifyOn = (function () { try { const c = _gmImLoadCfg(); return c.cartVerify !== false; } catch (e) { return true; } })();
         const canVerify = verifyOn && _gmImCartNames().length > 0;
-        let cur = null, swipeTimes = 0, probes = 0, usedArith = false;
-        let adv = (function () { try { const a = _gmImLoadCfg().cartAdvance; return (a >= 1 && a <= 8) ? a : 5; } catch (e) { return 5; } })();
-        if (!canVerify) {
-            if (verifyOn) _gmImLog('ℹ️ 战车名表未就绪（window.CHARIOT_LIST），本次只按算术定位；可用「📐 框选战车名」+ 校验开关排查');
-        }
+        let cur = null, pos = 0, posMax = 6, isLastPage = false, swipeTimes = 0, probes = 0, usedArith = false, reach = true;
+        const py = _gmImCartY();
+        const cal = _gmImCartCal();
+        _gmImLog('📐 坐标：第1位 x=' + _gmImCartSlotX(1, false).toFixed(3) + '｜间距 ' + (cal ? cal.cartPitch.toFixed(3) + '（已标定）' : '0.090（默认）') + '｜行 y=' + py.toFixed(3) + (cal ? '（已标定）' : ''));
+        if (!canVerify && verifyOn) _gmImLog('ℹ️ 战车名表未就绪（window.CHARIOT_LIST）→ 本次只按算术定位');
         if (canVerify) {
-            // 行校验 + y 自动定位：点第1格/第2格必须切出不同战车（y 偏了点不中格子 → 自动试 0.80~0.88）
-            const wr = await _gmImEnsureCartRow(hwnd, mode);
-            probes += 2;
-            if (wr.ok) {
-                cur = wr.a.index;
-                if (wr.step !== 1) _gmImLog('ℹ️ 实测相邻格跨度为 ' + wr.step + ' 号（正常应=1）→ 格子坐标可能有偏差，建议重新「🎯 标定战车位」');
-                _gmImLog('🔎 行校验通过：左端 = ' + cur + ' 号（' + wr.a.name + '），第2格 = ' + wr.b.index + ' 号（y=' + wr.y.toFixed(3) + '）');
-            } else if (wr.why === 'name') {
-                _gmImLog('⚠️ 战车名读不到 → 本次走算术定位（可用「📐 框选战车名」+「🔎 读名字」排查）');
+            // 3) 拉回最左：先快速盲滑 6 次（多滑无害），再 probe 校验；没到最左就用"带校验的滑动"继续拉（自带 y 自愈）
+            const y0 = (_gmImSwipeYOK != null) ? _gmImSwipeYOK : _gmImCartSwipeY();
+            for (let i = 0; i < 6; i++) { await _gmImRawSwipe(hwnd, mode, 'right', y0); }
+            const m0 = await _gmImProbeCart(hwnd, mode); probes++;
+            cur = m0 ? m0.index : null;
+            if (cur === null) {
+                _gmImLog('⚠️ 拉回最左后战车名读不到 → 本次走算术定位（先「📐 框选战车名」+「🔎 读名字」排查）');
+            } else {
+                let g = 0;
+                while (cur > 1 && g++ < 6) {
+                    const r = await _gmImSwipeProbe(hwnd, mode, 'right', cur);
+                    probes++;
+                    if (!r.moved) break;
+                    cur = r.idx;
+                }
+                _gmImLog('↩️ 已到最左：实测左端 = ' + cur + ' 号');
+                // 4) 闭环定位：朝目标方向滑，直到目标落在当前屏
+                for (let g2 = 0; g2 < 12; g2++) {
+                    isLastPage = cur >= GM_IM_CART_LAST_START;
+                    posMax = isLastPage ? 7 : 6;
+                    const p = cartNo - cur + 1;
+                    if (p >= 1 && p <= posMax) { pos = p; break; }
+                    if (p > posMax && cur >= GM_IM_CART_LAST_START) { pos = posMax; reach = false; break; }  // 已到底还超出（不该发生）
+                    const dir = (cartNo < cur) ? 'right' : 'left';
+                    const r = await _gmImSwipeProbe(hwnd, mode, dir, cur);
+                    probes++;
+                    if (!r.moved) {
+                        reach = false;
+                        _gmImLog('❌ 滑动无效（列表不动）：目标 ' + cartNo + ' 号，当前屏从 ' + cur + ' 号起 —— 请点「↺ 清除标定」或重做「🎯 标定战车位」');
+                        break;
+                    }
+                    swipeTimes++;
+                    cur = r.idx;
+                    _gmImLog('↔️ 滑一屏 → 左端 ' + cur + ' 号');
+                }
             }
         }
-        if (cur === null) {
-            const a = arith();
+        if (!canVerify || cur === null || !reach || pos < 1 || pos > posMax) {
+            // 兜底：算术定位（含"实测失败"的情况），并在日志里明确标记，绝不静默点错
+            if (canVerify && cur !== null && !reach) _gmImLog('⚠️ 实测定位失败 → 退回算术定位（结果可能不准）');
+            else if (canVerify && cur === null) _gmImLog('⚠️ 实测不可用 → 退回算术定位（结果可能不准）');
             usedArith = true;
-            for (let i = 0; i < a.times; i++) { await swipeLeft(); swipeTimes++; }
+            const a = arith();
+            for (let i = 0; i < a.times; i++) {
+                await _gmImRawSwipe(hwnd, mode, 'left', (_gmImSwipeYOK != null) ? _gmImSwipeYOK : _gmImCartSwipeY());
+                swipeTimes++;
+            }
             cur = a.start;
-        } else {
-            // 逐页推进到"能覆盖目标"的页；每次滑动后重新 probe 实测左端编号
-            let guard = 0;
-            while (cartNo > cur + 5 && cur < GM_IM_CART_LAST_START && guard++ < 8) {
-                const jump = Math.max(1, Math.min(4, Math.ceil((cartNo - cur - 5) / adv)));
-                for (let i = 0; i < jump; i++) { await swipeLeft(); swipeTimes++; }
-                const m1 = await _gmImProbeCart(hwnd, mode); probes++;
-                const nc = m1 ? m1.index : null;
-                if (nc === null) { cur = null; break; }
-                if (nc > cur) {
-                    const a = Math.round((nc - cur) / jump);
-                    if (a >= 1 && a <= 8) { adv = a; try { _gmImSaveCfg({ cartAdvance: a }); } catch (e) {} }
-                }
-                if (nc === cur) { cur = nc; break; } // 到底了（被夹住）
-                cur = nc;
-            }
-            if (cur === null) {
-                // probe 中途失败 → 位置不明：重新拉回最左，退回算术
-                _gmImLog('⚠️ 实测中断（名字读不到）→ 重新拉回最左并用算术定位');
-                await resetLeft();
-                const a = arith();
-                usedArith = true;
-                for (let i = 0; i < a.times; i++) { await swipeLeft(); swipeTimes++; }
-                cur = a.start;
-            }
+            isLastPage = cur >= GM_IM_CART_LAST_START;
+            posMax = isLastPage ? 7 : 6;
+            const p2 = cartNo - cur + 1;
+            pos = Math.min(Math.max(1, p2), posMax);
+            if (p2 > posMax) _gmImLog('❌ 目标 ' + cartNo + ' 超出算术可达范围（起始 ' + cur + '）→ 请修坐标');
         }
         // 5) 点目标格（第 7 位只在末页可用）
-        const isLastPage = cur >= GM_IM_CART_LAST_START;
-        const posMax = isLastPage ? 7 : 6;
-        let pos = cartNo - cur + 1;
-        if (pos < 1) pos = 1;
-        if (pos > posMax) pos = posMax;
-        const py = _gmImCartY();
         await window.gmClick(hwnd, _gmImCartSlotX(pos, isLastPage), py, 1, 200, mode);
         await _gmImSleep(450);
         // 6) 闭环纠正：读实际选中的编号，与目标不符就按差格点相邻格
@@ -6358,7 +6397,9 @@ if (true) {
             const c = _gmImLoadCfg();
             delete c.cartX1; delete c.cartPitch; delete c.cartY;
             localStorage.setItem(GM_IM_CFG_KEY, JSON.stringify(c));
-            _gmImLog('已清除战车位标定，回到默认坐标表');
+            _gmImSwipeYOK = null;
+            _gmImCalBadLogged = false;
+            _gmImLog('🧹 已清除战车位标定：回到默认坐标（第1位 x0.240｜间距 0.090｜行 y0.770），并把滑动行高恢复自动探测');
         } catch (e) {}
     };
 
