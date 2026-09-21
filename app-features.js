@@ -62,6 +62,274 @@
             await loadOldActivityItems(true);
             if (typeof renderCalcSkins === 'function') await renderCalcSkins();
         };
+
+        // ==================== 🏪 可扩展「活动 Tabs」（状元商店等） ====================
+        // 需求（用户 2026-09-21）：计算器里再加一个活动 tab（结构照旧活动：选目标 / 数据参考 / 氪金计算器），
+        //   并且「管理员面板 → 🎪 活动道具」里能维护这个 tab 的道具**和该 tab 的参数**——这一期活动是
+        //   "按波数产出"（波数 → 碎片），波数规则和以前不一样，所以要能改参数而不是写死。
+        // 存储：活动数据在索引 Gist 的 activity_tabs.json：{ tabs: [{ id, name, items:[{name,cost}], params:{...} ] }
+        //   旧活动（old_activity_items.json）**保持原样不动**，两边互不影响。
+        // 参数里 packs / waveRef 用「一行文本」存（管理端一个输入框即可改，避免嵌套表格 UI）：
+        //   packs   = 名称:金额:材料:金卡:限购  用 | 分隔（限购 0 = 不限）
+        //   waveRef = 档位:每日波数           用 | 分隔（纯参考展示）
+        const ACTIVITY_TABS_FILE = 'activity_tabs.json';
+        const ACTIVITY_TABS_DEFAULT = [
+            {
+                id: 'shop',
+                name: '状元商店',
+                items: [
+                    { name: '巨灵神·海妖', cost: 480 }, { name: '金银法王·恶匪', cost: 480 },
+                    { name: '电容器', cost: 480 }, { name: '山河社稷号', cost: 480 },
+                    { name: '寂静之月号', cost: 480 }, { name: '浴火凤凰号', cost: 480 },
+                    { name: '神剑山庄号', cost: 480 }, { name: '飞龙在天号', cost: 720 },
+                    { name: '金卡x1', cost: 20 }, { name: '如霜·女王', cost: 960 },
+                    { name: '博达尔多·后羿', cost: 960 }, { name: '风暴·战将', cost: 960 },
+                    { name: '魔化·天使', cost: 960 }, { name: '夏大叔·龟相', cost: 1280 },
+                    { name: '随机金色龙珠', cost: 1080 }, { name: '随机红色龙珠', cost: 1600 }
+                ],
+                params: {
+                    days: 21,
+                    waveStepWaves: 10, waveStepShards: 2,   // 每 10 波 = 2 碎片
+                    maxWaves: 200,                          // 每天最多波数（提示用）
+                    bonusWaves: 200, bonusShards: 2,        // 打满 200 波额外 +2 碎片
+                    zhanlingCost: 98, zhanlingMat: 200,
+                    packs: '68礼包:68:30:1:63|198礼包:198:80:3:63|328礼包:328:120:5:63|648礼包:648:240:9:999',
+                    waveRef: '480:129|640:169|720:189|960:200|1280:200'
+                }
+            }
+        ];
+        // 内置默认要暴露到 window：管理端（app-core.js）「活动道具」维护页读它做"恢复内置默认"与兜底
+        try { window.ACTIVITY_TABS_DEFAULT = JSON.parse(JSON.stringify(ACTIVITY_TABS_DEFAULT)); } catch (e) { window.ACTIVITY_TABS_DEFAULT = []; }
+        let _actTabsCache = null;
+        async function loadActivityTabs(force) {
+            if (_actTabsCache && !force) return _actTabsCache;
+            try {
+                const token = (typeof getGistToken === 'function') ? getGistToken() : '';
+                if (token && typeof wallReadGistFile === 'function' && typeof GIST_ID !== 'undefined') {
+                    const c = await wallReadGistFile(GIST_ID, ACTIVITY_TABS_FILE, token);
+                    if (c) {
+                        const d = JSON.parse(c);
+                        if (d && Array.isArray(d.tabs) && d.tabs.length) { _actTabsCache = d.tabs; return _actTabsCache; }
+                    }
+                }
+            } catch (e) {}
+            _actTabsCache = JSON.parse(JSON.stringify(ACTIVITY_TABS_DEFAULT));
+            return _actTabsCache;
+        }
+        function getActTab(id) {
+            const list = _actTabsCache || ACTIVITY_TABS_DEFAULT;
+            return list.find(function (t) { return t.id === id; }) || list[0] || null;
+        }
+        window.__reloadActivityTabs = async function () {
+            _actTabsCache = null;
+            await loadActivityTabs(true);
+            if (typeof renderShopSkins === 'function') await renderShopSkins();
+        };
+        // 波数 → 碎片（含"打满额外奖励"）；碎片 → 需要的波数（反算，向上取整）
+        function _actShardsFromWaves(waves, p) {
+            p = p || {};
+            const sw = Math.max(1, Number(p.waveStepWaves) || 10);
+            const ss = Math.max(0, Number(p.waveStepShards) || 0);
+            let sh = Math.floor(Math.max(0, waves) / sw) * ss;
+            const bw = Number(p.bonusWaves) || 0, bs = Number(p.bonusShards) || 0;
+            if (bw > 0 && waves >= bw) sh += bs;
+            return sh;
+        }
+        function _actWavesForShards(shards, p) {
+            p = p || {};
+            const sw = Math.max(1, Number(p.waveStepWaves) || 10);
+            const ss = Math.max(0.0001, Number(p.waveStepShards) || 1);
+            const bw = Number(p.bonusWaves) || 0, bs = Number(p.bonusShards) || 0;
+            let need = Math.max(0, Math.ceil(shards));
+            if (bw > 0 && bs > 0 && need > 0) {
+                // 先看"打满但不额外算奖励"够不够，不够再按含奖励算
+            }
+            let waves = Math.ceil(need / ss) * sw;
+            if (bs > 0 && need + bs <= Math.ceil(need)) waves = bw; // 打完满波刚好够
+            return waves;
+        }
+        function _actParsePacks(str) {
+            return String(str || '').split('|').map(function (s) {
+                const a = s.split(':');
+                if (a.length < 3 || !a[0].trim()) return null;
+                return { name: a[0].trim(), cost: Number(a[1]) || 0, mat: Number(a[2]) || 0, gold: Number(a[3]) || 0, max: a[4] === undefined ? 0 : (Number(a[4]) || 0) };
+            }).filter(Boolean);
+        }
+        function _actParseWaveRef(str) {
+            return String(str || '').split('|').map(function (s) {
+                const a = s.split(':');
+                if (a.length < 2) return null;
+                const cost = Number(a[0]) || 0, waves = Number(a[1]) || 0;
+                if (!cost) return null;
+                return { cost: cost, waves: waves };
+            }).filter(Boolean).sort(function (x, y) { return x.cost - y.cost; });
+        }
+        // 最优礼包组合：按该 tab 自己的礼包表做 DP（礼包少、量级小，枚举 + 余额用最大包补）
+        function _actOptimalPurchase(need, packs) {
+            const list = (packs || []).filter(function (p) { return p.mat > 0 && p.cost > 0; });
+            if (!list.length || need <= 0) return { cost: 0, plan: {}, totalMat: 0 };
+            const sorted = list.slice().sort(function (a, b) { return (a.cost / a.mat) - (b.cost / b.mat); });
+            let best = { cost: Infinity, plan: {}, totalMat: 0 };
+            const tryCombo = function (idx, matSum, costSum, plan) {
+                if (costSum >= best.cost) return;
+                if (matSum >= need) { if (costSum < best.cost) best = { cost: costSum, plan: Object.assign({}, plan), totalMat: matSum }; return; }
+                if (idx >= sorted.length) {
+                    // 剩下的用一个"每元材料最多"的包补齐
+                    const p = sorted[0];
+                    const cnt = Math.ceil((need - matSum) / p.mat);
+                    const capped = (p.max && p.max > 0) ? Math.ceil(cnt / p.max) * p.max : cnt;  // 有上限时按上限整批
+                    const c2 = costSum + capped * p.cost, m2 = matSum + capped * p.mat;
+                    if (c2 < best.cost) { const pl = Object.assign({}, plan); pl[p.name] = (pl[p.name] || 0) + capped; best = { cost: c2, plan: pl, totalMat: m2 }; }
+                    return;
+                }
+                const p = sorted[idx];
+                const maxCnt = p.max && p.max > 0 ? p.max : 999;
+                for (let c = 0; c <= maxCnt; c++) {
+                    if (matSum + c * p.mat >= need) { const c2 = costSum + c * p.cost, m2 = matSum + c * p.mat; if (c2 < best.cost) { const pl = Object.assign({}, plan); if (c) pl[p.name] = c; best = { cost: c2, plan: pl, totalMat: m2 }; } break; }
+                    const pl = Object.assign({}, plan); if (c) pl[p.name] = c;
+                    tryCombo(idx + 1, matSum + c * p.mat, costSum + c * p.cost, pl);
+                }
+            };
+            tryCombo(0, 0, 0, {});
+            return best;
+        }
+
+        // ---------- 活动 tab（状元商店）UI ----------
+        let calcShopSelected = new Set();
+        let _shopItemsFlat = [];
+        async function renderShopSkins() {
+            const box = document.getElementById('calcShopSkinsList');
+            if (!box) return;
+            await loadActivityTabs();
+            const tab = getActTab('shop');
+            const all = (tab && tab.items) || [];
+            const cats = Array.from(new Set(all.map(function (s) { return Number(s.cost) || 0; }))).sort(function (a, b) { return a - b; });
+            _shopItemsFlat = [];
+            let html = '';
+            cats.forEach(function (cat, ci) {
+                const items = all.filter(function (s) { return (Number(s.cost) || 0) === cat; });
+                if (!items.length) return;
+                const color = OLD_CAT_COLORS[ci % OLD_CAT_COLORS.length];
+                html += '<div style="margin-bottom:12px;">';
+                html += '<div style="color:' + color + ';font-size:0.8rem;font-weight:600;margin-bottom:6px;">' + cat + ' 材料档</div>';
+                html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+                items.forEach(function (it) {
+                    const idx = _shopItemsFlat.length;
+                    _shopItemsFlat.push({ name: it.name, cost: it.cost });
+                    const sel = calcShopSelected.has(it.name);
+                    const bg = sel ? 'background:linear-gradient(135deg,' + color + ',#2e7d32);border-color:' + color + ';' : 'background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1);';
+                    html += '<div onclick="toggleShopSkinByIdx(' + idx + ')" style="' + bg + 'border:1px solid;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:0.8rem;color:' + (sel ? '#fff' : 'rgba(255,255,255,0.8)') + ';user-select:none;">' + (sel ? '<span style="margin-right:4px;">✓</span>' : '') + _oldNameEsc(it.name) + '<span style="opacity:0.7;margin-left:4px;font-size:0.7rem;">' + it.cost + '</span></div>';
+                });
+                html += '</div></div>';
+            });
+            box.innerHTML = html || '<div style="color:rgba(255,255,255,0.4);padding:10px;text-align:center;">该活动还没有道具，请在管理端「🎪 活动道具」里添加</div>';
+            updateShopSummary();
+        }
+        window.toggleShopSkinByIdx = function (idx) {
+            const it = _shopItemsFlat[idx];
+            if (!it) return;
+            if (calcShopSelected.has(it.name)) calcShopSelected.delete(it.name); else calcShopSelected.add(it.name);
+            renderShopSkins();
+        };
+        window.clearShopSelection = function () { calcShopSelected.clear(); renderShopSkins(); };
+        function updateShopSummary() {
+            const tab = getActTab('shop');
+            const all = (tab && tab.items) || [];
+            let total = 0;
+            calcShopSelected.forEach(function (n) { const it = all.find(function (x) { return x.name === n; }); if (it) total += Number(it.cost) || 0; });
+            const t = document.getElementById('calcShopTargetTotal'); if (t) t.textContent = total;
+            const c = document.getElementById('calcShopSelectedCount'); if (c) c.textContent = calcShopSelected.size;
+            const inp = document.getElementById('calcShopTargetInput'); if (inp) inp.value = total;
+        }
+        window.switchShopCalcTab = function (which) {
+            const map = { skins: 'calcShopSkinsPanel', data: 'calcShopDataPanel', calc: 'calcShopCalcPanel' };
+            Object.keys(map).forEach(function (k) { const el = document.getElementById(map[k]); if (el) el.style.display = (k === which) ? 'block' : 'none'; });
+            const btns = { skins: 'calcShopTabSkins', data: 'calcShopTabData', calc: 'calcShopTabCalc' };
+            Object.keys(btns).forEach(function (k) {
+                const b = document.getElementById(btns[k]); if (!b) return;
+                if (k === which) { b.style.background = 'linear-gradient(135deg,#4caf50,#2e7d32)'; b.style.color = 'white'; }
+                else { b.style.background = 'rgba(255,255,255,0.1)'; b.style.color = 'rgba(255,255,255,0.7)'; }
+            });
+            if (which === 'skins') renderShopSkins();
+            if (which === 'data') renderShopDataPanel();
+        };
+        async function renderShopDataPanel() {
+            const box = document.getElementById('calcShopDataBody');
+            if (!box) return;
+            await loadActivityTabs();
+            const tab = getActTab('shop');
+            if (!tab) { box.innerHTML = ''; return; }
+            const p = tab.params || {};
+            const packs = _actParsePacks(p.packs);
+            const ref = _actParseWaveRef(p.waveRef);
+            let html = '<div style="color:#4ecdc4;font-weight:600;margin-bottom:8px;font-size:0.85rem;">📊 ' + _oldNameEsc(tab.name) + ' · 参数（管理员可在「🎪 活动道具」里改）</div>';
+            html += '<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px;margin-bottom:12px;font-size:0.78rem;line-height:1.7;color:rgba(255,255,255,0.8);">'
+                + '活动天数（默认）：<b style="color:#ffd700;">' + (p.days || 21) + ' 天</b><br>'
+                + '产出换算：<b style="color:#ffd700;">每 ' + (p.waveStepWaves || 10) + ' 波 = ' + (p.waveStepShards || 2) + ' 碎片</b>'
+                + (p.bonusWaves ? '，打满 <b style="color:#ffd700;">' + p.bonusWaves + ' 波</b>额外 +' + (p.bonusShards || 0) + ' 碎片' : '')
+                + '<br>战令：<b style="color:#ffd700;">' + (p.zhanlingCost || 98) + ' 元 = ' + (p.zhanlingMat || 200) + ' 材料</b><br>'
+                + '每天最多：<b style="color:#ffd700;">' + (p.maxWaves || 200) + ' 波</b></div>';
+            html += '<div style="color:#4ecdc4;font-weight:600;margin-bottom:8px;font-size:0.85rem;">🎁 礼包（元 → 材料）</div>';
+            html += '<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px;margin-bottom:12px;"><table style="width:100%;font-size:0.78rem;color:rgba(255,255,255,0.8);border-collapse:collapse;">'
+                + '<tr style="border-bottom:1px solid rgba(255,255,255,0.1);"><th style="text-align:left;padding:4px;">礼包</th><th style="text-align:right;padding:4px;">金额</th><th style="text-align:right;padding:4px;">材料</th><th style="text-align:right;padding:4px;">金卡</th><th style="text-align:right;padding:4px;">限购</th></tr>';
+            packs.forEach(function (k) {
+                html += '<tr><td style="padding:4px;">' + _oldNameEsc(k.name) + '</td><td style="text-align:right;padding:4px;">' + k.cost + '元</td><td style="text-align:right;padding:4px;">' + k.mat + '</td><td style="text-align:right;padding:4px;">' + (k.gold || 0) + '</td><td style="text-align:right;padding:4px;">' + (k.max ? k.max : '不限') + '</td></tr>';
+            });
+            html += '</table></div>';
+            if (ref.length) {
+                html += '<div style="color:#4ecdc4;font-weight:600;margin-bottom:8px;font-size:0.85rem;">🌊 参考：各档位每天需要的波数</div>';
+                html += '<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px;"><table style="width:100%;font-size:0.78rem;color:rgba(255,255,255,0.8);border-collapse:collapse;">'
+                    + '<tr style="border-bottom:1px solid rgba(255,255,255,0.1);"><th style="text-align:left;padding:4px;">目标档位</th><th style="text-align:right;padding:4px;">每天波数</th></tr>';
+                ref.forEach(function (r) {
+                    html += '<tr><td style="padding:4px;color:#ffd700;">' + r.cost + ' 材料</td><td style="text-align:right;padding:4px;color:#4ecdc4;font-weight:600;">' + r.waves + ' 波/天</td></tr>';
+                });
+                html += '</table></div>';
+            }
+            box.innerHTML = html;
+        }
+        window.doShopCalc = async function () {
+            await loadActivityTabs();
+            const tab = getActTab('shop');
+            const p = (tab && tab.params) || {};
+            const g = function (id, d) { const el = document.getElementById(id); return el ? (parseInt(el.value, 10) || 0) : d; };
+            const target = g('calcShopTargetInput', 0);
+            const owned = g('calcShopOwnedInput', 0);
+            const days = g('calcShopDaysInput', Number(p.days) || 21) || 21;
+            const waves = g('calcShopWavesInput', Number(p.maxWaves) || 200);
+            const buyZL = !!(document.getElementById('calcShopBuyZhanLing') && document.getElementById('calcShopBuyZhanLing').checked);
+            const box = document.getElementById('calcShopResultContent'), area = document.getElementById('calcShopResultArea');
+            if (!box || !area) return;
+            if (target <= 0) { alert('请先选择目标或输入目标材料数！'); return; }
+            const dailyShards = _actShardsFromWaves(waves, p);
+            const freeShards = dailyShards * days + owned;
+            const zlMat = buyZL ? (Number(p.zhanlingMat) || 0) : 0;
+            const zlCost = buyZL ? (Number(p.zhanlingCost) || 0) : 0;
+            const haveAll = freeShards + zlMat;
+            const packs = _actParsePacks(p.packs);
+            const needMat = Math.max(0, target - haveAll);
+            const best = _actOptimalPurchase(needMat, packs);
+            const totalCost = zlCost + (best.cost || 0);
+            let html = '';
+            html += '<div style="font-size:0.82rem;line-height:1.9;color:rgba(255,255,255,0.85);">';
+            html += '🎯 目标材料：<b style="color:#ffd700;">' + target + '</b>；已有：<b>' + owned + '</b><br>';
+            html += '🌊 每天打 <b style="color:#4ecdc4;">' + waves + ' 波</b> → 每天 <b style="color:#4ecdc4;">' + dailyShards + '</b> 碎片，' + days + ' 天共 <b style="color:#4ecdc4;">' + (dailyShards * days) + '</b>';
+            if (buyZL) html += '，战令 +<b style="color:#ffd700;">' + zlMat + '</b>（' + zlCost + '元）';
+            html += '<br>💰 白嫖合计：<b style="color:#4caf50;">' + haveAll + '</b>';
+            if (freeShards + zlMat >= target) {
+                html += ' → <b style="color:#4caf50;">够买目标了，不用额外氪金 ✅</b>';
+                const needWaves = _actWavesForShards(Math.max(0, target - owned - zlMat) / days, p);
+                html += '<br>💡 若想白嫖（不算礼包），每天约需 <b style="color:#4ecdc4;">' + needWaves + ' 波</b>';
+            } else {
+                html += '<br>❗ 还差 <b style="color:#ff6b6b;">' + (target - haveAll) + '</b> 材料 → 推荐买：';
+                html += '<div style="margin:6px 0 0 0;padding:8px;background:rgba(255,215,0,0.08);border-radius:6px;">';
+                Object.keys(best.plan || {}).forEach(function (k) { if (best.plan[k] > 0) html += '· ' + _oldNameEsc(k) + ' × <b>' + best.plan[k] + '</b><br>'; });
+                if (!Object.keys(best.plan || {}).length) html += '（按当前礼包表算不出更省方案，请检查参数）<br>';
+                html += '合计花费：<b style="color:#ffd700;">' + totalCost + ' 元</b>（含战令 ' + zlCost + ' 元），可得材料 <b>' + (haveAll + (best.totalMat || 0)) + '</b></div>';
+            }
+            html += '</div>';
+            box.innerHTML = html;
+            area.style.display = 'block';
+        };
         // 封神杯襄商店皮肤/战车清单（第四话·封神台）
         const BEIXIANG_SKINS = [
             // 480战旗档
@@ -283,9 +551,9 @@
             }
         }
 
-        // 顶层 Tab：新活动 / 旧活动 / Boss减伤 / 龙珠升星
+        // 顶层 Tab：新活动 / 旧活动 / 🏪活动tab(状元商店) / Boss减伤 / 龙珠升星
         function switchCalcTopTab(tab) {
-            const isNew = tab === 'new', isOld = tab === 'old', isBoss = tab === 'boss', isDragon = tab === 'dragon';
+            const isNew = tab === 'new', isOld = tab === 'old', isBoss = tab === 'boss', isDragon = tab === 'dragon', isShop = tab === 'shop';
             const body = document.getElementById('calcPanelBody');
             // 始终显示 calcPanelBody（内含顶层 Tab 按钮栏），否则切到 Boss 后切换按钮也被隐藏，无法返回
             if (body) body.style.display = 'block';
@@ -293,9 +561,11 @@
             if (boss) boss.style.display = isBoss ? 'block' : 'none';
             document.getElementById('calcNewContainer').style.display = isNew ? 'block' : 'none';
             document.getElementById('calcOldContainer').style.display = isOld ? 'block' : 'none';
+            const shop = document.getElementById('calcShopContainer');
+            if (shop) shop.style.display = isShop ? 'block' : 'none';
             const dragon = document.getElementById('calcDragonContainer');
             if (dragon) dragon.style.display = isDragon ? 'block' : 'none';
-            const defs = [['calcTopNew', isNew], ['calcTopOld', isOld], ['calcTopBoss', isBoss], ['calcTopDragon', isDragon]];
+            const defs = [['calcTopNew', isNew], ['calcTopOld', isOld], ['calcTopShop', isShop], ['calcTopBoss', isBoss], ['calcTopDragon', isDragon]];
             defs.forEach(function (d) {
                 const b = document.getElementById(d[0]); if (!b) return;
                 if (d[1]) { b.style.background = 'linear-gradient(135deg,#4caf50,#2e7d32)'; b.style.color = 'white'; }
@@ -303,6 +573,7 @@
             });
             if (isNew) { switchNewCalcTab('target'); }
             else if (isOld) { renderCalcSkins(); updateCalcSummary(); switchOldCalcTab('skins'); }
+            else if (isShop) { switchShopCalcTab('skins'); }
             else if (isBoss) { if (window.renderBossRed) renderBossRed(); }
             else if (isDragon) { renderDragonStarTable(); }
         }

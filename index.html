@@ -413,10 +413,11 @@
                 <button onclick="toggleActivityCalcPanel()" style="background:transparent;border:none;color:white;font-size:1.5rem;cursor:pointer;">×</button>
             </div>
             <div id="calcPanelBody" style="padding:15px;">
-                <!-- 顶层 2 tabs：新活动 / 旧活动 -->
-                <div style="display:flex;gap:5px;margin-bottom:15px;">
-                    <button onclick="switchCalcTopTab('new')" id="calcTopNew" data-tip="封神杯襄活动计算器：选目标皮肤/战车 → 算出需要氪多少钱、攒多少天" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;">🆕 新活动·封神杯襄</button>
-                    <button onclick="switchCalcTopTab('old')" id="calcTopOld" data-tip="旧活动·轮回计算器：选目标 → 算性价比最优的氪金方案" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">📦 旧活动·轮回</button>
+                <!-- 顶层 Tab：新活动 / 旧活动 / 🏪活动tab / Boss减伤 / 龙珠升星 -->
+                <div style="display:flex;gap:5px;margin-bottom:15px;flex-wrap:wrap;">
+                    <button onclick="switchCalcTopTab('new')" id="calcTopNew" data-tip="封神杯襄活动计算器：选目标皮肤/战车 → 算出需要氪多少钱、攒多少天" style="flex:1;min-width:110px;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;">🆕 新活动·封神杯襄</button>
+                    <button onclick="switchCalcTopTab('old')" id="calcTopOld" data-tip="旧活动·轮回计算器：选目标 → 算性价比最优的氪金方案" style="flex:1;min-width:110px;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">📦 旧活动·轮回</button>
+                    <button onclick="switchCalcTopTab('shop')" id="calcTopShop" data-tip="该期活动（状元商店）：按波数产出计算 —— 选目标 → 填活动天数/每天打几波 → 算出还差多少材料、推荐买哪几个礼包；道具与参数（每N波=M碎片、礼包表、参考波数）在管理员「🎪 活动道具」里维护" style="flex:1;min-width:110px;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">🏪 活动·状元商店</button>
                     <button onclick="switchCalcTopTab('boss')" id="calcTopBoss" data-tip="Boss减伤表：各Boss波次的减伤/血量数据（存云端 Gist，全员共享）" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">🛡️ Boss减伤</button>
                     <button onclick="switchCalcTopTab('dragon')" id="calcTopDragon" data-tip="龙珠升星计算器：算龙珠升到指定星级所需的材料/花费" style="flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">🐉 龙珠升星</button>
                 </div>
@@ -605,6 +606,72 @@
                     <div id="calcResultArea" style="display:none;">
                         <div style="color:#4ecdc4;font-weight:600;margin-bottom:10px;font-size:0.9rem;">💰 计算结果</div>
                         <div id="calcResultContent" style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;"></div>
+                    </div>
+                </div>
+
+                <!-- ============ 🏪 活动 Tab：状元商店（道具与参数由管理员维护，存 Gist activity_tabs.json） ============ -->
+                <div id="calcShopContainer" style="display:none;">
+                    <div style="display:flex;gap:4px;margin-bottom:12px;">
+                        <button onclick="switchShopCalcTab('skins')" id="calcShopTabSkins" style="flex:1;padding:7px;border:none;border-radius:6px;cursor:pointer;font-size:0.8rem;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;">🎯 选择目标</button>
+                        <button onclick="switchShopCalcTab('data')" id="calcShopTabData" style="flex:1;padding:7px;border:none;border-radius:6px;cursor:pointer;font-size:0.8rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">📊 数据参考</button>
+                        <button onclick="switchShopCalcTab('calc')" id="calcShopTabCalc" style="flex:1;padding:7px;border:none;border-radius:6px;cursor:pointer;font-size:0.8rem;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);">💰 氪金计算器</button>
+                    </div>
+
+                    <div id="calcShopSkinsPanel">
+                        <div style="color:#ff9800;font-weight:600;margin-bottom:10px;font-size:0.9rem;">🏪 选择目标（可多选）</div>
+                        <div id="calcShopSkinsList" style="max-height:55vh;overflow-y:auto;"></div>
+                        <div style="margin-top:12px;padding:10px;background:rgba(255,255,255,0.05);border-radius:8px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <span style="color:rgba(255,255,255,0.7);font-size:0.85rem;">已选目标材料总数：</span>
+                                <span id="calcShopTargetTotal" style="color:#ffd700;font-weight:bold;font-size:1.1rem;">0</span>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+                                <span style="color:rgba(255,255,255,0.7);font-size:0.85rem;">已选项目数：</span>
+                                <span id="calcShopSelectedCount" style="color:#4ecdc4;font-weight:bold;">0</span>
+                            </div>
+                        </div>
+                        <div style="margin-top:10px;display:flex;gap:8px;">
+                            <button onclick="clearShopSelection()" style="flex:1;padding:8px;border:none;border-radius:6px;background:rgba(239,68,68,0.3);color:#ef4444;cursor:pointer;font-size:0.8rem;">清空选择</button>
+                            <button onclick="switchShopCalcTab('calc')" style="flex:1;padding:8px;border:none;border-radius:6px;background:linear-gradient(135deg,#ff6b6b,#feca57);color:white;cursor:pointer;font-size:0.8rem;font-weight:bold;">下一步 →</button>
+                        </div>
+                    </div>
+
+                    <div id="calcShopDataPanel" style="display:none;">
+                        <div id="calcShopDataBody"></div>
+                    </div>
+
+                    <div id="calcShopCalcPanel" style="display:none;">
+                        <div style="color:#ff9800;font-weight:600;margin-bottom:10px;font-size:0.9rem;">⚙️ 计算参数</div>
+                        <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:12px;">
+                            <div style="margin-bottom:10px;">
+                                <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">目标材料总数</label>
+                                <input type="number" id="calcShopTargetInput" value="0" min="0" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;">
+                            </div>
+                            <div style="margin-bottom:10px;">
+                                <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">已有材料</label>
+                                <input type="number" id="calcShopOwnedInput" value="0" min="0" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;">
+                            </div>
+                            <div style="display:flex;gap:10px;margin-bottom:10px;">
+                                <div style="flex:1;">
+                                    <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">活动天数</label>
+                                    <input type="number" id="calcShopDaysInput" value="21" min="1" max="60" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;">
+                                </div>
+                                <div style="flex:1;">
+                                    <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">每天打多少波</label>
+                                    <input type="number" id="calcShopWavesInput" value="200" min="0" max="999" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;">
+                                </div>
+                            </div>
+                            <div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-bottom:10px;">💡 产出换算、礼包表、参考波数都在「📊 数据参考」里显示；换期改数字请去管理员「🎪 活动道具」</div>
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                                <input type="checkbox" id="calcShopBuyZhanLing" checked style="width:18px;height:18px;cursor:pointer;">
+                                <label for="calcShopBuyZhanLing" style="color:rgba(255,255,255,0.8);font-size:0.85rem;cursor:pointer;">购买战令（默认 98元/200材料，可在管理端改）</label>
+                            </div>
+                            <button onclick="doShopCalc()" style="width:100%;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,#ff6b6b,#feca57);color:white;font-size:1rem;font-weight:bold;cursor:pointer;">🧮 计算最优方案</button>
+                        </div>
+                        <div id="calcShopResultArea" style="display:none;">
+                            <div style="color:#4ecdc4;font-weight:600;margin-bottom:10px;font-size:0.9rem;">💰 计算结果</div>
+                            <div id="calcShopResultContent" style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1994,13 +2061,14 @@
             <div id="adminPageOldItems" style="display:none;">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
                     <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
-                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🎪 旧活动·道具档位维护</h3>
-                    <button class="admin-btn" onclick="renderOldItemsAdmin()" style="padding:6px 12px;font-size:0.8rem;margin-left:auto;">🔄 重新载入</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🎪 活动道具维护</h3>
+                    <button class="admin-btn" onclick="renderOldItemsAdmin(true)" style="padding:6px 12px;font-size:0.8rem;margin-left:auto;">🔄 重新载入</button>
                 </div>
                 <div style="font-size:0.72rem;color:rgba(255,255,255,0.55);margin-bottom:10px;background:rgba(255,255,255,0.05);border-radius:6px;padding:8px;line-height:1.6;">
+                    <b style="color:#ffd700;">按活动分开维护</b>：上面按钮可切换「旧活动·轮回」和各个活动 tab（如 🏪 状元商店）。<br>
                     档位 = 材料数：改「档位数字」即改档位，填一个不存在的数字（如 1600 / 604）就是新增档位。<br>
-                    计算只按档位数字累加，档位数量和每个档位里的道具数量都不影响计算。<br>
-                    保存后对所有人生效（存云端 Gist），活动换期时在这里改即可，不用改代码。
+                    <b style="color:#4ecdc4;">活动 tab 还能改该活动的参数</b>（活动天数、每 N 波 = M 碎片、战令、礼包表、参考波数表）——活动换期波数规则不一样时改这里，不用改代码。<br>
+                    保存后对所有人生效（存云端 Gist）；旧活动存 old_activity_items.json，活动 tab 存 activity_tabs.json。
                 </div>
                 <div id="adminOldItemsBody" style="max-height:66vh;overflow-y:auto;font-size:0.8rem;">加载中…</div>
             </div>

@@ -26408,15 +26408,32 @@ ${maSection}
         }
         window.openAdminPanel = openAdminPanel; // 🔴 2026-09-01 显式暴露到 window，供 index.html 内联兜底脚本调用
 
-        // ==================== 旧活动·道具档位维护（管理员） ====================
-        // 数据存索引 Gist 的 old_activity_items.json：{ items: [{ name, cost }] }
-        // 档位即 cost（材料数），任意数字都支持；前端「旧活动·选择目标」读这份数据，无配置时退回内置默认。
+        // ==================== 🎪 活动维护（管理员）：旧活动 + 可扩展活动 tabs ====================
+        // 旧活动：索引 Gist 的 old_activity_items.json → { items: [{ name, cost }] }（道具清单，档位=cost）
+        // 可扩展活动（2026-09-21 新增，如「状元商店」）：activity_tabs.json → { tabs: [{ id, name, items, params }] }
+        //   这类活动的**参数**（波数换算、礼包表、参考波数…）也在这里改 → 换期不用改代码。
         const OLD_ITEMS_GIST_FILE = 'old_activity_items.json';
-        let _oldItemsAdminDraft = null;
-        async function renderOldItemsAdmin() {
-            const box = document.getElementById('adminOldItemsBody');
-            if (!box) return;
-            box.innerHTML = '加载中…';
+        const ACT_TABS_GIST_FILE = 'activity_tabs.json';
+        let _oldItemsAdminDraft = null;     // 旧活动道具草稿
+        let _actTabsAdminDraft = null;      // 可扩展活动草稿（tabs 数组）
+        let _actAdminCur = 'old';           // 当前正在维护哪个活动：'old' 或 tab.id
+        let _actAdminLoaded = false;
+
+        // 统一把数据写回索引 Gist 的某个文件
+        async function _actGistPatch(file, obj) {
+            const token = getGistToken();
+            if (!token) throw new Error('无 Token');
+            const r = await fetch('https://api.github.com/gists/' + GIST_ID, {
+                method: 'PATCH',
+                headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
+                body: JSON.stringify({ files: { [file]: { content: JSON.stringify(obj, null, 2) } } })
+            });
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+        }
+        async function _actAdminLoad(force) {
+            if (_actAdminLoaded && !force) return;
+            _actAdminLoaded = true;
+            // ① 旧活动道具
             let items = [];
             try {
                 const token = getGistToken();
@@ -26425,20 +26442,101 @@ ${maSection}
                     if (c) { const d = JSON.parse(c); if (d && Array.isArray(d.items)) items = d.items; }
                 }
             } catch (e) {}
-            if (!items || !items.length) {
-                items = (window.ACTIVITY_SKINS_DEFAULT || []).map(s => ({ name: s.name, cost: s.cost }));
-            }
+            if (!items || !items.length) items = (window.ACTIVITY_SKINS_DEFAULT || []).map(s => ({ name: s.name, cost: s.cost }));
             _oldItemsAdminDraft = items.map(x => ({ name: String(x.name || ''), cost: Number(x.cost) || 0 }));
+            // ② 可扩展活动
+            let tabs = null;
+            try {
+                const token = getGistToken();
+                if (token && typeof wallReadGistFile === 'function') {
+                    const c = await wallReadGistFile(GIST_ID, ACT_TABS_GIST_FILE, token);
+                    if (c) { const d = JSON.parse(c); if (d && Array.isArray(d.tabs) && d.tabs.length) tabs = d.tabs; }
+                }
+            } catch (e) {}
+            if (!tabs) tabs = JSON.parse(JSON.stringify(window.ACTIVITY_TABS_DEFAULT || []));
+            _actTabsAdminDraft = tabs.map(function (t) {
+                return {
+                    id: String(t.id || ''),
+                    name: String(t.name || '未命名活动'),
+                    items: (t.items || []).map(x => ({ name: String(x.name || ''), cost: Number(x.cost) || 0 })),
+                    params: Object.assign({}, t.params || {})
+                };
+            });
+            if (_actAdminCur !== 'old' && !_actTabsAdminDraft.some(t => t.id === _actAdminCur)) _actAdminCur = 'old';
+        }
+        function _actAdminCurTab() {
+            return _actTabsAdminDraft ? _actTabsAdminDraft.find(function (t) { return t.id === _actAdminCur; }) : null;
+        }
+        // 当前活动的道具草稿（旧活动或某个 tab 的 items）
+        function _actAdminCurItems() {
+            if (_actAdminCur === 'old') return _oldItemsAdminDraft || [];
+            const t = _actAdminCurTab();
+            return (t && t.items) || [];
+        }
+        window.actTabAdminSwitch = async function (id) {
+            _actAdminCur = id;
+            await renderOldItemsAdmin();
+        };
+        async function renderOldItemsAdmin(force) {
+            const box = document.getElementById('adminOldItemsBody');
+            if (!box) return;
+            box.innerHTML = '加载中…';
+            await _actAdminLoad(force === true);
             _renderOldItemsAdminList();
         }
         window.renderOldItemsAdmin = renderOldItemsAdmin;
 
+        // 参数编辑器（只对"可扩展活动"显示）：这些数字就是"换期要改的东西"
+        function _renderActParamsEditor(tab) {
+            const p = (tab && tab.params) || {};
+            const I = function (key, label, val, hint, wide) {
+                return '<div style="' + (wide ? 'width:100%;' : 'flex:1;min-width:118px;') + '">'
+                    + '<label style="display:block;color:rgba(255,255,255,0.6);font-size:0.7rem;margin-bottom:3px;">' + label + '</label>'
+                    + '<input data-pf="' + key + '" value="' + _esc(String(val == null ? '' : val)) + '" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.3);border-radius:5px;color:#ffd700;font-size:0.75rem;padding:5px 6px;outline:none;">'
+                    + (hint ? '<div style="color:rgba(255,255,255,0.35);font-size:0.63rem;margin-top:2px;">' + hint + '</div>' : '')
+                    + '</div>';
+            };
+            let h = '<div style="margin-top:14px;background:rgba(78,205,196,0.07);border:1px solid rgba(78,205,196,0.25);border-radius:8px;padding:10px;">';
+            h += '<div style="color:#4ecdc4;font-size:0.82rem;font-weight:600;margin-bottom:8px;">⚙️ 该活动的参数（这一期的波数规则和其他活动不一样，改这里）</div>';
+            h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">';
+            h += I('days', '活动天数（默认）', p.days == null ? 21 : p.days);
+            h += I('maxWaves', '每天最多波数', p.maxWaves == null ? 200 : p.maxWaves);
+            h += I('waveStepWaves', '产出：每 N 波', p.waveStepWaves == null ? 10 : p.waveStepWaves);
+            h += I('waveStepShards', '产出：得 M 碎片', p.waveStepShards == null ? 2 : p.waveStepShards);
+            h += '</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">';
+            h += I('bonusWaves', '打满波数阈值', p.bonusWaves == null ? 200 : p.bonusWaves, '留空/0 = 无满波奖励');
+            h += I('bonusShards', '满波额外奖励碎片', p.bonusShards == null ? 2 : p.bonusShards);
+            h += I('zhanlingCost', '战令金额(元)', p.zhanlingCost == null ? 98 : p.zhanlingCost);
+            h += I('zhanlingMat', '战令给材料', p.zhanlingMat == null ? 200 : p.zhanlingMat);
+            h += '</div>';
+            h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">';
+            h += I('packs', '礼包表', p.packs || '', '格式：名称:金额:材料:金卡:限购，多个用 <b>|</b> 分隔（限购 0=不限）', true);
+            h += I('waveRef', '参考波数表', p.waveRef || '', '格式：档位:每天波数，多个用 <b>|</b> 分隔（只在「数据参考」里展示）', true);
+            h += '</div>';
+            h += '</div>';
+            return h;
+        }
+
         function _renderOldItemsAdminList() {
             const box = document.getElementById('adminOldItemsBody');
             if (!box) return;
-            const draft = _oldItemsAdminDraft || [];
-            const cats = Array.from(new Set(draft.map(x => Number(x.cost) || 0))).sort((a, b) => a - b);
+            const draft = _actAdminCurItems();
+            const isTab = _actAdminCur !== 'old';
+            const curTab = _actAdminCurTab();
             let html = '';
+            // 活动选择器：旧活动 + 每个可扩展活动
+            html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">';
+            html += '<button onclick="actTabAdminSwitch(\'old\')" style="padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;' +
+                (_actAdminCur === 'old' ? 'background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;' : 'background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);') + '">📦 旧活动·轮回</button>';
+            (_actTabsAdminDraft || []).forEach(function (t) {
+                const on = _actAdminCur === t.id;
+                html += '<button onclick="actTabAdminSwitch(\'' + _esc(t.id) + '\')" style="padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;' +
+                    (on ? 'background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;' : 'background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);') + '">🏪 ' + _esc(t.name) + '</button>';
+            });
+            html += '</div>';
+            // 道具清单（按档位分组）
+            html += '<div style="color:#ffd700;font-size:0.82rem;font-weight:600;margin-bottom:6px;">🎁 道具清单（档位 = 材料数）</div>';
+            const cats = Array.from(new Set(draft.map(x => Number(x.cost) || 0))).sort((a, b) => a - b);
             if (!cats.length) html += '<div style="color:rgba(255,255,255,0.4);padding:10px;text-align:center;">暂无道具，请在下方添加</div>';
             cats.forEach(cat => {
                 const items = draft.filter(x => (Number(x.cost) || 0) === cat);
@@ -26459,8 +26557,10 @@ ${maSection}
                 '<input id="oldItemsNewCost" type="number" placeholder="档位/材料数" style="width:112px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.3);border-radius:5px;color:#ffd700;font-size:0.75rem;padding:5px 8px;outline:none;">' +
                 '<button onclick="oldItemsAdminAdd()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;font-size:0.75rem;padding:5px 12px;border-radius:5px;cursor:pointer;">➕ 添加</button>' +
                 '</div>';
+            // 参数区（可扩展活动）
+            if (isTab && curTab) html += _renderActParamsEditor(curTab);
             html += '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">' +
-                '<button onclick="oldItemsAdminSave()" style="flex:1;min-width:140px;background:linear-gradient(135deg,#2196f3,#1976d2);color:#fff;border:none;font-size:0.85rem;padding:9px;border-radius:7px;cursor:pointer;font-weight:600;">💾 保存并立即生效</button>' +
+                '<button onclick="oldItemsAdminSave()" style="flex:1;min-width:140px;background:linear-gradient(135deg,#2196f3,#1976d2);color:#fff;border:none;font-size:0.85rem;padding:9px;border-radius:7px;cursor:pointer;font-weight:600;">💾 保存并立即生效' + (isTab ? '（道具+参数）' : '') + '</button>' +
                 '<button onclick="oldItemsAdminReset()" style="background:rgba(255,152,0,0.2);border:1px solid rgba(255,152,0,0.4);color:#ffb74d;font-size:0.8rem;padding:9px 14px;border-radius:7px;cursor:pointer;">↩ 恢复内置默认</button>' +
                 '</div>';
             box.innerHTML = html;
@@ -26468,9 +26568,20 @@ ${maSection}
                 inp.addEventListener('change', function () {
                     const i = parseInt(this.getAttribute('data-oldi'), 10);
                     const f = this.getAttribute('data-f');
-                    if (!_oldItemsAdminDraft || !_oldItemsAdminDraft[i]) return;
-                    if (f === 'name') _oldItemsAdminDraft[i].name = this.value.trim();
-                    else { _oldItemsAdminDraft[i].cost = Math.max(0, Number(this.value) || 0); _renderOldItemsAdminList(); } // 档位变了要重新分组
+                    const arr = _actAdminCurItems();
+                    if (!arr || !arr[i]) return;
+                    if (f === 'name') arr[i].name = this.value.trim();
+                    else { arr[i].cost = Math.max(0, Number(this.value) || 0); _renderOldItemsAdminList(); } // 档位变了要重新分组
+                });
+            });
+            box.querySelectorAll('input[data-pf]').forEach(inp => {
+                inp.addEventListener('change', function () {
+                    const t = _actAdminCurTab();
+                    if (!t) return;
+                    const k = this.getAttribute('data-pf');
+                    const numeric = ['days', 'maxWaves', 'bonusWaves', 'bonusShards', 'waveStepWaves', 'waveStepShards', 'zhanlingCost', 'zhanlingMat'];
+                    t.params = t.params || {};
+                    t.params[k] = numeric.indexOf(k) >= 0 ? Math.max(0, Number(this.value) || 0) : this.value.trim();
                 });
             });
         }
@@ -26481,37 +26592,56 @@ ${maSection}
             const cost = Math.max(0, Number(c ? c.value : 0) || 0);
             if (!name) { alert('请填写道具名'); return; }
             if (!cost) { alert('请填写档位/材料数（如 480、1600）'); return; }
-            _oldItemsAdminDraft = (_oldItemsAdminDraft || []).concat([{ name: name, cost: cost }]);
+            const arr = _actAdminCurItems();
+            arr.push({ name: name, cost: cost });
             if (n) n.value = '';
             _renderOldItemsAdminList();
         };
         window.oldItemsAdminRemove = function (idx) {
-            if (!_oldItemsAdminDraft || !_oldItemsAdminDraft[idx]) return;
-            if (!confirm('删除「' + _oldItemsAdminDraft[idx].name + '」？')) return;
-            _oldItemsAdminDraft.splice(idx, 1);
+            const arr = _actAdminCurItems();
+            if (!arr || !arr[idx]) return;
+            if (!confirm('删除「' + arr[idx].name + '」？')) return;
+            arr.splice(idx, 1);
             _renderOldItemsAdminList();
         };
         window.oldItemsAdminReset = function () {
-            if (!confirm('恢复为内置默认清单（当前云端配置将被覆盖）？')) return;
-            _oldItemsAdminDraft = (window.ACTIVITY_SKINS_DEFAULT || []).map(s => ({ name: s.name, cost: s.cost }));
+            if (_actAdminCur === 'old') {
+                if (!confirm('恢复为内置默认清单（当前云端配置将被覆盖）？')) return;
+                _oldItemsAdminDraft = (window.ACTIVITY_SKINS_DEFAULT || []).map(s => ({ name: s.name, cost: s.cost }));
+            } else {
+                const t = _actAdminCurTab();
+                if (!t) return;
+                if (!confirm('把「' + t.name + '」恢复为内置默认（道具 + 参数都覆盖，保存后生效）？')) return;
+                const def = (window.ACTIVITY_TABS_DEFAULT || []).find(function (x) { return x.id === t.id; });
+                if (!def) { alert('内置默认里没有这个活动'); return; }
+                t.items = (def.items || []).map(function (x) { return { name: x.name, cost: x.cost }; });
+                t.params = Object.assign({}, def.params || {});
+            }
             _renderOldItemsAdminList();
         };
         window.oldItemsAdminSave = async function () {
             const token = getGistToken();
             if (!token) { alert('无 Token，无法保存到云端'); return; }
-            const items = (_oldItemsAdminDraft || [])
-                .filter(x => x && String(x.name).trim())
-                .map(x => ({ name: String(x.name).trim(), cost: Math.max(0, Number(x.cost) || 0) }));
-            if (!items.length) { alert('清单为空，至少要有一个道具'); return; }
             try {
-                const r = await fetch('https://api.github.com/gists/' + GIST_ID, {
-                    method: 'PATCH',
-                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
-                    body: JSON.stringify({ files: { [OLD_ITEMS_GIST_FILE]: { content: JSON.stringify({ items: items }, null, 2) } } })
-                });
-                if (!r.ok) throw new Error('HTTP ' + r.status);
-                if (typeof window.__reloadOldActivityItems === 'function') await window.__reloadOldActivityItems();
-                alert('✅ 已保存并生效（' + items.length + ' 个道具）');
+                if (_actAdminCur === 'old') {
+                    const items = (_oldItemsAdminDraft || [])
+                        .filter(x => x && String(x.name).trim())
+                        .map(x => ({ name: String(x.name).trim(), cost: Math.max(0, Number(x.cost) || 0) }));
+                    if (!items.length) { alert('清单为空，至少要有一个道具'); return; }
+                    await _actGistPatch(OLD_ITEMS_GIST_FILE, { items: items });
+                    if (typeof window.__reloadOldActivityItems === 'function') await window.__reloadOldActivityItems();
+                    alert('✅ 旧活动已保存并生效（' + items.length + ' 个道具）');
+                } else {
+                    const t = _actAdminCurTab();
+                    if (!t) return;
+                    t.items = (t.items || [])
+                        .filter(x => x && String(x.name).trim())
+                        .map(x => ({ name: String(x.name).trim(), cost: Math.max(0, Number(x.cost) || 0) }));
+                    if (!t.items.length) { alert('道具清单为空，至少要有一个道具'); return; }
+                    await _actGistPatch(ACT_TABS_GIST_FILE, { tabs: _actTabsAdminDraft });
+                    if (typeof window.__reloadActivityTabs === 'function') await window.__reloadActivityTabs();
+                    alert('✅「' + t.name + '」已保存并生效（' + t.items.length + ' 个道具 + 参数）');
+                }
             } catch (e) { alert('保存失败：' + ((e && e.message) || e)); }
         };
 
