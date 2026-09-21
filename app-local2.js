@@ -6348,6 +6348,7 @@ if (true) {
         if (!_gmImGuardApp()) return;
         const hwnd = _gmImHwnd();
         if (!hwnd) { _gmImLog('⚠️ 请先在上方「🎮 游戏窗口」里选好窗口'); return; }
+        if (_gmImBusy) { _gmImLog('⏭ 正在执行连打/切车，稍后再点「🔎 行校验」'); return; }
         const mode = _gmImMode();
         _gmImLog('🔎 行校验开始（请先让游戏停在能打开战车的界面）…');
         const wr = await _gmImEnsureCartRow(hwnd, mode);
@@ -6373,6 +6374,19 @@ if (true) {
             _gmImLog('🧹 已清除战车位标定：回到默认坐标（第1位 x0.240｜间距 0.090｜行 y0.770），并把滑动行高恢复自动探测');
         } catch (e) {}
     };
+
+    // 🔴 2026-09-21 互斥执行：连打一轮要 10~20 秒，若"自动监控又触发一轮 / 用户同时点手动测试"，
+    //    两轮会交错点击 —— 典型后果：第二轮在【战车面板已开着】的状态下再点一次「战车入口(0.61,0.75)」，
+    //    这一击落在格子行上 → 把刚切好的车改成"当前装备那辆"（用户实测：设 11/8 都会在几秒后变回 10）。
+    let _gmImBusy = false;
+    async function _gmImRunExclusive(label, fn) {
+        if (_gmImBusy) { _gmImLog('⏭ ' + label + '：上一轮还在执行，已跳过（防重叠改车）'); return false; }
+        _gmImBusy = true;
+        try { await fn(); }
+        catch (e) { _gmImLog('❌ ' + label + '：' + ((e && e.message) || e)); }
+        finally { _gmImBusy = false; }
+        return true;
+    }
 
     // —— 完整连打一次：点卡组 → 切车（切车内部第一步就是「返回」，即卡组→战车之间的返回）
     async function gmImRunSequence(hwnd, deckNo, cartNo) {
@@ -6405,24 +6419,21 @@ if (true) {
         const hwnd = _gmImHwnd();
         if (!hwnd) { _gmImLog('⚠️ 请先在 ① 勾选一个游戏窗口'); return; }
         const cfg = _gmImReadInputs();
-        try { _gmImLog(await gmImSwitchDeck(hwnd, cfg.deck)); }
-        catch (e) { _gmImLog('❌ 切卡失败：' + (e && e.message || e)); }
+        await _gmImRunExclusive('只切卡', async () => { _gmImLog(await gmImSwitchDeck(hwnd, cfg.deck)); });
     };
     window.gmImTestCart = async function () {
         if (!_gmImGuardApp()) return;
         const hwnd = _gmImHwnd();
         if (!hwnd) { _gmImLog('⚠️ 请先在 ① 勾选一个游戏窗口'); return; }
         const cfg = _gmImReadInputs();
-        try { _gmImLog(await gmImSwitchCart(hwnd, cfg.cart)); }
-        catch (e) { _gmImLog('❌ 切车失败：' + (e && e.message || e)); }
+        await _gmImRunExclusive('只切车', async () => { _gmImLog(await gmImSwitchCart(hwnd, cfg.cart)); });
     };
     window.gmImRunOnce = async function () {
         if (!_gmImGuardApp()) return;
         const hwnd = _gmImHwnd();
         if (!hwnd) { _gmImLog('⚠️ 请先在 ① 勾选一个游戏窗口'); return; }
         const cfg = _gmImReadInputs();
-        try { await gmImRunSequence(hwnd, cfg.deck, cfg.cart); }
-        catch (e) { _gmImLog('❌ 连打失败：' + (e && e.message || e)); }
+        await _gmImRunExclusive('连打一次', async () => { await gmImRunSequence(hwnd, cfg.deck, cfg.cart); });
     };
 
     // OCR 顶部数字：整窗截图 → canvas 按比例裁剪数字区 → umi_ocr → 解析整数（比 Rust 整拍流程轻，仅连打监控用）
@@ -6473,14 +6484,17 @@ if (true) {
         _gmImLastFire = 0;
         _gmImAutoTimer = setInterval(async () => {
             try {
+                if (_gmImBusy) return;                       // 🔴 上一轮还在跑 → 直接跳过（防两轮交错点击）
                 const c = Object.assign({ deck: 1, cart: 1, cooldown: 15 }, _gmImLoadCfg()); // 面板关了也能继续跑
-                if (Date.now() - _gmImLastFire < (c.cooldown || 15) * 1000) return;
+                // 🔴 冷却下限 20s：一轮流程本身要 10~20s；冷却太短会在"面板还开着"时又起一轮 → 把刚切好的车改掉
+                const cd = Math.max(20, c.cooldown || 15);
+                if (Date.now() - _gmImLastFire < cd * 1000) return;
                 const hwnd2 = _gmImHwnd() || hwnd;
                 const num = await _gmImOcrNumber(hwnd2);
                 if (num === null || ![1, 2, 3].includes(num)) return;
-                _gmImLastFire = Date.now();
                 _gmImLog('🎯 识别到 ' + num + ' → 触发连打');
-                await gmImRunSequence(hwnd2, c.deck || 1, c.cart || 1);
+                const ran = await _gmImRunExclusive('连打', async () => { await gmImRunSequence(hwnd2, c.deck || 1, c.cart || 1); });
+                if (ran) _gmImLastFire = Date.now();          // 冷却从"本轮结束"开始算
             } catch (e) { _gmImLog('❌ ' + (e && e.message || e)); }
         }, Math.max(1, cfg.interval || 2) * 1000);
         if (btn) { btn.textContent = '⏹ 停止连打监控'; btn.style.background = 'linear-gradient(135deg,#f44336,#c62828)'; }
