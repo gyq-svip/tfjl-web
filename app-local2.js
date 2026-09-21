@@ -5592,11 +5592,13 @@ if (true) {
                     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
                         <button onclick="gmImTestDeck()" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🃏 只切卡（测试）</button>
                         <button onclick="gmImTestCart()" style="background:linear-gradient(135deg,#ff9800,#e65100);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🚂 只切车（测试）</button>
+                        <button onclick="gmImCalibCart()" title="一次性标定：把战车列表拉到最左，然后在截图上点第 1 格和第 6 格的中心" style="background:linear-gradient(135deg,#607d8b,#37474f);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🎯 标定战车位</button>
                         <button onclick="gmImRunOnce()" style="background:linear-gradient(135deg,#9c27b0,#6a1b9a);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🔥 完整连打一次</button>
                         <button id="gmImAutoBtn" onclick="gmImToggleAuto()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;font-weight:bold;">▶ 开始连打监控</button>
                     </div>
                     <div style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-bottom:8px;line-height:1.5;">
-                        切车流程（游戏坐标）：返回(0.86,0.11) → 等1秒 → 战车(0.61,0.75) → 拉回最左×4（按0.24,0.76滑到0.69,0.76）→ 按编号向左翻页（按0.69滑到0.24，每次+5）→ 点战车位(y0.77) → 确定(0.63,0.73)。每步之间随机延迟 500~1000ms。
+                        切车流程：返回(0.86,0.11) → 等1秒 → 战车(0.61,0.75) → 拉回最左×6（第1位↔第6位来回滑，已在最左时多余滑动无效）→ 按编号向左翻页（每次+5；末页滑到底会夹在 17 号）→ 点战车位 → 确定(0.63,0.73)。每步之间随机延迟 500~1000ms。<br>
+                        <b style="color:#ffd700;">⚠️ 若选车总偏 1~2 格：把战车列表拉到最左（1 号在最前），点「🎯 标定战车位」，在截图上依次点第 1 格、第 6 格的中心 —— 一次性标定，之后所有车位按实测坐标推算（越靠右越准）。</b>
                     </div>
                     <div id="gmImLog" style="background:rgba(0,0,0,0.3);border:1px solid rgba(78,205,196,0.2);border-radius:6px;padding:8px 10px;min-height:60px;max-height:150px;overflow:auto;color:rgba(255,255,255,0.6);font-size:0.7rem;line-height:1.6;">等待操作。先在 ① 勾选游戏窗口，再用「只切卡 / 只切车」单步测试。</div>
                 </div>
@@ -5844,6 +5846,25 @@ if (true) {
     const GM_IM_CART_TOTAL = 23;                 // 战车总数
     const GM_IM_CART_LAST_START = GM_IM_CART_TOTAL - 6; // 17：滑到底那一屏的首个编号
     const GM_IM_CART_Y = 0.77;
+    // 🔴 2026-09-21 战车位【实测标定】（用户反馈"错一个或错2个位置"）：
+    //    写死的比例坐标是"某次窗口尺寸下"量的；游戏 UI 的格子间距若不完全随窗口等比缩放，
+    //    越靠右的格子累积偏差越大 → 点第 6 位可能落到第 5 位、末页第 7 位落到第 6 位（=错1~2个位置）。
+    //    标定一次后改用「第1位中心 + 相邻间距×(p-1)」线性推算，所有格子都用实测值；未标定则回退上面的常量表。
+    function _gmImCartCal() {
+        try {
+            const c = _gmImLoadCfg();
+            if (c && c.cartX1 > 0 && c.cartPitch > 0.01 && c.cartY > 0) return c;
+        } catch (e) {}
+        return null;
+    }
+    function _gmImCartSlotX(p, isLast) {
+        const cal = _gmImCartCal();
+        if (cal) return cal.cartX1 + (p - 1) * cal.cartPitch;
+        const arr = isLast ? GM_IM_CART_X_LAST : GM_IM_CART_X;
+        return arr[p - 1] !== undefined ? arr[p - 1] : arr[arr.length - 1];
+    }
+    function _gmImCartY() { const cal = _gmImCartCal(); return cal ? cal.cartY : GM_IM_CART_Y; }
+    function _gmImCartSwipeY() { const cal = _gmImCartCal(); return cal ? cal.cartY : 0.76; }
     const GM_IM_BACK = { x: 0.86, y: 0.11 };        // 返回
     const GM_IM_CART_ENTRY = { x: 0.61, y: 0.75 };  // 战车选择入口
     const GM_IM_CART_OK = { x: 0.63, y: 0.73 };     // 确定（兼关闭战车弹窗）
@@ -6010,10 +6031,13 @@ if (true) {
         // 2) 打开战车选择
         await window.gmClick(hwnd, GM_IM_CART_ENTRY.x, GM_IM_CART_ENTRY.y, 1, 200, mode);
         await _gmImDelay();
-        // 3) 拉回最左（按住第1位滑到第6位 ×4，确保从第 1 页起算）
-        for (let i = 0; i < 4; i++) {
-            await window.gmSwipe(hwnd, GM_IM_CART_X[0], 0.76, GM_IM_CART_X[5], 0.76, 400, mode);
-            await _gmImSleep(350);
+        // 3) 拉回最左（按住第1位滑到第6位，确保从第 1 页起算）
+        //    🔴 2026-09-21 由 ×4 加到 ×6：多滑两次是"免费"的（已经在最左时滑动无效），
+        //    但任一滑动少走一格（拖拽距离被游戏吞掉一点）也能被后面的多余滑动抹平 —— 抗累积漂移。
+        const swFrom = _gmImCartSlotX(1, false), swTo = _gmImCartSlotX(6, false), swY = _gmImCartSwipeY();
+        for (let i = 0; i < 6; i++) {
+            await window.gmSwipe(hwnd, swFrom, swY, swTo, swY, 600, mode);
+            await _gmImSleep(400);
         }
         await _gmImSleep(400);
         // 4) 计算翻页次数：每滑一次起始 +5，但到底会被夹到 LAST_START（末页 17~23）
@@ -6029,21 +6053,68 @@ if (true) {
         }
         const start = startOf(k);
         const pos = cartNo - start + 1;   // 1..6（末页 1..7）
-        for (let i = 0; i < k; i++) {
-            await window.gmSwipe(hwnd, GM_IM_CART_X[5], 0.76, GM_IM_CART_X[0], 0.76, 400, mode);
+        // 🔴 2026-09-21 末页（22/23）再加两次滑动：滑到底会被夹在 17 起（确定性），
+        //    不依赖"每次刚好 +5"，22/23 就不会因回夹点错位置。
+        const swipeTimes = (start >= GM_IM_CART_LAST_START) ? Math.max(k, 6) : k;
+        for (let i = 0; i < swipeTimes; i++) {
+            await window.gmSwipe(hwnd, swTo, swY, swFrom, swY, 600, mode);
             await _gmImSleep(400);
         }
-        // 5) 点战车（末页用末页专属坐标表）
+        // 5) 点战车（坐标：已标定→按实测第1位+间距推算；未标定→回退写死的表）
         const isLastPage = start >= GM_IM_CART_LAST_START;
-        const list = isLastPage ? GM_IM_CART_X_LAST : GM_IM_CART_X;
-        const px = list[pos - 1] !== undefined ? list[pos - 1] : list[list.length - 1];
-        await window.gmClick(hwnd, px, GM_IM_CART_Y, 1, 200, mode);
+        const px = _gmImCartSlotX(pos, isLastPage);
+        const py = _gmImCartY();
+        await window.gmClick(hwnd, px, py, 1, 200, mode);
         await _gmImDelay();
         // 6) 确定（兼关闭战车弹窗）
         await window.gmClick(hwnd, GM_IM_CART_OK.x, GM_IM_CART_OK.y, 1, 200, mode);
         await _gmImDelay();
-        return '🚂 战车' + cartNo + '（滑' + k + '次 → 起始' + start + ' 第' + pos + '位 @x' + px + (isLastPage ? '，末页' : '') + '）已选';
+        return '🚂 战车' + cartNo + '（滑' + swipeTimes + '次 → 起始' + start + ' 第' + pos + '位 @x' + px.toFixed(3) + ' y' + py.toFixed(3) + (isLastPage ? '，末页' : '') + (_gmImCartCal() ? '，已标定' : '，未标定') + '）已选';
     }
+
+    // 🎯 标定战车位（一次性）：截游戏窗口图 → 点第 1 位中心 → 再点第 6 位中心 → 存 x1/间距/y。
+    //    用法：先把游戏里的战车列表【拉回最左】（1 号车在最前、7 号半露），再点本按钮。
+    async function _gmImCapturePng(hwnd) {
+        const bmpB64 = await tauriInvoke('capture_window_region', { hwnd: hwnd, x: 0, y: 0, w: 10, h: 10, full: true });
+        if (!bmpB64) throw new Error('截图失败（窗口可能已关闭或被最小化）');
+        const { png } = await _gmBmpToPng(bmpB64);
+        return png;
+    }
+    window.gmImCalibCart = async function () {
+        if (!_gmImGuardApp()) return;
+        const hwnd = _gmImHwnd();
+        if (!hwnd) { _gmImLog('⚠️ 请先在上方「🎮 游戏窗口」里选好窗口'); return; }
+        try {
+            const png = await _gmImCapturePng(hwnd);
+            _gmImLog('🎯 标定①：在图上点【第 1 个战车格子】的中心（列表要拉到最左，1 号车在最前）');
+            _gmShowPointPicker(png, '① 点【第 1 个战车格子】的中心（最左边那格）', (p1) => {
+                _gmImLog('已记录第1位 x=' + p1.x.toFixed(3) + ' y=' + p1.y.toFixed(3) + '，正在截第 2 张图…');
+                _gmImCapturePng(hwnd).then((png2) => {
+                    _gmShowPointPicker(png2, '② 点【第 6 个战车格子】的中心（右数第 2 格，第 7 格只露一半别点）', (p6) => {
+                        const pitch = (p6.x - p1.x) / 5;
+                        if (!(pitch > 0.02 && pitch < 0.3)) {
+                            _gmImLog('❌ 标定失败：第 6 位必须在第 1 位明显右侧（测得 x1=' + p1.x.toFixed(3) + ' x6=' + p6.x.toFixed(3) + '），请重试');
+                            return;
+                        }
+                        const y = (p1.y + p6.y) / 2;
+                        _gmImSaveCfg({ cartX1: p1.x, cartPitch: pitch, cartY: y });
+                        _gmImLog('✅ 战车位已标定：第1位 x=' + p1.x.toFixed(3) + '，间距=' + pitch.toFixed(4) + '，y=' + y.toFixed(3) +
+                            ' ｜ 推算：6位 x=' + (p1.x + 5 * pitch).toFixed(3) + '，末页7位(23号) x=' + (p1.x + 6 * pitch).toFixed(3));
+                        try { if (typeof showToast === 'function') showToast('✅ 战车位已标定', 'success'); } catch (e) {}
+                    });
+                }).catch(e => _gmImLog('❌ 第二次截图失败：' + ((e && e.message) || e)));
+            });
+        } catch (e) { _gmImLog('❌ 截图失败：' + ((e && e.message) || e)); }
+    };
+    // 清除标定（回到写死的坐标表）
+    window.gmImCalibCartClear = function () {
+        try {
+            const c = _gmImLoadCfg();
+            delete c.cartX1; delete c.cartPitch; delete c.cartY;
+            localStorage.setItem(GM_IM_CFG_KEY, JSON.stringify(c));
+            _gmImLog('已清除战车位标定，回到默认坐标表');
+        } catch (e) {}
+    };
 
     // —— 完整连打一次：点卡组 → 切车（切车内部第一步就是「返回」，即卡组→战车之间的返回）
     async function gmImRunSequence(hwnd, deckNo, cartNo) {
