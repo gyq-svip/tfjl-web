@@ -5674,6 +5674,13 @@ if (true) {
                             <label style="color:rgba(255,255,255,0.75);font-size:0.8rem;display:block;margin-bottom:4px;">触发冷却（秒）</label>
                             <input type="number" id="gmImCooldown" min="3" max="120" value="15" style="width:60px;padding:7px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;text-align:center;">
                         </div>
+                        <div>
+                            <label style="color:rgba(255,255,255,0.75);font-size:0.8rem;display:block;margin-bottom:4px;">悬浮提示</label>
+                            <!-- 🔴 2026-09-21 与页面顶部「悬浮提示」开关同一个状态：挡视线时在这里也能一键关掉 -->
+                            <label style="display:flex;align-items:center;gap:5px;color:rgba(255,255,255,0.8);font-size:0.78rem;cursor:pointer;user-select:none;padding-top:4px;">
+                                <input type="checkbox" id="gmImTipToggle" checked onchange="toggleHoverTips(this.checked)"> 鼠标悬停说明
+                            </label>
+                        </div>
                     </div>
                     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
                         <button onclick="gmImTestDeck()" style="background:linear-gradient(135deg,#00bcd4,#00838f);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;">🃏 只切卡（测试）</button>
@@ -6040,6 +6047,8 @@ if (true) {
         set('gmImInterval', c.interval || 2);
         set('gmImCooldown', c.cooldown || 15);
         _gmImCartWatchStart();   // 👁 启动"当前战车"实时识别（面板关掉自动停）
+        // 🖱 悬浮提示开关：打开面板时同步成当前状态（与页面顶部那个勾选框共用一份设置）
+        try { if (typeof window.syncHoverTipToggle === 'function') window.syncHoverTipToggle('gmImTipToggle'); } catch (e) {}
         // 窗口下拉：先用已有列表填充并保留上次选择，再异步枚举一次补全（老马窗口常需深度扫描）
         const fillWins = () => {
             const list = (_gmImWins && _gmImWins.length) ? _gmImWins : (function () {

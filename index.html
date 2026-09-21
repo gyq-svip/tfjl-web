@@ -1040,6 +1040,9 @@
                     <label style="font-size:0.7rem;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;">
                         <input type="checkbox" id="fusionSkinSplitToggle" checked onchange="toggleFusionSkinSplit(this.checked)" title="勾选：融合卡显示完整融合皮肤（主卡整皮 + 被融合卡右下角小图）；不勾：只显示主卡（单卡）整张皮肤。卡名始终按现状显示。"> 显示融合
                     </label>
+                    <label style="font-size:0.7rem;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;" title="鼠标悬停在按钮/标签上弹的说明框：觉得挡视线就取消勾选（立即生效、会记住，游戏监控面板一起生效）">
+                        <input type="checkbox" id="hoverTipToggle" checked onchange="toggleHoverTips(this.checked)"> 悬浮提示
+                    </label>
                     <span id="teamTotalDr" data-tip="全队合计减伤 = 我方总减伤 + 队友总减伤（每边已各自含自己的马车：我的=我方卡+我方马车，队友的=队友卡+队友马车，直接相加不重复）。鼠标悬停可看拆分。" style="background:rgba(255,215,0,0.14);border:1px solid rgba(255,215,0,0.45);color:#ffd700;padding:4px 10px;border-radius:6px;font-size:0.75rem;white-space:nowrap;cursor:help;">🛡 全队合计:0</span>
                     <button onclick="showDamageReductionDialog()" data-tip="设置/导出/导入各卡组的洗炼减伤数据（用于计算实际承伤）：多张减伤表的导入导出都在弹窗里，按当前表分别操作" style="background:rgba(78,205,196,0.2);border:1px solid rgba(78,205,196,0.4);color:#4ecdc4;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🛡️ 减伤</button>
                     <button onclick="resetAll()" data-tip="重置当前卡组：清空我方/队友全部卡槽（不删项目数据，手牌回到未上阵状态）" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🔄 重置</button>

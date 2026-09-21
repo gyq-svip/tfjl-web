@@ -5376,6 +5376,35 @@
             if (modal) modal.remove();
         }
 
+        // ===== 🖱 鼠标悬浮提示【总开关】（2026-09-21）=====
+        // 需求：提示框挡视线时能一键关掉（与「显示融合」同款开关，勾选/取消立即生效、会记住）。
+        // 关掉后：全站不再弹 data-tip 提示框（原生 title 的迁移照旧保留数据，只是不显示），鼠标悬停完全干净。
+        let tfjlHoverTipsEnabled = true;
+        try { tfjlHoverTipsEnabled = (localStorage.getItem('tfjl_hover_tips') !== '0'); } catch (e) {}
+        window.tfjlHoverTipsEnabled = tfjlHoverTipsEnabled;
+        function toggleHoverTips(on) {
+            tfjlHoverTipsEnabled = !!on;
+            window.tfjlHoverTipsEnabled = tfjlHoverTipsEnabled;
+            try { localStorage.setItem('tfjl_hover_tips', tfjlHoverTipsEnabled ? '1' : '0'); } catch (e) {}
+            // 立即生效：把当前正在显示的提示框收掉
+            try { document.querySelectorAll('.tfjl-tooltip').forEach(function (t) { t.classList.remove('show'); }); } catch (e) {}
+            // 两个入口（页面顶部 + 游戏监控面板）状态互相同步
+            try {
+                ['hoverTipToggle', 'gmImTipToggle'].forEach(function (id) {
+                    const el = document.getElementById(id);
+                    if (el) el.checked = tfjlHoverTipsEnabled;
+                });
+            } catch (e) {}
+            try { if (typeof showToast === 'function') showToast(tfjlHoverTipsEnabled ? '🖱 已开启悬浮提示' : '🖱 已关闭悬浮提示（悬停不再弹说明框）', 'info'); } catch (e) {}
+        }
+        // 供其它面板调用：把勾选框同步成当前状态
+        window.syncHoverTipToggle = function (id) {
+            try { const el = document.getElementById(id || 'hoverTipToggle'); if (el) el.checked = tfjlHoverTipsEnabled; } catch (e) {}
+        };
+        window.toggleHoverTips = toggleHoverTips;
+        // 初始化勾选框状态（默认开）
+        try { const _ht = document.getElementById('hoverTipToggle'); if (_ht) _ht.checked = tfjlHoverTipsEnabled; } catch (e) {}
+
         // ===== 悬浮提示 tooltip（读取 data-tip） =====
         (function initTooltips() {
             let tipEl = null;
@@ -5390,6 +5419,7 @@
                 return tipEl;
             }
             function showTip(el) {
+                if (!tfjlHoverTipsEnabled) return;   // 🖱 总开关关掉 → 一律不弹
                 const text = el.getAttribute('data-tip');
                 if (!text) return;
                 const tip = getTip();
@@ -5421,6 +5451,7 @@
                 return el;
             }
             function onMove(e) {
+                if (!tfjlHoverTipsEnabled) { if (_curEl) hideTip(); return; }   // 🖱 关掉后立刻收起、不再弹
                 const el = findTipEl(e);
                 if (el) {
                     if (el !== _curEl) { _curEl = el; showTip(el); }
