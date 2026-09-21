@@ -5682,9 +5682,9 @@ if (true) {
                         <button id="gmImAutoBtn" onclick="gmImToggleAuto()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;font-weight:bold;">▶ 开始连打监控</button>
                     </div>
                     <div style="color:rgba(255,255,255,0.35);font-size:0.68rem;margin-bottom:8px;line-height:1.5;">
-                        切车（搜索法，<b style="color:#ffd700;">不计算翻页</b>）：返回(0.86,0.11) → 等1秒 → 战车(0.61,0.75) →
-                        <b>点第 3 格读车名</b>（识别区域 x0.63 y0.25 w0.15 h0.05）→ 算出本屏覆盖哪几号 →
-                        <b>目标在左就往右滑、在右就往左滑</b>（滑动 0.24↔0.69 @y0.76）→ 每轮重新读，最多 16 轮 → 点中目标格 → 确定(0.63,0.73)。<br>
+                        切车（<b style="color:#ffd700;">读书自修正</b>，不计算翻页）：返回(0.86,0.11) → 战车(0.61,0.75) →
+                        <b>先点一下读一下自测</b>（算出你这台机器上真实的格子间距，坐标偏了也自动纠正）→ 按推算点目标格 →
+                        <b>读到不是目标就按实测偏差挪一格再点</b>；不在屏上就左右拖一屏（y0.76）再读 → 实在找不到就整行扫一遍 → 确定(0.63,0.73)。<br>
                         <b style="color:#9CCC65;">「战车编号」下方每 2 秒实时显示当前战车（编号+名字），可与设置对比。</b>
                     </div>
                     <div id="gmImLog" style="background:rgba(0,0,0,0.3);border:1px solid rgba(78,205,196,0.2);border-radius:6px;padding:8px 10px;min-height:60px;max-height:150px;overflow:auto;color:rgba(255,255,255,0.6);font-size:0.7rem;line-height:1.6;">等待操作。先在 ① 勾选游戏窗口，再用「只切卡 / 只切车」单步测试。</div>
@@ -5930,17 +5930,10 @@ if (true) {
     // 🔴 2026-09-21 v5（用户最终要求）：**不再计算翻页**，改成"读当前屏 → 判断目标在左/右 → 滑动 → 再读"的搜索法。
     //    只要 OCR 能读到战车名（用户给的区域，识别很准），就不依赖任何"第几页第几位"的推算。
     // 战车屏上 7 个位置 x：1~6 位=用户实测坐标（准）；第 7 位只在"滑到底被夹在 17"那一屏用。
-    const GM_IM_CART_X = [0.24, 0.33, 0.42, 0.51, 0.60, 0.69];   // 兼容旧引用（滑动两端/前 6 位）
-    const GM_IM_CART_SLOT_X = [0.24, 0.33, 0.42, 0.51, 0.60, 0.69, 0.76];
-    const GM_IM_CART_Y = 0.77;          // 点战车格子
-    const GM_IM_CART_SWIPE_Y = 0.76;    // 滑动
-    const GM_IM_CART_PROBE_SLOT = 3;    // 探测用第几格（用户指定：点第 3 格读车名，推出整屏范围）
-    const GM_IM_CART_TOTAL = 23;        // 战车总数
-    const GM_IM_CART_LAST_START = GM_IM_CART_TOTAL - 6; // 17：滑到底时屏首编号（17~23）
-    function _gmImCartSlotX(p) {
-        const a = GM_IM_CART_SLOT_X;
-        return a[p - 1] !== undefined ? a[p - 1] : a[a.length - 1];
-    }
+    const GM_IM_CART_Y = 0.77;          // 点战车格子的行高（点不动时程序会自动试 0.80/0.74/0.83）
+    const GM_IM_CART_SWIPE_Y = 0.76;    // 滑动的行高
+    const GM_IM_CART_TOTAL = 23;        // 战车总数（编号上限）
+    // 注：格子 x 不再写死坐标表 —— 程序每次切车前先"点一下读一下"自测，算出真实的格子间距并闭环修正。
     const GM_IM_BACK = { x: 0.86, y: 0.11 };        // 返回
     const GM_IM_CART_ENTRY = { x: 0.61, y: 0.75 };  // 战车选择入口
     const GM_IM_CART_OK = { x: 0.63, y: 0.73 };     // 确定（兼关闭战车弹窗）
@@ -6174,18 +6167,31 @@ if (true) {
         }
         return null;
     }
-    // 点第 slot 格 → 读名字（搜索法的基本动作）
-    async function _gmImPickSlot(hwnd, slot, mode) {
-        await window.gmClick(hwnd, _gmImCartSlotX(slot), GM_IM_CART_Y, 1, 200, mode);
-        await _gmImSleep(430);
+    // 点任意 x（比例坐标）→ 读车名（闭环搜索的基本动作：每次点都带回"这一点对应几号车"）
+    async function _gmImPickX(hwnd, x, mode, y) {
+        await window.gmClick(hwnd, x, y || GM_IM_CART_Y, 1, 200, mode);
+        await _gmImSleep(400);
         return await _gmImReadCartName(hwnd);
     }
-    // 滑一屏：'left'=显示更靠后的车（屏首 +5）、'right'=回到更前的车
+    // 滑一屏：'left'=手指往左拖（露出更靠后的车）/ 'right'=手指往右拖（回到更前的车）。
+    //   手势横跨整行，与具体格子坐标无关，所以就算格子坐标表不准也能滑得动。
     async function _gmImSwipePage(hwnd, dir, mode) {
-        const from = GM_IM_CART_X[dir === 'left' ? 5 : 0];
-        const to = GM_IM_CART_X[dir === 'left' ? 0 : 5];
-        await window.gmSwipe(hwnd, from, GM_IM_CART_SWIPE_Y, to, GM_IM_CART_SWIPE_Y, 500, mode);
+        const a = dir === 'left' ? 0.72 : 0.22, b = dir === 'left' ? 0.22 : 0.72;
+        await window.gmSwipe(hwnd, a, GM_IM_CART_SWIPE_Y, b, GM_IM_CART_SWIPE_Y, 500, mode);
         await _gmImSleep(450);
+    }
+    // 兜底"一个一个找"：把整行从左到右每个位置点一次、读一次，命中目标就确定收工
+    async function _gmImScanRow(hwnd, cartNo, mode, y) {
+        for (let x = 0.20; x <= 0.801; x += 0.04) {
+            const h = await _gmImPickX(hwnd, x, mode, y);
+            if (h && h.index === cartNo) {
+                await window.gmClick(hwnd, GM_IM_CART_OK.x, GM_IM_CART_OK.y, 1, 200, mode);
+                await _gmImDelay();
+                _gmImCartNowIdx = h.index;
+                return h;
+            }
+        }
+        return null;
     }
 
     // —— 切车：cartNo 1-23（2026-09-21 v5，用户指定：**不计算翻页**，用识别+左右滑动搜索）——
@@ -6201,55 +6207,98 @@ if (true) {
         await _gmImSleep(1000);
         await window.gmClick(hwnd, GM_IM_CART_ENTRY.x, GM_IM_CART_ENTRY.y, 1, 200, mode);
         await _gmImDelay();
-        const P = GM_IM_CART_PROBE_SLOT;
-        // 0) 前置自检：点第 3 格、第 4 格应能读到"相邻两辆"；读到同一辆 → 点击没落到格子上（y 偏 / 点击方式不对）
-        const a0 = await _gmImPickSlot(hwnd, 3, mode);
-        const b0 = await _gmImPickSlot(hwnd, 4, mode);
-        if (a0 && b0 && a0.index === b0.index) {
-            return '🚂 战车' + cartNo + '：❌ 点第 3 / 第 4 格读到同一辆（' + a0.index + '号 ' + a0.name + '）→ '
-                + '说明点击没落到格子上。请确认：①「点击方式」=真实鼠标 ②游戏停在「战车」面板（列表已拉出）';
-        }
-        _gmImLog('  ✓ 点击有效：第3格 ' + (a0 ? a0.index + '号 ' + a0.name : '读不到') + '、第4格 ' + (b0 ? b0.index + '号' : '读不到'));
-        let swipes = 0, lastL = 0, sameL = 0, lastTxt = '—';
-        _gmImLog('🔍 搜索切车：目标 ' + cartNo + ' 号（点第 ' + P + ' 格读车名 → 判断在左还是在右 → 滑动 → 再读）');
-        for (let step = 1; step <= 16; step++) {
-            const probe = await _gmImPickSlot(hwnd, P, mode);
-            if (!probe) {
-                return '🚂 战车' + cartNo + '：❌ 读不到战车名，搜索法无法工作'
-                    + '（请确认：游戏停在战车面板、名字那行没被遮挡；当前识别区 x0.63 y0.25 w0.15 h0.05）';
+        // 0) 自检：**必须点得动**才算数（点空/落在格子缝里时"选中不会变"，这种读数不能当测量值用）
+        const XMIN = 0.18, XMAX = 0.82;
+        const probe = await _gmImReadCartName(hwnd);        // 先读一次"现在的选中"
+        const before = probe ? probe.index : null;
+        let refX = null, refN = null, pickY = GM_IM_CART_Y;
+        let pitch = 0.09, hitOnce = false;
+        // 位置 × 行高 两重自检：哪个组合能把"选中"点变，就用它（顺带把行高 y 也试出来）
+        for (const yy of [GM_IM_CART_Y, 0.80, 0.74, 0.83]) {
+            if (hitOnce) break;
+            for (const cx of [0.42, 0.36, 0.45, 0.30, 0.51, 0.60, 0.24]) {
+                const h = await _gmImPickX(hwnd, cx, mode, yy);
+                if (!h) continue;
+                if (before !== null && h.index === before) continue;   // 点空了（选中没变）→ 换个位置/行高再点
+                pickY = yy; refX = cx; refN = h.index; hitOnce = true; break;
             }
-            const L = Math.max(1, probe.index - (P - 1));            // 本屏第 1 格 = 几号车
-            const R = Math.min(L + 6, GM_IM_CART_TOTAL);
-            lastTxt = probe.index + '号(' + probe.name + ')';
-            _gmImLog('  🔎 第' + step + '轮：第' + P + '格 = ' + probe.index + '号 ' + probe.name + ' → 本屏覆盖 ' + L + '~' + R);
-            if (cartNo >= L && cartNo <= R) {
-                let slot = cartNo - L + 1;
-                // 第 7 格只露一大半、坐标也更贴边 → 还能往左滑就先滑到"滑到底"那一屏（目标会落到 1~6 位）
-                if (slot === 7 && L < GM_IM_CART_LAST_START) {
-                    _gmImLog('  ↪ 目标落在只露一半的第 7 格 → 先往左滑一屏，让它落到 1~6 位');
-                    await _gmImSwipePage(hwnd, 'left', mode); swipes++;
-                    continue;
-                }
-                const hit = await _gmImPickSlot(hwnd, slot, mode);
-                if (hit && hit.index === cartNo) {
-                    await window.gmClick(hwnd, GM_IM_CART_OK.x, GM_IM_CART_OK.y, 1, 200, mode);
-                    await _gmImDelay();
-                    _gmImCartNowIdx = hit.index;
-                    return '🚂 战车' + cartNo + '（' + hit.name + '）已选中 ✅（搜索 ' + step + ' 轮 / 滑动 ' + swipes + ' 次）';
-                }
-                _gmImLog('  ⚠️ 点第 ' + slot + ' 位读到 ' + (hit ? hit.index + '号 ' + hit.name : '读不到') + '，与目标不符 → 继续搜索');
-            } else {
-                const dir = (cartNo < L) ? 'right' : 'left';
-                _gmImLog('  ↔ 目标 ' + cartNo + ' 号不在本屏（' + L + '~' + R + '）→ 往' + (dir === 'left' ? '左' : '右') + '滑一屏');
+        }
+        if (!hitOnce) {
+            return '🚂 战车' + cartNo + '：❌ 试了 4 个行高 × 7 个位置，选中都没变化（' + (before !== null ? before + '号' : '读不到名字') + '）→ '
+                + '点击没落到格子上：请确认①「点击方式」=真实鼠标 ②游戏停在「战车」面板（列表已拉出）';
+        }
+        if (pickY !== GM_IM_CART_Y) _gmImLog('  ⚠️ 默认行高 y=' + GM_IM_CART_Y + ' 点不动 → 本次改用 y=' + pickY + '（若每次都这样，请把这条发我，我改成默认值）');
+        // 再从参考点旁边点一处：两点编号有差 → 反推真实格子间距
+        for (const cx of [refX - 0.09, refX + 0.09, refX - 0.075, refX + 0.075, refX - 0.06, refX + 0.06]) {
+            if (cx < XMIN || cx > XMAX) continue;
+            const h = await _gmImPickX(hwnd, cx, mode, pickY);
+            if (h && h.index !== refN) {
+                const p = Math.abs((cx - refX) / (h.index - refN));
+                if (p >= 0.03 && p <= 0.15) pitch = p;
+                break;
+            }
+        }
+        _gmImLog('  ✓ 自检：在 x' + refX.toFixed(2) + ' y' + pickY + ' 处读到 ' + refN + '号（点击有效），实测格子间距 ' + pitch.toFixed(4));
+        _gmImLog('🔍 搜索切车：目标 ' + cartNo + ' 号（读一格 → 算目标 x → 点；点偏了按实测偏差挪一格再点）');
+        let swipes = 0, stuckSwipe = 0, stuckClick = 0, sweeps = 0, lastTxt = refN + '号';
+        for (let step = 1; step <= 20; step++) {
+            const want = refX + (cartNo - refN) * pitch;
+            if (want < XMIN || want > XMAX) {
+                // 目标不在屏上 → 朝目标方向滑一屏，再在 x=0.42 处重新测量（滑动位移多少不重要）
+                const dir = (cartNo > refN) ? 'left' : 'right';
+                _gmImLog('  ↔ 目标不在屏上（' + refN + '号 @x' + refX.toFixed(2) + ' → 推算 x' + want.toFixed(2) + '）→ 手指往' + (dir === 'left' ? '左' : '右') + '拖一屏');
                 await _gmImSwipePage(hwnd, dir, mode); swipes++;
+                let pr = null;
+                for (const cx of [0.42, 0.36, 0.30, 0.45]) { const h = await _gmImPickX(hwnd, cx, mode, pickY); if (h) { pr = h; refX = cx; break; } }
+                if (!pr) return '🚂 战车' + cartNo + '：❌ 滑动后读不到车名';
+                stuckSwipe = (pr.index === refN) ? stuckSwipe + 1 : 0;
+                refN = pr.index; lastTxt = refN + '号 ' + (pr.name || '');
+                if (stuckSwipe >= 2) {
+                    // 到头了：有可能是半露的边缘格 → 整行扫一遍兜底（"一个一个找"）
+                    _gmImLog('  ⚠️ 滑不动了（可能已到列表尽头）→ 整行扫一遍找 ' + cartNo + ' 号');
+                    const sc = await _gmImScanRow(hwnd, cartNo, mode, pickY);
+                    if (sc) return '🚂 战车' + cartNo + '（' + sc.name + '）已选中 ✅（滑到头后整行扫描命中）';
+                    return '🚂 战车' + cartNo + '：❌ 滑到头 + 整行扫描都没找到（最后读到 ' + lastTxt + '）—— 请把这条日志发我';
+                }
+                continue;
             }
-            // 到头/滑动无效检测：连续两轮同一屏首编号且目标仍不在屏内
-            if (lastL === L) sameL++; else { sameL = 0; lastL = L; }
-            if (sameL >= 2) {
-                return '🚂 战车' + cartNo + '：❌ 滑动后列表没变化（已到最' + (cartNo < L ? '左' : '右') + '端，或滑动没生效），最后读到 ' + lastTxt;
+            const x = Math.max(XMIN, Math.min(XMAX, want));
+            let hit = await _gmImPickX(hwnd, x, mode, pickY);
+            if (!hit) return '🚂 战车' + cartNo + '：❌ 点 x' + x.toFixed(2) + ' 后读不到车名';
+            let gotX = x;
+            // ① 点偏了（选中没变）→ 在附近 ±0.03/±0.06 挪一挪再点（"一个一个找"）
+            if (hit.index === refN && sweeps < 6) {
+                for (const c of [x - 0.03, x + 0.03, x - 0.06, x + 0.06]) {
+                    if (c < XMIN || c > XMAX) continue;
+                    sweeps++;
+                    const h2 = await _gmImPickX(hwnd, c, mode, pickY);
+                    if (h2 && h2.index !== hit.index) { hit = h2; gotX = c; _gmImLog('  ↪ 点 x' + x.toFixed(2) + ' 没反应 → 挪到 x' + c.toFixed(2) + ' 点到了 ' + h2.index + '号'); break; }
+                }
+            }
+            if (hit.index === cartNo) {
+                await window.gmClick(hwnd, GM_IM_CART_OK.x, GM_IM_CART_OK.y, 1, 200, mode);
+                await _gmImDelay();
+                _gmImCartNowIdx = hit.index;
+                return '🚂 战车' + cartNo + '（' + hit.name + '）已选中 ✅（搜索 ' + step + ' 轮 / 滑动 ' + swipes + ' 次）';
+            }
+            // ② ★自动修正：这一击给出了新的"x ↔ 编号"对应 → 更新参考点与实测间距，下一轮直接挪过去
+            const dn = hit.index - refN, dx = gotX - refX;
+            if (dn !== 0) { const p = Math.abs(dx / dn); if (p >= 0.03 && p <= 0.15) pitch = p; }
+            stuckClick = (hit.index === refN) ? stuckClick + 1 : 0;
+            refX = gotX; refN = hit.index; lastTxt = refN + '号 ' + (hit.name || '');
+            _gmImLog('  ✎ 点 x' + gotX.toFixed(3) + ' 读到 ' + hit.index + '号（目标 ' + cartNo + '，差 ' + (cartNo - hit.index)
+                + ' 格）→ 按实测间距 ' + pitch.toFixed(4) + ' 修正后再点');
+            if (stuckClick >= 4) {
+                _gmImLog('  ⚠️ 在 ' + hit.index + ' 号附近连点都点不中 → 整行扫一遍找 ' + cartNo + ' 号');
+                const sc = await _gmImScanRow(hwnd, cartNo, mode, pickY);
+                if (sc) return '🚂 战车' + cartNo + '（' + sc.name + '）已选中 ✅（整行扫描命中）';
+                return '🚂 战车' + cartNo + '：❌ 连点都点不中（最后读到 ' + lastTxt + '）—— 请把这条日志发我';
             }
         }
-        return '🚂 战车' + cartNo + '：❌ 搜索 16 轮仍未命中，最后读到 ' + lastTxt;
+        _gmImLog('  ⚠️ 20 轮仍未命中 → 整行扫一遍找 ' + cartNo + ' 号');
+        const sc2 = await _gmImScanRow(hwnd, cartNo, mode, pickY);
+        if (sc2) return '🚂 战车' + cartNo + '（' + sc2.name + '）已选中 ✅（整行扫描命中）';
+        return '🚂 战车' + cartNo + '：❌ 20 轮 + 整行扫描都没找到（最后读到 ' + lastTxt + '）';
     }
 
     let _gmImCartNowIdx = null;      // 最近一次读到的当前战车编号（供其它逻辑参考）
