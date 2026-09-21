@@ -5386,7 +5386,8 @@
             tfjlHoverTipsEnabled = !!on;
             window.tfjlHoverTipsEnabled = tfjlHoverTipsEnabled;
             try { localStorage.setItem('tfjl_hover_tips', tfjlHoverTipsEnabled ? '1' : '0'); } catch (e) {}
-            // 立即生效：把当前正在显示的提示框收掉
+            // 立即生效：把当前正在显示的提示框、以及"正在计时等待弹"的一起清掉
+            try { if (typeof window.__tfjlResetHoverTip === 'function') window.__tfjlResetHoverTip(); } catch (e) {}
             try { document.querySelectorAll('.tfjl-tooltip').forEach(function (t) { t.classList.remove('show'); }); } catch (e) {}
             // 两个入口（页面顶部 + 游戏监控面板）状态互相同步
             try {
@@ -5407,8 +5408,15 @@
 
         // ===== 悬浮提示 tooltip（读取 data-tip） =====
         (function initTooltips() {
+            // 🖱 2026-09-21 用户要求：不再"碰到就弹"，改成**悬停满 1 秒才弹**（鼠标路过/快速划过去不弹）。
+            //   想临时改时长：控制台执行 localStorage.tfjl_tip_delay_ms = 500（毫秒，0~5000）后刷新即可。
+            let TIP_DELAY = 1000;
+            try { const _d = parseInt(localStorage.getItem('tfjl_tip_delay_ms'), 10); if (_d >= 0 && _d <= 5000) TIP_DELAY = _d; } catch (e) {}
             let tipEl = null;
-            let _curEl = null;
+            let _curEl = null;        // 当前已弹出提示的元素
+            let _pendEl = null;       // 正在计时、还没到 1 秒的元素
+            let _tipTimer = null;
+            function cancelTipTimer() { if (_tipTimer) { try { clearTimeout(_tipTimer); } catch (e) {} _tipTimer = null; } }
             function getTip() {
                 if (!tipEl) {
                     tipEl = document.createElement('div');
@@ -5451,23 +5459,40 @@
                 return el;
             }
             function onMove(e) {
-                if (!tfjlHoverTipsEnabled) { if (_curEl) hideTip(); return; }   // 🖱 关掉后立刻收起、不再弹
+                if (!tfjlHoverTipsEnabled) { cancelTipTimer(); _pendEl = null; if (_curEl) hideTip(); return; }   // 🖱 关掉后立刻收起、不再弹
                 const el = findTipEl(e);
-                if (el) {
-                    if (el !== _curEl) { _curEl = el; showTip(el); }
-                } else if (_curEl) {
-                    hideTip();
+                if (!el) {
+                    // 离开任何提示元素 → 取消计时 + 收起已显示的
+                    cancelTipTimer(); _pendEl = null;
+                    if (_curEl) hideTip();
+                    return;
                 }
+                if (el === _curEl) return;         // 已经显示着，保持不动
+                if (el === _pendEl) return;        // 已经在等这 1 秒，别重置计时
+                // 换到新元素：先把旧的收掉，再重新计时 1 秒（鼠标路过不弹）
+                cancelTipTimer();
+                if (_curEl) hideTip();
+                _pendEl = el;
+                _tipTimer = setTimeout(function () {
+                    _tipTimer = null;
+                    if (_pendEl !== el) return;                       // 期间已经划走
+                    if (!tfjlHoverTipsEnabled) return;                // 期间被关掉了
+                    _curEl = el; showTip(el);
+                }, TIP_DELAY);
             }
+            // 立即收起（滚动/移出/失焦）：连计时一起取消
+            function hideNow() { cancelTipTimer(); _pendEl = null; hideTip(); }
+            // 供总开关调用：开关切换时把"计时中的等待"也一起清掉（否则关一下再开，同一元素要重新悬停才弹）
+            window.__tfjlResetHoverTip = hideNow;
             // 多事件源兜底：WebView2 对不同指针事件的派发不稳定，pointermove/mousemove
-            // 持续检测 + mouseover/pointerover 补一组，任一触发即可弹。
+            // 持续检测 + mouseover/pointerover 补一组，任一触发即可开始计时。
             document.addEventListener('pointermove', onMove, { passive: true });
             document.addEventListener('mousemove', onMove, { passive: true });
             document.addEventListener('mouseover', onMove, { passive: true });
             document.addEventListener('pointerover', onMove, { passive: true });
-            window.addEventListener('scroll', hideTip, true);
-            document.addEventListener('pointerleave', hideTip);
-            window.addEventListener('blur', hideTip);
+            window.addEventListener('scroll', hideNow, true);
+            document.addEventListener('pointerleave', hideNow);
+            window.addEventListener('blur', hideNow);
 
             // 🔴 2026-08-30 统一悬停提示：把所有原生 title 迁移为自定义 data-tip 提示框，
             //    避免"系统原生灰底小提示 + 自定义提示框"两套并存/样式不一致。
