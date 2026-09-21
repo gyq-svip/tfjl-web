@@ -739,8 +739,22 @@ fn run_ps(repo: &str, script: &str, extra: &[&str]) -> Result<String, String> {
         .current_dir(repo)
         .output()
         .map_err(|e| format!("执行 PowerShell 失败: {}", e))?;
-    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+    // 🔴 2026-09-21 修「皮肤发布日志一片乱码」：powershell 的 Write-Host 按**控制台编码**输出，
+    //    简体中文 Windows 下是 GBK/936；旧代码直接 String::from_utf8_lossy → 中文全变 �
+    //    （用户看到 [SKIN-PUB] 后面一串乱码，误以为发布失败）。改用与 read_text_file_auto 同款的
+    //    智能解码：先试 UTF-8（覆盖已设 OutputEncoding=UTF8 的情况）→ GB18030（GBK/GB2312）→ 最后 lossy 兜底。
+    let smart_decode = |bytes: &[u8]| -> String {
+        if let Ok(s) = std::str::from_utf8(bytes) {
+            return s.to_string();
+        }
+        let (decoded, _, had_errors) = encoding_rs::GB18030.decode(bytes);
+        if !had_errors {
+            return decoded.into_owned();
+        }
+        String::from_utf8_lossy(bytes).to_string()
+    };
+    let stdout = smart_decode(&out.stdout);
+    let stderr = smart_decode(&out.stderr);
     if !out.status.success() {
         return Err(format!("{} 执行失败:\n{}\n{}", script, stdout, stderr));
     }
