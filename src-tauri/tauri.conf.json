@@ -14,15 +14,16 @@
       {
         "title": "塔防精灵助手 - 阵容卡搭配",
         "url": "https://gyq-svip.github.io/tfjl-web/",
-        "width": 1205,
-        "height": 884,
+        "width": 1200,
+        "height": 960,
         "minWidth": 400,
         "minHeight": 500,
         "resizable": true,
         "fullscreen": false,
         "dragDropEnabled": false,
         "center": true,
-        "devtools": true
+        "devtools": true,
+        "preventOverflow": true
       }
     ],
     "security": {
