@@ -6032,7 +6032,9 @@ if (true) {
     // 方案：不再"算出来就点" —— ① 点第 1 格读左端实际编号（probe，实测锚点）；② 每次滑动后重新 probe，
     //      用实测锚点算位次；③ 点完目标格再读一次右侧详情名 → 与目标不符就点相邻格纠正。
     // 名字取自 window.CHARIOT_LIST（app-core.js 已暴露，23 辆，顺序=游戏内编号顺序）。
-    const GM_IM_CART_NAME_REGION = { x: 0.63, y: 0.14, w: 0.35, h: 0.09 }; // 详情区「XX号 Lv」那行（可用「📐 框选战车名」标定）
+    // 🔴 2026-09-21 用户实测值（战车面板右侧「XX号 LvN」那行）：x0.63 y0.25 w0.15 h0.05 —— 直接当默认，
+    //    换分辨率/窗口尺寸仍可用「📐 框选战车名」重新标定覆盖（存 cfg.cartNameRegion）。
+    const GM_IM_CART_NAME_REGION = { x: 0.63, y: 0.25, w: 0.15, h: 0.05 };
     function _gmImNameRegion() {
         try { const c = _gmImLoadCfg(); if (c && c.cartNameRegion && c.cartNameRegion.w > 0) return c.cartNameRegion; } catch (e) {}
         return GM_IM_CART_NAME_REGION;
@@ -6074,11 +6076,33 @@ if (true) {
         return j.data.map(d => (d.text || '').trim()).join('');
     }
     // 读右侧详情里的战车名 → {index,name} / null
+    // 🔴 2026-09-21 加"扩框重试"：标定框略偏 / 字体渲染差异时，先用标定框，认不出就用「向左上扩一圈」的框再试一次
+    //    （只在失败时才多花一次 OCR，成功路径不变）。
     async function _gmImReadCartName(hwnd) {
-        try {
-            const t = await _gmImOcrText(hwnd, _gmImNameRegion());
-            return _gmImMatchCartName(t);
-        } catch (e) { return null; }
+        const r = _gmImNameRegion();
+        const x2 = Math.max(0, r.x - 0.08), y2 = Math.max(0, r.y - 0.06);
+        const tries = [
+            r,
+            { x: x2, y: y2, w: Math.min(1 - x2, r.w + 0.18), h: Math.min(1 - y2, r.h + 0.12) }
+        ];
+        for (let i = 0; i < tries.length; i++) {
+            try {
+                const t = await _gmImOcrText(hwnd, tries[i]);
+                const m = _gmImMatchCartName(t);
+                if (m) return m;
+            } catch (e) {}
+        }
+        return null;
+    }
+    // 自检用：把当前区域 OCR 的【原文】也带出来（认不出时方便排查是框偏了还是字读错了）
+    async function _gmImOcrCartNameRaw(hwnd) {
+        const r = _gmImNameRegion();
+        const t = await _gmImOcrText(hwnd, r).catch(function () { return ''; });
+        const m = _gmImMatchCartName(t);
+        if (m) return { hit: m, raw: t };
+        const x2 = Math.max(0, r.x - 0.08), y2 = Math.max(0, r.y - 0.06);
+        const t2 = await _gmImOcrText(hwnd, { x: x2, y: y2, w: Math.min(1 - x2, r.w + 0.18), h: Math.min(1 - y2, r.h + 0.12) }).catch(function () { return ''; });
+        return { hit: _gmImMatchCartName(t2), raw: t, rawWide: t2 };
     }
     // probe：点第 1 格（最左，坐标最稳）后读名字 → 得到"当前页左端是几号车"
     async function _gmImProbeCart(hwnd, mode) {
@@ -6266,8 +6290,13 @@ if (true) {
         if (!_gmImGuardApp()) return;
         const hwnd = _gmImHwnd();
         if (!hwnd) { _gmImLog('⚠️ 请先在上方「🎮 游戏窗口」里选好窗口'); return; }
-        const m = await _gmImReadCartName(hwnd);
-        _gmImLog(m ? ('🔎 读到：' + m.index + ' 号「' + m.name + '」') : '⚠️ 没读到战车名：请用「📐 框选战车名」把右侧名字那行框上（框完再点本按钮自检）');
+        const r = await _gmImOcrCartNameRaw(hwnd);
+        if (r.hit) {
+            _gmImLog('🔎 读到：' + r.hit.index + ' 号「' + r.hit.name + '」（原文：' + String(r.raw || '').slice(0, 40) + '）');
+        } else {
+            _gmImLog('⚠️ 没读到战车名。框内原文=「' + String(r.raw || '').slice(0, 40) + '」扩框原文=「' + String(r.rawWide || '').slice(0, 40) + '」'
+                + ' → 若原文是空的或乱码，用「📐 框选战车名」把右侧「XX号 LvN」那行重新框一下（当前默认 x0.63 y0.25 w0.15 h0.05）');
+        }
     };
     // 名校验开关（默认开）：关掉后只按算术定位、不做纠正
     window.gmImSetCartVerify = function (on) {
