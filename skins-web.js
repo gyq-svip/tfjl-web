@@ -161,6 +161,18 @@
     return _fetchWithRetry(SKIN_BASE + relPath, 8000, 3);
   }
 
+  // 🔴 2026-09-21 皮肤文件名统一出口（修「融合皮 404 刷屏」）：
+  //    磁盘/线上的融合皮命名是「融合石头_石头.skin」——**前缀 = 目录名**；
+  //    但注册表条目若缺 file 字段，代码里到处写 `name + '.skin'` 会拼出不存在的 URL（用户实测 404 刷屏，
+  //    如 skins/融合石头/石狮子·石头.skin、skins/融合射线/射线.skin）。
+  //    这里对「融合XX」目录补上「目录名_」前缀，普通皮肤行为不变。
+  function skinFileOf(hero, name, file) {
+    if (file) return file;
+    name = name == null ? '' : String(name);
+    if (hero && String(hero).indexOf('融合') === 0) return hero + '_' + name + '.skin';
+    return name + '.skin';
+  }
+
   // 后台批量预热（网页版：仅下载到 IndexedDB 缓存，绝不参与首屏渲染阻塞）
   // 设计原则（s1.0.101 修正「越改越慢」回归）：
   //  - 全量 410 张预热改为「低并发(3)、可被打断、fire-and-forget」，注册表同步后异步启动，不 await；
@@ -192,7 +204,7 @@
       skinList.forEach(function (s) {
         // 🔴 跳过 IndexedDB 旧缓存恢复的 stale 皮肤：线上可能已删除/改名，发起请求必 404 刷屏
         if (s.stale) return;
-        queue.push({ hero: heroName, file: s.file || (s.name + '.skin') });
+        queue.push({ hero: heroName, file: skinFileOf(heroName, s.name, s.file) });
       });
     });
     var idx = 0;
@@ -277,7 +289,7 @@
         var remoteSkin = skinList[j];
         var skinName = remoteSkin.name;
         if (!skinName) continue;
-        var url = REMOTE_SKIN_BASE + '/' + encodeURIComponent(hn) + '/' + encodeURIComponent(remoteSkin.file || (skinName + '.skin'));
+        var url = REMOTE_SKIN_BASE + '/' + encodeURIComponent(hn) + '/' + encodeURIComponent(skinFileOf(hn, skinName, remoteSkin.file));
         if (localNames[skinName]) {
           var local = null;
           for (var m = 0; m < localSkins.length; m++) { if (localSkins[m].name === skinName) { local = localSkins[m]; break; } }

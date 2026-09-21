@@ -15785,6 +15785,33 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         const CONFIG_CACHE_TIME_KEY = 'TFJL_Config_Cache_Time';
         const NEWS_CACHE_KEY = 'TFJL_News_Cache';
         const NEWS_CACHE_TIME_KEY = 'TFJL_News_Cache_Time';
+
+        // 🔴 2026-09-21 raw.githubusercontent.com 在国内常被墙/超时（用户实测控制台刷
+        //    "GET https://raw.githubusercontent.com/.../index.json net::ERR_TIMED_OUT" + "从 GitHub 获取配置失败"）。
+        //    浏览器默认超时可达 1~2 分钟，而"拍卖快讯开关"每 30 秒就拉一次 news.json →
+        //    一整个会话都在挂连接、白占带宽（弱网下明显拖慢其它请求）。这里统一：
+        //      ① 8 秒超时（AbortController）；② 连续失败按"失败次数×30s"退避跳过后续拉取（最多 10 分钟），
+        //      ③ 成功一次立即清零，网络恢复后自动继续。已有的本地缓存/默认值兜底逻辑不变。
+        let _cfgNetFailStreak = 0;
+        let _cfgNetSkipUntil = 0;
+        function _cfgNetBusy() { return Date.now() < _cfgNetSkipUntil; }
+        function _cfgNetResult(ok) {
+            if (ok) { _cfgNetFailStreak = 0; _cfgNetSkipUntil = 0; return; }
+            _cfgNetFailStreak = Math.min(20, _cfgNetFailStreak + 1);
+            _cfgNetSkipUntil = Date.now() + _cfgNetFailStreak * 30000;
+        }
+        async function fetchCfgWithTimeout(url, opts) {
+            const ctrl = new AbortController();
+            const timer = setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, 8000);
+            try {
+                const r = await fetch(url, Object.assign({}, opts || {}, { signal: ctrl.signal }));
+                _cfgNetResult(true);
+                return r;
+            } catch (e) {
+                _cfgNetResult(false);
+                throw e;
+            } finally { clearTimeout(timer); }
+        }
         
         // 默认配置
         const DEFAULT_CONFIG = {
@@ -16057,7 +16084,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         // 从GitHub获取配置
         async function fetchConfigFromGitHub() {
             try {
-                const response = await fetch(CONFIG_URL, {
+                const response = await fetchCfgWithTimeout(CONFIG_URL, {
                     method: 'GET',
                     headers: {
                         'Accept': 'application/json'
@@ -16224,7 +16251,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                         return cachedNews;
                     }
                     // 完全没有缓存时才回退到GitHub仓库
-                    const response = await fetch(NEWS_URL, {
+                    const response = await fetchCfgWithTimeout(NEWS_URL, {
                         method: 'GET',
                         headers: {
                             'Accept': 'application/json'
@@ -16435,13 +16462,17 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         // 该文件由管理员切换时经 saveAuctionNewsToRepo 同步写入；若缺失则回退到权威公告 Gist。
         async function fetchAuctionNewsSwitch() {
             let data = null;
-            try {
-                const r = await fetch(NEWS_URL, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
-                if (r.ok) {
-                    const d = await r.json().catch(() => null);
-                    if (d && typeof d.auctionNews !== 'undefined') data = d;
-                }
-            } catch (e) { /* 忽略，走 Gist 兜底 */ }
+            // 🔴 2026-09-21 该函数每 30 秒跑一次；raw.githubusercontent 被墙时每次都挂很久 →
+            //    连续失败期间直接跳过（走 Gist 兜底），不再空转刷屏。
+            if (!_cfgNetBusy()) {
+                try {
+                    const r = await fetchCfgWithTimeout(NEWS_URL, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
+                    if (r.ok) {
+                        const d = await r.json().catch(() => null);
+                        if (d && typeof d.auctionNews !== 'undefined') data = d;
+                    }
+                } catch (e) { /* 忽略，走 Gist 兜底 */ }
+            }
             if (!data) {
                 const token = getGistToken();
                 if (token) {

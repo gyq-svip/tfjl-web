@@ -989,9 +989,15 @@ if (true) {
         _showTopRightBtns();
         // 🔴 2026-08-31 APP专属·窗口置顶：启动时恢复上次的置顶状态（记在 localStorage）
         _tryRestoreAlwaysOnTop();
-        await restoreLocalFromDisk();  // 先恢复磁盘配置（重装/清缓存后复原）
+        // 🔴 2026-09-21 网页版【不再碰 D 盘】（用户实测：网页版控制台一直刷
+        //    "[数据存储] ❌ tfjl.dat 写入失败（目录可能不可写/权限不足）: D:\withfriends\塔防精灵助手数据\tfjl.dat"）。
+        //    这两步（磁盘配置恢复 + localStorage↔数据目录自动同步）是桌面版专属；
+        //    网页版的数据走 localStorage + Gist，本来就不需要、也永远写不进去 → 旧代码无条件执行只会刷红字并浪费启动时间。
+        if (isTauriApp) {
+            await restoreLocalFromDisk();  // 先恢复磁盘配置（重装/清缓存后复原）
+            initDataSync();  // 启动 localStorage → 用户数据目录自动同步
+        }
         loadConfig();
-        initDataSync();  // 启动 localStorage → 用户数据目录自动同步
         loadSkinSelections();  // 恢复皮肤选择记录
         // 先扫描本地，再同步远程；如果并行会导致 scanSkins 清空 registry 把远程条目冲掉
         // 🔴 链路兜底置位 _skinRegistryReady（syncRemoteSkins 内部 finally 也置一次，双保险）：
@@ -4285,6 +4291,16 @@ if (true) {
     window.skinRegistry = {};       // { 英雄名: [{ name, url, path }] }
     window.heroSkinSelections = {};  // { 英雄名: 皮肤名 }
 
+    // 🔴 2026-09-21 与 skins-web.js 的 skinFileOf 同一规则（修「融合皮 404」）：
+    //    融合皮在磁盘/线上的命名是「融合石头_石头.skin」（前缀=目录名），注册表条目缺 file 时
+    //    用 name+'.skin' 拼出的 URL 必 404（用户实测网页版控制台刷屏）。此处补前缀，普通皮肤不变。
+    function _skinFileOf(hero, name, file) {
+        if (file) return file;
+        name = (name == null) ? '' : String(name);
+        if (hero && String(hero).indexOf('融合') === 0) return hero + '_' + name + '.skin';
+        return name + '.skin';
+    }
+
     // 解析 "皮肤名·英雄名" 格式，返回基础英雄名
     // 如 "牛魔王·魇" → { heroName: "魇", skinName: "牛魔王" }
     // "海妖" → { heroName: "海妖", skinName: null }
@@ -4468,7 +4484,7 @@ if (true) {
                 for (const remoteSkin of skinList) {
                     const skinName = remoteSkin.name;
                     if (!skinName) continue;
-                    const remoteUrl = REMOTE_SKIN_BASE + '/' + encodeURIComponent(heroName) + '/' + encodeURIComponent(remoteSkin.file || (skinName + '.skin'));
+                    const remoteUrl = REMOTE_SKIN_BASE + '/' + encodeURIComponent(heroName) + '/' + encodeURIComponent(_skinFileOf(heroName, skinName, remoteSkin.file));
                     if (localNames.has(skinName)) {
                         // 本地已有：如果本地还没加载 url，补上远程 url 作为回退
                         const local = localSkins.find(s => s.name === skinName);
@@ -4633,7 +4649,7 @@ if (true) {
             if (!Array.isArray(skinList) || !skinList.length) continue;
             await _ensureSkinDiskDir(heroName);
             for (const s of skinList) {
-                const file = s.file || (s.name + '.skin');
+                const file = _skinFileOf(heroName, s.name, s.file);
                 const skinPath = base + '\\' + heroName + '\\' + file;
                 // 已存在则跳过（本地已有 .skin，可能来自 Gitee zip 或之前下载）
                 // 用自定义 path_exists 判断（已授权、跨 Tauri 版本稳定），避免 read_file 误判"不存在"导致每次重新下载
