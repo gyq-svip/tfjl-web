@@ -8123,6 +8123,10 @@
             if (window.cloudFusions) Object.keys(window.cloudFusions).forEach(n => names.add(n));
             return [...names];
         }
+        // 🔴 2026-09-22 阵容图库复用主页融合体系（现成数据，用户要求"直接拿过来用"）：只暴露，不改逻辑
+        window.getAllFusionNames = getAllFusionNames;
+        window.getFusionVariantsForBase = getFusionVariantsForBase;
+        window.getFusionParts = getFusionParts;
         // 基础英雄 → 以其为主卡(part[0])的融合卡列表
         function getFusionVariantsForBase(baseHero) {
             if (!baseHero) return [];
