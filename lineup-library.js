@@ -239,28 +239,25 @@
         const L = _slot('sailing', s.id);
         const sum = _sumDr('我的', s.heroes);
         let h = '<div class="ll-card" style="border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:6px 9px;margin-bottom:6px;background:rgba(0,0,0,0.22);">';
-        h += '<div style="display:flex;align-items:flex-start;gap:8px;">';
-        h += '<div style="min-width:28px;padding-top:8px;"><b style="color:#4ecdc4;font-size:0.85rem;">#' + s.n + '</b></div>';
+        // 组头：#N + 主车 + 副车 + 减伤（小字，在卡组上方）
+        h += '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:4px;">';
+        h += '<b style="color:#4ecdc4;font-size:0.85rem;">#' + s.n + '</b>';
+        h += '<span style="color:rgba(255,255,255,0.5);font-size:0.66rem;">主</span>' + _cartSelect('sailing', s.id, 'cart', L.cart);
+        h += '<span style="color:rgba(255,255,255,0.5);font-size:0.66rem;">副</span>' + _cartSelect('sailing', s.id, 'cart2', L.cart2);
+        h += '<span style="color:#ff8a80;font-size:0.66rem;">🛡️' + sum + '%</span>';
+        h += '</div>';
+        // 5×2 卡槽
         h += '<div style="display:grid;grid-template-columns:repeat(5,40px);gap:3px;">';
         s.heroes.forEach(function (n, i) { h += _slotHtml(i < 5 ? 'u' : 'd', i % 5, n, 'sailing', s.id, 40); });
         h += '</div>';
-        h += '<div style="display:flex;flex-direction:column;gap:3px;min-width:150px;padding-top:4px;">';
-        h += '<div style="display:flex;align-items:center;gap:4px;margin-bottom:3px;">';
-        h += '<span style="color:rgba(255,255,255,0.55);font-size:0.68rem;min-width:26px;">主车</span>' + _cartSelect('sailing', s.id, 'cart', L.cart);
-        h += '</div>';
-        h += '<div style="display:flex;align-items:center;gap:4px;margin-bottom:3px;">';
-        h += '<span style="color:rgba(255,255,255,0.55);font-size:0.68rem;min-width:26px;">副车</span>' + _cartSelect('sailing', s.id, 'cart2', L.cart2);
-        h += '</div>';
-        h += '<div style="color:rgba(255,255,255,0.4);font-size:0.64rem;">🛡️ ' + sum + '%</div>';
-        h += '</div></div>';
-        h += '<div style="display:flex;align-items:center;gap:4px;margin:4px 0 0 36px;flex-wrap:wrap;">';
+        // 波次备注行
+        h += '<div style="display:flex;align-items:center;gap:4px;margin-top:4px;flex-wrap:wrap;">';
         [['n219', '219波'], ['n229', '229波'], ['n230', '230波'], ['other', '其他']].forEach(function (p2) {
             const val = (L.notes && L.notes[p2[0]]) || '';
             h += '<span style="color:#f0932b;font-size:0.68rem;font-weight:700;">' + p2[1] + '</span>';
             h += '<input value="' + _esc(val) + '" oninput="_llSet(\'sailing\',\'' + s.id + '\',\'notes\',\'' + p2[0] + '\',this.value)" placeholder="上什么卡…" style="width:150px;padding:2px 5px;border-radius:5px;border:1px solid rgba(240,147,43,0.3);background:rgba(0,0,0,0.3);color:rgba(255,255,255,0.85);font-size:0.68rem;">';
         });
         h += '<button onclick="_llReset(\'sailing\',\'' + s.id + '\')" style="padding:1px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.5);font-size:0.66rem;cursor:pointer;">↺ 重置</button>';
-        h += '</div></div>';
         h += '</div>';
         return h;
     }
@@ -268,25 +265,21 @@
     function _actCard(a) {
         let h = '<div class="ll-card" style="border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:6px 9px;margin-bottom:6px;background:rgba(0,0,0,0.22);">';
         h += '<div style="display:flex;align-items:flex-start;gap:10px;">';
-        // 🔴 战车/减伤：小字集中在「第N天」右边（用户要求），A/B 两组各一行
-        h += '<div style="min-width:150px;padding-top:6px;">';
-        h += '<b style="color:#ffd700;font-size:0.85rem;">第' + a.day + '天</b>';
+        // 第N天
+        h += '<div style="min-width:52px;padding-top:6px;"><b style="color:#ffd700;font-size:0.85rem;">第' + a.day + '天</b></div>';
+        // A/B 两组并排：组头（A/B + 主车 + 副车 + 减伤）在上，5×2 网格在下
         ['A', 'B'].forEach(function (ab) {
             const id = 'd' + a.day + ab;
             const L = _slot('activity', id);
             const table = _tableFor('act', ab.toLowerCase());
             const sum = _sumDr(table, a[ab]);
-            h += '<div style="display:flex;align-items:center;gap:3px;flex-wrap:wrap;margin-top:4px;">';
-            h += '<span style="font-weight:800;color:' + (ab === 'A' ? '#4ecdc4' : '#f0932b') + ';font-size:0.72rem;">' + ab + '</span>';
-            h += '<span style="color:rgba(255,255,255,0.45);font-size:0.6rem;">主</span>' + _cartSelect('activity', id, 'cart', L.cart);
-            h += '<span style="color:rgba(255,255,255,0.45);font-size:0.6rem;">副</span>' + _cartSelect('activity', id, 'cart2', L.cart2);
-            h += '<span style="color:#ff8a80;font-size:0.62rem;">🛡️' + sum + '%</span>';
-            h += '</div>';
-        });
-        h += '</div>';
-        // A/B 两组 5×2 网格并排（一行=一天）
-        ['A', 'B'].forEach(function (ab) {
             h += '<div>';
+            h += '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:4px;">';
+            h += '<span style="font-weight:800;color:' + (ab === 'A' ? '#4ecdc4' : '#f0932b') + ';font-size:0.76rem;">' + ab + '组</span>';
+            h += '<span style="color:rgba(255,255,255,0.45);font-size:0.62rem;">主</span>' + _cartSelect('activity', id, 'cart', L.cart);
+            h += '<span style="color:rgba(255,255,255,0.45);font-size:0.62rem;">副</span>' + _cartSelect('activity', id, 'cart2', L.cart2);
+            h += '<span style="color:#ff8a80;font-size:0.64rem;">🛡️' + sum + '%</span>';
+            h += '</div>';
             h += '<div style="display:grid;grid-template-columns:repeat(5,40px);gap:3px;">';
             (a[ab] || []).forEach(function (n, i) { h += _slotHtml(ab.toLowerCase(), i, n, 'activity', 'd' + a.day, 40); });
             h += '</div></div>';
