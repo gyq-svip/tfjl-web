@@ -18,6 +18,8 @@
         return o[tab][id];
     }
     function _esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+    // 🔴 2026-09-23 功能埋点（与主页 __recordFeatureUse 同一 buffer，管理员可在「按 Gist×功能 TOP」看到使用情况）
+    function _llTrack(fn) { try { if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse(fn); } catch (e) {} }
     function _escJs(s) { return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
     function _data() { return (window.LINEUP_LIBRARY && window.LINEUP_LIBRARY.sailing) ? window.LINEUP_LIBRARY : { sailing: [], activity: [] }; }
     function _parseNames(txt) { return String(txt || '').split(/[,，、\n\r]+/).map(s => s.trim()).filter(Boolean); }
@@ -25,6 +27,7 @@
     window.openLineupLibraryPanel = function () {
         let ov = document.getElementById('lineupLibWin');
         if (ov) { ov.style.display = 'block'; return; }
+        _llTrack('阵容图库');
         ov = document.createElement('div');
         ov.id = 'lineupLibWin';
         ov.style.cssText = 'position:fixed;top:80px;right:20px;width:min(1180px,96vw);height:min(86vh,900px);min-width:780px;min-height:360px;z-index:99996;display:flex;flex-direction:column;background:linear-gradient(160deg,#141a33,#0d1b2a);border:1px solid rgba(78,205,196,0.4);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.6);overflow:auto;resize:both;';
@@ -154,11 +157,21 @@
         (root || document.getElementById('llList') || document).querySelectorAll('.ll-drsum').forEach(function (el) {
             try {
                 const heroes = JSON.parse(el.getAttribute('data-heroes') || '[]');
-                const cards = _drCards(el.getAttribute('data-tab'), el.getAttribute('data-lid'), heroes);
-                const bd = (window.getDamageReductionBreakdown ? window.getDamageReductionBreakdown(cards, el.getAttribute('data-side') || 'my', el.getAttribute('data-table') || '我的') : null);
-                if (!bd) { el.textContent = '🛡️—'; return; }
-                el.textContent = '🛡️' + bd.total + '%';
-                const tip = (window.formatDrTooltip ? window.formatDrTooltip(bd) : '') + '｜战车按主页战车框配置；融合卡拆主/副卡计';
+                const tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid');
+                const cards = _drCards(tab, lid, heroes);
+                const side = el.getAttribute('data-side') || 'my', table = el.getAttribute('data-table') || '我的';
+                const calc = window.calculateDamageReductionForCards, bd = window.getDamageReductionBreakdown;
+                if (!calc || !bd) { el.textContent = '🛡️—'; return; }
+                const all = bd(cards, side, table);
+                el.textContent = '🛡️' + all.total + '%';
+                // 🔴 2026-09-23 逐卡明细（用户要求）：10 张只能上 7 张，悬浮看到每张卡的减伤才能核算去掉哪 3 张。
+                //    单卡计算 skipChariot=true（战车不摊到卡上，主页「单卡明细」同款），战车单列一行。
+                const lines = cards.map(function (c) {
+                    const v = calc([c.name], side, table, true);
+                    return c.name.replace(/\+/g, '·') + ' ' + v + '%';
+                });
+                if (all.chariot > 0) lines.push('战车 ' + all.chariot + '%');
+                const tip = lines.join('｜') + ' ｜ 合计 ' + all.total + '%';
                 el.title = tip;
                 el.setAttribute('data-tip', tip);
             } catch (e) {}
@@ -201,6 +214,7 @@
         const hero = el.getAttribute('data-hero'), tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid');
         const L = _slot(tab, lid);
         const variants = (window.getFusionVariantsForBase ? window.getFusionVariantsForBase(hero) : []);
+        _llTrack('阵容图库切融合');
         if (!variants.length) { try { if (typeof showToast === 'function') showToast(hero + ' 没有可融合的卡', 'info'); } catch (e2) {} return; }
         // 🔴 2026-09-22 主页同款循环（用户要求）：关闭 → 变体1(副卡默认皮) → 变体1(副卡皮2) → … → 变体N(…) → 关闭
         //    融合卡与副卡皮肤一次循环搞定；右键仍独立切主卡皮肤，互不影响。
@@ -232,6 +246,7 @@
         const hero = el.getAttribute('data-hero'), tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid');
         const L = _slot(tab, lid);
         const _nm = function (s) { return (typeof s === 'string') ? s : (s && s.name) || ''; };
+        _llTrack('阵容图库切皮肤');
         const cur = (L.skin && L.skin[hero]) || '';
         let list = [];
         if (window.getHeroSkins) list = (window.getHeroSkins(hero) || []).map(_nm).filter(Boolean);
@@ -306,6 +321,7 @@
                 window._llSet('activity', id, 'script', null, ta.value);
                 window._llSet('activity', id, 'scriptUrl', null, url);
                 window._llSet('activity', id, 'scriptName', null, fname);
+                _llTrack('阵容图库脚本上传');
                 urlLine.style.display = 'block'; urlSpan.textContent = url;
                 try { if (typeof showToast === 'function') showToast('已上传到脚本分享：' + fname, 'success'); } catch (e) {}
             } catch (e) {
