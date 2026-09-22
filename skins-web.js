@@ -94,6 +94,28 @@
   // 旧 URL 引用的 Blob 与解码纹理无法 GC，长期挂机 → 任务管理器 1.7~3GB 暴涨。
   // 改为按 key 复用一个永久 objectURL（进程生命周期内有效），每个皮肤只 createObjectURL 一次。
   var _objectUrlCache = {}; // key -> 已创建的 objectURL（永不 revoke，复用）
+  // 🔴 2026-09-22 皮肤 404 负缓存：线上不存在的 .skin（多数是融合皮）此前每次渲染都重新探测 →
+  //    融合卡永远比基础卡"慢半拍"还刷 404。记住 404（12 小时过期、上限 300 条、持久化 localStorage），
+  //    再次渲染直接返回 null → 立即走基础皮兜底，零网络请求。
+  var _SKIN404_KEY = 'tfjl_skin404_v1', _SKIN404_TTL = 12 * 3600 * 1000, _SKIN404_MAX = 300;
+  var _skin404 = (function () {
+    try {
+      var o = JSON.parse(localStorage.getItem(_SKIN404_KEY) || '{}'), now = Date.now(), out = {};
+      for (var k in o) if (now - o[k] < _SKIN404_TTL) out[k] = o[k];
+      return out;
+    } catch (e) { return {}; }
+  })();
+  function _skin404Save() {
+    try {
+      var keys = Object.keys(_skin404);
+      if (keys.length > _SKIN404_MAX) {
+        keys.sort(function (a, b) { return _skin404[a] - _skin404[b]; });
+        keys.slice(0, keys.length - _SKIN404_MAX).forEach(function (k) { delete _skin404[k]; });
+      }
+      localStorage.setItem(_SKIN404_KEY, JSON.stringify(_skin404));
+    } catch (e) {}
+  }
+  function _skin404Mark(key) { _skin404[key] = Date.now(); try { delete _objectUrlCache[key]; } catch (e) {} _skin404Save(); }
   async function _getCachedSkinUrl(remoteUrl) {
     if (!remoteUrl) return null;
     if (!/^https?:\/\//i.test(remoteUrl)) return remoteUrl;
@@ -105,12 +127,15 @@
     var key = 'skin:' + hero + '/' + file;
     // 🔴 复用已创建的 objectURL，避免重复 createObjectURL 造成 Blob 泄漏
     if (_objectUrlCache[key]) return _objectUrlCache[key];
+    // 🔴 2026-09-22 404 负缓存命中：直接返回 null（调用方立即走基础皮兜底），不再发起必 404 的请求
+    if (_skin404[key]) return null;
     // 1) IndexedDB 命中即返回（毫秒级，离线/弱网也能显示已缓存皮肤）
     var cached = await _idbGet(key);
     if (cached && cached.blob) {
       try {
         var u1 = URL.createObjectURL(cached.blob);
         _objectUrlCache[key] = u1; // 缓存复用
+        if (_skin404[key]) { delete _skin404[key]; _skin404Save(); } // 有缓存说明 404 记录已过时
         return u1;
       }
       catch (e) { console.warn('[SKIN-WEB] createObjectURL failed:', e); }
@@ -120,12 +145,13 @@
     var p = (async function () {
       var url = SKIN_BASE + '/' + encodeURIComponent(hero) + '/' + encodeURIComponent(file);
       try {
-        var resp = await _fetchWithRetry(url, 10000, 2); // 同源 GitHub Pages，超时 10s + 重试 2 次
+        var resp = await _fetchWithRetry(url, 10000, 2, function () { _skin404Mark(key); }); // 404 → 记入负缓存
         if (resp && resp.ok) {
           var blob = await resp.blob();
           _idbPut(key, blob); // 回写缓存，下次刷新即稳定
           var u2 = URL.createObjectURL(blob);
           _objectUrlCache[key] = u2; // 缓存复用，避免后续重复创建
+          if (_skin404[key]) { delete _skin404[key]; _skin404Save(); } // 拉到了 → 清除过时的 404 记录
           return u2;
         }
       } catch (e) { console.warn('[SKIN-WEB] 皮肤加载失败:', url, e); }
@@ -137,7 +163,8 @@
 
   function _sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   // fetch + 超时 + 重试（指数退避），单一同源即可（GitHub Pages 已相当稳定）
-  async function _fetchWithRetry(url, ms, retries) {
+  // on404：可选回调——命中的是"资源确实不存在"（非网络故障），调用方（404 负缓存）据此记录
+  async function _fetchWithRetry(url, ms, retries, on404) {
     retries = retries || 2;
     var lastErr;
     for (var i = 0; i <= retries; i++) {
@@ -149,7 +176,11 @@
         clearTimeout(timer);
         if (resp.ok) return resp;
         // 铁律：404 = 资源不存在（如用户自定义融合皮肤 .skin 文件缺失），重试无意义，直接放弃避免刷屏
-        if (resp.status === 404) { console.warn('[skins-web] 404 资源不存在，跳过重试:', url); return null; }
+        if (resp.status === 404) {
+          console.warn('[skins-web] 404 资源不存在，跳过重试:', url);
+          if (on404) { try { on404(); } catch (e2) {} }
+          return null;
+        }
         lastErr = new Error('HTTP ' + resp.status);
       } catch (e) { lastErr = e; if (timer) clearTimeout(timer); }
       if (i < retries) await _sleep((i + 1) * 400); // 退避后重试
