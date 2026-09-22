@@ -352,10 +352,11 @@ const HASHED_URL_RE = /\.(?:js|css)\?v=h[0-9a-f]{8}$/;
 function _isHashedAsset(url) { return HASHED_URL_RE.test(url.pathname + url.search); }
 
 // CacheFirst：有缓存直接回（仅用于内容哈希版 URL）；没有再联网并写入缓存；断网时回退缓存。
-async function cacheFirst(request, cacheName) {
+async function cacheFirst(request, cacheName, offline) {
     const cache = await caches.open(cacheName);
     const cached = await cache.match(request);
     if (cached) return cached;
+    if (offline) return undefined;   // 🔴 2026-09-22 离线快速通道：缓存没有就是没有（该文件从未被缓存过），不空耗网络
     try {
         const resp = await fetch(request);
         if (resp && (resp.ok || resp.type === 'opaque')) { try { await cache.put(request, resp.clone()); } catch (e) {} }
@@ -380,6 +381,11 @@ self.addEventListener('fetch', (event) => {
 
     const url = new URL(request.url);
 
+    // 🔴 2026-09-22 离线快速通道：系统明确离线（navigator.onLine === false）时，后面所有策略直接走缓存，
+    //    不再等网络超时（真禁网 fetch 虽快失败，但"假连接"会吃满 8 秒 NET_TIMEOUT）。在线状态由 online 事件与真实请求自行纠正。
+    let _offline = false;
+    try { _offline = (self.navigator && self.navigator.onLine === false); } catch (e) {}
+
     // 放行「SW 主动轮询线上 sw.js」这一个请求（SW 自己发的 fetch 本不会过自己的 fetch 事件，这里再精确兜一层，
     // 避免以后又写成整域豁免）。其余同源资产照常走缓存。
     if (url.hostname.includes('gyq-svip.github.io') && url.pathname.endsWith('/sw.js')) return;
@@ -391,7 +397,7 @@ self.addEventListener('fetch', (event) => {
 
     // 🔴 内置背景图（bg/…）：走"跨版本保留"的 CACHE_ASSETS —— 首拉后无论多少次部署/升级都不再重下。
     if (url.pathname.indexOf('/bg/') >= 0) {
-        event.respondWith(staleWhileRevalidate(request, CACHE_ASSETS));
+        event.respondWith(staleWhileRevalidate(request, CACHE_ASSETS, _offline));
         return;
     }
 
@@ -405,7 +411,7 @@ self.addEventListener('fetch', (event) => {
     // 🔴 2026-09-22 内容哈希版 JS/CSS：cacheFirst（URL 即内容指纹 → 缓存不可能过期）。
     //    这是"打开秒开 + 小更新只下变化文件"的关键；其余 JS/CSS 维持 networkFirst（旧行为）。
     if (_isHashedAsset(url)) {
-        event.respondWith(cacheFirst(request, CACHE_RUNTIME));
+        event.respondWith(cacheFirst(request, CACHE_RUNTIME, _offline));
         return;
     }
 
@@ -413,21 +419,21 @@ self.addEventListener('fetch', (event) => {
     // 不再 staleWhileRevalidate 先返回可能损坏的旧缓存（旧缓存 app-core.js 缺失 HB_JITTER 导致白屏）。
     // 网络优先 + 超时(8s)回退缓存，保证用户永远拿到线上正确文件。
     if (request.mode === 'navigate' || request.destination === 'document') {
-        event.respondWith(networkFirst(request, CACHE_RUNTIME));
+        event.respondWith(networkFirst(request, CACHE_RUNTIME, _offline));
         return;
     }
     if (['script', 'style'].includes(request.destination)) {
-        event.respondWith(networkFirst(request, CACHE_RUNTIME));
+        event.respondWith(networkFirst(request, CACHE_RUNTIME, _offline));
         return;
     }
     // 图片/字体等静态资源：StaleWhileRevalidate（缓存秒开 + 后台更新）
     if (['image', 'font', 'manifest'].includes(request.destination)) {
-        event.respondWith(staleWhileRevalidate(request, CACHE_RUNTIME));
+        event.respondWith(staleWhileRevalidate(request, CACHE_RUNTIME, _offline));
         return;
     }
 
     // 其他 GET：NetworkFirst
-    event.respondWith(networkFirst(request, CACHE_RUNTIME));
+    event.respondWith(networkFirst(request, CACHE_RUNTIME, _offline));
 });
 
 // ============================================================
@@ -442,9 +448,11 @@ function _timeoutFetch(request) {
         .finally(() => clearTimeout(timer));
 }
 
-function staleWhileRevalidate(request, cacheName) {
+function staleWhileRevalidate(request, cacheName, offline) {
     return caches.open(cacheName).then((cache) => {
         return cache.match(request).then((cachedResponse) => {
+            // 🔴 2026-09-22 离线快速通道：有缓存直接回；没有也不空耗网络（undefined → 浏览器报 404/失败，属正常）
+            if (offline) return cachedResponse;
             // 有缓存：立即返回秒开，后台静默更新（不阻塞页面）
             if (cachedResponse) {
                 _timeoutFetch(request).then(async (networkResponse) => {
@@ -484,8 +492,27 @@ function staleWhileRevalidate(request, cacheName) {
 // 该比对在 SW 安装初期缓存尚未预热时必然不一致，导致每次升级后重复弹气泡（bug）。
 // 「发现新版本」气泡统一由 install 阶段（有旧 SW 时）与 _pollLatestVersion 轮询（受功能开关控制）负责。
 // ============================================================
-function networkFirst(request, cacheName) {
+// 断网/超时时的回退匹配：精确键 → （导航请求）index.html 多键位（忽略查询参数）
+async function _matchNavFallback(cache, request) {
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    if (request.mode === 'navigate' || request.destination === 'document') {
+        const cands = [];
+        try { cands.push(new URL('index.html', request.url).href); } catch (e) {}
+        try { cands.push(new URL('./', request.url).href); } catch (e) {}
+        try { cands.push(new URL('index.html', self.registration.scope).href); } catch (e) {}
+        try { cands.push(new URL('./', self.registration.scope).href); } catch (e) {}
+        for (const u of cands) {
+            try { const hit = await cache.match(u, { ignoreSearch: true }); if (hit) return hit; } catch (e) {}
+        }
+    }
+    return undefined;
+}
+
+function networkFirst(request, cacheName, offline) {
     return caches.open(cacheName).then((cache) => {
+        // 🔴 2026-09-22 离线快速通道：系统明确离线时跳过必然失败的网络尝试，直接回退缓存（0 秒）
+        if (offline) return _matchNavFallback(cache, request);
         const isNav = (request.mode === 'navigate' || request.destination === 'document');
         return _timeoutFetch(request).then((networkResponse) => {
             if (networkResponse && networkResponse.status === 200) {
@@ -504,21 +531,8 @@ function networkFirst(request, cacheName) {
             return networkResponse;
         }).catch(async () => {
             // 超时/网络失败：立即回退缓存，不让页面白屏干等
-            const cached = await cache.match(request);
-            if (cached) return cached;
-            // 🔴 2026-09-22 断网兜底④：导航请求缓存里没有精确条目时，依次找缓存的 index.html
-            //    （当前目录 / SW scope 下的 index.html 与根路径，忽略查询参数）
-            if (isNav) {
-                const cands = [];
-                try { cands.push(new URL('index.html', request.url).href); } catch (e) {}
-                try { cands.push(new URL('./', request.url).href); } catch (e) {}
-                try { cands.push(new URL('index.html', self.registration.scope).href); } catch (e) {}
-                try { cands.push(new URL('./', self.registration.scope).href); } catch (e) {}
-                for (const u of cands) {
-                    try { const hit = await cache.match(u, { ignoreSearch: true }); if (hit) return hit; } catch (e) {}
-                }
-            }
-            return cached;
+            const hit = await _matchNavFallback(cache, request);
+            return hit;   // 命中返回缓存；未命中返回 undefined（维持原行为）
         });
     });
 }

@@ -5702,6 +5702,39 @@
         // 初始化勾选框状态（默认开）
         try { const _ht = document.getElementById('hoverTipToggle'); if (_ht) _ht.checked = tfjlHoverTipsEnabled; } catch (e) {}
 
+        // ===== 🌐 断网恢复（2026-09-22）=====
+        // 用户反馈：从没网切回有网后"网络不会恢复"——之前失败的云请求（公告/云数据/皮肤）不会自动重试。
+        // 现在首页全量缓存优先、刷新≈秒开 → online 事件时提示并自动刷新一次即可完全恢复；offline 时提示本地功能不受影响。
+        let _tfjlWasOffline = false;
+        try { _tfjlWasOffline = (navigator.onLine === false); } catch (e) {}   // 开屏就处于离线的情况也算
+        window.addEventListener('offline', function () {
+            _tfjlWasOffline = true;
+            try { if (typeof showToast === 'function') showToast('📴 网络已断开：本地功能不受影响，云功能暂时不可用', 'info'); } catch (e) {}
+        });
+        window.addEventListener('online', function () {
+            if (!_tfjlWasOffline) return;   // 正常开机联网不折腾（只有"断过网"才自动刷新）
+            _tfjlWasOffline = false;
+            try { if (typeof showToast === 'function') showToast('🌐 网络已恢复，正在刷新以同步云数据…', 'info'); } catch (e) {}
+            setTimeout(function () { try { location.reload(); } catch (e) {} }, 1200);
+        });
+
+        // ===== 🖲 「本地/共享」下拉支持鼠标滚轮切换（2026-09-22 用户要求）=====
+        // 悬停在 #projectScopeSelector 上滚动即切换本地↔共享（preventDefault 避免连带着滚动页面）。
+        (function bindScopeWheel() {
+            var sel = document.getElementById('projectScopeSelector');
+            if (!sel || sel.__tfjlWheelBound) return;
+            sel.__tfjlWheelBound = 1;
+            sel.addEventListener('wheel', function (e) {
+                e.preventDefault();
+                var n = sel.options.length, i = sel.selectedIndex;
+                var ni = Math.max(0, Math.min(n - 1, i + (e.deltaY > 0 ? 1 : -1)));
+                if (ni !== i) {
+                    sel.selectedIndex = ni;
+                    try { if (typeof handleProjectScopeChange === 'function') handleProjectScopeChange(); } catch (e2) {}
+                }
+            }, { passive: false });
+        })();
+
         // ===== 悬浮提示 tooltip（读取 data-tip） =====
         (function initTooltips() {
             // 🖱 2026-09-21 用户要求：不再"碰到就弹"，改成**悬停满 1 秒才弹**（鼠标路过/快速划过去不弹）。
