@@ -156,7 +156,8 @@
         if (!dr) return;
         const b = document.createElement('div');
         b.className = 'll-badge';
-        b.style.cssText = 'position:absolute;left:1px;top:1px;display:flex;gap:2px;pointer-events:none;';
+        // 🔴 2026-09-22 减伤角标移右下（原左上与融合卡渲染重叠；融合切角小图在左下、金边在右上，右下最空）
+        b.style.cssText = 'position:absolute;right:1px;bottom:1px;display:flex;gap:2px;pointer-events:none;';
         b.innerHTML = '<span style="background:rgba(244,67,54,0.78);color:#fff;font-size:0.56rem;padding:0 3px;border-radius:3px;">-' + _esc(dr) + '%</span>';
         el.appendChild(b);
     }
@@ -188,7 +189,7 @@
         try { const p = window.getFusionParts ? window.getFusionParts(v) : null; if (p && p.length >= 2) label = '融·' + p[1]; else label = '融·' + v; } catch (e) { label = '融·' + v; }
         const b = document.createElement('div');
         b.className = 'll-fus';
-        b.style.cssText = 'position:absolute;right:1px;top:1px;pointer-events:none;';
+        b.style.cssText = 'position:absolute;left:1px;top:1px;pointer-events:none;';
         b.innerHTML = '<span style="background:rgba(156,39,176,0.85);color:#fff;font-size:0.56rem;padding:0 3px;border-radius:3px;">' + _esc(label) + '</span>';
         el.appendChild(b);
     }
@@ -206,18 +207,36 @@
         Promise.resolve().then(function () { return window.applySkinBgToSlot(el, next || hero, next || hero, 'my', skin); }).catch(function () {}).then(function () { _fusBadge(el, next); });
         try { if (typeof showToast === 'function') showToast(next ? (hero + ' 融合 → ' + next) : '已还原为 ' + hero, 'info'); } catch (e2) {}
     };
-    //   右键 = 自动循环皮肤：默认 → 注册表第1套 → … → 最后一套 → 默认（存个人设置，只重刷这一个槽位）
+    //   右键 = 循环皮肤（🔴 2026-09-22 全部沿用主页：皮肤列表 = 主页卡池 getHeroSkins；
+    //          融合态则循环【副卡皮肤】写 window.fusionSkins（主页同款存储，两处共享），对齐主页右键行为）
     window._llSkinCycle = function (el) {
         const hero = el.getAttribute('data-hero'), tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid');
         const L = _slot(tab, lid);
+        const fuse = (L.fus && L.fus[hero]) || '';
+        const _nm = function (s) { return (typeof s === 'string') ? s : (s && s.name) || ''; };
+        if (fuse) {
+            const parts = (window.getFusionParts ? window.getFusionParts(fuse) : null);
+            const sub = (parts && parts.length >= 2) ? parts[1] : '';
+            const skins = ((sub && window.getHeroSkins) ? window.getHeroSkins(sub) : []).map(_nm).filter(Boolean);
+            if (!skins.length) { try { if (typeof showToast === 'function') showToast(sub + ' 没有可用皮肤', 'info'); } catch (e2) {} return; }
+            const cur = (window.fusionSkins && window.fusionSkins[sub] !== undefined) ? (window.fusionSkins[sub] || '') : '';
+            const names = [''].concat(skins);
+            let i = names.indexOf(cur); if (i < 0) i = 0;
+            const next = names[(i + 1) % names.length];
+            try { window.fusionSkins = window.fusionSkins || {}; window.fusionSkins[sub] = next; } catch (e2) {}
+            Promise.resolve().then(function () { return window.applySkinBgToSlot(el, fuse, fuse, 'my', (L.skin && L.skin[hero]) || undefined); }).catch(function () {});
+            try { if (typeof showToast === 'function') showToast(fuse + ' 副卡 ' + sub + ' 皮肤 → ' + (next || '默认'), 'info'); } catch (e2) {}
+            return;
+        }
         const cur = (L.skin && L.skin[hero]) || '';
-        const reg = (window.skinRegistry && window.skinRegistry[hero]) || [];
-        const names = [''].concat(reg.map(function (s) { return (typeof s === 'string') ? s : (s && s.name) || ''; }).filter(Boolean));
+        let list = [];
+        if (window.getHeroSkins) list = (window.getHeroSkins(hero) || []).map(_nm).filter(Boolean);
+        else list = ((window.skinRegistry && window.skinRegistry[hero]) || []).map(_nm).filter(Boolean);
+        const names = [''].concat(list);
         let i = names.indexOf(cur); if (i < 0) i = 0;
         const next = names[(i + 1) % names.length];
         window._llSet(tab, lid, 'skin', hero, next);
-        const fuse = (L.fus && L.fus[hero]) || hero;
-        Promise.resolve().then(function () { return window.applySkinBgToSlot(el, fuse, fuse, 'my', next || undefined); }).catch(function () {});
+        Promise.resolve().then(function () { return window.applySkinBgToSlot(el, hero, hero, 'my', next || undefined); }).catch(function () {});
         try { if (typeof showToast === 'function') showToast(hero + ' 皮肤 → ' + (next || '默认'), 'info'); } catch (e2) {}
     };
     // ---------- 大航海（一排一套：#N + 10卡槽 + 主副车；第二行小字波次备注） ----------
@@ -261,7 +280,7 @@
     // ---------- 活动阵容卡片（左 A/B 卡组 右战车） ----------
     function _actCard(a) {
         let h = '<div class="ll-card" style="border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:6px 9px;margin-bottom:10px;background:rgba(0,0,0,0.22);">';
-        h += '<div style="display:flex;align-items:flex-start;gap:10px;">';
+        h += '<div style="display:flex;align-items:flex-start;gap:18px;">';
         // 第N天
         h += '<div style="min-width:52px;padding-top:6px;"><b style="color:#ffd700;font-size:0.85rem;">第' + a.day + '天</b></div>';
         // A/B 两组并排：组头（A/B + 主车 + 副车 + 减伤）在上，5×2 网格在下
