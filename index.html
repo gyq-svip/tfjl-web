@@ -82,35 +82,40 @@
         //    现在遮罩带**真实进度**（已加载 x/N 个文件）一直显示到 load，超过 12 秒出现"网络较慢/重试"提示。
         window.addEventListener('load', function () { hide('load'); });
         // ② 实时进度 + 慢网提示 + 硬兜底
+        //    🔴 进度用「元素事件计数」（script/link 的 load/error 各 +1）：
+        //    不能用 performance.getEntriesByType('resource') —— app-core 启动后会定时 clearResourceTimings() 清空缓冲，
+        //    计数会被清零。事件计数不受影响。
         var startedAt = Date.now();
-        var total = 0;
-        function countTargets() {
-            var n = 0;
-            try {
-                document.querySelectorAll('script[src],link[rel="stylesheet"]').forEach(function (el) {
-                    var u = el.src || el.href || '';
-                    if (u && u.indexOf(location.host) >= 0) n++;
-                });
-            } catch (e) {}
-            return n;
+        var doneN = 0, totalN = 0;
+        function _watch(el) {
+            if (!el || el.__tfjlWatched) return;
+            el.__tfjlWatched = 1;
+            totalN++;
+            var f = function () { doneN++; };
+            el.addEventListener('load', f);
+            el.addEventListener('error', f);
         }
+        try {
+            new MutationObserver(function () {
+                try { document.querySelectorAll('script[src],link[rel="stylesheet"]').forEach(_watch); } catch (e) {}
+            }).observe(document.documentElement || document, { childList: true, subtree: true });
+        } catch (e) {}
         var SLOW_MS = 12000, HARD_MS = 120000;
         var _progTimer = setInterval(function () {
             if (hidden) { try { clearInterval(_progTimer); } catch (e) {} return; }
-            // 总数等 DOM 解析完再统计（本脚本在 <head> 里执行时 body 还没解析）
-            if (document.readyState !== 'loading' && !total) total = countTargets();
-            var done = 0;
+            // 🔴 2026-09-22 应用界面一旦可见（登录层或主界面出现）就收遮罩 —— 平时（缓存命中）秒开体感；
+            //    避免个别非关键资源（图片/字体）拖住 window.load 让遮罩多挂。
             try {
-                (performance.getEntriesByType('resource') || []).forEach(function (e) {
-                    if (e.name.indexOf(location.host) < 0) return;
-                    if (!/\.js|\.css/.test(e.name)) return;
-                    if (e.responseEnd > 0) done++;
-                });
+                var _po = document.getElementById('passwordOverlay'), _mc = document.getElementById('mainContent');
+                var _poV = _po && getComputedStyle(_po).display !== 'none' && _po.getBoundingClientRect().height > 10;
+                var _mcV = _mc && getComputedStyle(_mc).display !== 'none' && _mc.getBoundingClientRect().height > 10;
+                if (_poV || _mcV) { try { clearInterval(_progTimer); } catch (e2) {} hide('应用界面已就绪'); return; }
             } catch (e) {}
-            if (total > 0) {
-                var pct = Math.min(96, Math.round(done / total * 100));
+            try { document.querySelectorAll('script[src],link[rel="stylesheet"]').forEach(_watch); } catch (e) {}
+            if (totalN > 0) {
+                var pct = Math.min(96, Math.round(doneN / totalN * 100));
                 try { var bar = document.getElementById('loadingProgressBar'); if (bar) bar.style.width = pct + '%'; } catch (e) {}
-                try { var st = document.getElementById('loadingStatusText'); if (st) st.textContent = '正在加载 ' + done + '/' + total + ' 个文件' + (pct >= 96 ? '，马上好…' : ''); } catch (e) {}
+                try { var st = document.getElementById('loadingStatusText'); if (st) st.textContent = '正在加载 ' + doneN + '/' + totalN + ' 个文件' + (pct >= 96 ? '，马上好…' : ''); } catch (e) {}
             }
             var el = Date.now() - startedAt;
             try { if (el > SLOW_MS) { var h = document.getElementById('loadingSlowHint'); if (h) h.style.display = 'block'; } } catch (e) {}

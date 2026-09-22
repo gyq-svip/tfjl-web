@@ -677,7 +677,7 @@
                 }
                 // dev 模式（localhost/127.0.0.1）跳过 SW 注册：dev 用 http-server 服务 webroot，SW 的 scope='./' 会缓存 dev 前端，
                 // 且会接管之前生产 exe 注册的旧 SW，导致前端初始化卡死、按钮全失效。生产（github.io）才注册 SW。
-                const isDev = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//.test(location.href);
+                const isDev = !localStorage.getItem('tfjl_sw_dev') && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//.test(location.href);
                 if (isDev) {
                     console.log('[PWA] 开发模式跳过 Service Worker 注册（避免缓存污染导致按钮失效）');
                     // 顺手清掉可能残留的旧 SW（比如之前生产 exe 注册的），让 dev 永远用最新未缓存前端
