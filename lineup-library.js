@@ -27,7 +27,7 @@
         if (ov) { ov.style.display = 'block'; return; }
         ov = document.createElement('div');
         ov.id = 'lineupLibWin';
-        ov.style.cssText = 'position:fixed;top:80px;right:20px;width:min(1180px,96vw);height:min(86vh,900px);min-width:660px;min-height:360px;z-index:99996;display:flex;flex-direction:column;background:linear-gradient(160deg,#141a33,#0d1b2a);border:1px solid rgba(78,205,196,0.4);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.6);overflow:auto;resize:both;';
+        ov.style.cssText = 'position:fixed;top:80px;right:20px;width:min(1180px,96vw);height:min(86vh,900px);min-width:780px;min-height:360px;z-index:99996;display:flex;flex-direction:column;background:linear-gradient(160deg,#141a33,#0d1b2a);border:1px solid rgba(78,205,196,0.4);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.6);overflow:auto;resize:both;';
         ov.innerHTML =
             '<div id="llDrag" style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:linear-gradient(135deg,#0f3d3a,#123c5c);border-radius:12px 12px 0 0;cursor:move;user-select:none;">'
             + '<span style="font-size:1.05rem;font-weight:800;color:#4ecdc4;">📚 阵容图库</span>'
@@ -38,11 +38,10 @@
             + '<div id="llHead" style="padding:10px 14px 6px;"></div>'
             + '<div id="llList" style="padding:0 14px 14px;"></div>';
         document.body.appendChild(ov);
-        // 卡槽点击：🔴 2026-09-22 用户要求快捷操作（不弹菜单）：
-        //   左键 = 切换融合（开/关，紫色「融」角标）；右键 = 自动循环切换皮肤（默认→皮肤1→…→默认）
+        // 卡槽点击：🔴 2026-09-22 与主页一致：左键 = 循环切换融合卡；右键 = 循环切换主卡皮肤（均不弹菜单）
         ov.addEventListener('click', function (e) {
             const sl = e.target.closest('.ll-slot');
-            if (sl) { window._llFuseToggle(sl); }
+            if (sl) { window._llFuseCycle(sl); }
         });
         ov.addEventListener('contextmenu', function (e) {
             const sl = e.target.closest('.ll-slot');
@@ -84,7 +83,7 @@
             + '<button onclick="_llTab(\'act\')" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (!isSail ? 'rgba(255,215,0,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (!isSail ? 'rgba(255,215,0,0.15)' : 'transparent') + ';color:' + (!isSail ? '#ffd700' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">🏆 活动阵容(' + D.activity.length + '天)</button>'
             + '<input id="llSearch" value="' + _esc(state.q) + '" oninput="_llSearch(this.value)" placeholder="🔍 输入英雄名，查所有含它的阵容…" style="flex:1;min-width:200px;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;">'
             + '</div>'
-            + '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-top:4px;">左卡组右笔记 · <b style="color:#ce93d8;">左键点卡=切换融合</b> · <b style="color:rgba(255,255,255,0.7);">右键点卡=切换皮肤（自动循环）</b>（个人设置只存本机）· 拖标题栏移动窗口，右下角拉伸大小</div>';
+            + '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-top:4px;">左卡组右笔记 · <b style="color:#ce93d8;">左键点卡=切换融合卡</b> · <b style="color:rgba(255,255,255,0.7);">右键点卡=切换皮肤（自动循环）</b>（个人设置只存本机）· 拖标题栏移动窗口，右下角拉伸大小</div>';
     }
     function _filteredSailing() {
         const q = state.q;
@@ -172,30 +171,40 @@
             const tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid'), w = el.getAttribute('data-w');
             const L = _slot(tab, lid);
             const force = (L.skin && L.skin[hero]) || undefined;
+            // 🔴 2026-09-22 融合卡渲染与主页一致：槽位卡名直接用融合卡名（applySkinBgToSlot 内部走对角切割渲染）
+            const cur = (L.fus && L.fus[hero]) || hero;
             const table = _tableFor(tab, w);
             const dr = _cardDr(table, hero);
-            Promise.resolve().then(function () { return window.applySkinBgToSlot(el, hero, hero, 'my', force); })
+            Promise.resolve().then(function () { return window.applySkinBgToSlot(el, cur, cur, 'my', force); })
                 .catch(function () {}).then(function () { _slotBadge(el, dr); _fusBadge(el, (L.fus && L.fus[hero]) || ''); step(); });
         })();
     }
-    // 🔴 2026-09-22 快捷操作（取代旧菜单，用户要求"点一下就生效"）：
-    //   左键 = 切换融合：有「融」角标就清掉，没有就标记（兼容旧手填的文本值，原样显示）
+    // 🔴 2026-09-22 快捷操作（与主页融合一致，用户要求）：
+    //   左键 = 循环切换融合卡：原卡 → 融合变体1 → … → 原卡（列表 = getFusionVariantsForBase 主页现成数据）
     function _fusBadge(el, v) {
         const old = el.querySelector('.ll-fus'); if (old) old.remove();
         if (!v) return;
+        let label = '融';
+        try { const p = window.getFusionParts ? window.getFusionParts(v) : null; if (p && p.length >= 2) label = '融·' + p[1]; else label = '融·' + v; } catch (e) { label = '融·' + v; }
         const b = document.createElement('div');
         b.className = 'll-fus';
         b.style.cssText = 'position:absolute;right:1px;top:1px;pointer-events:none;';
-        b.innerHTML = '<span style="background:rgba(156,39,176,0.85);color:#fff;font-size:0.56rem;padding:0 3px;border-radius:3px;">融' + (v === '1' ? '' : _esc(v)) + '</span>';
+        b.innerHTML = '<span style="background:rgba(156,39,176,0.85);color:#fff;font-size:0.56rem;padding:0 3px;border-radius:3px;">' + _esc(label) + '</span>';
         el.appendChild(b);
     }
-    window._llFuseToggle = function (el) {
+    window._llFuseCycle = function (el) {
         const hero = el.getAttribute('data-hero'), tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid');
         const L = _slot(tab, lid);
-        const has = L.fus && L.fus[hero];
-        window._llSet(tab, lid, 'fus', hero, has ? '' : '1');
-        _fusBadge(el, has ? '' : '1');
-        try { if (typeof showToast === 'function') showToast(has ? '已取消融合标记' : '已标记融合', 'info'); } catch (e2) {}
+        const cur = (L.fus && L.fus[hero]) || '';
+        const variants = (window.getFusionVariantsForBase ? window.getFusionVariantsForBase(hero) : []);
+        if (!variants.length) { try { if (typeof showToast === 'function') showToast(hero + ' 没有可融合的卡', 'info'); } catch (e2) {} return; }
+        const names = [''].concat(variants);
+        let i = names.indexOf(cur); if (i < 0) i = 0;
+        const next = names[(i + 1) % names.length];
+        window._llSet(tab, lid, 'fus', hero, next);
+        const skin = (L.skin && L.skin[hero]) || undefined;
+        Promise.resolve().then(function () { return window.applySkinBgToSlot(el, next || hero, next || hero, 'my', skin); }).catch(function () {}).then(function () { _fusBadge(el, next); });
+        try { if (typeof showToast === 'function') showToast(next ? (hero + ' 融合 → ' + next) : '已还原为 ' + hero, 'info'); } catch (e2) {}
     };
     //   右键 = 自动循环皮肤：默认 → 注册表第1套 → … → 最后一套 → 默认（存个人设置，只重刷这一个槽位）
     window._llSkinCycle = function (el) {
@@ -207,7 +216,8 @@
         let i = names.indexOf(cur); if (i < 0) i = 0;
         const next = names[(i + 1) % names.length];
         window._llSet(tab, lid, 'skin', hero, next);
-        Promise.resolve().then(function () { return window.applySkinBgToSlot(el, hero, hero, 'my', next || undefined); }).catch(function () {});
+        const fuse = (L.fus && L.fus[hero]) || hero;
+        Promise.resolve().then(function () { return window.applySkinBgToSlot(el, fuse, fuse, 'my', next || undefined); }).catch(function () {});
         try { if (typeof showToast === 'function') showToast(hero + ' 皮肤 → ' + (next || '默认'), 'info'); } catch (e2) {}
     };
     // ---------- 大航海（一排一套：#N + 10卡槽 + 主副车；第二行小字波次备注） ----------
@@ -229,18 +239,21 @@
         h += '<span style="color:rgba(255,255,255,0.5);font-size:0.66rem;">副</span>' + _cartSelect('sailing', s.id, 'cart2', L.cart2);
         h += '<span style="color:#ff8a80;font-size:0.66rem;">🛡️' + sum + '%</span>';
         h += '</div>';
-        // 5×2 卡槽
-        h += '<div style="display:grid;grid-template-columns:repeat(5,54px);gap:5px;">';
-        s.heroes.forEach(function (n, i) { h += _slotHtml(i < 5 ? 'u' : 'd', i % 5, n, 'sailing', s.id, 54); });
+        // 卡组（5×2）+ 右侧波次备注列（🔴 2026-09-22 用户要求：备注放卡组右边，正好填补空白）
+        h += '<div style="display:flex;align-items:flex-start;gap:10px;">';
+        h += '<div style="display:grid;grid-template-columns:repeat(5,60px);gap:5px;">';
+        s.heroes.forEach(function (n, i) { h += _slotHtml(i < 5 ? 'u' : 'd', i % 5, n, 'sailing', s.id, 60); });
         h += '</div>';
-        // 波次备注行
-        h += '<div style="display:flex;align-items:center;gap:4px;margin-top:4px;flex-wrap:wrap;">';
+        h += '<div style="flex:1;min-width:150px;display:flex;flex-direction:column;gap:3px;padding-top:2px;">';
         [['n219', '219波'], ['n229', '229波'], ['n230', '230波'], ['other', '其他']].forEach(function (p2) {
             const val = (L.notes && L.notes[p2[0]]) || '';
-            h += '<span style="color:#f0932b;font-size:0.68rem;font-weight:700;">' + p2[1] + '</span>';
-            h += '<input value="' + _esc(val) + '" oninput="_llSet(\'sailing\',\'' + s.id + '\',\'notes\',\'' + p2[0] + '\',this.value)" placeholder="上什么卡…" style="flex:1 1 100px;min-width:80px;max-width:150px;padding:2px 5px;border-radius:5px;border:1px solid rgba(240,147,43,0.3);background:rgba(0,0,0,0.3);color:rgba(255,255,255,0.85);font-size:0.68rem;">';
+            h += '<div style="display:flex;align-items:center;gap:4px;">';
+            h += '<span style="color:#f0932b;font-size:0.66rem;font-weight:700;flex:0 0 auto;">' + p2[1] + '</span>';
+            h += '<input value="' + _esc(val) + '" oninput="_llSet(\'sailing\',\'' + s.id + '\',\'notes\',\'' + p2[0] + '\',this.value)" placeholder="上什么卡…" style="flex:1;min-width:0;padding:2px 5px;border-radius:5px;border:1px solid rgba(240,147,43,0.3);background:rgba(0,0,0,0.3);color:rgba(255,255,255,0.85);font-size:0.68rem;">';
+            h += '</div>';
         });
-        h += '<button onclick="_llReset(\'sailing\',\'' + s.id + '\')" style="padding:1px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.5);font-size:0.66rem;cursor:pointer;">↺ 重置</button>';
+        h += '<button onclick="_llReset(\'sailing\',\'' + s.id + '\')" style="align-self:flex-end;padding:1px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.5);font-size:0.66rem;cursor:pointer;">↺ 重置</button>';
+        h += '</div>';
         h += '</div>';
         h += '</div>';   // 🔴 收卡片本体（v6 误删导致所有卡嵌进第一张 → 网格只剩 1 个子项 → 两列失效）
         return h;
@@ -264,8 +277,8 @@
             h += '<span style="color:rgba(255,255,255,0.45);font-size:0.62rem;">副</span>' + _cartSelect('activity', id, 'cart2', L.cart2);
             h += '<span style="color:#ff8a80;font-size:0.64rem;">🛡️' + sum + '%</span>';
             h += '</div>';
-            h += '<div style="display:grid;grid-template-columns:repeat(5,54px);gap:5px;">';
-            (a[ab] || []).forEach(function (n, i) { h += _slotHtml(ab.toLowerCase(), i, n, 'activity', 'd' + a.day, 54); });
+            h += '<div style="display:grid;grid-template-columns:repeat(5,60px);gap:5px;">';
+            (a[ab] || []).forEach(function (n, i) { h += _slotHtml(ab.toLowerCase(), i, n, 'activity', 'd' + a.day, 60); });
             h += '</div></div>';
         });
         h += '<div style="align-self:center;"><button onclick="_llReset(\'activity\',\'d' + a.day + '\')" title="重置该天个人设置" style="padding:2px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.5);font-size:0.66rem;cursor:pointer;">↺</button></div>';
