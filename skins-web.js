@@ -116,6 +116,12 @@
     } catch (e) {}
   }
   function _skin404Mark(key) { _skin404[key] = Date.now(); try { delete _objectUrlCache[key]; } catch (e) {} _skin404Save(); }
+  // 🔴 2026-09-22 启动即恢复上次成功的融合定义（先于任何渲染）——否则首屏渲染时 cloudFusions 还没拉到，
+  //    融合卡被当"无名单卡" → 皮肤丢失 + No skin 刷屏（与 APP 端 app-local2.js 同款修复）
+  try {
+    var _f0 = JSON.parse(localStorage.getItem('tfjl_cloud_fusions') || 'null');
+    if (_f0 && _f0.v && (!window.cloudFusions || !Object.keys(window.cloudFusions).length)) window.cloudFusions = _f0.v;
+  } catch (e) {}
   async function _getCachedSkinUrl(remoteUrl) {
     if (!remoteUrl) return null;
     if (!/^https?:\/\//i.test(remoteUrl)) return remoteUrl;
@@ -391,16 +397,35 @@
       : function (fn) { setTimeout(fn, 1500); }; // 不支持 idle 时延后启动，给首屏足够时间
     _idleStart(function () { try { _preheatSkins(window.skinRegistry, { concurrency: 2 }); } catch (e) {} });
     // 拉取融合卡定义（云端 fusions.json，管理员维护）
+    // 🔴 2026-09-22 成功即落本地缓存；拉取失败/未拉到时恢复上次成功的结果（否则融合卡被当"无名单卡"丢皮肤）
     try {
       var fResp = await _fetchJsonWithFallback('/fusions.json');
       if (fResp && fResp.ok) {
         var fData = await fResp.json();
         if (fData && fData.fusions) {
           window.cloudFusions = fData.fusions;
+          try { localStorage.setItem('tfjl_cloud_fusions', JSON.stringify({ t: Date.now(), v: fData.fusions })); } catch (e2) {}
           console.log('[SKIN-WEB] cloud fusions loaded:', Object.keys(fData.fusions).length);
         }
+      } else {
+        try {
+          var _o = JSON.parse(localStorage.getItem('tfjl_cloud_fusions') || 'null');
+          if (_o && _o.v && (!window.cloudFusions || !Object.keys(window.cloudFusions).length)) {
+            window.cloudFusions = _o.v;
+            console.log('[SKIN-WEB] cloud fusions 从本地缓存恢复:', Object.keys(_o.v).length);
+          }
+        } catch (e3) {}
       }
-    } catch (fe) { console.warn('[SKIN-WEB] load fusions.json failed:', fe); }
+    } catch (fe) {
+      console.warn('[SKIN-WEB] load fusions.json failed:', fe);
+      try {
+        var _o2 = JSON.parse(localStorage.getItem('tfjl_cloud_fusions') || 'null');
+        if (_o2 && _o2.v && (!window.cloudFusions || !Object.keys(window.cloudFusions).length)) {
+          window.cloudFusions = _o2.v;
+          console.log('[SKIN-WEB] cloud fusions 从本地缓存恢复:', Object.keys(_o2.v).length);
+        }
+      } catch (e3) {}
+    }
     // 拉取皮肤属性表（云端 skin-attributes.json，管理员维护）
     try {
       var aResp = await _fetchJsonWithFallback('/skin-attributes.json');
