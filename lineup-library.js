@@ -83,7 +83,7 @@
             + '<button onclick="_llTab(\'act\')" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (!isSail ? 'rgba(255,215,0,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (!isSail ? 'rgba(255,215,0,0.15)' : 'transparent') + ';color:' + (!isSail ? '#ffd700' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">🏆 活动阵容(' + D.activity.length + '天)</button>'
             + '<input id="llSearch" value="' + _esc(state.q) + '" oninput="_llSearch(this.value)" placeholder="🔍 输入英雄名，查所有含它的阵容…" style="flex:1;min-width:200px;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;">'
             + '</div>'
-            + '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-top:4px;">左卡组右笔记 · <b style="color:#ce93d8;">左键点卡=切换融合卡</b> · <b style="color:rgba(255,255,255,0.7);">右键点卡=切换皮肤（自动循环）</b>（个人设置只存本机）· 拖标题栏移动窗口，右下角拉伸大小</div>';
+            + '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-top:4px;">左卡组右笔记 · <b style="color:#ce93d8;">左键=轮流切融合卡（含副卡皮肤，末尾关闭）</b> · <b style="color:rgba(255,255,255,0.7);">右键=主卡皮肤（融合后也可切）</b> · 活动 📜=脚本 ·（个人设置只存本机）· 拖标题栏移动窗口，右下角拉伸大小</div>';
     }
     function _filteredSailing() {
         const q = state.q;
@@ -196,38 +196,38 @@
     window._llFuseCycle = function (el) {
         const hero = el.getAttribute('data-hero'), tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid');
         const L = _slot(tab, lid);
-        const cur = (L.fus && L.fus[hero]) || '';
         const variants = (window.getFusionVariantsForBase ? window.getFusionVariantsForBase(hero) : []);
         if (!variants.length) { try { if (typeof showToast === 'function') showToast(hero + ' 没有可融合的卡', 'info'); } catch (e2) {} return; }
-        const names = [''].concat(variants);
-        let i = names.indexOf(cur); if (i < 0) i = 0;
-        const next = names[(i + 1) % names.length];
-        window._llSet(tab, lid, 'fus', hero, next);
+        // 🔴 2026-09-22 主页同款循环（用户要求）：关闭 → 变体1(副卡默认皮) → 变体1(副卡皮2) → … → 变体N(…) → 关闭
+        //    融合卡与副卡皮肤一次循环搞定；右键仍独立切主卡皮肤，互不影响。
+        const _nm = function (s) { return (typeof s === 'string') ? s : (s && s.name) || ''; };
+        const steps = [{ v: '', sub: '', skin: '' }];
+        variants.forEach(function (v) {
+            const parts = (window.getFusionParts ? window.getFusionParts(v) : null) || [];
+            const sub = parts[1] || '';
+            const skins = [''].concat(((sub && window.getHeroSkins) ? window.getHeroSkins(sub) : []).map(_nm).filter(Boolean));
+            skins.forEach(function (sk) { steps.push({ v: v, sub: sub, skin: sk }); });
+        });
+        const curFuse = (L.fus && L.fus[hero]) || '';
+        const curParts = curFuse ? ((window.getFusionParts ? window.getFusionParts(curFuse) : null) || []) : [];
+        const curSub = curParts[1] || '';
+        const curSkin = curSub && window.fusionSkins && window.fusionSkins[curSub] !== undefined ? (window.fusionSkins[curSub] || '') : '';
+        let idx = steps.findIndex(function (s) { return s.v === curFuse && s.sub === curSub && s.skin === curSkin; });
+        if (idx < 0) idx = steps.findIndex(function (s) { return s.v === curFuse; });   // 变体在但副卡皮对不上 → 从该变体段继续
+        if (idx < 0) idx = 0;
+        const next = steps[(idx + 1) % steps.length];
+        window._llSet(tab, lid, 'fus', hero, next.v);
+        if (next.sub) { try { window.fusionSkins = window.fusionSkins || {}; window.fusionSkins[next.sub] = next.skin; } catch (e2) {} }
         const skin = (L.skin && L.skin[hero]) || undefined;
-        Promise.resolve().then(function () { return window.applySkinBgToSlot(el, next || hero, next || hero, 'my', skin); }).catch(function () {}).then(function () { _fusBadge(el, next); });
-        try { if (typeof showToast === 'function') showToast(next ? (hero + ' 融合 → ' + next) : '已还原为 ' + hero, 'info'); } catch (e2) {}
+        const shown = next.v || hero;
+        Promise.resolve().then(function () { return window.applySkinBgToSlot(el, shown, shown, 'my', skin); }).catch(function () {}).then(function () { _fusBadge(el, next.v); });
+        try { if (typeof showToast === 'function') showToast(next.v ? (next.v + (next.skin ? ' · 副卡皮:' + next.skin : ' · 副卡默认皮')) : '已关闭融合（' + hero + '）', 'info'); } catch (e2) {}
     };
-    //   右键 = 循环皮肤（🔴 2026-09-22 全部沿用主页：皮肤列表 = 主页卡池 getHeroSkins；
-    //          融合态则循环【副卡皮肤】写 window.fusionSkins（主页同款存储，两处共享），对齐主页右键行为）
+    //   右键 = 循环【主卡】皮肤（🔴 2026-09-22 修复：融合后也一直可切，与左键融合循环互不影响；列表=主页卡池 getHeroSkins）
     window._llSkinCycle = function (el) {
         const hero = el.getAttribute('data-hero'), tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid');
         const L = _slot(tab, lid);
-        const fuse = (L.fus && L.fus[hero]) || '';
         const _nm = function (s) { return (typeof s === 'string') ? s : (s && s.name) || ''; };
-        if (fuse) {
-            const parts = (window.getFusionParts ? window.getFusionParts(fuse) : null);
-            const sub = (parts && parts.length >= 2) ? parts[1] : '';
-            const skins = ((sub && window.getHeroSkins) ? window.getHeroSkins(sub) : []).map(_nm).filter(Boolean);
-            if (!skins.length) { try { if (typeof showToast === 'function') showToast(sub + ' 没有可用皮肤', 'info'); } catch (e2) {} return; }
-            const cur = (window.fusionSkins && window.fusionSkins[sub] !== undefined) ? (window.fusionSkins[sub] || '') : '';
-            const names = [''].concat(skins);
-            let i = names.indexOf(cur); if (i < 0) i = 0;
-            const next = names[(i + 1) % names.length];
-            try { window.fusionSkins = window.fusionSkins || {}; window.fusionSkins[sub] = next; } catch (e2) {}
-            Promise.resolve().then(function () { return window.applySkinBgToSlot(el, fuse, fuse, 'my', (L.skin && L.skin[hero]) || undefined); }).catch(function () {});
-            try { if (typeof showToast === 'function') showToast(fuse + ' 副卡 ' + sub + ' 皮肤 → ' + (next || '默认'), 'info'); } catch (e2) {}
-            return;
-        }
         const cur = (L.skin && L.skin[hero]) || '';
         let list = [];
         if (window.getHeroSkins) list = (window.getHeroSkins(hero) || []).map(_nm).filter(Boolean);
@@ -236,8 +236,65 @@
         let i = names.indexOf(cur); if (i < 0) i = 0;
         const next = names[(i + 1) % names.length];
         window._llSet(tab, lid, 'skin', hero, next);
-        Promise.resolve().then(function () { return window.applySkinBgToSlot(el, hero, hero, 'my', next || undefined); }).catch(function () {});
-        try { if (typeof showToast === 'function') showToast(hero + ' 皮肤 → ' + (next || '默认'), 'info'); } catch (e2) {}
+        const shown = (L.fus && L.fus[hero]) || hero;
+        Promise.resolve().then(function () { return window.applySkinBgToSlot(el, shown, shown, 'my', next || undefined); }).catch(function () {});
+        try { if (typeof showToast === 'function') showToast(hero + ' 主卡皮肤 → ' + (next || '默认'), 'info'); } catch (e2) {}
+    };
+    // ---------- 活动脚本（🔴 2026-09-22 用户要求：活动可以用脚本去打，每天一个脚本，可上传到脚本分享供大家使用） ----------
+    window._llScriptDlg = function (id) {
+        const old = document.getElementById('llScriptDlg'); if (old) old.remove();
+        const L = _slot('activity', id);
+        const day = String(id).replace(/^d/, '');
+        const m = document.createElement('div');
+        m.id = 'llScriptDlg';
+        m.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;';
+        const box = document.createElement('div');
+        box.style.cssText = 'width:min(560px,92vw);background:linear-gradient(160deg,#141a33,#0d1b2a);border:1px solid rgba(240,147,43,0.5);border-radius:12px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.6);';
+        box.innerHTML =
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><b style="color:#f0932b;font-size:0.95rem;">📜 活动·第' + _esc(day) + '天 · 阵容脚本</b><span style="flex:1;"></span><button id="llScriptClose" style="background:transparent;border:none;color:#fff;font-size:1.2rem;cursor:pointer;">×</button></div>'
+            + '<textarea id="llScriptText" placeholder="把该天要用的活动脚本贴到这里（可先用「💾保存到本机」），或从本地脚本导出后粘贴…" style="width:100%;box-sizing:border-box;height:180px;resize:vertical;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.35);color:rgba(255,255,255,0.92);font-size:0.78rem;font-family:Consolas,monospace;"></textarea>'
+            + '<div id="llScriptUrlLine" style="display:none;margin-top:6px;color:rgba(255,255,255,0.55);font-size:0.7rem;word-break:break-all;">已上传：<span id="llScriptUrl" style="color:#4ecdc4;cursor:pointer;" title="点击复制链接"></span></div>'
+            + '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">'
+            + '<button id="llScriptSave" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(78,205,196,0.5);background:rgba(78,205,196,0.15);color:#4ecdc4;cursor:pointer;font-size:0.78rem;font-weight:700;">💾 保存到本机</button>'
+            + '<button id="llScriptUp" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(240,147,43,0.55);background:rgba(240,147,43,0.15);color:#f0932b;cursor:pointer;font-size:0.78rem;font-weight:700;">📤 上传到脚本分享</button>'
+            + '<button id="llScriptCopy" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:transparent;color:rgba(255,255,255,0.75);cursor:pointer;font-size:0.78rem;">📋 复制脚本</button>'
+            + '</div>'
+            + '<div style="color:rgba(255,255,255,0.4);font-size:0.68rem;margin-top:8px;">上传后自动出现在「脚本分享」里供大家下载（需要已配置 Gist Token）；脚本只存本机 + Gist，不影响其他人。</div>';
+        m.appendChild(box);
+        document.body.appendChild(m);
+        const ta = box.querySelector('#llScriptText');
+        ta.value = L.script || '';
+        const urlLine = box.querySelector('#llScriptUrlLine'), urlSpan = box.querySelector('#llScriptUrl');
+        if (L.scriptUrl) { urlLine.style.display = 'block'; urlSpan.textContent = L.scriptUrl; }
+        box.querySelector('#llScriptClose').addEventListener('click', function () { m.remove(); });
+        m.addEventListener('click', function (e) { if (e.target === m) m.remove(); });
+        function _copy(txt, tip) {
+            try { (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(function () { try { if (typeof showToast === 'function') showToast(tip, 'info'); } catch (e) {} }).catch(function () {}); } catch (e) {}
+        }
+        urlSpan.addEventListener('click', function () { _copy(urlSpan.textContent, '脚本链接已复制'); });
+        box.querySelector('#llScriptSave').addEventListener('click', function () {
+            window._llSet('activity', id, 'script', null, ta.value);
+            try { if (typeof showToast === 'function') showToast('脚本已保存到本机（第' + day + '天）', 'info'); } catch (e) {}
+        });
+        box.querySelector('#llScriptCopy').addEventListener('click', function () { _copy(ta.value, '脚本内容已复制'); });
+        box.querySelector('#llScriptUp').addEventListener('click', async function () {
+            const content = ta.value.trim();
+            if (!content) { try { if (typeof showToast === 'function') showToast('先贴入脚本文本', 'warn'); } catch (e) {} return; }
+            const btn = this; btn.disabled = true; btn.textContent = '⏳ 上传中…';
+            try {
+                if (typeof window.uploadScriptToGist !== 'function') throw new Error('上传设施未就绪');
+                const fname = '活动第' + day + '天_阵容脚本_' + String(Date.now()).slice(-6) + '.js';
+                const url = await window.uploadScriptToGist({ name: fname }, content);
+                window._llSet('activity', id, 'script', null, ta.value);
+                window._llSet('activity', id, 'scriptUrl', null, url);
+                urlLine.style.display = 'block'; urlSpan.textContent = url;
+                try { if (typeof showToast === 'function') showToast('已上传到脚本分享，大家可以在脚本墙看到了', 'success'); } catch (e) {}
+            } catch (e) {
+                try { if (typeof showToast === 'function') showToast('上传失败：' + (e && e.message || e) + '（需要已配置 Gist Token）', 'error'); } catch (e2) {}
+            }
+            btn.disabled = false; btn.textContent = '📤 上传到脚本分享';
+        });
+        setTimeout(function () { ta.focus(); }, 0);
     };
     // ---------- 大航海（一排一套：#N + 10卡槽 + 主副车；第二行小字波次备注） ----------
     function _cartSelect(tab, id, field, cur) {
@@ -300,7 +357,9 @@
             (a[ab] || []).forEach(function (n, i) { h += _slotHtml(ab.toLowerCase(), i, n, 'activity', 'd' + a.day, 60); });
             h += '</div></div>';
         });
-        h += '<div style="align-self:center;"><button onclick="_llReset(\'activity\',\'d' + a.day + '\')" title="重置该天个人设置" style="padding:2px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.5);font-size:0.66rem;cursor:pointer;">↺</button></div>';
+        const _lday = _slot('activity', 'd' + a.day);   // 🔴 天级个人设置（脚本文本/链接存这里，与 A/B 槽位分开）
+        h += '<div style="align-self:center;display:flex;flex-direction:column;gap:4px;"><button onclick="_llReset(\'activity\',\'d' + a.day + '\')" title="重置该天个人设置" style="padding:2px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.5);font-size:0.66rem;cursor:pointer;">↺</button>';
+        h += '<button onclick="_llScriptDlg(\'d' + a.day + '\')" title="该天的活动脚本（可上传供大家使用，活动可用脚本打）" style="padding:2px 8px;border-radius:6px;border:1px solid rgba(240,147,43,0.45);background:rgba(240,147,43,0.12);color:#f0932b;font-size:0.66rem;cursor:pointer;">📜' + ((_lday.script || _lday.scriptUrl) ? '✓' : '') + '</button></div>';
         h += '</div></div>';
         return h;
     }
