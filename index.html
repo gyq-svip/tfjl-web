@@ -27,6 +27,15 @@
         <div style="width:220px;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden;animation:progressGlow 2s ease-in-out infinite;">
             <div id="loadingProgressBar" style="width:0%;height:100%;background:linear-gradient(90deg,#00bcd4,#00e5ff,#ffd700);border-radius:2px;transition:width 0.3s ease;"></div>
         </div>
+        <!-- 🔴 2026-09-22 更新/加载进度文字 + 慢网提示：以前遮罩 8 秒就消失，慢网时后面全是黑屏干等 -->
+        <div id="loadingStatusText" style="color:rgba(255,255,255,0.55);font-size:12px;margin-top:10px;letter-spacing:1px;">正在加载…</div>
+        <div id="loadingSlowHint" style="display:none;margin-top:18px;text-align:center;">
+            <div style="color:#ffd700;font-size:13px;line-height:1.8;max-width:360px;padding:0 10px;">
+                网络较慢：版本更新需要重新下载程序文件，可能需要 1~2 分钟。<br>
+                也可以切换网络（如手机热点 / 加速器）后点下面的按钮重试。
+            </div>
+            <button onclick="location.reload()" style="margin-top:10px;padding:8px 20px;border:none;border-radius:8px;background:linear-gradient(135deg,#ff9800,#e65100);color:#fff;cursor:pointer;font-size:0.85rem;font-weight:600;">🔄 重试</button>
+        </div>
         <!-- 跳动点 -->
         <div style="display:flex;gap:6px;margin-top:20px;">
             <div style="width:6px;height:6px;background:#00bcd4;border-radius:50%;animation:loadingDotBounce 1.2s ease-in-out infinite;"></div>
@@ -40,10 +49,10 @@
          深蓝色启动遮罩就会永久盖屏 → 表现为「蓝屏卡住、一直加载中请稍候」。
          点「强制刷新」时会清空 CacheStorage + 注销 SW + 移除 TFJL_NotFirst 兜底标记，
          所有资源都必须重新联网下载，因此最容易复现该卡死。
-         这里内联一份健壮实现：不依赖外部文件，任何情况下最多 8 秒必定放行。 -->
+         这里内联一份健壮实现：不依赖外部文件；带真实加载进度，慢网时给出提示与重试按钮，
+         最长 120 秒必定放行（2026-09-22：旧版 8 秒就撤遮罩 → 慢网更新时后面全是黑屏）。 -->
     <script>
     (function () {
-        var HARD_MS = 8000;
         var hidden = false;
         function hide(reason) {
             if (hidden) return;
@@ -67,17 +76,51 @@
         }
         window._hideLoadingScreen = hide;
         window._loadingHidden = function () { return hidden; };
-        // ① 正常路径：页面 load 完成
+        // ① 正常路径：**页面 load 完成**才收起（load = 所有 defer 脚本都已下载并执行完）。
+        //    🔴 2026-09-22 修复"每次更新黑屏很久"：旧逻辑在 DOMContentLoaded（脚本还在下载！）和
+        //       8 秒兜底就把遮罩撤了 → 慢网更新时用户面对的是几十秒纯黑屏、没有任何提示。
+        //    现在遮罩带**真实进度**（已加载 x/N 个文件）一直显示到 load，超过 12 秒出现"网络较慢/重试"提示。
         window.addEventListener('load', function () { hide('load'); });
-        // ①-b 更快路径：DOM 解析完即可隐藏（不等图片/外部资源 load，避免线上慢时 loading 屏长时间转圈）
-        document.addEventListener('DOMContentLoaded', function () { hide('domready'); });
-        // ② 硬超时兜底：无论外部 JS 是否加载成功，最多 8 秒必定放行，杜绝永久卡屏
-        setTimeout(function () { hide('8秒超时兜底'); }, HARD_MS);
-        // ③ 关键脚本加载失败也放行（script 的 error 不冒泡，必须用捕获阶段监听）
+        // ② 实时进度 + 慢网提示 + 硬兜底
+        var startedAt = Date.now();
+        var total = 0;
+        function countTargets() {
+            var n = 0;
+            try {
+                document.querySelectorAll('script[src],link[rel="stylesheet"]').forEach(function (el) {
+                    var u = el.src || el.href || '';
+                    if (u && u.indexOf(location.host) >= 0) n++;
+                });
+            } catch (e) {}
+            return n;
+        }
+        var SLOW_MS = 12000, HARD_MS = 120000;
+        var _progTimer = setInterval(function () {
+            if (hidden) { try { clearInterval(_progTimer); } catch (e) {} return; }
+            // 总数等 DOM 解析完再统计（本脚本在 <head> 里执行时 body 还没解析）
+            if (document.readyState !== 'loading' && !total) total = countTargets();
+            var done = 0;
+            try {
+                (performance.getEntriesByType('resource') || []).forEach(function (e) {
+                    if (e.name.indexOf(location.host) < 0) return;
+                    if (!/\.js|\.css/.test(e.name)) return;
+                    if (e.responseEnd > 0) done++;
+                });
+            } catch (e) {}
+            if (total > 0) {
+                var pct = Math.min(96, Math.round(done / total * 100));
+                try { var bar = document.getElementById('loadingProgressBar'); if (bar) bar.style.width = pct + '%'; } catch (e) {}
+                try { var st = document.getElementById('loadingStatusText'); if (st) st.textContent = '正在加载 ' + done + '/' + total + ' 个文件' + (pct >= 96 ? '，马上好…' : ''); } catch (e) {}
+            }
+            var el = Date.now() - startedAt;
+            try { if (el > SLOW_MS) { var h = document.getElementById('loadingSlowHint'); if (h) h.style.display = 'block'; } } catch (e) {}
+            if (el > HARD_MS) { try { clearInterval(_progTimer); } catch (e) {} hide('120秒兜底'); }
+        }, 300);
+        // ③ 关键脚本加载失败也提示（script 的 error 不冒泡，必须用捕获阶段监听）
         window.addEventListener('error', function (ev) {
             var t = ev && ev.target;
             if (t && t.tagName === 'SCRIPT') {
-                setTimeout(function () { hide('脚本加载失败: ' + (t.src || '')); }, 1200);
+                try { var st = document.getElementById('loadingStatusText'); if (st) st.textContent = '有文件加载失败，正在重试…（也可点下方重试按钮）'; } catch (e) {}
             }
         }, true);
     })();

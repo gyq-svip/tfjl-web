@@ -1,12 +1,5 @@
-
-    // 非首次启动跳过启动动画（SW缓存已命中，页面已渲染，动画反而挡屏幕）
-    (function(){
-        var notFirst = false;
-        try { notFirst = !!localStorage['TFJL_NotFirst']; } catch(e) {}
-        if(notFirst){
-            // 统一走 index.html 内联定义的隐藏函数（含淡出与移除）；取不到时退回直接隐藏
-            if (window._hideLoadingScreen) { window._hideLoadingScreen('非首次启动'); return; }
-            var s=document.getElementById('appLoadingScreen');
-            if(s)s.style.display='none';
-        }
-    })();
+    // 🔴 2026-09-22 不再在这里提前隐藏启动遮罩（原来"非首次启动"直接 hide → 缓存命中时无所谓，
+    //     但【版本更新】时缓存是空的、脚本要重新下载 → 遮罩被提前撤掉后就是几十秒纯黑屏（用户反馈"更新黑屏很久"））。
+    //     现在遮罩（index.html 内联）自带真实加载进度（x/N 个文件）+ 慢网提示 + 重试按钮，
+    //     并在 window.load（所有 defer 脚本下载执行完）或 app-core 就绪时自动收起 —— 缓存命中时 load 几乎立即触发，不会多等。
+    //     （此文件如需再放启动期逻辑，注意不要调用 window._hideLoadingScreen。）
