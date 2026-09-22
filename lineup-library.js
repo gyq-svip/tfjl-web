@@ -117,17 +117,31 @@
         _applySlots(p);
     }
     // ---------- 主页同款卡槽 ----------
-    // 生成 battle-slot 结构 + 用主页渲染管线 applySkinBgToSlot(slot, hero, hero, 'my', forceSkin) 上皮肤
-    // （forceSkin = 本阵容的个人皮肤选择；点卡槽 → 皮肤菜单；融合副卡也在菜单里）
-    function _slotHtml(which, idx, hero, lv, tab, id) {
-        const sid = 'll-' + tab + '-' + id + '-' + which + idx;
-        return '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;">'
-            + '<div class="battle-slot filled ll-slot" data-slot="' + sid + '" data-hero="' + _esc(hero) + '" data-tab="' + tab + '" data-lid="' + _esc(id) + '" data-w="' + which + '" title="点击换皮肤/融合" style="width:64px;height:64px;cursor:pointer;">'
+    // battle-slot 结构 + 主页渲染管线 applySkinBgToSlot(slot, hero, hero, 'my', forceSkin)
+    // forceSkin = 本阵容个人皮肤；徽标（Lv/魔/减伤）在渲染后叠加
+    function _slotHtml(which, idx, hero, tab, id) {
+        return '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;">'
+            + '<div class="battle-slot filled ll-slot" data-slot="ll-' + tab + '-' + id + '-' + which + idx + '" data-hero="' + _esc(hero) + '" data-tab="' + tab + '" data-lid="' + _esc(id) + '" data-w="' + which + '" title="点击：换皮肤 / 等级 / 魔化 / 融合 / 减伤" style="width:50px;height:50px;cursor:pointer;position:relative;">'
             + '<span class="card-item"><span class="card-name">' + _esc(hero) + '</span></span>'
             + '</div>'
-            + (tab === 'sail' ? '<input value="' + _esc(lv) + '" oninput="_llSet(\'sailing\',\'' + _escJs(id) + '\',\'lv\',\'' + _escJs(hero) + '\',this.value)" placeholder="Lv" style="width:40px;padding:1px 3px;border-radius:4px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.35);color:#ffd700;font-size:0.68rem;text-align:center;">' : '')
-            + '<div style="color:rgba(255,255,255,0.6);font-size:0.62rem;max-width:64px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" title="' + _esc(hero) + '">' + _esc(hero) + '</div>'
+            + '<div style="color:rgba(255,255,255,0.6);font-size:0.6rem;max-width:50px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" title="' + _esc(hero) + '">' + _esc(hero) + '</div>'
             + '</div>';
+    }
+    function _slotBadge(el, L, hero) {
+        const old = el.querySelector('.ll-badge'); if (old) old.remove();
+        const lv = (L.lv && L.lv[hero]) || '';
+        const mo = (L.mohua && L.mohua[hero]) || '';
+        const dr = (L.dr && L.dr[hero]) || '';
+        if (!lv && !mo && !dr) return;
+        const b = document.createElement('div');
+        b.className = 'll-badge';
+        b.style.cssText = 'position:absolute;left:1px;top:1px;display:flex;gap:2px;pointer-events:none;';
+        let inner = '';
+        if (lv) inner += '<span style="background:rgba(0,0,0,0.68);color:#ffd700;font-size:0.56rem;padding:0 3px;border-radius:3px;">Lv' + _esc(lv) + '</span>';
+        if (mo) inner += '<span style="background:rgba(156,39,176,0.78);color:#fff;font-size:0.56rem;padding:0 3px;border-radius:3px;">魔</span>';
+        if (dr) inner += '<span style="background:rgba(244,67,54,0.78);color:#fff;font-size:0.56rem;padding:0 3px;border-radius:3px;">-' + _esc(dr) + '%</span>';
+        b.innerHTML = inner;
+        el.appendChild(b);
     }
     function _applySlots(root) {
         if (!window.applySkinBgToSlot) return;
@@ -141,7 +155,7 @@
             const L = _slot(tab, lid);
             const force = (L.skin && L.skin[hero]) || undefined;
             Promise.resolve().then(function () { return window.applySkinBgToSlot(el, hero, hero, 'my', force); })
-                .catch(function () {}).then(step);
+                .catch(function () {}).then(function () { _slotBadge(el, L, hero); step(); });
         })();
     }
     // 皮肤/融合菜单（点卡槽弹出）
@@ -165,6 +179,12 @@
             if (!nm) return;
             h += '<div class="ll-opt" data-v="' + _esc(nm) + '" style="padding:3px 6px;border-radius:6px;cursor:pointer;font-size:0.75rem;' + (cur === nm ? 'background:rgba(78,205,196,0.2);color:#4ecdc4;' : 'color:rgba(255,255,255,0.8);') + '">' + _esc(nm) + '</div>';
         });
+        h += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.45);margin:6px 0 2px;">等级 / 魔化 / 减伤%</div>';
+        h += '<div style="display:flex;gap:4px;align-items:center;">';
+        h += '<input id="llLvInput" value="' + _esc((L.lv && L.lv[hero]) || '') + '" placeholder="Lv" style="width:52px;padding:3px 5px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.35);color:#ffd700;font-size:0.75rem;text-align:center;">';
+        h += '<label style="display:flex;align-items:center;gap:3px;color:rgba(255,255,255,0.8);font-size:0.72rem;cursor:pointer;"><input type="checkbox" id="llMoInput"' + ((L.mohua && L.mohua[hero]) ? ' checked' : '') + ' style="accent-color:#9c27b0;">魔化</label>';
+        h += '<input id="llDrInput" value="' + _esc((L.dr && L.dr[hero]) || '') + '" placeholder="减伤%" style="width:60px;padding:3px 5px;border-radius:6px;border:1px solid rgba(244,67,54,0.4);background:rgba(0,0,0,0.35);color:#ff8a80;font-size:0.75rem;text-align:center;">';
+        h += '</div>';
         h += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.45);margin:6px 0 2px;">融合副卡（选填）</div>';
         h += '<input id="llFusInput" value="' + _esc(fus) + '" style="width:100%;box-sizing:border-box;padding:4px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.35);color:#fff;font-size:0.75rem;">';
         h += '<div style="margin-top:6px;text-align:right;"><button onclick="this.closest(\'#llSkinMenu\').remove()" style="padding:2px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.6);font-size:0.72rem;cursor:pointer;">关闭</button></div>';
@@ -180,102 +200,95 @@
         m.querySelector('#llFusInput').addEventListener('input', function () {
             window._llSet(tab, lid, 'fus', hero, this.value);
         });
+        m.querySelector('#llLvInput').addEventListener('input', function () {
+            window._llSet(tab, lid, 'lv', hero, this.value);
+            _slotBadge(el, _slot(tab, lid), hero);
+        });
+        m.querySelector('#llMoInput').addEventListener('change', function () {
+            window._llSet(tab, lid, 'mohua', hero, this.checked ? '1' : '');
+            _slotBadge(el, _slot(tab, lid), hero);
+        });
+        m.querySelector('#llDrInput').addEventListener('input', function () {
+            window._llSet(tab, lid, 'dr', hero, this.value);
+            _slotBadge(el, _slot(tab, lid), hero);
+        });
         setTimeout(function () {
             document.addEventListener('pointerdown', function close(e) {
                 if (m && !m.contains(e.target)) { m.remove(); document.removeEventListener('pointerdown', close); }
             });
         }, 0);
     };
-    // ---------- 大航海卡片（左卡组 右笔记） ----------
+    // ---------- 大航海卡片（默认展开：左卡组 右战车/笔记） ----------
+    function _sumDr(L) { let t = 0; for (const k in (L.dr || {})) { const v = parseFloat(L.dr[k]); if (!isNaN(v)) t += v; } return Math.round(t * 10) / 10; }
+    function _cartSelect(tab, id, field, cur) {
+        let h = '<select onchange="_llSet(\'' + tab + '\',\'' + id + '\',\'' + field + '\',null,this.value)" style="padding:3px 6px;border-radius:6px;border:1px solid rgba(255,215,0,0.35);background:#2a2a4a;color:#ffd700;font-size:0.75rem;">';
+        h += '<option value="">未设置</option>';
+        (window.CHARIOT_LIST || []).forEach(function (cn, i) { h += '<option value="' + (i + 1) + '"' + (String(cur) === String(i + 1) ? ' selected' : '') + '>' + _esc(cn) + '</option>'; });
+        h += '</select>';
+        return h;
+    }
     function _sailCard(s) {
         const key = s.id;
         const L = _slot('sailing', key);
-        const open = !!state.open[key];
         const cartName = L.cart && window.CHARIOT_LIST ? (window.CHARIOT_LIST[Number(L.cart) - 1] || '') : '';
-        let h = '<div class="ll-card" style="border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:8px 10px;margin-bottom:8px;background:rgba(0,0,0,0.22);">';
-        h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">';
-        h += '<b style="color:#4ecdc4;font-size:0.9rem;">#' + s.n + '</b>';
-        if (cartName) h += '<span style="font-size:0.72rem;color:#ffd700;background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.35);border-radius:6px;padding:1px 6px;">🚂 ' + _esc(cartName) + '</span>';
-        const notesHit = (L.notes && (L.notes.n219 || L.notes.n229 || L.notes.n230 || L.notes.other));
-        if (notesHit) h += '<span style="font-size:0.7rem;color:#f0932b;">📝 已记波次</span>';
+        const cart2Name = L.cart2 && window.CHARIOT_LIST ? (window.CHARIOT_LIST[Number(L.cart2) - 1] || '') : '';
+        const sum = _sumDr(L);
+        let h = '<div class="ll-card" style="border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:7px 9px;margin-bottom:7px;background:rgba(0,0,0,0.22);">';
+        h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px;">';
+        h += '<b style="color:#4ecdc4;font-size:0.88rem;">#' + s.n + '</b>';
+        if (cartName) h += '<span style="font-size:0.7rem;color:#ffd700;background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.35);border-radius:6px;padding:1px 6px;">主🚂 ' + _esc(cartName) + '</span>';
+        if (cart2Name) h += '<span style="font-size:0.7rem;color:#ffe082;background:rgba(255,224,130,0.1);border:1px solid rgba(255,224,130,0.3);border-radius:6px;padding:1px 6px;">副🚂 ' + _esc(cart2Name) + '</span>';
+        if (sum > 0) h += '<span style="font-size:0.7rem;color:#ff8a80;background:rgba(244,67,54,0.1);border:1px solid rgba(244,67,54,0.3);border-radius:6px;padding:1px 6px;">🛡️ 减伤 ' + sum + '%</span>';
         h += '<span style="flex:1;"></span>';
-        h += '<button onclick="_llToggle(\'' + key + '\')" style="padding:2px 10px;border-radius:6px;border:1px solid rgba(78,205,196,0.4);background:rgba(78,205,196,0.1);color:#4ecdc4;font-size:0.72rem;cursor:pointer;">' + (open ? '▲ 收起' : '▼ 卡组与笔记') + '</button>';
+        h += '<span style="color:rgba(255,255,255,0.3);font-size:0.68rem;">权重' + s.w + '</span>';
         h += '</div>';
-        if (!open) {
-            h += '<div style="color:rgba(255,255,255,0.65);font-size:0.74rem;line-height:1.6;">' + s.heroes.map(_esc).join(' · ') + '</div>';
-        } else {
-            h += '<div style="display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:10px;">';
-            // 左：卡组槽位（主页同款）
-            h += '<div><div style="color:rgba(255,255,255,0.45);font-size:0.68rem;margin-bottom:4px;">🃏 卡组（点卡槽换皮肤 / 填等级）</div>';
-            h += '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;">';
-            s.heroes.forEach(function (n, i) {
-                h += _slotHtml(i < 5 ? 'u' : 'd', i % 5, n, (L.lv && L.lv[n]) || '', 'sailing', s.id);
-            });
-            h += '</div></div>';
-            // 右：笔记
-            h += '<div style="border-left:1px dashed rgba(255,255,255,0.15);padding-left:10px;">';
-            h += '<div style="color:rgba(255,255,255,0.45);font-size:0.68rem;margin-bottom:4px;">📝 笔记（只存本机）</div>';
-            h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">';
-            h += '<span style="color:rgba(255,255,255,0.6);font-size:0.72rem;">🚂 战车</span>';
-            h += '<select onchange="_llSet(\'sailing\',\'' + s.id + '\',\'cart\',null,this.value)" style="flex:1;padding:4px 8px;border-radius:6px;border:1px solid rgba(255,215,0,0.35);background:#2a2a4a;color:#ffd700;font-size:0.78rem;">';
-            h += '<option value="">未设置</option>';
-            (window.CHARIOT_LIST || []).forEach(function (cn, i) { h += '<option value="' + (i + 1) + '"' + (String(L.cart) === String(i + 1) ? ' selected' : '') + '>' + _esc(cn) + '</option>'; });
-            h += '</select></div>';
-            [['n219', '219波'], ['n229', '229波'], ['n230', '230波'], ['other', '其他']].forEach(function (p2) {
-                const val = (L.notes && L.notes[p2[0]]) || '';
-                h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">';
-                h += '<span style="color:#f0932b;font-size:0.72rem;font-weight:700;min-width:38px;">' + p2[1] + '</span>';
-                h += '<input value="' + _esc(val) + '" oninput="_llSet(\'sailing\',\'' + s.id + '\',\'notes\',\'' + p2[0] + '\',this.value)" placeholder="这波上什么卡…" style="flex:1;padding:4px 6px;border-radius:5px;border:1px solid rgba(240,147,43,0.3);background:rgba(0,0,0,0.3);color:rgba(255,255,255,0.85);font-size:0.72rem;">';
-                h += '</div>';
-            });
-            h += '<div style="margin-top:6px;"><button onclick="_llReset(\'sailing\',\'' + s.id + '\')" style="padding:2px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.5);font-size:0.7rem;cursor:pointer;">↺ 重置个人设置</button></div>';
-            h += '</div></div>';
-        }
+        h += '<div style="display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:10px;">';
+        h += '<div><div style="color:rgba(255,255,255,0.4);font-size:0.64rem;margin-bottom:3px;">🃏 点卡槽：换皮肤 / 等级 / 魔化 / 融合 / 减伤</div>';
+        h += '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;">';
+        s.heroes.forEach(function (n, i) { h += _slotHtml(i < 5 ? 'u' : 'd', i % 5, n, 'sailing', s.id); });
+        h += '</div></div>';
+        h += '<div style="border-left:1px dashed rgba(255,255,255,0.15);padding-left:10px;">';
+        h += '<div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">';
+        h += '<span style="color:rgba(255,255,255,0.55);font-size:0.7rem;min-width:30px;">主车</span>' + _cartSelect('sailing', s.id, 'cart', L.cart);
+        h += '</div>';
+        h += '<div style="display:flex;align-items:center;gap:4px;margin-bottom:5px;">';
+        h += '<span style="color:rgba(255,255,255,0.55);font-size:0.7rem;min-width:30px;">副车</span>' + _cartSelect('sailing', s.id, 'cart2', L.cart2);
+        h += '</div>';
+        [['n219', '219波'], ['n229', '229波'], ['n230', '230波'], ['other', '其他']].forEach(function (p2) {
+            const val = (L.notes && L.notes[p2[0]]) || '';
+            h += '<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">';
+            h += '<span style="color:#f0932b;font-size:0.7rem;font-weight:700;min-width:36px;">' + p2[1] + '</span>';
+            h += '<input value="' + _esc(val) + '" oninput="_llSet(\'sailing\',\'' + s.id + '\',\'notes\',\'' + p2[0] + '\',this.value)" placeholder="这波上什么卡…" style="flex:1;padding:3px 6px;border-radius:5px;border:1px solid rgba(240,147,43,0.3);background:rgba(0,0,0,0.3);color:rgba(255,255,255,0.85);font-size:0.7rem;">';
+            h += '</div>';
+        });
+        h += '<div style="margin-top:4px;"><button onclick="_llReset(\'sailing\',\'' + s.id + '\')" style="padding:2px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.5);font-size:0.68rem;cursor:pointer;">↺ 重置个人设置</button></div>';
+        h += '</div></div>';
         h += '</div>';
         return h;
     }
     // ---------- 活动阵容卡片（左 A/B 卡组 右战车） ----------
     function _actCard(a) {
-        let h = '<div style="border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:8px 10px;margin-bottom:8px;background:rgba(0,0,0,0.22);">';
+        let h = '<div class="ll-card" style="border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:7px 9px;margin-bottom:7px;background:rgba(0,0,0,0.22);">';
         h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">';
-        h += '<b style="color:#ffd700;font-size:0.9rem;">轮转第 ' + a.day + ' 天</b>';
-        h += '<span style="flex:1;"></span>';
-        h += '<button onclick="_llToggle(\'a' + a.day + '\')" style="padding:2px 10px;border-radius:6px;border:1px solid rgba(255,215,0,0.4);background:rgba(255,215,0,0.08);color:#ffd700;font-size:0.72rem;cursor:pointer;">' + (state.open['a' + a.day] ? '▲ 收起' : '▼ 卡组与战车') + '</button>';
+        h += '<b style="color:#ffd700;font-size:0.88rem;">轮转第 ' + a.day + ' 天</b>';
         h += '</div>';
-        if (!state.open['a' + a.day]) {
-            ['A', 'B'].forEach(function (ab) {
-                h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">';
-                h += '<span style="font-weight:800;color:' + (ab === 'A' ? '#4ecdc4' : '#f0932b') + ';font-size:0.78rem;min-width:14px;">' + ab + '</span>';
-                h += '<div style="color:rgba(255,255,255,0.65);font-size:0.74rem;">' + (a[ab] || []).map(_esc).join(' · ') + '</div>';
-                h += '</div>';
-            });
-        } else {
-            h += '<div style="display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:10px;">';
-            h += '<div>';
-            ['A', 'B'].forEach(function (ab) {
-                h += '<div style="font-weight:800;color:' + (ab === 'A' ? '#4ecdc4' : '#f0932b') + ';font-size:0.76rem;margin:4px 0 3px;">' + ab + ' 组（点卡槽换皮肤/融合）</div>';
-                h += '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:6px;">';
-                (a[ab] || []).forEach(function (n, i) {
-                    h += _slotHtml(ab.toLowerCase(), i % 5, n, '', 'activity', 'd' + a.day);
-                });
-                h += '</div>';
-            });
-            h += '</div>';
-            h += '<div style="border-left:1px dashed rgba(255,255,255,0.15);padding-left:10px;">';
-            h += '<div style="color:rgba(255,255,255,0.45);font-size:0.68rem;margin-bottom:4px;">🚂 战车（各自本机）</div>';
+        {
             ['A', 'B'].forEach(function (ab) {
                 const id = 'd' + a.day + ab;
                 const L = _slot('activity', id);
-                h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">';
-                h += '<span style="font-weight:800;color:' + (ab === 'A' ? '#4ecdc4' : '#f0932b') + ';font-size:0.78rem;min-width:14px;">' + ab + '</span>';
-                h += '<select onchange="_llSet(\'activity\',\'' + id + '\',\'cart\',null,this.value)" style="flex:1;padding:4px 8px;border-radius:6px;border:1px solid rgba(255,215,0,0.35);background:#2a2a4a;color:#ffd700;font-size:0.78rem;">';
-                h += '<option value="">未设置</option>';
-                (window.CHARIOT_LIST || []).forEach(function (cn, i) { h += '<option value="' + (i + 1) + '"' + (String(L.cart) === String(i + 1) ? ' selected' : '') + '>' + _esc(cn) + '</option>'; });
-                h += '</select></div>';
+                const sum = _sumDr(L);
+                h += '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:3px 0 4px;">';
+                h += '<span style="font-weight:800;color:' + (ab === 'A' ? '#4ecdc4' : '#f0932b') + ';font-size:0.8rem;">' + ab + ' 组</span>';
+                h += '<span style="color:rgba(255,255,255,0.5);font-size:0.7rem;">主车</span>' + _cartSelect('activity', id, 'cart', L.cart);
+                h += '<span style="color:rgba(255,255,255,0.5);font-size:0.7rem;">副车</span>' + _cartSelect('activity', id, 'cart2', L.cart2);
+                if (sum > 0) h += '<span style="font-size:0.68rem;color:#ff8a80;">🛡️ ' + sum + '%</span>';
+                h += '</div>';
+                h += '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:6px;">';
+                (a[ab] || []).forEach(function (n, i) { h += _slotHtml(ab.toLowerCase(), i % 5, n, 'activity', 'd' + a.day); });
+                h += '</div>';
             });
-            h += '<div style="margin-top:6px;"><button onclick="_llReset(\'activity\',\'d' + a.day + '\')" style="padding:2px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.5);font-size:0.7rem;cursor:pointer;">↺ 重置该天设置</button></div>';
-            h += '</div></div>';
         }
+        h += '<div style="text-align:right;"><button onclick="_llReset(\'activity\',\'d' + a.day + '\')" style="padding:2px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.5);font-size:0.68rem;cursor:pointer;">↺ 重置该天设置</button></div>';
         h += '</div>';
         return h;
     }
