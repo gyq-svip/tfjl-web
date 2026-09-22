@@ -123,6 +123,7 @@
         }
         p.innerHTML = h;
         _applySlots(p);
+        _refreshDrSums(p);
     }
     // ---------- 主页同款卡槽 ----------
     // battle-slot 结构 + 主页渲染管线 applySkinBgToSlot(slot, hero, hero, 'my', forceSkin)
@@ -138,28 +139,30 @@
             + '<span class="card-item"><span class="card-name">' + _esc(hero) + '</span></span>'
             + '</div>';
     }
-    // 🔴 2026-09-22 减伤直接读现有减伤表（不手动设置）：航海/活动A组=「我的」表，活动B组=「队友」表；
-    //    小野/酋长/宝库/我的战车/队友战车是表级特殊项，普通卡在 洗炼[卡名]
-    function _tableFor(tab, w) { return (tab === 'act' && w === 'b') ? '队友' : '我的'; }
-    function _cardDr(table, hero) {
-        try {
-            const tb = window.drTables && (window.drTables[table] || window.drTables['我的']);
-            if (!tb) return 0;
-            if (tb.洗炼 && tb.洗炼[hero] != null) return parseFloat(tb.洗炼[hero]) || 0;
-            if (tb[hero] != null) return parseFloat(tb[hero]) || 0;
-            return 0;
-        } catch (e) { return 0; }
+    // 🔴 2026-09-22 减伤计算全部改用主页现成的 getDamageReductionBreakdown（洗炼+小野/酋长/宝库特殊技能+战车，
+    //    与主页完全一致）——旧的 _cardDr/_sumDr 只读洗炼、漏了特殊卡表级值和战车（用户实测 260% 只算出部分）。
+    //    卡上不再画减伤角标（被名字挡住）；组头 🛡️ 悬浮显示主页同款拆分明细。
+    function _drCards(tab, lid, heroes) {
+        const L = _slot(tab, lid);
+        return (heroes || []).map(function (n) {
+            const f = L.fus && L.fus[n];
+            if (f) { const p = (window.getFusionParts ? window.getFusionParts(f) : null); if (p && p.length >= 2) return p.join('+'); return f; }
+            return n;
+        }).map(function (n) { return { name: n }; });   // breakdown 的 cardList 元素格式 = {name}
     }
-    function _sumDr(table, heroes) { let t = 0; (heroes || []).forEach(function (n) { t += _cardDr(table, n); }); return Math.round(t * 10) / 10; }
-    function _slotBadge(el, dr) {
-        const old = el.querySelector('.ll-badge'); if (old) old.remove();
-        if (!dr) return;
-        const b = document.createElement('div');
-        b.className = 'll-badge';
-        // 🔴 2026-09-22 减伤角标移右下（原左上与融合卡渲染重叠；融合切角小图在左下、金边在右上，右下最空）
-        b.style.cssText = 'position:absolute;right:1px;bottom:1px;display:flex;gap:2px;pointer-events:none;';
-        b.innerHTML = '<span style="background:rgba(244,67,54,0.78);color:#fff;font-size:0.56rem;padding:0 3px;border-radius:3px;">-' + _esc(dr) + '%</span>';
-        el.appendChild(b);
+    function _refreshDrSums(root) {
+        (root || document.getElementById('llList') || document).querySelectorAll('.ll-drsum').forEach(function (el) {
+            try {
+                const heroes = JSON.parse(el.getAttribute('data-heroes') || '[]');
+                const cards = _drCards(el.getAttribute('data-tab'), el.getAttribute('data-lid'), heroes);
+                const bd = (window.getDamageReductionBreakdown ? window.getDamageReductionBreakdown(cards, el.getAttribute('data-side') || 'my', el.getAttribute('data-table') || '我的') : null);
+                if (!bd) { el.textContent = '🛡️—'; return; }
+                el.textContent = '🛡️' + bd.total + '%';
+                const tip = (window.formatDrTooltip ? window.formatDrTooltip(bd) : '') + '｜战车按主页战车框配置；融合卡拆主/副卡计';
+                el.title = tip;
+                el.setAttribute('data-tip', tip);
+            } catch (e) {}
+        });
     }
     function _applySlots(root) {
         if (!window.applySkinBgToSlot) return;
@@ -169,15 +172,16 @@
             if (i >= slots.length) return;
             const el = slots[i++];
             const hero = el.getAttribute('data-hero');
-            const tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid'), w = el.getAttribute('data-w');
+            const tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid');
             const L = _slot(tab, lid);
             const force = (L.skin && L.skin[hero]) || undefined;
-            // 🔴 2026-09-22 融合卡渲染与主页一致：槽位卡名直接用融合卡名（applySkinBgToSlot 内部走对角切割渲染）
-            const cur = (L.fus && L.fus[hero]) || hero;
-            const table = _tableFor(tab, w);
-            const dr = _cardDr(table, hero);
-            Promise.resolve().then(function () { return window.applySkinBgToSlot(el, cur, cur, 'my', force); })
-                .catch(function () {}).then(function () { _slotBadge(el, dr); _fusBadge(el, (L.fus && L.fus[hero]) || ''); step(); });
+            // 🔴 2026-09-22 融合卡渲染与主页一致：槽位卡名直接用融合卡名（applySkinBgToSlot 内部走对角切割渲染）。
+            //    第6参 forceMainSkin：融合卡的主卡皮肤（融合分支只读项目级存储，外部必须显式传）。
+            //    🔴 减伤不再画在卡上（用户要求：右下角被名字挡住）——组头 🛡️ 悬浮明细统一在 _refreshDrSums 计算。
+            const fus = (L.fus && L.fus[hero]) || '';
+            const cur = fus || hero;
+            Promise.resolve().then(function () { return window.applySkinBgToSlot(el, cur, cur, 'my', force, fus ? force : undefined); })
+                .catch(function () {}).then(function () { _fusBadge(el, fus); step(); });
         })();
     }
     // 🔴 2026-09-22 快捷操作（与主页融合一致，用户要求）：
@@ -220,7 +224,7 @@
         if (next.sub) { try { window.fusionSkins = window.fusionSkins || {}; window.fusionSkins[next.sub] = next.skin; } catch (e2) {} }
         const skin = (L.skin && L.skin[hero]) || undefined;
         const shown = next.v || hero;
-        Promise.resolve().then(function () { return window.applySkinBgToSlot(el, shown, shown, 'my', skin); }).catch(function () {}).then(function () { _fusBadge(el, next.v); });
+        Promise.resolve().then(function () { return window.applySkinBgToSlot(el, shown, shown, 'my', skin, next.v ? skin : undefined); }).catch(function () {}).then(function () { _fusBadge(el, next.v); _refreshDrSums(document.getElementById('llList')); });
         try { if (typeof showToast === 'function') showToast(next.v ? (next.v + (next.skin ? ' · 副卡皮:' + next.skin : ' · 副卡默认皮')) : '已关闭融合（' + hero + '）', 'info'); } catch (e2) {}
     };
     //   右键 = 循环【主卡】皮肤（🔴 2026-09-22 修复：融合后也一直可切，与左键融合循环互不影响；列表=主页卡池 getHeroSkins）
@@ -236,8 +240,11 @@
         let i = names.indexOf(cur); if (i < 0) i = 0;
         const next = names[(i + 1) % names.length];
         window._llSet(tab, lid, 'skin', hero, next);
-        const shown = (L.fus && L.fus[hero]) || hero;
-        Promise.resolve().then(function () { return window.applySkinBgToSlot(el, shown, shown, 'my', next || undefined); }).catch(function () {});
+        const fus = (L.fus && L.fus[hero]) || '';
+        const shown = fus || hero;
+        // 🔴 融合态必须传第6参 forceMainSkin（融合分支只认它，第5参被忽略）——修复"显示切了但皮肤没换"
+        Promise.resolve().then(function () { return window.applySkinBgToSlot(el, shown, shown, 'my', next || undefined, fus ? (next || undefined) : undefined); })
+            .catch(function () {}).then(function () { _refreshDrSums(document.getElementById('llList')); });
         try { if (typeof showToast === 'function') showToast(hero + ' 主卡皮肤 → ' + (next || '默认'), 'info'); } catch (e2) {}
     };
     // ---------- 活动脚本（🔴 2026-09-22 用户要求：活动可以用脚本去打，每天一个脚本，可上传到脚本分享供大家使用） ----------
@@ -282,13 +289,25 @@
             if (!content) { try { if (typeof showToast === 'function') showToast('先贴入脚本文本', 'warn'); } catch (e) {} return; }
             const btn = this; btn.disabled = true; btn.textContent = '⏳ 上传中…';
             try {
-                if (typeof window.uploadScriptToGist !== 'function') throw new Error('上传设施未就绪');
                 const fname = '活动第' + day + '天_阵容脚本_' + String(Date.now()).slice(-6) + '.js';
-                const url = await window.uploadScriptToGist({ name: fname }, content);
+                let url = '';
+                if (typeof window.uploadScriptToGist === 'function') {
+                    url = await window.uploadScriptToGist({ name: fname }, content);
+                } else {
+                    // 🔴 回退：app-core 旧缓存未暴露上传函数时，直接调 GitHub API（同格式，描述含「脚本分享」→ 进脚本墙）
+                    const token = (typeof window.getGistToken === 'function') ? window.getGistToken() : '';
+                    if (!token) throw new Error('无 Gist Token（请在主页设置里配置）');
+                    const resp = await fetch('https://api.github.com/gists', { method: 'POST', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token }, body: JSON.stringify({ description: '脚本分享: ' + fname, public: true, files: { [fname]: { content: content } } }) });
+                    if (!resp.ok) { const er = await resp.json().catch(function () { return {}; }); throw new Error(er.message || ('HTTP ' + resp.status)); }
+                    const data = await resp.json();
+                    const fd = data.files && data.files[fname];
+                    url = (fd && fd.raw_url) || data.html_url || '';
+                }
                 window._llSet('activity', id, 'script', null, ta.value);
                 window._llSet('activity', id, 'scriptUrl', null, url);
+                window._llSet('activity', id, 'scriptName', null, fname);
                 urlLine.style.display = 'block'; urlSpan.textContent = url;
-                try { if (typeof showToast === 'function') showToast('已上传到脚本分享，大家可以在脚本墙看到了', 'success'); } catch (e) {}
+                try { if (typeof showToast === 'function') showToast('已上传到脚本分享：' + fname, 'success'); } catch (e) {}
             } catch (e) {
                 try { if (typeof showToast === 'function') showToast('上传失败：' + (e && e.message || e) + '（需要已配置 Gist Token）', 'error'); } catch (e2) {}
             }
@@ -306,14 +325,13 @@
     }
     function _sailCard(s) {
         const L = _slot('sailing', s.id);
-        const sum = _sumDr('我的', s.heroes);
         let h = '<div class="ll-card" style="border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:6px 9px;margin-bottom:10px;background:rgba(0,0,0,0.22);">';
         // 组头：#N + 主车 + 副车 + 减伤（小字，在卡组上方）
         h += '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:4px;">';
         h += '<b style="color:#4ecdc4;font-size:0.85rem;">#' + s.n + '</b>';
         h += '<span style="color:rgba(255,255,255,0.5);font-size:0.66rem;">主</span>' + _cartSelect('sailing', s.id, 'cart', L.cart);
         h += '<span style="color:rgba(255,255,255,0.5);font-size:0.66rem;">副</span>' + _cartSelect('sailing', s.id, 'cart2', L.cart2);
-        h += '<span style="color:#ff8a80;font-size:0.66rem;">🛡️' + sum + '%</span>';
+        h += '<span class="ll-drsum" data-tab="sailing" data-lid="' + _esc(s.id) + '" data-side="my" data-table="我的" data-heroes="' + _esc(JSON.stringify(s.heroes)) + '" title="减伤明细" style="color:#ff8a80;font-size:0.66rem;font-weight:700;cursor:help;">🛡️…</span>';
         h += '</div>';
         // 卡组（5×2）+ 右侧波次备注列（🔴 2026-09-22 用户要求：备注放卡组右边，正好填补空白）
         h += '<div style="display:flex;align-items:flex-start;gap:10px;">';
@@ -344,22 +362,23 @@
         ['A', 'B'].forEach(function (ab) {
             const id = 'd' + a.day + ab;
             const L = _slot('activity', id);
-            const table = _tableFor('act', ab.toLowerCase());
-            const sum = _sumDr(table, a[ab]);
+            const st = (ab === 'A') ? { side: 'my', table: '我的' } : { side: 'teammate', table: '队友' };
             h += '<div>';
             h += '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:4px;">';
             h += '<span style="font-weight:800;color:' + (ab === 'A' ? '#4ecdc4' : '#f0932b') + ';font-size:0.76rem;">' + ab + '组</span>';
             h += '<span style="color:rgba(255,255,255,0.45);font-size:0.62rem;">主</span>' + _cartSelect('activity', id, 'cart', L.cart);
             h += '<span style="color:rgba(255,255,255,0.45);font-size:0.62rem;">副</span>' + _cartSelect('activity', id, 'cart2', L.cart2);
-            h += '<span style="color:#ff8a80;font-size:0.64rem;">🛡️' + sum + '%</span>';
+            h += '<span class="ll-drsum" data-tab="activity" data-lid="d' + a.day + '" data-side="' + st.side + '" data-table="' + st.table + '" data-heroes="' + _esc(JSON.stringify(a[ab] || [])) + '" title="减伤明细" style="color:#ff8a80;font-size:0.64rem;font-weight:700;cursor:help;">🛡️…</span>';
             h += '</div>';
             h += '<div style="display:grid;grid-template-columns:repeat(5,60px);gap:5px;">';
             (a[ab] || []).forEach(function (n, i) { h += _slotHtml(ab.toLowerCase(), i, n, 'activity', 'd' + a.day, 60); });
             h += '</div></div>';
         });
         const _lday = _slot('activity', 'd' + a.day);   // 🔴 天级个人设置（脚本文本/链接存这里，与 A/B 槽位分开）
-        h += '<div style="align-self:center;display:flex;flex-direction:column;gap:4px;"><button onclick="_llReset(\'activity\',\'d' + a.day + '\')" title="重置该天个人设置" style="padding:2px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.5);font-size:0.66rem;cursor:pointer;">↺</button>';
-        h += '<button onclick="_llScriptDlg(\'d' + a.day + '\')" title="该天的活动脚本（可上传供大家使用，活动可用脚本打）" style="padding:2px 8px;border-radius:6px;border:1px solid rgba(240,147,43,0.45);background:rgba(240,147,43,0.12);color:#f0932b;font-size:0.66rem;cursor:pointer;">📜' + ((_lday.script || _lday.scriptUrl) ? '✓' : '') + '</button></div>';
+        h += '<div style="align-self:center;display:flex;flex-direction:column;gap:4px;align-items:center;"><button onclick="_llReset(\'activity\',\'d' + a.day + '\')" title="重置该天个人设置" style="padding:2px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.5);font-size:0.66rem;cursor:pointer;">↺</button>';
+        h += '<button onclick="_llScriptDlg(\'d' + a.day + '\')" title="该天的活动脚本（可上传供大家使用，活动可用脚本打）" style="padding:2px 8px;border-radius:6px;border:1px solid rgba(240,147,43,0.45);background:rgba(240,147,43,0.12);color:#f0932b;font-size:0.66rem;cursor:pointer;">📜' + ((_lday.script || _lday.scriptUrl) ? '✓' : '') + '</button>';
+        if (_lday.scriptName) h += '<div title="' + _esc(_lday.scriptName) + '" style="max-width:88px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:rgba(240,147,43,0.8);font-size:0.56rem;cursor:help;">' + _esc(_lday.scriptName) + '</div>';
+        h += '</div>';
         h += '</div></div>';
         return h;
     }

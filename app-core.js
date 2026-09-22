@@ -8128,6 +8128,8 @@
         window.getFusionVariantsForBase = getFusionVariantsForBase;
         window.getFusionParts = getFusionParts;
         window.uploadScriptToGist = uploadScriptToGist;   // 图库活动阵容的「📜脚本」上传（描述含"脚本分享"→ 自动进脚本墙）
+        window.getDamageReductionBreakdown = getDamageReductionBreakdown;   // 图库组头减伤悬浮明细（主页同款计算）
+        window.formatDrTooltip = formatDrTooltip;
         // 基础英雄 → 以其为主卡(part[0])的融合卡列表
         function getFusionVariantsForBase(baseHero) {
             if (!baseHero) return [];
@@ -11353,7 +11355,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         }
 
         // 给战斗槽卡牌应用皮肤背景
-        async function applySkinBgToSlot(slot, heroName, forceCardId, forceHandType, forceSkin) {
+        async function applySkinBgToSlot(slot, heroName, forceCardId, forceHandType, forceSkin, forceMainSkin) {
             // 🔴 2026-08-30 黑屏根治：原实现一进来就删除旧 .skin-layer / .skin-layer-fused，
             //    然后 await resolveHeroSkinInfo（本地磁盘读图+canvas 缩放，几百 ms）。
             //    等待期间槽位无任何皮肤层 → 黑窗；右键一次触发 3 个并发重绘（setCardSkin 的 forEach
@@ -11377,7 +11379,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     const mainHero = parts[0], fusedHero = parts[1];
                     const slotCardId = forceCardId !== undefined ? forceCardId : (slot && slot.dataset ? slot.dataset.cardId : null);
                     const slotHandType = forceHandType !== undefined ? forceHandType : (slot && slot.dataset && slot.dataset.handType ? slot.dataset.handType : 'my');
-                    const mainSkin = slotCardId ? getCardSkin(slotCardId, mainHero, slotHandType) : '默认';
+                    // 🔴 2026-09-22 第6参 forceMainSkin：阵容图库等外部渲染融合卡时显式指定主卡皮肤
+                    //    （融合分支原本只读项目级 getCardSkin(cardId)，外部无项目上下文 → 传了也无效）。
+                    //    仅在显式传入时生效，主页所有调用点不传第6参 → 行为完全不变。
+                    const mainSkin = (forceMainSkin !== undefined && forceMainSkin !== null) ? forceMainSkin : (slotCardId ? getCardSkin(slotCardId, mainHero, slotHandType) : '默认');
                     let mainInfo = null;
                     if (window.resolveHeroSkinInfo) {
                         mainInfo = await window.resolveHeroSkinInfo(mainHero, mainSkin);
