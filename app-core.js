@@ -11495,6 +11495,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             /* [SKIN log muted] */ void (0) && console.log('[SKIN] Skin <img> updated for slot', slot.dataset.slot);
         }
 
+        // 🔴 2026-09-22 暴露给「阵容图库」(lineup-library.js)：复用主页同款卡槽皮肤渲染管线（含融合/双缓冲）
+        try { window.applySkinBgToSlot = applySkinBgToSlot; } catch (e) {}
+
         async function restoreBattleSlots() {
             // 恢复我方战斗槽
             for (const card of myPlacedCards) {
