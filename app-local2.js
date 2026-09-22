@@ -4457,9 +4457,41 @@ if (true) {
             setTimeout(function () { div.style.opacity = '0'; div.style.transition = 'opacity 0.4s'; setTimeout(function () { if (div.parentNode) div.parentNode.removeChild(div); }, 400); }, 6000);
         } catch (e) {}
     }
+    // 🔴 2026-09-22 云端配置本地持久化：fusions.json（融合定义）/cards.json/skin-attributes.json 都要联网拉取，
+    //    网络抽风时拉不到 → cloudFusions 为空 → 死神冰骑/小野酋长/咕咕萨满等融合卡被当"无名单卡" → 皮肤全丢（用户日志实测）。
+    //    现在把"上次成功的结果"存 localStorage，启动与拉取失败时立即恢复 —— 融合卡从第一帧就能被识别，联网成功后自动被新数据覆盖。
+    function _cacheCloudJson(key, val) { try { localStorage.setItem(key, JSON.stringify({ t: Date.now(), v: val })); } catch (e) {} }
+    function _readCloudJson(key) {
+        try {
+            const raw = localStorage.getItem(key); if (!raw) return null;
+            const o = JSON.parse(raw);
+            if (!o || !o.v || !Object.keys(o.v).length) return null;
+            if (Date.now() - (o.t || 0) > 30 * 24 * 3600 * 1000) return null;   // 30 天过期：融合定义很少变，宁旧勿缺
+            return o.v;
+        } catch (e) { return null; }
+    }
+    function _restoreCloudConfigs() {
+        try {
+            if (!window.cloudFusions || !Object.keys(window.cloudFusions).length) {
+                const c = _readCloudJson('tfjl_cloud_fusions');
+                if (c) { window.cloudFusions = c; console.log('[SKIN] cloud fusions 从本地缓存恢复:', Object.keys(c).length, '条（网络恢复后会自动更新）'); }
+            }
+            if (!window.cloudCards || !Object.keys(window.cloudCards).length) {
+                const c = _readCloudJson('tfjl_cloud_cards');
+                if (c) { window.cloudCards = c; console.log('[SKIN] cloud cards 从本地缓存恢复:', Object.keys(c).length, '条'); }
+            }
+            if (!window.skinAttributesCloud || !Object.keys(window.skinAttributesCloud).length) {
+                const c = _readCloudJson('tfjl_skin_attrs');
+                if (c) { window.skinAttributesCloud = c; console.log('[SKIN] skin-attributes 从本地缓存恢复:', Object.keys(c).length, '条'); }
+            }
+        } catch (e) {}
+    }
+    _restoreCloudConfigs();   // 模块加载即恢复（先于任何渲染，消除"启动空窗"）
+
     async function syncRemoteSkins(force) {
         if (_remoteSkinSynced && !force) return;
         _remoteSkinSynced = true;
+        _restoreCloudConfigs();   // 同步开始前再兜一次（防启动后被清）
         console.log('[SKIN] syncRemoteSkins() fetching registry from:', REMOTE_SKIN_REGISTRY_URL);
         try {
             const resp = await _fetchWithTimeout(REMOTE_SKIN_REGISTRY_URL, 8000, { cache: 'no-cache' });
@@ -4504,26 +4536,33 @@ if (true) {
             }
 
             // 拉取融合卡定义（云端 fusions.json，管理员维护）
+            // 🔴 2026-09-22 成功即落本地缓存；失败/未拉到时保持 _restoreCloudConfigs 恢复的旧数据（不再留空窗）
             try {
                 const fResp = await fetch(REMOTE_SKIN_FUSIONS_URL, { cache: 'no-cache' });
                 if (fResp.ok) {
                     const fData = await fResp.json();
                     if (fData && fData.fusions) {
                         window.cloudFusions = fData.fusions;
+                        _cacheCloudJson('tfjl_cloud_fusions', fData.fusions);
                         console.log('[SKIN] cloud fusions loaded:', Object.keys(fData.fusions).length);
                         if (typeof window.renderFusionCardsToPool === 'function') window.renderFusionCardsToPool();
                     }
+                } else {
+                    _restoreCloudConfigs();
                 }
-            } catch (fe) { console.warn('[SKIN] load fusions.json failed:', fe); }
+            } catch (fe) { console.warn('[SKIN] load fusions.json failed:', fe); _restoreCloudConfigs(); }
             // 拉取皮肤属性表（云端 skin-attributes.json，管理员维护，随 git_push_skins 推送）
             try {
                 const aResp = await _fetchWithTimeout(REMOTE_SKIN_BASE + '/skin-attributes.json', 8000, { cache: 'no-cache' });
                 if (aResp.ok) {
                     const aData = await aResp.json();
                     window.skinAttributesCloud = aData || {};
+                    _cacheCloudJson('tfjl_skin_attrs', window.skinAttributesCloud);
                     console.log('[SKIN] skin-attributes.json loaded, heroes:', Object.keys(aData || {}).length);
+                } else {
+                    _restoreCloudConfigs();
                 }
-            } catch (ae) { console.warn('[SKIN] load skin-attributes.json failed:', ae); }
+            } catch (ae) { console.warn('[SKIN] load skin-attributes.json failed:', ae); _restoreCloudConfigs(); }
 
             // 拉取云端基础卡定义（cards.json，管理员维护新英雄）
             try {
@@ -4532,11 +4571,14 @@ if (true) {
                     const cData = await cResp.json();
                     if (cData && cData.cards) {
                         window.cloudCards = cData.cards;
+                        _cacheCloudJson('tfjl_cloud_cards', cData.cards);
                         console.log('[SKIN] cloud cards loaded:', Object.keys(cData.cards).length);
                         if (typeof window.renderCloudCardsToPool === 'function') window.renderCloudCardsToPool();
                     }
+                } else {
+                    _restoreCloudConfigs();
                 }
-            } catch (ce) { console.warn('[SKIN] load cards.json failed:', ce); }
+            } catch (ce) { console.warn('[SKIN] load cards.json failed:', ce); _restoreCloudConfigs(); }
 
             // 后台尝试下载远程皮肤到本地 data/skin 目录（仅 Tauri 环境）
             _downloadRemoteSkinsToLocal(registry.heroes);
