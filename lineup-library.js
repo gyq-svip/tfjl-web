@@ -42,6 +42,80 @@
         if (left.length) o.activity[id].scripts = left; else delete o.activity[id].scripts;
         _save(o); if (window._llRenderScripts) window._llRenderScripts(id);
     }
+    // ---------- 🔴 2026-09-23 云端共享索引（与需求墙同用一个主 Gist；只存元数据，正文在各自脚本 Gist） ----------
+    // 目的：上传分享后所有人（含网页端）在该天下都能看到，而不是只存本机
+    const _LL_IDX_GIST = (typeof window.TFJL_MASTER_GIST_ID === 'string' && window.TFJL_MASTER_GIST_ID) || 'a32a0628bd9275f3a4922cd12cf298c9';
+    const _LL_IDX_FILE = 'lineup_scripts.json';
+    let _llCloudCache = null;      // { data, ts } 内存缓存 5 分钟
+    function _llTok() { try { return (typeof window.getGistToken === 'function') ? (window.getGistToken() || '') : ''; } catch (e) { return ''; } }
+    function _llAuthor() { try { return localStorage.getItem('TFJL_UserName') || '匿名'; } catch (e) { return '匿名'; } }
+    async function _llIdxLoad() {
+        const tok = _llTok(); if (!tok) return null;
+        try {
+            const r = await fetch('https://api.github.com/gists/' + _LL_IDX_GIST, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': 'token ' + tok } });
+            if (!r.ok) return null;
+            const d = await r.json();
+            const f = d.files && d.files[_LL_IDX_FILE];
+            if (!f) return {};
+            let txt = f.content;
+            if (f.truncated) txt = await fetch(f.raw_url).then(function (x) { return x.text(); });
+            try { return JSON.parse(txt) || {}; } catch (e) { return {}; }
+        } catch (e) { return null; }
+    }
+    async function _llIdxSave(data) {
+        const tok = _llTok(); if (!tok) return false;
+        try {
+            const r = await fetch('https://api.github.com/gists/' + _LL_IDX_GIST, {
+                method: 'PATCH',
+                headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + tok },
+                body: JSON.stringify({ files: { [_LL_IDX_FILE]: { content: JSON.stringify(data) } } })
+            });
+            return r.ok;
+        } catch (e) { return false; }
+    }
+    // 读-改-写 + 重试（Gist 无锁，并发 PATCH 会互相覆盖 → 每次先读最新再写回）
+    async function _llIdxMutate(fn) {
+        for (let i = 0; i < 3; i++) {
+            const d = await _llIdxLoad();
+            if (!d) return false;
+            try { fn(d); } catch (e) { return false; }
+            if (await _llIdxSave(d)) { _llCloudCache = { data: d, ts: Date.now() }; return true; }
+            await new Promise(function (r) { setTimeout(r, 400 * (i + 1)); });
+        }
+        return false;
+    }
+    // 某天的云端脚本（带缓存）
+    async function _llCloudOf(id) {
+        if (_llCloudCache && Date.now() - _llCloudCache.ts < 300000) return (_llCloudCache.data && _llCloudCache.data[id]) || [];
+        const d = await _llIdxLoad();
+        if (d) _llCloudCache = { data: d, ts: Date.now() };
+        return (d && d[id]) || [];
+    }
+    // 本机 + 云端合并（按 url 去重：本机已有的不再重复显示）
+    async function _llDayScriptsAll(id) {
+        const local = _dayScripts(id);
+        let cloud = [];
+        try { cloud = await _llCloudOf(id); } catch (e) { cloud = []; }
+        const seen = {};
+        local.forEach(function (s) { if (s && s.url) seen[s.url] = 1; });
+        const extra = (cloud || []).filter(function (c) { return c && c.url && !seen[c.url]; }).map(function (c) {
+            return { id: c.id || ('c' + String(c.url).slice(-10)), name: c.name || '云端脚本', url: c.url, content: '', shared: true, cloud: true, author: c.author || '' };
+        });
+        return local.concat(extra);
+    }
+    // 按 sid 查找（本机 + 云端都能找到）
+    async function _llFindScript(id, sid) {
+        const arr = await _llDayScriptsAll(id);
+        return arr.find(function (x) { return x.id === sid; }) || null;
+    }
+    // 后台预热云端索引 + 刷新所有可见列表
+    async function _llRefreshCloud() {
+        try { await _llCloudOf('__warm__'); } catch (e) {}
+        const els = document.querySelectorAll('[id^="llScripts-"]');
+        for (let i = 0; i < els.length; i++) { const id = els[i].id.replace('llScripts-', ''); if (typeof _llRenderScripts === 'function') await _llRenderScripts(id); }
+        const dlg = document.getElementById('llScriptDlg');
+        if (dlg && dlg.dataset.day && typeof _llScriptDlg === 'function') _llScriptDlg(dlg.dataset.day);
+    }
     function _slot(tab, id) {
         const o = _load();
         o[tab] = o[tab] || {};
@@ -99,6 +173,8 @@
         });
         _renderHead();
         _renderList();
+        // 🔴 后台拉取云端共享脚本并刷新各天列表（不阻塞首屏：先渲染本机，云端到了再补）
+        setTimeout(function () { try { _llRefreshCloud(); } catch (e) {} }, 400);
     };
     window.closeLineupLibraryPanel = function () {
         const ov = document.getElementById('lineupLibWin');
@@ -327,6 +403,7 @@
         const m = document.createElement('div'); m.id = 'llScriptDlg';
         m.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;';
         const box = document.createElement('div');
+        box.dataset.day = id;   // 🔴 供云端刷新时定位是哪一天
         box.style.cssText = 'width:min(600px,94vw);max-height:88vh;overflow:auto;background:linear-gradient(160deg,#141a33,#0d1b2a);border:1px solid rgba(240,147,43,0.5);border-radius:12px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.6);';
         box.innerHTML =
             '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><b style="color:#f0932b;font-size:0.95rem;">📜 活动·第' + _esc(day) + '天 · 阵容脚本（可多个）</b><span style="flex:1;"></span><button id="llScriptClose" style="background:transparent;border:none;color:#fff;font-size:1.2rem;cursor:pointer;">×</button></div>'
@@ -344,16 +421,16 @@
         const ta = box.querySelector('#llScriptText');
         const listEl = box.querySelector('#llScriptList');
         function _copy(txt, tip) { try { (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(function () { try { if (typeof showToast === 'function') showToast(tip, 'info'); } catch (e) {} }).catch(function () {}); } catch (e) {} }
-        function _renderList() {
-            const arr = _dayScripts(id);
+        async function _renderList() {
+            const arr = await _llDayScriptsAll(id);
             if (!arr.length) { listEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);font-size:0.72rem;padding:8px;border:1px dashed rgba(255,255,255,0.15);border-radius:8px;">（暂无脚本：粘贴 TXT 文本或选 .txt 文件 → 点「☁ 上传分享」）</div>'; return; }
             listEl.innerHTML = '<div style="color:rgba(255,255,255,0.6);font-size:0.7rem;margin-bottom:6px;">该天共 ' + arr.length + ' 个脚本：</div>' + arr.map(function (s) {
                 const cloud = !!s.url;
                 return '<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;margin-bottom:6px;background:rgba(0,0,0,0.25);border-radius:8px;border:1px solid ' + (cloud ? 'rgba(78,205,196,0.3)' : 'rgba(240,147,43,0.3)') + ';">'
-                    + '<span onclick="_llOpenScript(\'' + id + '\',\'' + s.id + '\')" style="cursor:pointer;flex:1;color:' + (cloud ? '#4ecdc4' : '#f0932b') + ';font-size:0.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + _esc(s.name) + '">' + _esc(s.name) + (cloud ? ' ☁' : ' 💾') + '</span>'
+                    + '<span onclick="_llOpenScript(\'' + id + '\',\'' + s.id + '\')" style="cursor:pointer;flex:1;color:' + (cloud ? '#4ecdc4' : '#f0932b') + ';font-size:0.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + _esc(s.name) + (s.author ? ' · 分享者：' + _esc(s.author) : '') + '">' + _esc(s.name) + (cloud ? ' ☁' : ' 💾') + (s.author ? ' <span style="opacity:0.6;font-size:0.66rem;">by ' + _esc(s.author) + '</span>' : '') + '</span>'
                     + '<button onclick="_llOpenScript(\'' + id + '\',\'' + s.id + '\')" title="用脚本记事本打开（改颜色/减伤/对比）" style="padding:3px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.8);cursor:pointer;font-size:0.72rem;">👁</button>'
                     + '<button onclick="_llImportToLaoMa(\'' + id + '\',\'' + s.id + '\')" title="一键导入到老马" style="padding:3px 8px;border-radius:6px;border:1px solid rgba(255,152,0,0.4);background:rgba(255,152,0,0.12);color:#ff9800;cursor:pointer;font-size:0.72rem;">📁老马</button>'
-                    + '<button onclick="_llRenameScript(\'' + id + '\',\'' + s.id + '\')" title="改名" style="padding:3px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.7);cursor:pointer;font-size:0.72rem;">✏</button>'
+                    + (s.cloud ? '' : '<button onclick="_llRenameScript(\'' + id + '\',\'' + s.id + '\')" title="改名" style="padding:3px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.7);cursor:pointer;font-size:0.72rem;">✏</button>')
                     + (cloud ? '<button onclick="_llImportLocal(\'' + id + '\',\'' + s.id + '\')" title="存一份本机副本" style="padding:3px 8px;border-radius:6px;border:1px solid rgba(78,205,196,0.4);background:rgba(78,205,196,0.12);color:#4ecdc4;cursor:pointer;font-size:0.72rem;">📥副本</button>' : '')
                     + '<button onclick="_llScriptDel(\'' + id + '\',\'' + s.id + '\')" title="删除脚本" style="padding:3px 8px;border-radius:6px;border:1px solid rgba(255,107,107,0.4);background:rgba(255,107,107,0.12);color:#ff6b6b;cursor:pointer;font-size:0.72rem;">🗑</button>'
                     + '</div>';
@@ -380,10 +457,15 @@
             const up = box.querySelector('#llScriptUp'); up.disabled = true; up.textContent = '⏳ 上传中…';
             try {
                 const url = await window._doScriptUpload(content, fname);
-                _upsertScript(id, { id: _newSid(), name: fname, content: content, url: url, shared: true });
+                const sid = _newSid();
+                _upsertScript(id, { id: sid, name: fname, content: content, url: url, shared: true });
                 _llTrack('阵容图库脚本上传');
                 try { if (typeof showToast === 'function') showToast('已上传分享：' + fname, 'success'); } catch (e) {}
                 ta.value = ''; _renderList(); if (typeof _llRenderScripts === 'function') _llRenderScripts(id);
+                // 🔴 写云端共享索引：写成功=所有人（含网页端）在该天都能看到；失败不回滚（脚本 Gist 已建、raw_url 已拿到）
+                let okIdx = false;
+                try { okIdx = await _llIdxMutate(function (d) { (d[id] = d[id] || []).unshift({ id: sid, name: fname, url: url, author: _llAuthor(), ts: Date.now() }); }); } catch (e) {}
+                try { if (typeof showToast === 'function') showToast(okIdx ? '已加入云端分享列表（所有人可见）' : '注意：云端分享列表写入失败，当前仅本机可见（可稍后重传）', okIdx ? 'success' : 'warn'); } catch (e) {}
             } catch (e) { try { if (typeof showToast === 'function') showToast('上传失败：' + (e && e.message || e) + '（需要已配置 Gist Token）', 'error'); } catch (e2) {} }
             up.disabled = false; up.textContent = '☁ 上传分享（TXT）';
         }
@@ -402,26 +484,36 @@
     };
     // 🔴 2026-09-23 重做：预览/编辑统一调用项目现成的「脚本记事本」openScriptNotebook
     // （自带改颜色、减伤栏、📊对比、查找替换、📥下载、📁另存/导入项目；与需求墙看 TXT 完全是同一套）
-    window._llOpenScript = function (id, sid) {
-        const L = _slot('activity', id); const arr = Array.isArray(L.scripts) ? L.scripts : [];
-        const s = arr.find(function (x) { return x.id === sid; }); if (!s) return;
+    // 🔴 zAboveSettings:true → 记事本走 100000+ 层级，盖过阵容图库面板(99996)/脚本弹窗(100001)，不会再被挡在后面
+    window._llOpenScript = async function (id, sid) {
+        const s = await _llFindScript(id, sid); if (!s) return;
         if (typeof window.openScriptNotebook !== 'function') { try { if (typeof showToast === 'function') showToast('脚本记事本未加载，请刷新页面后重试', 'error'); } catch (e) {} return; }
-        if (s.content) { window.openScriptNotebook({ name: s.name, content: s.content, fileIndex: -1 }); return; }
-        // 本机没存内容（只有链接）→ 走需求墙同款的远程预览：fetch raw 后交给同一个记事本打开
-        if (s.url && typeof window.previewScriptFile === 'function') { window.previewScriptFile(s.url); return; }
-        window.openScriptNotebook({ name: s.name, content: '', fileIndex: -1 });
+        if (s.content) { window.openScriptNotebook({ name: s.name, content: s.content, fileIndex: -1, zAboveSettings: true }); return; }
+        // 云端脚本（本机只有链接没有正文）→ 内联 fetch raw 再交给记事本
+        // 注：previewScriptFile 是 app-core 的私有函数（从未挂到 window），不能依赖
+        if (s.url) {
+            try { if (typeof showToast === 'function') showToast('正在拉取云端脚本…', 'info'); } catch (e) {}
+            try {
+                const txt = await fetch(s.url).then(function (r) { return r.text(); });
+                window.openScriptNotebook({ name: s.name, content: txt || '', fileIndex: -1, zAboveSettings: true });
+            } catch (e) { try { if (typeof showToast === 'function') showToast('云端脚本拉取失败', 'error'); } catch (e2) {} }
+            return;
+        }
+        window.openScriptNotebook({ name: s.name, content: '', fileIndex: -1, zAboveSettings: true });
     };
     // 删除脚本：本机直接删；云端先删 Gist 再移除引用
     window._llScriptDel = async function (id, sid) {
-        const L = _slot('activity', id); const arr = Array.isArray(L.scripts) ? L.scripts : [];
-        const s = arr.find(function (x) { return x.id === sid; }); if (!s) return;
+        const s = await _llFindScript(id, sid); if (!s) return;
         const isCloud = !!s.url;
         if (!confirm('确定删除该' + (isCloud ? '云端' : '本机') + '脚本？' + (isCloud ? '（云端 Gist 也会一并删除，不可恢复）' : ''))) return;
         if (isCloud) {
             try { await window._deleteGist(s.url); }
-            catch (e) { try { if (typeof showToast === 'function') showToast('删除云端失败：' + (e && e.message || e) + '，仅移除本机引用', 'error'); } catch (e2) {} }
+            catch (e) { try { if (typeof showToast === 'function') showToast('删除云端失败：' + (e && e.message || e) + '，仅移除引用', 'error'); } catch (e2) {} }
+            // 从云端共享索引剔除（失败只提示，不回滚本机）
+            try { await _llIdxMutate(function (d) { if (d[id]) d[id] = d[id].filter(function (x) { return x.url !== s.url; }); }); } catch (e) {}
+            _llCloudCache = null;
         }
-        _delScript(id, sid);
+        _delScript(id, sid);   // 纯云端条目本机无记录，此步为空操作
         try { if (typeof showToast === 'function') showToast('已删除脚本', 'info'); } catch (e) {}
         _llRefresh(id);
     };
@@ -432,8 +524,7 @@
     }
     // 一键导入到老马：复用项目现成的 importToLaoMaFromWall（桌面端 Tauri 写老马目录）
     window._llImportToLaoMa = async function (id, sid) {
-        const L = _slot('activity', id); const arr = Array.isArray(L.scripts) ? L.scripts : [];
-        const s = arr.find(function (x) { return x.id === sid; }); if (!s) return;
+        const s = await _llFindScript(id, sid); if (!s) return;
         let url = s.url;
         if (!url) {
             try { if (typeof showToast === 'function') showToast('未分享，先上传到脚本分享再导入老马…', 'info'); } catch (e) {}
@@ -449,9 +540,8 @@
         }
     };
     // 改名（自定义弹窗，避免 Tauri 桌面端 prompt 返回 null 失效）
-    window._llRenameScript = function (id, sid) {
-        const L = _slot('activity', id); const arr = Array.isArray(L.scripts) ? L.scripts : [];
-        const s = arr.find(function (x) { return x.id === sid; }); if (!s) return;
+    window._llRenameScript = async function (id, sid) {
+        const s = await _llFindScript(id, sid); if (!s) return;
         const m = document.createElement('div'); m.id = 'llRenameModal';
         m.style.cssText = 'position:fixed;inset:0;z-index:100003;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;';
         m.innerHTML = '<div style="background:#1a1a2e;border:2px solid rgba(240,147,43,0.5);border-radius:14px;padding:22px;width:min(420px,92vw);"><h3 style="margin:0 0 12px;color:#f0932b;text-align:center;font-size:0.95rem;">✏ 脚本改名</h3>'
@@ -476,7 +566,16 @@
         if (!r.ok && r.status !== 404) throw new Error('HTTP ' + r.status);
         return true;
     };
-    window._llImportLocal = function (id, sid) { const L = _slot('activity', id); const arr = Array.isArray(L.scripts) ? L.scripts : []; const s = arr.find(function (x) { return x.id === sid; }); if (!s) return; _upsertScript(id, { id: _newSid(), name: s.name + '（本地副本）', content: s.content, url: '', shared: false }); _llTrack('阵容图库导入脚本本地'); try { if (typeof showToast === 'function') showToast('已存一份本机副本', 'success'); } catch (e) {} _llRefresh(id); };
+    // 存一份本机副本（云端脚本本机没有正文 → 先 fetch，否则副本是空的）
+    window._llImportLocal = async function (id, sid) {
+        const s = await _llFindScript(id, sid); if (!s) return;
+        let content = s.content || '';
+        if (!content && s.url) { try { content = await fetch(s.url).then(function (r) { return r.text(); }); } catch (e) { content = ''; } }
+        _upsertScript(id, { id: _newSid(), name: s.name + '（本地副本）', content: content, url: '', shared: false });
+        _llTrack('阵容图库导入脚本本地');
+        try { if (typeof showToast === 'function') showToast(content ? '已存一份本机副本' : '副本为空（云端内容拉取失败）', content ? 'success' : 'warn'); } catch (e) {}
+        _llRefresh(id);
+    };
     // ---------- 大航海（一排一套：#N + 10卡槽 + 主副车；第二行小字波次备注） ----------
     function _cartSelect(tab, id, field, cur) {
         let h = '<select onchange="_llSet(\'' + tab + '\',\'' + id + '\',\'' + field + '\',null,this.value)" style="padding:3px 6px;border-radius:6px;border:1px solid rgba(255,215,0,0.35);background:#2a2a4a;color:#ffd700;font-size:0.75rem;">';
@@ -569,14 +668,15 @@
         return arr.map(function (s) {
             const cloud = !!s.url;
             return '<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;background:rgba(0,0,0,0.25);border-radius:6px;border:1px solid ' + (cloud ? 'rgba(78,205,196,0.3)' : 'rgba(240,147,43,0.3)') + ';">'
-                + '<span onclick="_llOpenScript(\'' + id + '\',\'' + s.id + '\')" style="cursor:pointer;flex:1;color:' + (cloud ? '#4ecdc4' : '#f0932b') + ';font-size:0.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + _esc(s.name) + '">' + _esc(s.name) + (cloud ? ' ☁' : ' 💾') + '</span>'
+                + '<span onclick="_llOpenScript(\'' + id + '\',\'' + s.id + '\')" style="cursor:pointer;flex:1;color:' + (cloud ? '#4ecdc4' : '#f0932b') + ';font-size:0.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + _esc(s.name) + (s.author ? ' · 分享者：' + _esc(s.author) : '') + '">' + _esc(s.name) + (cloud ? ' ☁' : ' 💾') + (s.author ? ' <span style="opacity:0.6;font-size:0.6rem;">by ' + _esc(s.author) + '</span>' : '') + '</span>'
                 + '<button onclick="_llOpenScript(\'' + id + '\',\'' + s.id + '\')" style="padding:1px 6px;border-radius:5px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.8);cursor:pointer;font-size:0.66rem;">👁</button>'
                 + '<button onclick="_llImportToLaoMa(\'' + id + '\',\'' + s.id + '\')" title="一键导入到老马" style="padding:1px 6px;border-radius:5px;border:1px solid rgba(255,152,0,0.4);background:rgba(255,152,0,0.12);color:#ff9800;cursor:pointer;font-size:0.66rem;">📁</button>'
-                + '<button onclick="_llRenameScript(\'' + id + '\',\'' + s.id + '\')" title="改名" style="padding:1px 6px;border-radius:5px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.7);cursor:pointer;font-size:0.66rem;">✏</button>'
+                + (s.cloud ? '' : '<button onclick="_llRenameScript(\'' + id + '\',\'' + s.id + '\')" title="改名" style="padding:1px 6px;border-radius:5px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.7);cursor:pointer;font-size:0.66rem;">✏</button>')
                 + (cloud ? '<button onclick="_llImportLocal(\'' + id + '\',\'' + s.id + '\')" title="下载到本机再编辑" style="padding:1px 6px;border-radius:5px;border:1px solid rgba(78,205,196,0.4);background:rgba(78,205,196,0.12);color:#4ecdc4;cursor:pointer;font-size:0.66rem;">📥</button>' : '')
                 + '<button onclick="_llScriptDel(\'' + id + '\',\'' + s.id + '\')" title="删除脚本" style="padding:1px 6px;border-radius:5px;border:1px solid rgba(255,107,107,0.4);background:rgba(255,107,107,0.12);color:#ff6b6b;cursor:pointer;font-size:0.66rem;">🗑</button>'
                 + '</div>';
         }).join('');
     }
-    window._llRenderScripts = function (id) { const el = document.getElementById('llScripts-' + id); if (!el) return; el.innerHTML = _scriptsHtml(_dayScripts(id), id); };
+    // 🔴 异步：本机 + 云端共享脚本合并渲染（这样别人分享的脚本在网页端也能看到）
+    window._llRenderScripts = async function (id) { const el = document.getElementById('llScripts-' + id); if (!el) return; const arr = await _llDayScriptsAll(id); el.innerHTML = _scriptsHtml(arr, id); };
 })();
