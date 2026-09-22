@@ -8127,6 +8127,7 @@
         window.getAllFusionNames = getAllFusionNames;
         window.getFusionVariantsForBase = getFusionVariantsForBase;
         window.getFusionParts = getFusionParts;
+        window.uploadScriptToGist = uploadScriptToGist;   // 图库活动阵容的「📜脚本」上传（描述含"脚本分享"→ 自动进脚本墙）
         // 基础英雄 → 以其为主卡(part[0])的融合卡列表
         function getFusionVariantsForBase(baseHero) {
             if (!baseHero) return [];
