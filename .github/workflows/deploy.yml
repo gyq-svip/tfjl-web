@@ -67,11 +67,10 @@ jobs:
 
       - name: Bump asset version (cache-bust per deploy)
         run: |
-          VER="b$(date +%Y%m%d%H%M%S)"
-          echo "Cache-bust version: $VER"
-          # 把 _site/index.html 里所有脚本 src 的 ?v= 查询参数替换为部署时间戳，
-          # 确保 Service Worker(staleWhileRevalidate) 每次部署都按新 URL 拉到最新 JS，不再跑旧缓存。
-          sed -i -E 's/(<script[^>]*src="[^"]*)\?v=[^"]*(")/\1?v='"$VER"'\2/g' _site/index.html
+          # 🔴 2026-09-22 改为「按文件内容哈希」注入 ?v=（CI_AUTO → h<sha256前8位>）：
+          #    没变的文件 URL 不变 → SW cacheFirst 秒开 + activate 跨部署保留（只下真正变化的文件）；
+          #    变了的文件换新 URL → 自然重下。取代旧的"全部脚本统一时间戳"（那会导致每次部署全量重下 ~0.9MB）。
+          node scripts/inject-hash-version.mjs _site/index.html
           echo "--- script tags after bump ---"
           grep -nE '<script[^>]*src="[^"]*\.js' _site/index.html || true
 

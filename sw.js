@@ -271,21 +271,54 @@ async function _maybeForceOnTraffic() {
 
 // ============================================================
 // 激活事件：只删除"旧版本"运行时缓存，保留当前版本缓存（避免 reload 时空窗蓝屏）
+// 🔴 2026-09-22 新增：删除前先把【当前 index.html 引用的内容哈希版文件】从旧缓存搬进新缓存 ——
+//    这些 URL 带内容指纹、内容必然没变，搬过来 = 更新后没变的文件不用重下（小更新秒开的关键）。
+//    搬运失败/拿不到 index.html 就跳过（等同旧行为：首开重下），绝不引入坏缓存。
 // ============================================================
+
+// 从旧 runtime 缓存里搬运当前版本引用的哈希版文件（URL 相同才搬，保证内容一致）
+async function _preserveCurrentHashedAssets() {
+    try {
+        const idxUrl = new URL('index.html', self.registration.scope);
+        const r = await fetch(idxUrl.href + '?_=' + Date.now(), { cache: 'no-store' });
+        if (!r.ok) return;
+        const html = await r.text();
+        const urls = new Set();
+        const re = /(?:src|href)="([^"?]+\.(?:js|css))\?v=h[0-9a-f]{8}"/g;
+        let m;
+        while ((m = re.exec(html))) urls.add(new URL(m[1], idxUrl).href);
+        if (!urls.size) return;
+        const oldNames = (await caches.keys()).filter((n) => n.endsWith('-runtime') && n !== CACHE_RUNTIME);
+        if (!oldNames.length) return;
+        const dst = await caches.open(CACHE_RUNTIME);
+        let copied = 0;
+        for (const u of urls) {
+            for (const n of oldNames) {
+                const hit = await (await caches.open(n)).match(u);
+                if (hit) { try { await dst.put(u, hit.clone()); copied++; } catch (e) {} break; }
+            }
+        }
+        console.log('[SW] activate：从旧缓存保留当前版本引用的哈希文件 ' + copied + '/' + urls.size + '（没变的文件不用重下）');
+    } catch (e) { /* 保留失败不影响升级，只是首次打开重下 */ }
+}
+
 self.addEventListener('activate', (event) => {
     event.waitUntil(
-        caches.keys().then((cacheNames) => {
-            return Promise.all(
-                cacheNames
-                    // 🔴 P0（2026-08-27 白屏）：删除【所有】runtime 缓存（含当前版本），
-                    // 强制新 SW 首次请求走网络拿正确文件，不再复用可能损坏的旧缓存 app-core.js。
-                    .filter((name) => name.endsWith('-runtime'))
-                    .map((name) => caches.delete(name))
-            );
-        }).then(() => {
-            // 拿下所有页面控制权（NEW_VERSION_READY 已在 install 阶段发给现有页面，这里不再重复发，避免更新后重复弹气泡）
-            return self.clients.claim();
-        })
+        _preserveCurrentHashedAssets()
+            .catch(() => {})
+            .then(() => caches.keys())
+            .then((cacheNames) => {
+                return Promise.all(
+                    cacheNames
+                        // 🔴 P0（2026-08-27 白屏）：删除【所有】旧 runtime 缓存；
+                        //    2026-09-22 起删除前已把当前版本引用的哈希文件搬进新缓存（见 _preserveCurrentHashedAssets）。
+                        .filter((name) => name.endsWith('-runtime'))
+                        .map((name) => caches.delete(name))
+                );
+            }).then(() => {
+                // 拿下所有页面控制权（NEW_VERSION_READY 已在 install 阶段发给现有页面，这里不再重复发，避免更新后重复弹气泡）
+                return self.clients.claim();
+            })
     );
     // 🔴 启动 SW 主动轮询：每 5 分钟探测线上 sw.js 最新版本，发现更新且功能开关开则推页面静默强刷。
     // 解决「页面一直开着不 reload 就不自动升级」的缺口（P3/最小化托盘场景）。仅激活后启动一次，避免重复定时器。
@@ -299,6 +332,29 @@ self.addEventListener('activate', (event) => {
 // ============================================================
 // 请求拦截
 // ============================================================
+
+// 🔴 2026-09-22 内容哈希版 URL（CI 把 ?v=CI_AUTO 换成 h<文件sha256前8位>）：
+//    URL 不变 = 内容必然没变 → 可以放心 cacheFirst 秒回，缓存永远不可能是"过期的旧文件"，
+//    也就不会复发 2026-08-27 那类「旧缓存缺新函数」白屏 —— 那次事故才被迫把 JS 全改成 networkFirst（每次打开都重下）。
+const HASHED_URL_RE = /\.(?:js|css)\?v=h[0-9a-f]{8}$/;
+function _isHashedAsset(url) { return HASHED_URL_RE.test(url.pathname + url.search); }
+
+// CacheFirst：有缓存直接回（仅用于内容哈希版 URL）；没有再联网并写入缓存；断网时回退缓存。
+async function cacheFirst(request, cacheName) {
+    const cache = await caches.open(cacheName);
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    try {
+        const resp = await fetch(request);
+        if (resp && (resp.ok || resp.type === 'opaque')) { try { await cache.put(request, resp.clone()); } catch (e) {} }
+        return resp;
+    } catch (e) {
+        const fb = await cache.match(request);
+        if (fb) return fb;
+        throw e;
+    }
+}
+
 self.addEventListener('fetch', (event) => {
     const request = event.request;
     if (request.method !== 'GET') return;
@@ -331,6 +387,13 @@ self.addEventListener('fetch', (event) => {
     // 且 github.io 偶发不可达时 networkFirst 会回退到旧缓存 → 导致「英雄卡消失」（如 水人）。
     // 故这些 JSON 永远直连拿最新，不走 SW 缓存；图片 .skin/.png 仍走 SWR 离线可用。
     if (url.hostname.includes('github.io') && url.pathname.includes('/skins/') && url.pathname.endsWith('.json')) {
+        return;
+    }
+
+    // 🔴 2026-09-22 内容哈希版 JS/CSS：cacheFirst（URL 即内容指纹 → 缓存不可能过期）。
+    //    这是"打开秒开 + 小更新只下变化文件"的关键；其余 JS/CSS 维持 networkFirst（旧行为）。
+    if (_isHashedAsset(url)) {
+        event.respondWith(cacheFirst(request, CACHE_RUNTIME));
         return;
     }
 
