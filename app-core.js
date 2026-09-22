@@ -27955,6 +27955,33 @@ ${maSection}
                             html += '</div>';
                         });
                         html += '</div></details></div>';
+                        // 🔴 2026-09-23：阵容图库功能使用专属分组（单独高亮，便于管理员一眼看该功能各项使用热度）
+                        (function () {
+                            const _llKeys = useKeys.filter(function (k) { return k.substring(4).indexOf('阵容图库') === 0; });
+                            if (_llKeys.length) {
+                                const _llAgg = {};
+                                _llKeys.forEach(function (k) { const fn = k.substring(4); _llAgg[fn] = (useAgg[fn] || 0); });
+                                const _llTop = sortBy(_llAgg);
+                                const _llMax = _llTop.length ? _llTop[0].v : 1;
+                                html += '<details style="margin-bottom:14px;border:1px solid rgba(56,189,248,0.4);border-radius:10px;background:rgba(56,189,248,0.06);overflow:hidden;">';
+                                html += '<summary style="cursor:pointer;padding:9px 12px;font-size:0.85rem;color:#38bdf8;font-weight:700;">💡 阵容图库功能使用 TOP <span style="color:#7dd3fc;font-size:0.72rem;font-weight:400;">（共 ' + _llTop.length + ' 项 · 点此展开/收起）</span></summary>';
+                                html += '<div style="padding:6px 12px 10px 12px;">';
+                                _llTop.forEach(function (x, i) {
+                                    const id = 'llUseDetail_' + i;
+                                    html += '<div style="cursor:pointer;color:#cbd5e1;" onclick="var d=document.getElementById(\'' + id + '\');if(d.style.display===\'none\'){d.style.display=\'block\';}else{d.style.display=\'none\';}">' + bar(x.v, _llMax) + ' <b style="color:' + C_NUM + ';">' + x.v + '</b>　📚 ' + x.k + ' <span style="color:#60a5fa;font-size:0.7rem;">▶</span></div>';
+                                    html += '<div id="' + id + '" style="display:none;background:rgba(0,0,0,0.25);border-left:2px solid #38bdf8;padding:6px 10px;margin:4px 0 8px 12px;font-size:0.75rem;">';
+                                    _llKeys.filter(function (k) { return k.substring(4) === x.k; }).forEach(function (k) {
+                                        (detailByFn[k] || []).forEach(function (row) {
+                                            const m = row.file, e = row.entry;
+                                            const ts = m.last ? new Date(m.last).toLocaleString('zh-CN') : '?';
+                                            html += '<div style="margin-bottom:4px;">' + _colorWho(m.who) + ' ×<b style="color:' + C_NUM + ';">' + (e.count || 0) + '</b> <span style="color:' + C_TIME + ';">[' + ts + ']</span></div>';
+                                        });
+                                    });
+                                    html += '</div>';
+                                });
+                                html += '</div></details>';
+                            }
+                        })();
                         // 组2：⚪ 功能使用埋点（不写 Gist）
                         html += '<details style="margin-bottom:16px;"><summary style="cursor:pointer;color:#a78bfa;font-weight:700;padding:4px 0;">⚙️⚪ 功能使用 TOP <span style="color:#c4b5fd;font-size:0.7rem;font-weight:400;">（仅埋点统计，不写 Gist · 点此展开/收起）</span></summary>';
                         if (!uTop2.length) html += '<div style="color:#94a3b8;font-size:0.74rem;">暂无功能使用记录</div>';
