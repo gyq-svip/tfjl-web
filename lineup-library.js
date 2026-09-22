@@ -313,6 +313,7 @@
         urlSpan.addEventListener('click', function () { _copy(urlSpan.textContent, '脚本链接已复制'); });
         box.querySelector('#llScriptSave').addEventListener('click', function () {
             window._llSet('activity', id, 'script', null, ta.value);
+            _llTrack('阵容图库保存脚本');
             try { if (typeof showToast === 'function') showToast('脚本已保存到本机（第' + day + '天）', 'info'); } catch (e) {}
         });
         box.querySelector('#llScriptCopy').addEventListener('click', function () { _copy(ta.value, '脚本内容已复制'); });
