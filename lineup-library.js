@@ -84,17 +84,28 @@
             '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
             + '<button onclick="_llTab(\'sail\')" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (isSail ? 'rgba(78,205,196,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (isSail ? 'rgba(78,205,196,0.18)' : 'transparent') + ';color:' + (isSail ? '#4ecdc4' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">🚢 大航海(' + D.sailing.length + ')</button>'
             + '<button onclick="_llTab(\'act\')" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (!isSail ? 'rgba(255,215,0,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (!isSail ? 'rgba(255,215,0,0.15)' : 'transparent') + ';color:' + (!isSail ? '#ffd700' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">🏆 活动阵容(' + D.activity.length + '天)</button>'
-            + '<input id="llSearch" value="' + _esc(state.q) + '" oninput="_llSearch(this.value)" placeholder="🔍 输入英雄名，查所有含它的阵容…" style="flex:1;min-width:200px;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;">'
+            + '<input id="llSearch" value="' + _esc(state.q) + '" oninput="_llSearch(this.value)" placeholder="🔍 多个英雄用空格/逗号分隔（同时含才显示）：如 电法 炎魔 悟空" style="flex:1;min-width:200px;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;">'
             + '</div>'
             + '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-top:4px;">左卡组右笔记 · <b style="color:#ce93d8;">左键=轮流切融合卡（含副卡皮肤，末尾关闭）</b> · <b style="color:rgba(255,255,255,0.7);">右键=主卡皮肤（融合后也可切）</b> · 活动 📜=脚本 ·（个人设置只存本机）· 拖标题栏移动窗口，右下角拉伸大小</div>';
     }
+    // 🔴 2026-09-23 多关键词搜索：空格/逗号/顿号分隔，必须【同时包含】（AND）——搜"电法 炎魔 悟空"才精准
+    function _qTerms() {
+        return String(state.q || '').split(/[,，、\s]+/).map(function (s) { return s.trim(); }).filter(Boolean);
+    }
     function _filteredSailing() {
-        const q = state.q;
-        return _data().sailing.filter(s => !q || s.heroes.some(h => h.indexOf(q) >= 0));
+        const ts = _qTerms();
+        if (!ts.length) return _data().sailing;
+        return _data().sailing.filter(function (s) {
+            return ts.every(function (t) { return s.heroes.some(function (h) { return h.indexOf(t) >= 0; }); });
+        });
     }
     function _filteredActivity() {
-        const q = state.q;
-        return _data().activity.filter(d => !q || d.A.some(h => h.indexOf(q) >= 0) || d.B.some(h => h.indexOf(q) >= 0));
+        const ts = _qTerms();
+        if (!ts.length) return _data().activity;
+        return _data().activity.filter(function (d) {
+            const all = (d.A || []).concat(d.B || []);
+            return ts.every(function (t) { return all.some(function (h) { return h.indexOf(t) >= 0; }); });
+        });
     }
     const PAGE = 10;
     function _renderList() {
