@@ -283,14 +283,24 @@ async function _preserveCurrentHashedAssets() {
         const r = await fetch(idxUrl.href + '?_=' + Date.now(), { cache: 'no-store' });
         if (!r.ok) return;
         const html = await r.text();
+        const dst = await caches.open(CACHE_RUNTIME);
+        // 🔴 2026-09-22 断网兜底②：把 index.html 本体也存进新缓存 —— 导航请求在线时因目录 URL 重定向，
+        //    响应无法按原键写入缓存（重定向响应不可存）→ 缓存里从来没有 HTML → 断网打开直接 ERR_FAILED（用户实测）。
+        //    这里用"干净合成 Response"存两种键（/index.html 与目录根），断网回退时任意一个都能打开。
+        //    activate 一定发生在联网时（SW 更新本身就要联网下载）→ 每次升级都会刷新这份 HTML。
+        try {
+            for (const k of new Set([idxUrl.href, new URL('./', self.registration.scope).href])) {
+                try {
+                    await dst.put(k, new Response(html, { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }));
+                } catch (e) {}
+            }
+        } catch (e) {}
         const urls = new Set();
         const re = /(?:src|href)="([^"?]+\.(?:js|css))\?v=h[0-9a-f]{8}"/g;
         let m;
         while ((m = re.exec(html))) urls.add(new URL(m[1], idxUrl).href);
         if (!urls.size) return;
         const oldNames = (await caches.keys()).filter((n) => n.endsWith('-runtime') && n !== CACHE_RUNTIME);
-        if (!oldNames.length) return;
-        const dst = await caches.open(CACHE_RUNTIME);
         let copied = 0;
         for (const u of urls) {
             for (const n of oldNames) {
@@ -298,7 +308,7 @@ async function _preserveCurrentHashedAssets() {
                 if (hit) { try { await dst.put(u, hit.clone()); copied++; } catch (e) {} break; }
             }
         }
-        console.log('[SW] activate：从旧缓存保留当前版本引用的哈希文件 ' + copied + '/' + urls.size + '（没变的文件不用重下）');
+        console.log('[SW] activate：从旧缓存保留当前版本引用的哈希文件 ' + copied + '/' + urls.size + ' + index.html（断网可开）');
     } catch (e) { /* 保留失败不影响升级，只是首次打开重下 */ }
 }
 
@@ -312,7 +322,9 @@ self.addEventListener('activate', (event) => {
                     cacheNames
                         // 🔴 P0（2026-08-27 白屏）：删除【所有】旧 runtime 缓存；
                         //    2026-09-22 起删除前已把当前版本引用的哈希文件搬进新缓存（见 _preserveCurrentHashedAssets）。
-                        .filter((name) => name.endsWith('-runtime'))
+                        //    🔴 2026-09-22 修复（e2e 抓到）：原过滤把【当前版本】的新缓存也删了 → preserve 白搬、
+                        //    每次更新后仍全量重下。必须排除 CACHE_RUNTIME 本身。
+                        .filter((name) => name.endsWith('-runtime') && name !== CACHE_RUNTIME)
                         .map((name) => caches.delete(name))
                 );
             }).then(() => {
@@ -474,15 +486,39 @@ function staleWhileRevalidate(request, cacheName) {
 // ============================================================
 function networkFirst(request, cacheName) {
     return caches.open(cacheName).then((cache) => {
+        const isNav = (request.mode === 'navigate' || request.destination === 'document');
         return _timeoutFetch(request).then((networkResponse) => {
             if (networkResponse && networkResponse.status === 200) {
                 // 仅更新缓存，不比较文本、不弹气泡
                 cache.put(request, networkResponse.clone()).catch(() => {});
+                // 🔴 2026-09-22 断网兜底③：导航 HTML（如目录 URL → GitHub Pages 30x 重定向）的响应
+                //    无法按原始键写入缓存（重定向响应不可存）→ 缓存里从来没有 HTML → 断网打开直接 ERR_FAILED。
+                //    这里合成一份"干净"Response 存为 index.html 键，保证断网回退永远有 HTML 可用。
+                if (isNav) {
+                    networkResponse.clone().text().then((txt) => {
+                        return cache.put(new URL('index.html', request.url).href,
+                            new Response(txt, { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }));
+                    }).catch(() => {});
+                }
             }
             return networkResponse;
-        }).catch(() => {
+        }).catch(async () => {
             // 超时/网络失败：立即回退缓存，不让页面白屏干等
-            return cache.match(request);
+            const cached = await cache.match(request);
+            if (cached) return cached;
+            // 🔴 2026-09-22 断网兜底④：导航请求缓存里没有精确条目时，依次找缓存的 index.html
+            //    （当前目录 / SW scope 下的 index.html 与根路径，忽略查询参数）
+            if (isNav) {
+                const cands = [];
+                try { cands.push(new URL('index.html', request.url).href); } catch (e) {}
+                try { cands.push(new URL('./', request.url).href); } catch (e) {}
+                try { cands.push(new URL('index.html', self.registration.scope).href); } catch (e) {}
+                try { cands.push(new URL('./', self.registration.scope).href); } catch (e) {}
+                for (const u of cands) {
+                    try { const hit = await cache.match(u, { ignoreSearch: true }); if (hit) return hit; } catch (e) {}
+                }
+            }
+            return cached;
         });
     });
 }
