@@ -18,6 +18,10 @@
         return o[tab][id];
     }
     function _esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+    // 🔴 2026-09-23 英雄名别名（游戏显示名 → 库名）：recognize.js 同款。微型潜艇就是潜艇，
+    //    阵容数据若用「微型潜艇」也能正确查减伤/融合/皮肤（主页按「潜艇」存）。
+    const _ALIASES = { '微型潜艇': '潜艇' };
+    function _norm(h) { return _ALIASES[h] || h; }
     // 🔴 2026-09-23 功能埋点（与主页 __recordFeatureUse 同一 buffer，管理员可在「按 Gist×功能 TOP」看到使用情况）
     function _llTrack(fn) { try { if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse(fn); } catch (e) {} }
     function _escJs(s) { return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
@@ -160,8 +164,8 @@
         const L = _slot(tab, lid);
         return (heroes || []).map(function (n) {
             const f = L.fus && L.fus[n];
-            if (f) { const p = (window.getFusionParts ? window.getFusionParts(f) : null); if (p && p.length >= 2) return p.join('+'); return f; }
-            return n;
+            if (f) { const p = (window.getFusionParts ? window.getFusionParts(f) : null); if (p && p.length >= 2) return p.map(_norm).join('+'); return _norm(f); }
+            return _norm(n);
         }).map(function (n) { return { name: n }; });   // breakdown 的 cardList 元素格式 = {name}
     }
     function _refreshDrSums(root) {
@@ -224,7 +228,7 @@
     window._llFuseCycle = function (el) {
         const hero = el.getAttribute('data-hero'), tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid');
         const L = _slot(tab, lid);
-        const variants = (window.getFusionVariantsForBase ? window.getFusionVariantsForBase(hero) : []);
+        const variants = (window.getFusionVariantsForBase ? window.getFusionVariantsForBase(_norm(hero)) : []);
         _llTrack('阵容图库切融合');
         if (!variants.length) { try { if (typeof showToast === 'function') showToast(hero + ' 没有可融合的卡', 'info'); } catch (e2) {} return; }
         // 🔴 2026-09-22 主页同款循环（用户要求）：关闭 → 变体1(副卡默认皮) → 变体1(副卡皮2) → … → 变体N(…) → 关闭
@@ -233,7 +237,7 @@
         const steps = [{ v: '', sub: '', skin: '' }];
         variants.forEach(function (v) {
             const parts = (window.getFusionParts ? window.getFusionParts(v) : null) || [];
-            const sub = parts[1] || '';
+            const sub = _norm(parts[1] || '');
             const skins = [''].concat(((sub && window.getHeroSkins) ? window.getHeroSkins(sub) : []).map(_nm).filter(Boolean));
             skins.forEach(function (sk) { steps.push({ v: v, sub: sub, skin: sk }); });
         });
@@ -260,8 +264,8 @@
         _llTrack('阵容图库切皮肤');
         const cur = (L.skin && L.skin[hero]) || '';
         let list = [];
-        if (window.getHeroSkins) list = (window.getHeroSkins(hero) || []).map(_nm).filter(Boolean);
-        else list = ((window.skinRegistry && window.skinRegistry[hero]) || []).map(_nm).filter(Boolean);
+        if (window.getHeroSkins) list = (window.getHeroSkins(_norm(hero)) || []).map(_nm).filter(Boolean);
+        else list = ((window.skinRegistry && window.skinRegistry[_norm(hero)]) || []).map(_nm).filter(Boolean);
         const names = [''].concat(list);
         let i = names.indexOf(cur); if (i < 0) i = 0;
         const next = names[(i + 1) % names.length];
@@ -287,12 +291,14 @@
             '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><b style="color:#f0932b;font-size:0.95rem;">📜 活动·第' + _esc(day) + '天 · 阵容脚本</b><span style="flex:1;"></span><button id="llScriptClose" style="background:transparent;border:none;color:#fff;font-size:1.2rem;cursor:pointer;">×</button></div>'
             + '<textarea id="llScriptText" placeholder="把该天要用的活动脚本贴到这里（可先用「💾保存到本机」），或从本地脚本导出后粘贴…" style="width:100%;box-sizing:border-box;height:180px;resize:vertical;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.35);color:rgba(255,255,255,0.92);font-size:0.78rem;font-family:Consolas,monospace;"></textarea>'
             + '<div id="llScriptUrlLine" style="display:none;margin-top:6px;color:rgba(255,255,255,0.55);font-size:0.7rem;word-break:break-all;">已上传：<span id="llScriptUrl" style="color:#4ecdc4;cursor:pointer;" title="点击复制链接"></span></div>'
+            + '<input type="file" id="llScriptFile" accept=".js,.txt,text/javascript,text/plain" style="display:none">'
             + '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">'
             + '<button id="llScriptSave" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(78,205,196,0.5);background:rgba(78,205,196,0.15);color:#4ecdc4;cursor:pointer;font-size:0.78rem;font-weight:700;">💾 保存到本机</button>'
+            + '<button id="llScriptPick" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:transparent;color:rgba(255,255,255,0.75);cursor:pointer;font-size:0.78rem;">📁 选择文件</button>'
             + '<button id="llScriptUp" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(240,147,43,0.55);background:rgba(240,147,43,0.15);color:#f0932b;cursor:pointer;font-size:0.78rem;font-weight:700;">📤 上传到脚本分享</button>'
             + '<button id="llScriptCopy" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:transparent;color:rgba(255,255,255,0.75);cursor:pointer;font-size:0.78rem;">📋 复制脚本</button>'
             + '</div>'
-            + '<div style="color:rgba(255,255,255,0.4);font-size:0.68rem;margin-top:8px;">上传后自动出现在「脚本分享」里供大家下载（需要已配置 Gist Token）；脚本只存本机 + Gist，不影响其他人。</div>';
+            + '<div style="color:rgba(255,255,255,0.4);font-size:0.68rem;margin-top:8px;">可粘贴脚本文本后点「📤 上传」，或直接点「📤 上传 / 📁 选择文件」从本地选 .js 文件（选完自动填到上面，📤 还会直接上传）。上传后自动出现在「脚本分享」里供大家下载（需要已配置 Gist Token）；脚本只存本机 + Gist，不影响其他人。</div>';
         m.appendChild(box);
         document.body.appendChild(m);
         const ta = box.querySelector('#llScriptText');
@@ -310,10 +316,24 @@
             try { if (typeof showToast === 'function') showToast('脚本已保存到本机（第' + day + '天）', 'info'); } catch (e) {}
         });
         box.querySelector('#llScriptCopy').addEventListener('click', function () { _copy(ta.value, '脚本内容已复制'); });
-        box.querySelector('#llScriptUp').addEventListener('click', async function () {
+        const fileInput = box.querySelector('#llScriptFile');
+        let pendingAuto = false;   // true=由「📤上传」触发的选文件，选完自动上传；false=「📁选文件」只填不传
+        fileInput.addEventListener('change', function () {
+            const f = this.files && this.files[0]; if (!f) return;
+            const reader = new FileReader();
+            reader.onload = function () { ta.value = String(reader.result || ''); if (pendingAuto) { pendingAuto = false; doUpload(); } };
+            reader.onerror = function () { try { if (typeof showToast === 'function') showToast('读文件失败', 'error'); } catch (e) {} };
+            reader.readAsText(f);
+        });
+        box.querySelector('#llScriptPick').addEventListener('click', function () { pendingAuto = false; fileInput.click(); });
+        box.querySelector('#llScriptUp').addEventListener('click', function () {
+            if (!ta.value.trim()) { pendingAuto = true; fileInput.click(); return; }   // 🔴 空 → 弹本地文件框（用户期望的交互）
+            doUpload();
+        });
+        async function doUpload() {
             const content = ta.value.trim();
-            if (!content) { try { if (typeof showToast === 'function') showToast('先贴入脚本文本', 'warn'); } catch (e) {} return; }
-            const btn = this; btn.disabled = true; btn.textContent = '⏳ 上传中…';
+            if (!content) { try { if (typeof showToast === 'function') showToast('先贴入脚本文本，或点「📤 上传 / 📁 选择文件」选本地文件', 'warn'); } catch (e) {} return; }
+            const up = box.querySelector('#llScriptUp'); up.disabled = true; up.textContent = '⏳ 上传中…';
             try {
                 const fname = '活动第' + day + '天_阵容脚本_' + String(Date.now()).slice(-6) + '.js';
                 let url = '';
@@ -338,8 +358,8 @@
             } catch (e) {
                 try { if (typeof showToast === 'function') showToast('上传失败：' + (e && e.message || e) + '（需要已配置 Gist Token）', 'error'); } catch (e2) {}
             }
-            btn.disabled = false; btn.textContent = '📤 上传到脚本分享';
-        });
+            up.disabled = false; up.textContent = '📤 上传到脚本分享';
+        }
         setTimeout(function () { ta.focus(); }, 0);
     };
     // ---------- 大航海（一排一套：#N + 10卡槽 + 主副车；第二行小字波次备注） ----------
