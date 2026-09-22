@@ -9,8 +9,39 @@
     const LS_KEY = 'tfjl_lineup_local_v1';
     const state = { tab: 'sail', q: '', page: 1, open: {}, menuFor: null };
 
-    function _load() { try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch (e) { return {}; } }
+    function _load() { let o; try { o = JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch (e) { o = {}; } _migrateScripts(o); return o; }
     function _save(o) { try { localStorage.setItem(LS_KEY, JSON.stringify(o)); } catch (e) {} }
+    // 🔴 2026-09-23 单脚本 → 多脚本迁移：旧字段 script/scriptUrl/scriptName 合并成 scripts 数组（兼容老数据）
+    function _migrateScripts(o) {
+        let changed = false;
+        const act = o.activity || {};
+        Object.keys(act).forEach(function (d) {
+            const s = act[d];
+            if (s && !Array.isArray(s.scripts) && (s.script !== undefined || s.scriptUrl !== undefined)) {
+                const arr = [];
+                if (s.script !== undefined || s.scriptUrl !== undefined) {
+                    arr.push({ id: 's' + Date.now() + Math.random().toString(36).slice(2, 5), name: s.scriptName || '阵容脚本', content: s.script || '', url: s.scriptUrl || '', shared: !!s.scriptUrl });
+                }
+                s.scripts = arr; delete s.script; delete s.scriptUrl; delete s.scriptName; changed = true;
+            }
+        });
+        if (changed) _save(o);
+    }
+    function _newSid() { return 's' + Date.now() + Math.random().toString(36).slice(2, 6); }
+    function _dayScripts(id) { const L = _slot('activity', id); return Array.isArray(L.scripts) ? L.scripts : []; }
+    function _upsertScript(id, scr) {
+        const o = _load(); o.activity = o.activity || {}; o.activity[id] = o.activity[id] || {};
+        const arr = Array.isArray(o.activity[id].scripts) ? o.activity[id].scripts : [];
+        const i = arr.findIndex(function (x) { return x.id === scr.id; });
+        if (i >= 0) arr[i] = scr; else arr.push(scr);
+        o.activity[id].scripts = arr; _save(o); if (window._llRenderScripts) window._llRenderScripts(id);
+    }
+    function _delScript(id, sid) {
+        const o = _load(); const arr = (o.activity[id] && o.activity[id].scripts) || [];
+        const left = arr.filter(function (x) { return x.id !== sid; });
+        if (left.length) o.activity[id].scripts = left; else delete o.activity[id].scripts;
+        _save(o); if (window._llRenderScripts) window._llRenderScripts(id);
+    }
     function _slot(tab, id) {
         const o = _load();
         o[tab] = o[tab] || {};
@@ -278,91 +309,149 @@
         try { if (typeof showToast === 'function') showToast(hero + ' 主卡皮肤 → ' + (next || '默认'), 'info'); } catch (e2) {}
     };
     // ---------- 活动脚本（🔴 2026-09-22 用户要求：活动可以用脚本去打，每天一个脚本，可上传到脚本分享供大家使用） ----------
+    // 🔴 2026-09-23 抽出的上传函数（多脚本复用）：把脚本内容传到 Gist 脚本分享，返回 raw_url
+    window._doScriptUpload = async function (content, fname) {
+        if (typeof window.uploadScriptToGist === 'function') return await window.uploadScriptToGist({ name: fname }, content);
+        const token = (typeof window.getGistToken === 'function') ? window.getGistToken() : '';
+        if (!token) throw new Error('无 Gist Token（请在主页设置里配置）');
+        const resp = await fetch('https://api.github.com/gists', { method: 'POST', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token }, body: JSON.stringify({ description: '脚本分享: ' + fname, public: true, files: { [fname]: { content: content } } }) });
+        if (!resp.ok) { const er = await resp.json().catch(function () { return {}; }); throw new Error(er.message || ('HTTP ' + resp.status)); }
+        const data = await resp.json();
+        const fd = data.files && data.files[fname];
+        return (fd && fd.raw_url) || data.html_url || '';
+    };
+    // 下载脚本为 .js 文件
+    function _downloadScript(name, content) {
+        try {
+            const blob = new Blob([content], { type: 'text/javascript;charset=utf-8' });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+            a.download = name.endsWith('.js') ? name : name + '.js';
+            document.body.appendChild(a); a.click();
+            setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+        } catch (e) {}
+    }
+    // 多脚本管理弹窗（新建 + 列表）
     window._llScriptDlg = function (id) {
         const old = document.getElementById('llScriptDlg'); if (old) old.remove();
-        const L = _slot('activity', id);
         const day = String(id).replace(/^d/, '');
-        const m = document.createElement('div');
-        m.id = 'llScriptDlg';
+        const m = document.createElement('div'); m.id = 'llScriptDlg';
         m.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;';
         const box = document.createElement('div');
-        box.style.cssText = 'width:min(560px,92vw);background:linear-gradient(160deg,#141a33,#0d1b2a);border:1px solid rgba(240,147,43,0.5);border-radius:12px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.6);';
+        box.style.cssText = 'width:min(600px,94vw);max-height:88vh;overflow:auto;background:linear-gradient(160deg,#141a33,#0d1b2a);border:1px solid rgba(240,147,43,0.5);border-radius:12px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.6);';
         box.innerHTML =
-            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><b style="color:#f0932b;font-size:0.95rem;">📜 活动·第' + _esc(day) + '天 · 阵容脚本</b><span style="flex:1;"></span><button id="llScriptClose" style="background:transparent;border:none;color:#fff;font-size:1.2rem;cursor:pointer;">×</button></div>'
-            + '<textarea id="llScriptText" placeholder="把该天要用的活动脚本贴到这里（可先用「💾保存到本机」），或从本地脚本导出后粘贴…" style="width:100%;box-sizing:border-box;height:180px;resize:vertical;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.35);color:rgba(255,255,255,0.92);font-size:0.78rem;font-family:Consolas,monospace;"></textarea>'
-            + '<div id="llScriptUrlLine" style="display:none;margin-top:6px;color:rgba(255,255,255,0.55);font-size:0.7rem;word-break:break-all;">已上传：<span id="llScriptUrl" style="color:#4ecdc4;cursor:pointer;" title="点击复制链接"></span></div>'
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><b style="color:#f0932b;font-size:0.95rem;">📜 活动·第' + _esc(day) + '天 · 阵容脚本（可多个）</b><span style="flex:1;"></span><button id="llScriptClose" style="background:transparent;border:none;color:#fff;font-size:1.2rem;cursor:pointer;">×</button></div>'
+            + '<div style="color:rgba(255,255,255,0.45);font-size:0.68rem;margin-bottom:6px;">支持多个脚本（你和队友各一个）：粘贴文本或选文件 → 「💾保存本机」即新增一个；再「📤上传」分享。云端脚本只查看/下载，点「📥导入本地」可下载到本机再编辑。</div>'
+            + '<textarea id="llScriptText" placeholder="把一条活动脚本贴到这里，保存到本机即成为当天的第 N 个脚本…" style="width:100%;box-sizing:border-box;height:150px;resize:vertical;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.35);color:rgba(255,255,255,0.92);font-size:0.78rem;font-family:Consolas,monospace;"></textarea>'
             + '<input type="file" id="llScriptFile" accept=".js,.txt,text/javascript,text/plain" style="display:none">'
             + '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">'
-            + '<button id="llScriptSave" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(78,205,196,0.5);background:rgba(78,205,196,0.15);color:#4ecdc4;cursor:pointer;font-size:0.78rem;font-weight:700;">💾 保存到本机</button>'
+            + '<button id="llScriptSave" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(78,205,196,0.5);background:rgba(78,205,196,0.15);color:#4ecdc4;cursor:pointer;font-size:0.78rem;font-weight:700;">💾 保存本机（新增1个）</button>'
             + '<button id="llScriptPick" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:transparent;color:rgba(255,255,255,0.75);cursor:pointer;font-size:0.78rem;">📁 选择文件</button>'
             + '<button id="llScriptUp" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(240,147,43,0.55);background:rgba(240,147,43,0.15);color:#f0932b;cursor:pointer;font-size:0.78rem;font-weight:700;">📤 上传到脚本分享</button>'
-            + '<button id="llScriptCopy" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:transparent;color:rgba(255,255,255,0.75);cursor:pointer;font-size:0.78rem;">📋 复制脚本</button>'
+            + '<button id="llScriptCopy" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:transparent;color:rgba(255,255,255,0.75);cursor:pointer;font-size:0.78rem;">📋 复制</button>'
             + '</div>'
-            + '<div style="color:rgba(255,255,255,0.4);font-size:0.68rem;margin-top:8px;">可粘贴脚本文本后点「📤 上传」，或直接点「📤 上传 / 📁 选择文件」从本地选 .js 文件（选完自动填到上面，📤 还会直接上传）。上传后自动出现在「脚本分享」里供大家下载（需要已配置 Gist Token）；脚本只存本机 + Gist，不影响其他人。</div>';
-        m.appendChild(box);
-        document.body.appendChild(m);
+            + '<div id="llScriptList" style="margin-top:12px;"></div>';
+        m.appendChild(box); document.body.appendChild(m);
         const ta = box.querySelector('#llScriptText');
-        ta.value = L.script || '';
-        const urlLine = box.querySelector('#llScriptUrlLine'), urlSpan = box.querySelector('#llScriptUrl');
-        if (L.scriptUrl) { urlLine.style.display = 'block'; urlSpan.textContent = L.scriptUrl; }
+        const listEl = box.querySelector('#llScriptList');
+        function _copy(txt, tip) { try { (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(function () { try { if (typeof showToast === 'function') showToast(tip, 'info'); } catch (e) {} }).catch(function () {}); } catch (e) {} }
+        function _renderList() {
+            const arr = _dayScripts(id);
+            if (!arr.length) { listEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);font-size:0.72rem;padding:8px;border:1px dashed rgba(255,255,255,0.15);border-radius:8px;">（暂无脚本，粘贴或选文件后点「💾保存本机」添加第 1 个）</div>'; return; }
+            listEl.innerHTML = '<div style="color:rgba(255,255,255,0.6);font-size:0.7rem;margin-bottom:6px;">该天共 ' + arr.length + ' 个脚本：</div>' + arr.map(function (s) {
+                const cloud = !!s.url;
+                return '<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;margin-bottom:6px;background:rgba(0,0,0,0.25);border-radius:8px;border:1px solid ' + (cloud ? 'rgba(78,205,196,0.3)' : 'rgba(240,147,43,0.3)') + ';">'
+                    + '<span onclick="_llScriptView(\'' + id + '\',\'' + s.id + '\')" style="cursor:pointer;flex:1;color:' + (cloud ? '#4ecdc4' : '#f0932b') + ';font-size:0.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + _esc(s.name) + '">' + _esc(s.name) + (cloud ? ' ☁' : ' 💾') + '</span>'
+                    + '<button onclick="_llScriptView(\'' + id + '\',\'' + s.id + '\')" style="padding:3px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.8);cursor:pointer;font-size:0.72rem;">👁</button>'
+                    + (cloud ? '<button onclick="_llImportLocal(\'' + id + '\',\'' + s.id + '\')" style="padding:3px 8px;border-radius:6px;border:1px solid rgba(78,205,196,0.4);background:rgba(78,205,196,0.12);color:#4ecdc4;cursor:pointer;font-size:0.72rem;">📥导入本地</button>' : '')
+                    + (cloud ? '' : '<button onclick="_llScriptDel(\'' + id + '\',\'' + s.id + '\')" style="padding:3px 8px;border-radius:6px;border:1px solid rgba(255,107,107,0.4);background:rgba(255,107,107,0.12);color:#ff6b6b;cursor:pointer;font-size:0.72rem;">🗑</button>')
+                    + '</div>';
+            }).join('');
+        }
         box.querySelector('#llScriptClose').addEventListener('click', function () { m.remove(); });
         m.addEventListener('click', function (e) { if (e.target === m) m.remove(); });
-        function _copy(txt, tip) {
-            try { (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(function () { try { if (typeof showToast === 'function') showToast(tip, 'info'); } catch (e) {} }).catch(function () {}); } catch (e) {}
-        }
-        urlSpan.addEventListener('click', function () { _copy(urlSpan.textContent, '脚本链接已复制'); });
-        box.querySelector('#llScriptSave').addEventListener('click', function () {
-            window._llSet('activity', id, 'script', null, ta.value);
-            _llTrack('阵容图库保存脚本');
-            try { if (typeof showToast === 'function') showToast('脚本已保存到本机（第' + day + '天）', 'info'); } catch (e) {}
-        });
-        box.querySelector('#llScriptCopy').addEventListener('click', function () { _copy(ta.value, '脚本内容已复制'); });
         const fileInput = box.querySelector('#llScriptFile');
-        let pendingAuto = false;   // true=由「📤上传」触发的选文件，选完自动上传；false=「📁选文件」只填不传
-        fileInput.addEventListener('change', function () {
-            const f = this.files && this.files[0]; if (!f) return;
-            const reader = new FileReader();
-            reader.onload = function () { ta.value = String(reader.result || ''); if (pendingAuto) { pendingAuto = false; doUpload(); } };
-            reader.onerror = function () { try { if (typeof showToast === 'function') showToast('读文件失败', 'error'); } catch (e) {} };
-            reader.readAsText(f);
-        });
+        let pendingAuto = false;
+        fileInput.addEventListener('change', function () { const f = this.files && this.files[0]; if (!f) return; const reader = new FileReader(); reader.onload = function () { ta.value = String(reader.result || ''); if (pendingAuto) { pendingAuto = false; _saveNew(true); } }; reader.onerror = function () { try { if (typeof showToast === 'function') showToast('读文件失败', 'error'); } catch (e) {} }; reader.readAsText(f); });
         box.querySelector('#llScriptPick').addEventListener('click', function () { pendingAuto = false; fileInput.click(); });
-        box.querySelector('#llScriptUp').addEventListener('click', function () {
-            if (!ta.value.trim()) { pendingAuto = true; fileInput.click(); return; }   // 🔴 空 → 弹本地文件框（用户期望的交互）
-            doUpload();
-        });
-        async function doUpload() {
+        async function _saveNew(doUp) {
             const content = ta.value.trim();
-            if (!content) { try { if (typeof showToast === 'function') showToast('先贴入脚本文本，或点「📤 上传 / 📁 选择文件」选本地文件', 'warn'); } catch (e) {} return; }
-            const up = box.querySelector('#llScriptUp'); up.disabled = true; up.textContent = '⏳ 上传中…';
-            try {
-                const fname = '活动第' + day + '天_阵容脚本_' + String(Date.now()).slice(-6) + '.js';
-                let url = '';
-                if (typeof window.uploadScriptToGist === 'function') {
-                    url = await window.uploadScriptToGist({ name: fname }, content);
-                } else {
-                    // 🔴 回退：app-core 旧缓存未暴露上传函数时，直接调 GitHub API（同格式，描述含「脚本分享」→ 进脚本墙）
-                    const token = (typeof window.getGistToken === 'function') ? window.getGistToken() : '';
-                    if (!token) throw new Error('无 Gist Token（请在主页设置里配置）');
-                    const resp = await fetch('https://api.github.com/gists', { method: 'POST', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token }, body: JSON.stringify({ description: '脚本分享: ' + fname, public: true, files: { [fname]: { content: content } } }) });
-                    if (!resp.ok) { const er = await resp.json().catch(function () { return {}; }); throw new Error(er.message || ('HTTP ' + resp.status)); }
-                    const data = await resp.json();
-                    const fd = data.files && data.files[fname];
-                    url = (fd && fd.raw_url) || data.html_url || '';
-                }
-                window._llSet('activity', id, 'script', null, ta.value);
-                window._llSet('activity', id, 'scriptUrl', null, url);
-                window._llSet('activity', id, 'scriptName', null, fname);
-                _llTrack('阵容图库脚本上传');
-                urlLine.style.display = 'block'; urlSpan.textContent = url;
-                try { if (typeof showToast === 'function') showToast('已上传到脚本分享：' + fname, 'success'); } catch (e) {}
-            } catch (e) {
-                try { if (typeof showToast === 'function') showToast('上传失败：' + (e && e.message || e) + '（需要已配置 Gist Token）', 'error'); } catch (e2) {}
+            if (!content) { try { if (typeof showToast === 'function') showToast('先贴入脚本文本，或点「📤上传 / 📁选择文件」选本地文件', 'warn'); } catch (e) {} return; }
+            const sid = _newSid();
+            const fname = '活动第' + day + '天_阵容脚本_' + String(Date.now()).slice(-6) + '.js';
+            _upsertScript(id, { id: sid, name: fname, content: content, url: '', shared: false });
+            _llTrack('阵容图库保存脚本');
+            try { if (typeof showToast === 'function') showToast('已保存本机（第' + day + '天）', 'info'); } catch (e) {}
+            if (doUp) {
+                const up = box.querySelector('#llScriptUp'); up.disabled = true; up.textContent = '⏳ 上传中…';
+                try {
+                    const url = await window._doScriptUpload(content, fname);
+                    _upsertScript(id, { id: sid, name: fname, content: content, url: url, shared: true });
+                    _llTrack('阵容图库脚本上传');
+                    try { if (typeof showToast === 'function') showToast('已上传到脚本分享：' + fname, 'success'); } catch (e) {}
+                } catch (e) { try { if (typeof showToast === 'function') showToast('上传失败：' + (e && e.message || e) + '（需要已配置 Gist Token）', 'error'); } catch (e2) {} }
+                up.disabled = false; up.textContent = '📤 上传到脚本分享';
             }
-            up.disabled = false; up.textContent = '📤 上传到脚本分享';
+            ta.value = ''; _renderList();
         }
+        box.querySelector('#llScriptSave').addEventListener('click', function () { _saveNew(false); });
+        box.querySelector('#llScriptUp').addEventListener('click', function () { if (!ta.value.trim()) { pendingAuto = true; fileInput.click(); return; } _saveNew(true); });
+        box.querySelector('#llScriptCopy').addEventListener('click', function () { _copy(ta.value, '脚本内容已复制'); });
+        _renderList();
         setTimeout(function () { ta.focus(); }, 0);
     };
+    // 脚本详情/查看/编辑（云端只读，本地可编辑）
+    window._llScriptView = function (id, sid) {
+        const old = document.getElementById('llScriptView'); if (old) old.remove();
+        const L = _slot('activity', id); const arr = Array.isArray(L.scripts) ? L.scripts : [];
+        const s = arr.find(function (x) { return x.id === sid; }); if (!s) return;
+        const cloud = !!s.url;
+        const m = document.createElement('div'); m.id = 'llScriptView';
+        m.style.cssText = 'position:fixed;inset:0;z-index:100002;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;';
+        const box = document.createElement('div');
+        box.style.cssText = 'width:min(600px,94vw);max-height:88vh;overflow:auto;background:linear-gradient(160deg,#141a33,#0d1b2a);border:1px solid ' + (cloud ? 'rgba(78,205,196,0.5)' : 'rgba(240,147,43,0.5)') + ';border-radius:12px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.6);';
+        box.innerHTML =
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><b style="color:' + (cloud ? '#4ecdc4' : '#f0932b') + ';font-size:0.92rem;">' + (cloud ? '☁ 云端脚本' : '💾 本机脚本') + '：' + _esc(s.name) + '</b><span style="flex:1;"></span><button id="llViewClose" style="background:transparent;border:none;color:#fff;font-size:1.2rem;cursor:pointer;">×</button></div>'
+            + (cloud ? '<div style="color:rgba(78,205,196,0.8);font-size:0.7rem;margin-bottom:6px;">云端只读 · 可下载到本机再编辑（📥导入本地）</div>' : '')
+            + (s.url ? '<div style="color:rgba(255,255,255,0.55);font-size:0.7rem;word-break:break-all;margin-bottom:6px;">分享链接：<span style="color:#4ecdc4;">' + _esc(s.url) + '</span></div>' : '')
+            + '<textarea id="llViewText" ' + (cloud ? 'readonly ' : '') + 'style="width:100%;box-sizing:border-box;height:200px;resize:vertical;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.35);color:rgba(255,255,255,0.92);font-size:0.78rem;font-family:Consolas,monospace;">' + _esc(s.content) + '</textarea>'
+            + '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">'
+            + (cloud ? '' : '<button id="llViewSave" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(78,205,196,0.5);background:rgba(78,205,196,0.15);color:#4ecdc4;cursor:pointer;font-size:0.78rem;font-weight:700;">💾 保存修改</button>')
+            + (cloud ? '' : '<button id="llViewUp" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(240,147,43,0.55);background:rgba(240,147,43,0.15);color:#f0932b;cursor:pointer;font-size:0.78rem;font-weight:700;">📤 上传/更新</button>')
+            + '<button id="llViewDown" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:transparent;color:rgba(255,255,255,0.75);cursor:pointer;font-size:0.78rem;">📥 下载</button>'
+            + '<button id="llViewCopy" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:transparent;color:rgba(255,255,255,0.75);cursor:pointer;font-size:0.78rem;">📋 复制</button>'
+            + (cloud ? '<button id="llViewImport" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(78,205,196,0.4);background:rgba(78,205,196,0.12);color:#4ecdc4;cursor:pointer;font-size:0.78rem;">📥 导入到本地</button>' : '<button id="llViewDel" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(255,107,107,0.4);background:rgba(255,107,107,0.12);color:#ff6b6b;cursor:pointer;font-size:0.78rem;">🗑 删除</button>')
+            + '</div>';
+        m.appendChild(box); document.body.appendChild(m);
+        const ta = box.querySelector('#llViewText');
+        function _copy(txt, tip) { try { (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(function () { try { if (typeof showToast === 'function') showToast(tip, 'info'); } catch (e) {} }).catch(function () {}); } catch (e) {} }
+        box.querySelector('#llViewClose').addEventListener('click', function () { m.remove(); });
+        m.addEventListener('click', function (e) { if (e.target === m) m.remove(); });
+        box.querySelector('#llViewCopy').addEventListener('click', function () { _copy(ta.value, '脚本内容已复制'); });
+        box.querySelector('#llViewDown').addEventListener('click', function () { _downloadScript(s.name, ta.value); try { if (typeof showToast === 'function') showToast('已开始下载：' + s.name, 'info'); } catch (e) {} });
+        if (!cloud) {
+            box.querySelector('#llViewSave').addEventListener('click', function () { _upsertScript(id, { id: sid, name: s.name, content: ta.value, url: s.url, shared: s.shared }); _llTrack('阵容图库保存脚本'); try { if (typeof showToast === 'function') showToast('已保存修改', 'info'); } catch (e) {} m.remove(); if (typeof _llScriptDlg === 'function') _llScriptDlg(id); });
+            box.querySelector('#llViewUp').addEventListener('click', async function () {
+                const up = box.querySelector('#llViewUp'); up.disabled = true; up.textContent = '⏳ 上传中…';
+                try {
+                    const url = await window._doScriptUpload(ta.value, s.name);
+                    _upsertScript(id, { id: sid, name: s.name, content: ta.value, url: url, shared: true });
+                    _llTrack('阵容图库脚本上传');
+                    try { if (typeof showToast === 'function') showToast('已上传/更新到脚本分享', 'success'); } catch (e) {}
+                    m.remove(); if (typeof _llScriptDlg === 'function') _llScriptDlg(id);
+                } catch (e) { try { if (typeof showToast === 'function') showToast('上传失败：' + (e && e.message || e), 'error'); } catch (e2) {} up.disabled = false; up.textContent = '📤 上传/更新'; }
+            });
+            box.querySelector('#llViewDel').addEventListener('click', function () { _llScriptDel(id, sid); m.remove(); if (typeof _llScriptDlg === 'function') _llScriptDlg(id); });
+        } else {
+            box.querySelector('#llViewImport').addEventListener('click', function () {
+                _upsertScript(id, { id: _newSid(), name: s.name + '（本地副本）', content: s.content, url: '', shared: false });
+                _llTrack('阵容图库导入脚本本地');
+                try { if (typeof showToast === 'function') showToast('已导入到本机（可编辑）', 'success'); } catch (e) {}
+                m.remove(); if (typeof _llScriptDlg === 'function') _llScriptDlg(id);
+            });
+        }
+    };
+    window._llScriptDel = function (id, sid) { if (!confirm('确定删除该本机脚本？')) return; _delScript(id, sid); try { if (typeof showToast === 'function') showToast('已删除本机脚本', 'info'); } catch (e) {} };
+    window._llImportLocal = function (id, sid) { const L = _slot('activity', id); const arr = Array.isArray(L.scripts) ? L.scripts : []; const s = arr.find(function (x) { return x.id === sid; }); if (!s) return; _upsertScript(id, { id: _newSid(), name: s.name + '（本地副本）', content: s.content, url: '', shared: false }); _llTrack('阵容图库导入脚本本地'); try { if (typeof showToast === 'function') showToast('已导入到本机（可编辑）', 'success'); } catch (e) {} };
     // ---------- 大航海（一排一套：#N + 10卡槽 + 主副车；第二行小字波次备注） ----------
     function _cartSelect(tab, id, field, cur) {
         let h = '<select onchange="_llSet(\'' + tab + '\',\'' + id + '\',\'' + field + '\',null,this.value)" style="padding:3px 6px;border-radius:6px;border:1px solid rgba(255,215,0,0.35);background:#2a2a4a;color:#ffd700;font-size:0.75rem;">';
@@ -404,8 +493,9 @@
     function _actCard(a) {
         let h = '<div class="ll-card" style="border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:6px 9px;margin-bottom:10px;background:rgba(0,0,0,0.22);">';
         h += '<div style="display:flex;align-items:flex-start;gap:18px;">';
-        // 第N天
-        h += '<div style="min-width:52px;padding-top:6px;"><b style="color:#ffd700;font-size:0.85rem;">第' + a.day + '天</b></div>';
+        // 第N天 + 重置按钮（🔴 用户要求上移，放在第N天标题下方更显眼）
+        h += '<div style="min-width:52px;padding-top:6px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;"><b style="color:#ffd700;font-size:0.85rem;">第' + a.day + '天</b>'
+            + '<button onclick="_llReset(\'activity\',\'d' + a.day + '\')" title="重置该天个人设置（英雄/融合/皮肤/脚本）" style="padding:3px 10px;border-radius:7px;border:1px solid rgba(255,107,107,0.45);background:rgba(255,107,107,0.14);color:#ff6b6b;cursor:pointer;font-size:0.7rem;font-weight:700;">↺ 重置改天个人设置</button></div>';
         // A/B 两组并排：组头（A/B + 主车 + 副车 + 减伤）在上，5×2 网格在下
         ['A', 'B'].forEach(function (ab) {
             const id = 'd' + a.day + ab;
@@ -422,10 +512,10 @@
             (a[ab] || []).forEach(function (n, i) { h += _slotHtml(ab.toLowerCase(), i, n, 'activity', 'd' + a.day, 60); });
             h += '</div></div>';
         });
-        const _lday = _slot('activity', 'd' + a.day);   // 🔴 天级个人设置（脚本文本/链接存这里，与 A/B 槽位分开）
-        h += '<div style="align-self:center;display:flex;flex-direction:column;gap:4px;align-items:center;"><button onclick="_llReset(\'activity\',\'d' + a.day + '\')" title="重置该天个人设置" style="padding:2px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.5);font-size:0.66rem;cursor:pointer;">↺</button>';
-        h += '<button onclick="_llScriptDlg(\'d' + a.day + '\')" title="该天的活动脚本（可上传供大家使用，活动可用脚本打）" style="padding:2px 8px;border-radius:6px;border:1px solid rgba(240,147,43,0.45);background:rgba(240,147,43,0.12);color:#f0932b;font-size:0.66rem;cursor:pointer;">📜' + ((_lday.script || _lday.scriptUrl) ? '✓' : '') + '</button>';
-        if (_lday.scriptName) h += '<div title="' + _esc(_lday.scriptName) + '" style="max-width:88px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:rgba(240,147,43,0.8);font-size:0.56rem;cursor:help;">' + _esc(_lday.scriptName) + '</div>';
+        const _arrScripts = _dayScripts('d' + a.day);   // 🔴 天级多脚本（与 A/B 槽位分开）
+        h += '<div style="align-self:flex-start;display:flex;flex-direction:column;gap:5px;min-width:128px;">';
+        h += '<button onclick="_llScriptDlg(\'d' + a.day + '\')" title="管理该天多个活动脚本（新增/上传/查看/导入本地）" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(240,147,43,0.45);background:rgba(240,147,43,0.12);color:#f0932b;font-size:0.74rem;font-weight:700;cursor:pointer;text-align:left;">📜 阵容脚本（' + _arrScripts.length + '）</button>';
+        h += '<div id="llScripts-d' + a.day + '">' + _scriptsHtml(_arrScripts, 'd' + a.day) + '</div>';
         h += '</div>';
         h += '</div></div>';
         return h;
@@ -448,4 +538,18 @@
         _renderList();
         try { if (typeof showToast === 'function') showToast('已重置该阵容的个人设置', 'info'); } catch (e) {}
     };
+    // 🔴 2026-09-23 当天脚本列表 HTML（右侧常驻 + 弹窗列表共用）
+    function _scriptsHtml(arr, id) {
+        if (!arr.length) return '<div style="color:rgba(255,255,255,0.35);font-size:0.66rem;padding:2px 4px;">（暂无脚本，点上方「📜 阵容脚本」添加）</div>';
+        return arr.map(function (s) {
+            const cloud = !!s.url;
+            return '<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;background:rgba(0,0,0,0.25);border-radius:6px;border:1px solid ' + (cloud ? 'rgba(78,205,196,0.3)' : 'rgba(240,147,43,0.3)') + ';">'
+                + '<span onclick="_llScriptView(\'' + id + '\',\'' + s.id + '\')" style="cursor:pointer;flex:1;color:' + (cloud ? '#4ecdc4' : '#f0932b') + ';font-size:0.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + _esc(s.name) + '">' + _esc(s.name) + (cloud ? ' ☁' : ' 💾') + '</span>'
+                + '<button onclick="_llScriptView(\'' + id + '\',\'' + s.id + '\')" style="padding:1px 6px;border-radius:5px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.8);cursor:pointer;font-size:0.66rem;">👁</button>'
+                + (cloud ? '<button onclick="_llImportLocal(\'' + id + '\',\'' + s.id + '\')" title="下载到本机再编辑" style="padding:1px 6px;border-radius:5px;border:1px solid rgba(78,205,196,0.4);background:rgba(78,205,196,0.12);color:#4ecdc4;cursor:pointer;font-size:0.66rem;">📥</button>' : '')
+                + (cloud ? '' : '<button onclick="_llScriptDel(\'' + id + '\',\'' + s.id + '\')" title="删除本机脚本" style="padding:1px 6px;border-radius:5px;border:1px solid rgba(255,107,107,0.4);background:rgba(255,107,107,0.12);color:#ff6b6b;cursor:pointer;font-size:0.66rem;">🗑</button>')
+                + '</div>';
+        }).join('');
+    }
+    window._llRenderScripts = function (id) { const el = document.getElementById('llScripts-' + id); if (!el) return; el.innerHTML = _scriptsHtml(_dayScripts(id), id); };
 })();
