@@ -38,14 +38,15 @@
             + '<div id="llHead" style="padding:10px 14px 6px;"></div>'
             + '<div id="llList" style="padding:0 14px 14px;"></div>';
         document.body.appendChild(ov);
-        // 卡槽点击/右键 → 换肤/融合菜单（事件委托，重渲染后仍有效；右键跟主页一致）
+        // 卡槽点击：🔴 2026-09-22 用户要求快捷操作（不弹菜单）：
+        //   左键 = 切换融合（开/关，紫色「融」角标）；右键 = 自动循环切换皮肤（默认→皮肤1→…→默认）
         ov.addEventListener('click', function (e) {
             const sl = e.target.closest('.ll-slot');
-            if (sl) { window._llSkinMenu(sl, 'skin'); }
+            if (sl) { window._llFuseToggle(sl); }
         });
         ov.addEventListener('contextmenu', function (e) {
             const sl = e.target.closest('.ll-slot');
-            if (sl) { e.preventDefault(); window._llSkinMenu(sl, 'fus'); }
+            if (sl) { e.preventDefault(); window._llSkinCycle(sl); }
         });
         // 拖动（标题栏按住移动窗口；窗口用 left/top 定位后 resize 仍可用）
         const win = ov, bar = ov.querySelector('#llDrag');
@@ -83,7 +84,7 @@
             + '<button onclick="_llTab(\'act\')" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (!isSail ? 'rgba(255,215,0,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (!isSail ? 'rgba(255,215,0,0.15)' : 'transparent') + ';color:' + (!isSail ? '#ffd700' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">🏆 活动阵容(' + D.activity.length + '天)</button>'
             + '<input id="llSearch" value="' + _esc(state.q) + '" oninput="_llSearch(this.value)" placeholder="🔍 输入英雄名，查所有含它的阵容…" style="flex:1;min-width:200px;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;">'
             + '</div>'
-            + '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-top:4px;">左卡组右笔记 · <b style="color:rgba(255,255,255,0.7);">点卡槽换皮肤 / 填等级 / 填融合</b>（个人设置只存本机）· 拖标题栏移动窗口，右下角拉伸大小</div>';
+            + '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-top:4px;">左卡组右笔记 · <b style="color:#ce93d8;">左键点卡=切换融合</b> · <b style="color:rgba(255,255,255,0.7);">右键点卡=切换皮肤（自动循环）</b>（个人设置只存本机）· 拖标题栏移动窗口，右下角拉伸大小</div>';
     }
     function _filteredSailing() {
         const q = state.q;
@@ -176,61 +177,40 @@
             const table = _tableFor(tab, w);
             const dr = _cardDr(table, hero);
             Promise.resolve().then(function () { return window.applySkinBgToSlot(el, hero, hero, 'my', force); })
-                .catch(function () {}).then(function () { _slotBadge(el, dr); step(); });
+                .catch(function () {}).then(function () { _slotBadge(el, dr); _fusBadge(el, (L.fus && L.fus[hero]) || ''); step(); });
         })();
     }
-    // 皮肤/融合菜单（点卡槽弹出）
-    window._llSkinMenu = function (el, mode) {
-        mode = mode || 'skin';
+    // 🔴 2026-09-22 快捷操作（取代旧菜单，用户要求"点一下就生效"）：
+    //   左键 = 切换融合：有「融」角标就清掉，没有就标记（兼容旧手填的文本值，原样显示）
+    function _fusBadge(el, v) {
+        const old = el.querySelector('.ll-fus'); if (old) old.remove();
+        if (!v) return;
+        const b = document.createElement('div');
+        b.className = 'll-fus';
+        b.style.cssText = 'position:absolute;right:1px;top:1px;pointer-events:none;';
+        b.innerHTML = '<span style="background:rgba(156,39,176,0.85);color:#fff;font-size:0.56rem;padding:0 3px;border-radius:3px;">融' + (v === '1' ? '' : _esc(v)) + '</span>';
+        el.appendChild(b);
+    }
+    window._llFuseToggle = function (el) {
+        const hero = el.getAttribute('data-hero'), tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid');
+        const L = _slot(tab, lid);
+        const has = L.fus && L.fus[hero];
+        window._llSet(tab, lid, 'fus', hero, has ? '' : '1');
+        _fusBadge(el, has ? '' : '1');
+        try { if (typeof showToast === 'function') showToast(has ? '已取消融合标记' : '已标记融合', 'info'); } catch (e2) {}
+    };
+    //   右键 = 自动循环皮肤：默认 → 注册表第1套 → … → 最后一套 → 默认（存个人设置，只重刷这一个槽位）
+    window._llSkinCycle = function (el) {
         const hero = el.getAttribute('data-hero'), tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid');
         const L = _slot(tab, lid);
         const cur = (L.skin && L.skin[hero]) || '';
-        const fus = (L.fus && L.fus[hero]) || '';
         const reg = (window.skinRegistry && window.skinRegistry[hero]) || [];
-        let m = document.getElementById('llSkinMenu');
-        if (m) m.remove();
-        m = document.createElement('div');
-        m.id = 'llSkinMenu';
-        const r = el.getBoundingClientRect();
-        m.style.cssText = 'position:fixed;z-index:100000;left:' + Math.min(r.left, window.innerWidth - 240) + 'px;top:' + Math.min(r.bottom + 4, window.innerHeight - 300) + 'px;width:220px;max-height:280px;overflow:auto;background:rgba(20,24,48,0.98);border:1px solid rgba(78,205,196,0.5);border-radius:10px;padding:8px;box-shadow:0 6px 24px rgba(0,0,0,0.6);';
-        let h = '<div style="font-weight:800;color:#4ecdc4;font-size:0.8rem;margin-bottom:4px;">' + _esc(hero) + (mode === 'fus' ? ' · 融合' : ' · 皮肤') + '</div>';
-        h += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.45);margin-bottom:4px;">皮肤</div>';
-        h += '<div class="ll-opt" data-v="" style="padding:3px 6px;border-radius:6px;cursor:pointer;font-size:0.75rem;' + (!cur ? 'background:rgba(78,205,196,0.2);color:#4ecdc4;' : 'color:rgba(255,255,255,0.8);') + '">默认皮肤</div>';
-        (reg || []).forEach(function (s) {
-            const nm = (typeof s === 'string') ? s : (s && s.name) || '';
-            if (!nm) return;
-            h += '<div class="ll-opt" data-v="' + _esc(nm) + '" style="padding:3px 6px;border-radius:6px;cursor:pointer;font-size:0.75rem;' + (cur === nm ? 'background:rgba(78,205,196,0.2);color:#4ecdc4;' : 'color:rgba(255,255,255,0.8);') + '">' + _esc(nm) + '</div>';
-        });
-        const _drShow = _cardDr(_tableFor(tab, el.getAttribute('data-w')), hero);
-        if (mode === 'skin') {
-        h += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.45);margin:6px 0 2px;">减伤（自动读减伤表，在「🛡️ 减伤」里维护）</div>';
-        h += '<div style="color:#ff8a80;font-size:0.8rem;font-weight:800;">-' + _drShow + '%</div>';
-        }
-        else {
-        h += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.45);margin:6px 0 2px;">融合副卡（选填）</div>';
-        h += '<input id="llFusInput" value="' + _esc(fus) + '" style="width:100%;box-sizing:border-box;padding:4px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.35);color:#fff;font-size:0.75rem;">';
-        h += '<div style="margin-top:6px;text-align:right;"><button onclick="this.closest(\'#llSkinMenu\').remove()" style="padding:2px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.6);font-size:0.72rem;cursor:pointer;">关闭</button></div>';
-        }
-        m.innerHTML = h;
-        document.body.appendChild(m);
-        if (mode === 'skin') {
-            m.addEventListener('click', function (e) {
-                const opt = e.target.closest('.ll-opt');
-                if (!opt) return;
-                window._llSet(tab, lid, 'skin', hero, opt.getAttribute('data-v'));
-                m.remove();
-                _applySlots(document.getElementById('llList') || document);
-            });
-        } else {
-            m.querySelector('#llFusInput').addEventListener('input', function () {
-                window._llSet(tab, lid, 'fus', hero, this.value);
-            });
-        }
-        setTimeout(function () {
-            document.addEventListener('pointerdown', function close(e) {
-                if (m && !m.contains(e.target)) { m.remove(); document.removeEventListener('pointerdown', close); }
-            });
-        }, 0);
+        const names = [''].concat(reg.map(function (s) { return (typeof s === 'string') ? s : (s && s.name) || ''; }).filter(Boolean));
+        let i = names.indexOf(cur); if (i < 0) i = 0;
+        const next = names[(i + 1) % names.length];
+        window._llSet(tab, lid, 'skin', hero, next);
+        Promise.resolve().then(function () { return window.applySkinBgToSlot(el, hero, hero, 'my', next || undefined); }).catch(function () {});
+        try { if (typeof showToast === 'function') showToast(hero + ' 皮肤 → ' + (next || '默认'), 'info'); } catch (e2) {}
     };
     // ---------- 大航海（一排一套：#N + 10卡槽 + 主副车；第二行小字波次备注） ----------
     function _cartSelect(tab, id, field, cur) {
@@ -264,6 +244,7 @@
         });
         h += '<button onclick="_llReset(\'sailing\',\'' + s.id + '\')" style="padding:1px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.5);font-size:0.66rem;cursor:pointer;">↺ 重置</button>';
         h += '</div>';
+        h += '</div>';   // 🔴 收卡片本体（v6 误删导致所有卡嵌进第一张 → 网格只剩 1 个子项 → 两列失效）
         return h;
     }
     // ---------- 活动阵容卡片（左 A/B 卡组 右战车） ----------
