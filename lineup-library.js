@@ -320,17 +320,7 @@
         const fd = data.files && data.files[fname];
         return (fd && fd.raw_url) || data.html_url || '';
     };
-    // 下载脚本为 .js 文件
-    function _downloadScript(name, content) {
-        try {
-            const blob = new Blob([content], { type: 'text/javascript;charset=utf-8' });
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-            a.download = name.endsWith('.js') ? name : name + '.js';
-            document.body.appendChild(a); a.click();
-            setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
-        } catch (e) {}
-    }
-    // 多脚本管理弹窗（新建 + 列表）
+    // 多脚本管理弹窗（🔴 2026-09-23 重做：粘贴 TXT / 选 .txt 文件 → 直接上传云端分享；预览统一走 openScriptNotebook）
     window._llScriptDlg = function (id) {
         const old = document.getElementById('llScriptDlg'); if (old) old.remove();
         const day = String(id).replace(/^d/, '');
@@ -340,13 +330,13 @@
         box.style.cssText = 'width:min(600px,94vw);max-height:88vh;overflow:auto;background:linear-gradient(160deg,#141a33,#0d1b2a);border:1px solid rgba(240,147,43,0.5);border-radius:12px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.6);';
         box.innerHTML =
             '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><b style="color:#f0932b;font-size:0.95rem;">📜 活动·第' + _esc(day) + '天 · 阵容脚本（可多个）</b><span style="flex:1;"></span><button id="llScriptClose" style="background:transparent;border:none;color:#fff;font-size:1.2rem;cursor:pointer;">×</button></div>'
-            + '<div style="color:rgba(255,255,255,0.45);font-size:0.68rem;margin-bottom:6px;">支持多个脚本（你和队友各一个）：粘贴文本或选文件 → 「💾保存本机」即新增一个；再「📤上传」分享。云端脚本只查看/下载，点「📥导入本地」可下载到本机再编辑。</div>'
-            + '<textarea id="llScriptText" placeholder="把一条活动脚本贴到这里，保存到本机即成为当天的第 N 个脚本…" style="width:100%;box-sizing:border-box;height:150px;resize:vertical;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.35);color:rgba(255,255,255,0.92);font-size:0.78rem;font-family:Consolas,monospace;"></textarea>'
-            + '<input type="file" id="llScriptFile" accept=".js,.txt,text/javascript,text/plain" style="display:none">'
+            + '<div style="color:rgba(255,255,255,0.45);font-size:0.68rem;margin-bottom:6px;">粘贴 TXT 文本或选 .txt 文件 → 点「☁ 上传分享」即上传到云端公开分享（与需求墙同一套）。点脚本名用<b style="color:rgba(255,255,255,0.7);">脚本记事本</b>打开：可改颜色、看减伤、📊对比、查找替换、📥下载、📁导入老马。</div>'
+            + '<textarea id="llScriptText" placeholder="把 TXT 脚本内容粘贴到这里…" style="width:100%;box-sizing:border-box;height:150px;resize:vertical;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.35);color:rgba(255,255,255,0.92);font-size:0.78rem;font-family:Consolas,monospace;"></textarea>'
+            + '<input type="file" id="llScriptFile" accept=".txt,text/plain" style="display:none">'
             + '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">'
-            + '<button id="llScriptSave" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(78,205,196,0.5);background:rgba(78,205,196,0.15);color:#4ecdc4;cursor:pointer;font-size:0.78rem;font-weight:700;">💾 保存本机（新增1个）</button>'
-            + '<button id="llScriptPick" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:transparent;color:rgba(255,255,255,0.75);cursor:pointer;font-size:0.78rem;">📁 选择文件</button>'
-            + '<button id="llScriptUp" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(240,147,43,0.55);background:rgba(240,147,43,0.15);color:#f0932b;cursor:pointer;font-size:0.78rem;font-weight:700;">📤 上传到脚本分享</button>'
+            + '<button id="llScriptUp" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(240,147,43,0.55);background:rgba(240,147,43,0.15);color:#f0932b;cursor:pointer;font-size:0.78rem;font-weight:700;">☁ 上传分享（TXT）</button>'
+            + '<button id="llScriptPick" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:transparent;color:rgba(255,255,255,0.75);cursor:pointer;font-size:0.78rem;">📁 选择 .txt 文件</button>'
+            + '<button id="llScriptSave" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(78,205,196,0.5);background:rgba(78,205,196,0.15);color:#4ecdc4;cursor:pointer;font-size:0.78rem;">💾 只存本机</button>'
             + '<button id="llScriptCopy" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:transparent;color:rgba(255,255,255,0.75);cursor:pointer;font-size:0.78rem;">📋 复制</button>'
             + '</div>'
             + '<div id="llScriptList" style="margin-top:12px;"></div>';
@@ -360,10 +350,12 @@
             listEl.innerHTML = '<div style="color:rgba(255,255,255,0.6);font-size:0.7rem;margin-bottom:6px;">该天共 ' + arr.length + ' 个脚本：</div>' + arr.map(function (s) {
                 const cloud = !!s.url;
                 return '<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;margin-bottom:6px;background:rgba(0,0,0,0.25);border-radius:8px;border:1px solid ' + (cloud ? 'rgba(78,205,196,0.3)' : 'rgba(240,147,43,0.3)') + ';">'
-                    + '<span onclick="_llScriptView(\'' + id + '\',\'' + s.id + '\')" style="cursor:pointer;flex:1;color:' + (cloud ? '#4ecdc4' : '#f0932b') + ';font-size:0.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + _esc(s.name) + '">' + _esc(s.name) + (cloud ? ' ☁' : ' 💾') + '</span>'
-                    + '<button onclick="_llScriptView(\'' + id + '\',\'' + s.id + '\')" style="padding:3px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.8);cursor:pointer;font-size:0.72rem;">👁</button>'
-                    + (cloud ? '<button onclick="_llImportLocal(\'' + id + '\',\'' + s.id + '\')" style="padding:3px 8px;border-radius:6px;border:1px solid rgba(78,205,196,0.4);background:rgba(78,205,196,0.12);color:#4ecdc4;cursor:pointer;font-size:0.72rem;">📥导入本地</button>' : '')
-                    + (cloud ? '' : '<button onclick="_llScriptDel(\'' + id + '\',\'' + s.id + '\')" style="padding:3px 8px;border-radius:6px;border:1px solid rgba(255,107,107,0.4);background:rgba(255,107,107,0.12);color:#ff6b6b;cursor:pointer;font-size:0.72rem;">🗑</button>')
+                    + '<span onclick="_llOpenScript(\'' + id + '\',\'' + s.id + '\')" style="cursor:pointer;flex:1;color:' + (cloud ? '#4ecdc4' : '#f0932b') + ';font-size:0.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + _esc(s.name) + '">' + _esc(s.name) + (cloud ? ' ☁' : ' 💾') + '</span>'
+                    + '<button onclick="_llOpenScript(\'' + id + '\',\'' + s.id + '\')" title="用脚本记事本打开（改颜色/减伤/对比）" style="padding:3px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.8);cursor:pointer;font-size:0.72rem;">👁</button>'
+                    + '<button onclick="_llImportToLaoMa(\'' + id + '\',\'' + s.id + '\')" title="一键导入到老马" style="padding:3px 8px;border-radius:6px;border:1px solid rgba(255,152,0,0.4);background:rgba(255,152,0,0.12);color:#ff9800;cursor:pointer;font-size:0.72rem;">📁老马</button>'
+                    + '<button onclick="_llRenameScript(\'' + id + '\',\'' + s.id + '\')" title="改名" style="padding:3px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.7);cursor:pointer;font-size:0.72rem;">✏</button>'
+                    + (cloud ? '<button onclick="_llImportLocal(\'' + id + '\',\'' + s.id + '\')" title="存一份本机副本" style="padding:3px 8px;border-radius:6px;border:1px solid rgba(78,205,196,0.4);background:rgba(78,205,196,0.12);color:#4ecdc4;cursor:pointer;font-size:0.72rem;">📥副本</button>' : '')
+                    + '<button onclick="_llScriptDel(\'' + id + '\',\'' + s.id + '\')" title="删除脚本" style="padding:3px 8px;border-radius:6px;border:1px solid rgba(255,107,107,0.4);background:rgba(255,107,107,0.12);color:#ff6b6b;cursor:pointer;font-size:0.72rem;">🗑</button>'
                     + '</div>';
             }).join('');
         }
@@ -371,88 +363,53 @@
         m.addEventListener('click', function (e) { if (e.target === m) m.remove(); });
         const fileInput = box.querySelector('#llScriptFile');
         let pendingAuto = false;
-        fileInput.addEventListener('change', function () { const f = this.files && this.files[0]; if (!f) return; const reader = new FileReader(); reader.onload = function () { ta.value = String(reader.result || ''); if (pendingAuto) { pendingAuto = false; _saveNew(true); } }; reader.onerror = function () { try { if (typeof showToast === 'function') showToast('读文件失败', 'error'); } catch (e) {} }; reader.readAsText(f); });
-        box.querySelector('#llScriptPick').addEventListener('click', function () { pendingAuto = false; fileInput.click(); });
-        async function _saveNew(doUp) {
-            const content = ta.value.trim();
-            if (!content) { try { if (typeof showToast === 'function') showToast('先贴入脚本文本，或点「📤上传 / 📁选择文件」选本地文件', 'warn'); } catch (e) {} return; }
-            const sid = _newSid();
-            const fname = '活动第' + day + '天_阵容脚本_' + String(Date.now()).slice(-6) + '.js';
-            _upsertScript(id, { id: sid, name: fname, content: content, url: '', shared: false });
-            _llTrack('阵容图库保存脚本');
-            try { if (typeof showToast === 'function') showToast('已保存本机（第' + day + '天）', 'info'); } catch (e) {}
-            if (doUp) {
-                const up = box.querySelector('#llScriptUp'); up.disabled = true; up.textContent = '⏳ 上传中…';
-                try {
-                    const url = await window._doScriptUpload(content, fname);
-                    _upsertScript(id, { id: sid, name: fname, content: content, url: url, shared: true });
-                    _llTrack('阵容图库脚本上传');
-                    try { if (typeof showToast === 'function') showToast('已上传到脚本分享：' + fname, 'success'); } catch (e) {}
-                } catch (e) { try { if (typeof showToast === 'function') showToast('上传失败：' + (e && e.message || e) + '（需要已配置 Gist Token）', 'error'); } catch (e2) {} }
-                up.disabled = false; up.textContent = '📤 上传到脚本分享';
-            }
-            ta.value = ''; _renderList();
+        fileInput.addEventListener('change', function () { const f = this.files && this.files[0]; if (!f) return; const reader = new FileReader(); reader.onload = function () { ta.value = String(reader.result || ''); if (pendingAuto) { pendingAuto = false; _upload(ta.value.trim(), f.name); } }; reader.onerror = function () { try { if (typeof showToast === 'function') showToast('读文件失败', 'error'); } catch (e) {} }; reader.readAsText(f); });
+        // 🔴 选 .txt 文件后自动上传（一键完成）；点「选择文件」即 pendingAuto
+        box.querySelector('#llScriptPick').addEventListener('click', function () { pendingAuto = true; fileInput.click(); });
+        // 统一产出 .txt 文件名（选文件时沿用原文件名，粘贴时自动生成）
+        function _fname(hint) {
+            let n = String(hint || '').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]/g, '_').trim();
+            if (!n) n = '活动第' + day + '天_阵容_' + String(Date.now()).slice(-6);
+            if (!/\.txt$/i.test(n)) n += '.txt';
+            return n;
         }
-        box.querySelector('#llScriptSave').addEventListener('click', function () { _saveNew(false); });
-        box.querySelector('#llScriptUp').addEventListener('click', function () { if (!ta.value.trim()) { pendingAuto = true; fileInput.click(); return; } _saveNew(true); });
+        // 上传分享：走需求墙同一套 uploadScriptToGist（默认公开分享，返回 raw_url）
+        async function _upload(content, hint) {
+            if (!content) { try { if (typeof showToast === 'function') showToast('先粘贴 TXT 文本，或点「📁 选择 .txt 文件」', 'warn'); } catch (e) {} return; }
+            const fname = _fname(hint);
+            const up = box.querySelector('#llScriptUp'); up.disabled = true; up.textContent = '⏳ 上传中…';
+            try {
+                const url = await window._doScriptUpload(content, fname);
+                _upsertScript(id, { id: _newSid(), name: fname, content: content, url: url, shared: true });
+                _llTrack('阵容图库脚本上传');
+                try { if (typeof showToast === 'function') showToast('已上传分享：' + fname, 'success'); } catch (e) {}
+                ta.value = ''; _renderList(); if (typeof _llRenderScripts === 'function') _llRenderScripts(id);
+            } catch (e) { try { if (typeof showToast === 'function') showToast('上传失败：' + (e && e.message || e) + '（需要已配置 Gist Token）', 'error'); } catch (e2) {} }
+            up.disabled = false; up.textContent = '☁ 上传分享（TXT）';
+        }
+        box.querySelector('#llScriptUp').addEventListener('click', function () { const c = ta.value.trim(); if (!c) { pendingAuto = true; fileInput.click(); return; } _upload(c); });
+        box.querySelector('#llScriptSave').addEventListener('click', function () {
+            const content = ta.value.trim();
+            if (!content) { try { if (typeof showToast === 'function') showToast('先粘贴 TXT 文本或选择 .txt 文件', 'warn'); } catch (e) {} return; }
+            _upsertScript(id, { id: _newSid(), name: _fname(), content: content, url: '', shared: false });
+            _llTrack('阵容图库保存脚本');
+            try { if (typeof showToast === 'function') showToast('已存本机（第' + day + '天）', 'info'); } catch (e) {}
+            ta.value = ''; _renderList(); if (typeof _llRenderScripts === 'function') _llRenderScripts(id);
+        });
         box.querySelector('#llScriptCopy').addEventListener('click', function () { _copy(ta.value, '脚本内容已复制'); });
         _renderList();
         setTimeout(function () { ta.focus(); }, 0);
     };
-    // 脚本详情/查看/编辑（云端只读，本地可编辑）
-    window._llScriptView = function (id, sid) {
-        const old = document.getElementById('llScriptView'); if (old) old.remove();
+    // 🔴 2026-09-23 重做：预览/编辑统一调用项目现成的「脚本记事本」openScriptNotebook
+    // （自带改颜色、减伤栏、📊对比、查找替换、📥下载、📁另存/导入项目；与需求墙看 TXT 完全是同一套）
+    window._llOpenScript = function (id, sid) {
         const L = _slot('activity', id); const arr = Array.isArray(L.scripts) ? L.scripts : [];
         const s = arr.find(function (x) { return x.id === sid; }); if (!s) return;
-        const cloud = !!s.url;
-        const m = document.createElement('div'); m.id = 'llScriptView';
-        m.style.cssText = 'position:fixed;inset:0;z-index:100002;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;';
-        const box = document.createElement('div');
-        box.style.cssText = 'width:min(600px,94vw);max-height:88vh;overflow:auto;background:linear-gradient(160deg,#141a33,#0d1b2a);border:1px solid ' + (cloud ? 'rgba(78,205,196,0.5)' : 'rgba(240,147,43,0.5)') + ';border-radius:12px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.6);';
-        box.innerHTML =
-            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><b style="color:' + (cloud ? '#4ecdc4' : '#f0932b') + ';font-size:0.92rem;">' + (cloud ? '☁ 云端脚本' : '💾 本机脚本') + '：' + _esc(s.name) + '</b><span style="flex:1;"></span><button id="llViewClose" style="background:transparent;border:none;color:#fff;font-size:1.2rem;cursor:pointer;">×</button></div>'
-            + (cloud ? '<div style="color:rgba(78,205,196,0.8);font-size:0.7rem;margin-bottom:6px;">云端只读 · 可下载/导入到本机编辑，或一键导入到老马</div>' : '')
-            + '<textarea id="llViewText" ' + (cloud ? 'readonly ' : '') + 'style="width:100%;box-sizing:border-box;height:200px;resize:vertical;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.35);color:rgba(255,255,255,0.92);font-size:0.78rem;font-family:Consolas,monospace;">' + _esc(s.content) + '</textarea>'
-            + '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">'
-            + '<button id="llViewLaoma" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(255,152,0,0.5);background:rgba(255,152,0,0.15);color:#ff9800;cursor:pointer;font-size:0.78rem;font-weight:700;">📁 导入到老马</button>'
-            + '<button id="llViewRename" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:transparent;color:rgba(255,255,255,0.75);cursor:pointer;font-size:0.78rem;">✏ 改名</button>'
-            + (cloud ? '' : '<button id="llViewSave" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(78,205,196,0.5);background:rgba(78,205,196,0.15);color:#4ecdc4;cursor:pointer;font-size:0.78rem;font-weight:700;">💾 保存修改</button>')
-            + (cloud ? '' : '<button id="llViewUp" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(240,147,43,0.55);background:rgba(240,147,43,0.15);color:#f0932b;cursor:pointer;font-size:0.78rem;font-weight:700;">📤 上传/更新</button>')
-            + '<button id="llViewDown" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:transparent;color:rgba(255,255,255,0.75);cursor:pointer;font-size:0.78rem;">📥 下载</button>'
-            + '<button id="llViewCopy" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:transparent;color:rgba(255,255,255,0.75);cursor:pointer;font-size:0.78rem;">📋 复制</button>'
-            + (cloud ? '<button id="llViewImport" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(78,205,196,0.4);background:rgba(78,205,196,0.12);color:#4ecdc4;cursor:pointer;font-size:0.78rem;">📥 导入到本地</button>' : '')
-            + '<button id="llViewDel" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(255,107,107,0.4);background:rgba(255,107,107,0.12);color:#ff6b6b;cursor:pointer;font-size:0.78rem;">🗑 删除</button>'
-            + '</div>';
-        m.appendChild(box); document.body.appendChild(m);
-        const ta = box.querySelector('#llViewText');
-        function _copy(txt, tip) { try { (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(function () { try { if (typeof showToast === 'function') showToast(tip, 'info'); } catch (e) {} }).catch(function () {}); } catch (e) {} }
-        box.querySelector('#llViewClose').addEventListener('click', function () { m.remove(); });
-        m.addEventListener('click', function (e) { if (e.target === m) m.remove(); });
-        box.querySelector('#llViewCopy').addEventListener('click', function () { _copy(ta.value, '脚本内容已复制'); });
-        box.querySelector('#llViewDown').addEventListener('click', function () { _downloadScript(s.name, ta.value); try { if (typeof showToast === 'function') showToast('已开始下载：' + s.name, 'info'); } catch (e) {} });
-        box.querySelector('#llViewLaoma').addEventListener('click', function () { window._llImportToLaoMa(id, sid); });
-        box.querySelector('#llViewRename').addEventListener('click', function () { window._llRenameScript(id, sid); });
-        box.querySelector('#llViewDel').addEventListener('click', function () { window._llScriptDel(id, sid); m.remove(); if (typeof _llScriptDlg === 'function') _llScriptDlg(id); });
-        if (!cloud) {
-            box.querySelector('#llViewSave').addEventListener('click', function () { _upsertScript(id, { id: sid, name: s.name, content: ta.value, url: s.url, shared: s.shared }); _llTrack('阵容图库保存脚本'); try { if (typeof showToast === 'function') showToast('已保存修改', 'info'); } catch (e) {} m.remove(); if (typeof _llScriptDlg === 'function') _llScriptDlg(id); });
-            box.querySelector('#llViewUp').addEventListener('click', async function () {
-                const up = box.querySelector('#llViewUp'); up.disabled = true; up.textContent = '⏳ 上传中…';
-                try {
-                    const url = await window._doScriptUpload(ta.value, s.name);
-                    _upsertScript(id, { id: sid, name: s.name, content: ta.value, url: url, shared: true });
-                    _llTrack('阵容图库脚本上传');
-                    try { if (typeof showToast === 'function') showToast('已上传/更新到脚本分享', 'success'); } catch (e) {}
-                    m.remove(); if (typeof _llScriptDlg === 'function') _llScriptDlg(id);
-                } catch (e) { try { if (typeof showToast === 'function') showToast('上传失败：' + (e && e.message || e), 'error'); } catch (e2) {} up.disabled = false; up.textContent = '📤 上传/更新'; }
-            });
-        } else {
-            box.querySelector('#llViewImport').addEventListener('click', function () {
-                _upsertScript(id, { id: _newSid(), name: s.name + '（本地副本）', content: s.content, url: '', shared: false });
-                _llTrack('阵容图库导入脚本本地');
-                try { if (typeof showToast === 'function') showToast('已导入到本机（可编辑）', 'success'); } catch (e) {}
-                m.remove(); if (typeof _llScriptDlg === 'function') _llScriptDlg(id);
-            });
-        }
+        if (typeof window.openScriptNotebook !== 'function') { try { if (typeof showToast === 'function') showToast('脚本记事本未加载，请刷新页面后重试', 'error'); } catch (e) {} return; }
+        if (s.content) { window.openScriptNotebook({ name: s.name, content: s.content, fileIndex: -1 }); return; }
+        // 本机没存内容（只有链接）→ 走需求墙同款的远程预览：fetch raw 后交给同一个记事本打开
+        if (s.url && typeof window.previewScriptFile === 'function') { window.previewScriptFile(s.url); return; }
+        window.openScriptNotebook({ name: s.name, content: '', fileIndex: -1 });
     };
     // 删除脚本：本机直接删；云端先删 Gist 再移除引用
     window._llScriptDel = async function (id, sid) {
@@ -466,7 +423,13 @@
         }
         _delScript(id, sid);
         try { if (typeof showToast === 'function') showToast('已删除脚本', 'info'); } catch (e) {}
+        _llRefresh(id);
     };
+    // 🔴 列表刷新：右侧常驻列表 + 弹窗列表（弹窗开着就重建，保证两处一致）
+    function _llRefresh(id) {
+        if (typeof _llRenderScripts === 'function') _llRenderScripts(id);
+        if (document.getElementById('llScriptDlg') && typeof _llScriptDlg === 'function') _llScriptDlg(id);
+    }
     // 一键导入到老马：复用项目现成的 importToLaoMaFromWall（桌面端 Tauri 写老马目录）
     window._llImportToLaoMa = async function (id, sid) {
         const L = _slot('activity', id); const arr = Array.isArray(L.scripts) ? L.scripts : [];
@@ -477,6 +440,7 @@
             url = await window._doScriptUpload(s.content, s.name);
             _upsertScript(id, { id: sid, name: s.name, content: s.content, url: url, shared: true });
             _llTrack('阵容图库脚本上传');
+            _llRefresh(id);
         }
         if (typeof window.importToLaoMaFromWall === 'function') {
             window.importToLaoMaFromWall(url, s.name);
@@ -495,7 +459,7 @@
             + '<div style="display:flex;gap:10px;margin-top:16px;"><button id="llRenameOk" style="flex:1;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;cursor:pointer;font-size:0.9rem;">确认</button><button id="llRenameCancel" style="flex:1;padding:10px;border:none;border-radius:8px;background:#666;color:#fff;cursor:pointer;font-size:0.9rem;">取消</button></div></div>';
         document.body.appendChild(m);
         const inp = m.querySelector('#llRenameInput'); inp.focus(); inp.select();
-        function _do() { const v = (inp.value || '').trim(); if (!v) { alert('名称不能为空'); return; } m.remove(); _upsertScript(id, { id: sid, name: v, content: s.content, url: s.url, shared: s.shared }); _llTrack('阵容图库脚本改名'); try { if (typeof showToast === 'function') showToast('已改名：' + v, 'info'); } catch (e) {} if (typeof _llScriptDlg === 'function') _llScriptDlg(id); }
+        function _do() { const v = (inp.value || '').trim(); if (!v) { alert('名称不能为空'); return; } m.remove(); _upsertScript(id, { id: sid, name: v, content: s.content, url: s.url, shared: s.shared }); _llTrack('阵容图库脚本改名'); try { if (typeof showToast === 'function') showToast('已改名：' + v, 'info'); } catch (e) {} _llRefresh(id); }
         m.querySelector('#llRenameOk').addEventListener('click', _do);
         m.querySelector('#llRenameCancel').addEventListener('click', function () { m.remove(); });
         inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') _do(); });
@@ -512,7 +476,7 @@
         if (!r.ok && r.status !== 404) throw new Error('HTTP ' + r.status);
         return true;
     };
-    window._llImportLocal = function (id, sid) { const L = _slot('activity', id); const arr = Array.isArray(L.scripts) ? L.scripts : []; const s = arr.find(function (x) { return x.id === sid; }); if (!s) return; _upsertScript(id, { id: _newSid(), name: s.name + '（本地副本）', content: s.content, url: '', shared: false }); _llTrack('阵容图库导入脚本本地'); try { if (typeof showToast === 'function') showToast('已导入到本机（可编辑）', 'success'); } catch (e) {} };
+    window._llImportLocal = function (id, sid) { const L = _slot('activity', id); const arr = Array.isArray(L.scripts) ? L.scripts : []; const s = arr.find(function (x) { return x.id === sid; }); if (!s) return; _upsertScript(id, { id: _newSid(), name: s.name + '（本地副本）', content: s.content, url: '', shared: false }); _llTrack('阵容图库导入脚本本地'); try { if (typeof showToast === 'function') showToast('已存一份本机副本', 'success'); } catch (e) {} _llRefresh(id); };
     // ---------- 大航海（一排一套：#N + 10卡槽 + 主副车；第二行小字波次备注） ----------
     function _cartSelect(tab, id, field, cur) {
         let h = '<select onchange="_llSet(\'' + tab + '\',\'' + id + '\',\'' + field + '\',null,this.value)" style="padding:3px 6px;border-radius:6px;border:1px solid rgba(255,215,0,0.35);background:#2a2a4a;color:#ffd700;font-size:0.75rem;">';
@@ -575,7 +539,7 @@
         });
         const _arrScripts = _dayScripts('d' + a.day);   // 🔴 天级多脚本（与 A/B 槽位分开）
         h += '<div style="align-self:flex-start;display:flex;flex-direction:column;gap:5px;min-width:128px;">';
-        h += '<button onclick="_llScriptDlg(\'d' + a.day + '\')" title="管理该天多个活动脚本（新增/上传/查看/导入本地）" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(240,147,43,0.45);background:rgba(240,147,43,0.12);color:#f0932b;font-size:0.74rem;font-weight:700;cursor:pointer;text-align:left;">📜 阵容脚本（' + _arrScripts.length + '）</button>';
+        h += '<button onclick="_llScriptDlg(\'d' + a.day + '\')" title="管理该天活动脚本（TXT 上传分享 / 记事本打开 / 导入老马）" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(240,147,43,0.45);background:rgba(240,147,43,0.12);color:#f0932b;font-size:0.74rem;font-weight:700;cursor:pointer;text-align:left;">📜 阵容脚本（' + _arrScripts.length + '）</button>';
         h += '<div id="llScripts-d' + a.day + '">' + _scriptsHtml(_arrScripts, 'd' + a.day) + '</div>';
         h += '</div>';
         h += '</div></div>';
@@ -605,9 +569,10 @@
         return arr.map(function (s) {
             const cloud = !!s.url;
             return '<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;background:rgba(0,0,0,0.25);border-radius:6px;border:1px solid ' + (cloud ? 'rgba(78,205,196,0.3)' : 'rgba(240,147,43,0.3)') + ';">'
-                + '<span onclick="_llScriptView(\'' + id + '\',\'' + s.id + '\')" style="cursor:pointer;flex:1;color:' + (cloud ? '#4ecdc4' : '#f0932b') + ';font-size:0.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + _esc(s.name) + '">' + _esc(s.name) + (cloud ? ' ☁' : ' 💾') + '</span>'
-                + '<button onclick="_llScriptView(\'' + id + '\',\'' + s.id + '\')" style="padding:1px 6px;border-radius:5px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.8);cursor:pointer;font-size:0.66rem;">👁</button>'
+                + '<span onclick="_llOpenScript(\'' + id + '\',\'' + s.id + '\')" style="cursor:pointer;flex:1;color:' + (cloud ? '#4ecdc4' : '#f0932b') + ';font-size:0.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + _esc(s.name) + '">' + _esc(s.name) + (cloud ? ' ☁' : ' 💾') + '</span>'
+                + '<button onclick="_llOpenScript(\'' + id + '\',\'' + s.id + '\')" style="padding:1px 6px;border-radius:5px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.8);cursor:pointer;font-size:0.66rem;">👁</button>'
                 + '<button onclick="_llImportToLaoMa(\'' + id + '\',\'' + s.id + '\')" title="一键导入到老马" style="padding:1px 6px;border-radius:5px;border:1px solid rgba(255,152,0,0.4);background:rgba(255,152,0,0.12);color:#ff9800;cursor:pointer;font-size:0.66rem;">📁</button>'
+                + '<button onclick="_llRenameScript(\'' + id + '\',\'' + s.id + '\')" title="改名" style="padding:1px 6px;border-radius:5px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.7);cursor:pointer;font-size:0.66rem;">✏</button>'
                 + (cloud ? '<button onclick="_llImportLocal(\'' + id + '\',\'' + s.id + '\')" title="下载到本机再编辑" style="padding:1px 6px;border-radius:5px;border:1px solid rgba(78,205,196,0.4);background:rgba(78,205,196,0.12);color:#4ecdc4;cursor:pointer;font-size:0.66rem;">📥</button>' : '')
                 + '<button onclick="_llScriptDel(\'' + id + '\',\'' + s.id + '\')" title="删除脚本" style="padding:1px 6px;border-radius:5px;border:1px solid rgba(255,107,107,0.4);background:rgba(255,107,107,0.12);color:#ff6b6b;cursor:pointer;font-size:0.66rem;">🗑</button>'
                 + '</div>';
