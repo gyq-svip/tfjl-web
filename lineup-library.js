@@ -27,7 +27,7 @@
         if (ov) { ov.style.display = 'block'; return; }
         ov = document.createElement('div');
         ov.id = 'lineupLibWin';
-        ov.style.cssText = 'position:fixed;top:80px;right:20px;width:min(1180px,96vw);height:min(86vh,900px);min-width:520px;min-height:360px;z-index:99996;display:flex;flex-direction:column;background:linear-gradient(160deg,#141a33,#0d1b2a);border:1px solid rgba(78,205,196,0.4);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.6);overflow:auto;resize:both;';
+        ov.style.cssText = 'position:fixed;top:80px;right:20px;width:min(1180px,96vw);height:min(86vh,900px);min-width:660px;min-height:360px;z-index:99996;display:flex;flex-direction:column;background:linear-gradient(160deg,#141a33,#0d1b2a);border:1px solid rgba(78,205,196,0.4);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.6);overflow:auto;resize:both;';
         ov.innerHTML =
             '<div id="llDrag" style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:linear-gradient(135deg,#0f3d3a,#123c5c);border-radius:12px 12px 0 0;cursor:move;user-select:none;">'
             + '<span style="font-size:1.05rem;font-weight:800;color:#4ecdc4;">📚 阵容图库</span>'
@@ -131,14 +131,12 @@
     function _slotHtml(which, idx, hero, tab, id, sz) {
         const s = sz || 50;
         // 🔴 2026-09-22 全局 .battle-slot 写死 min/max-width:72px、min-height:72px（styles.css:545），
-        //    min-width 会压过内联 width → 图库 44px 格子里实际渲染 72px → 相邻卡槽互相重叠（用户实测）。
+        //    min-width 会压过内联 width → 图库小格子里实际渲染 72px → 相邻卡槽互相重叠（用户实测）。
         //    内联把 min/max 全部钉死 + overflow:hidden，保证槽位永远等于格子尺寸。
         const box = 'width:' + s + 'px;height:' + s + 'px;min-width:' + s + 'px;max-width:' + s + 'px;min-height:' + s + 'px;max-height:' + s + 'px;padding:0;border-radius:6px;cursor:pointer;position:relative;overflow:hidden;';
-        return '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;">'
-            + '<div class="battle-slot filled ll-slot" data-slot="ll-' + tab + '-' + id + '-' + which + idx + '" data-hero="' + _esc(hero) + '" data-tab="' + tab + '" data-lid="' + _esc(id) + '" data-w="' + which + '" title="右键：换皮肤 / 等级 / 魔化 / 融合 / 减伤" style="' + box + '">'
+        // 🔴 2026-09-22 卡下方名字标签移除（皮肤图上已有名字）；卡放大 44→54px（用户反馈太小、融合卡看不清）
+        return '<div class="battle-slot filled ll-slot" data-slot="ll-' + tab + '-' + id + '-' + which + idx + '" data-hero="' + _esc(hero) + '" data-tab="' + tab + '" data-lid="' + _esc(id) + '" data-w="' + which + '" title="' + _esc(hero) + '（右键：切换皮肤 / 左键：融合）" style="' + box + '">'
             + '<span class="card-item"><span class="card-name">' + _esc(hero) + '</span></span>'
-            + '</div>'
-            + '<div style="color:rgba(255,255,255,0.6);font-size:0.6rem;max-width:' + s + 'px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" title="' + _esc(hero) + '">' + _esc(hero) + '</div>'
             + '</div>';
     }
     // 🔴 2026-09-22 减伤直接读现有减伤表（不手动设置）：航海/活动A组=「我的」表，活动B组=「队友」表；
@@ -232,8 +230,8 @@
         h += '<span style="color:#ff8a80;font-size:0.66rem;">🛡️' + sum + '%</span>';
         h += '</div>';
         // 5×2 卡槽
-        h += '<div style="display:grid;grid-template-columns:repeat(5,44px);gap:5px;">';
-        s.heroes.forEach(function (n, i) { h += _slotHtml(i < 5 ? 'u' : 'd', i % 5, n, 'sailing', s.id, 44); });
+        h += '<div style="display:grid;grid-template-columns:repeat(5,54px);gap:5px;">';
+        s.heroes.forEach(function (n, i) { h += _slotHtml(i < 5 ? 'u' : 'd', i % 5, n, 'sailing', s.id, 54); });
         h += '</div>';
         // 波次备注行
         h += '<div style="display:flex;align-items:center;gap:4px;margin-top:4px;flex-wrap:wrap;">';
@@ -266,8 +264,8 @@
             h += '<span style="color:rgba(255,255,255,0.45);font-size:0.62rem;">副</span>' + _cartSelect('activity', id, 'cart2', L.cart2);
             h += '<span style="color:#ff8a80;font-size:0.64rem;">🛡️' + sum + '%</span>';
             h += '</div>';
-            h += '<div style="display:grid;grid-template-columns:repeat(5,44px);gap:5px;">';
-            (a[ab] || []).forEach(function (n, i) { h += _slotHtml(ab.toLowerCase(), i, n, 'activity', 'd' + a.day, 44); });
+            h += '<div style="display:grid;grid-template-columns:repeat(5,54px);gap:5px;">';
+            (a[ab] || []).forEach(function (n, i) { h += _slotHtml(ab.toLowerCase(), i, n, 'activity', 'd' + a.day, 54); });
             h += '</div></div>';
         });
         h += '<div style="align-self:center;"><button onclick="_llReset(\'activity\',\'d' + a.day + '\')" title="重置该天个人设置" style="padding:2px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.5);font-size:0.66rem;cursor:pointer;">↺</button></div>';
