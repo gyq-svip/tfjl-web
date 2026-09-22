@@ -451,6 +451,7 @@
                 <button onclick="toggleReferencePanel()" title="参考图片" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:1rem;line-height:1;">🖼️</button>
                 <button onclick="saveCurrentProject()" id="saveBtn" title="确定保存：有未保存的改动时点此落盘（已取消自动保存，调错也不会存盘）" data-tip="确定保存：把当前项目的所有改动落盘（手牌/记事本/脚本/图片）。已取消自动保存，调错了也不会自动存盘" style="background:rgba(76,175,80,0.8);color:white;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:1rem;line-height:1;position:relative;">💾<span id="saveDirtyDot" style="display:none;position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#ff5252;border:2px solid #1a1a2e;border-radius:50%;box-shadow:0 0 6px #ff5252;"></span></button>
                 <button onclick="toggleActivityCalcPanel()" title="计算器" style="background:linear-gradient(135deg,#ff6b6b,#feca57);color:white;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:1rem;line-height:1;">🧮</button>
+                <button id="lineupLibBtn" onclick="if(typeof openLineupLibraryPanel==='function')openLineupLibraryPanel();else showToast('阵容图库加载中，请稍候...','info');" title="阵容图库" data-tip="📚 阵容图库：🚢大航海223套（单人10卡，可设战车/219·229·230波备注）+ 🏆活动阵容（双人A/B轮转）。搜英雄名快速定位；等级/皮肤/融合/战车是个人设置只存本机" style="background:linear-gradient(135deg,#4ecdc4,#2e7d32);color:white;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:1rem;line-height:1;">📚</button>
             </div>
         </div>
 
@@ -913,6 +914,8 @@
         <!-- 网页版皮肤系统（仅非 Tauri 浏览器执行；Tauri 由 app-local.js 负责，文件内部自动跳过） -->
         <script defer src="skins-web.js?v=CI_AUTO"></script>
         <script defer src="daily-rotation.js?v=CI_AUTO"></script>
+        <script defer src="lineup-data.js?v=CI_AUTO"></script>
+        <script defer src="lineup-library.js?v=CI_AUTO"></script>
 
         <script defer src="app-picker.js?v=CI_AUTO"></script>
 
