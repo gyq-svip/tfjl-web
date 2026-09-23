@@ -340,7 +340,7 @@
             const fallbackTop = (parseFloat(hdr.style.top) ? parseFloat(hdr.style.top) : 20) + hdr.offsetHeight;
             const top = rect.bottom ? rect.bottom : fallbackTop;
             // 让公告栏以下区域独立滚动，滚动条从公告栏下方开始，头部完全固定
-            sc.style.position = 'fixed';
+            sc.style.position = 'absolute';
             sc.style.top = top + 'px';
             // 不用 transform，否则 scrollableContent 内的 position:fixed 子元素会相对于它定位
             sc.style.left = '10px';
@@ -353,7 +353,7 @@
             sc.style.overflowY = 'auto';
             sc.style.overflowX = 'hidden';
             sc.style.boxSizing = 'border-box';
-            sc.style.zIndex = '1';
+            sc.style.zIndex = 'auto';
             sc.style.paddingTop = '0px';
             document.body.style.overflow = 'hidden';
             document.documentElement.style.overflow = 'hidden';
