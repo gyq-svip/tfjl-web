@@ -8727,7 +8727,7 @@
                 sharePassword = shareOpts.password;
                 recoveryKey = shareOpts.recoveryKey || '';
             } else {
-                const opts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk, cat) { resolve([e, p, rk, cat]); }); });
+                const opts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk, cat) { resolve([e, p, rk, cat]); }, window.inferScriptCat(file ? file.name : '')); });
                 if (opts === null || opts[0] === null) return;
                 expireMinutes = opts[0];
                 sharePassword = opts[1];
@@ -8810,7 +8810,7 @@
             // 批量统一选择分享选项
             const opts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk, cat) { resolve([e, p, rk, cat]); }); });
             if (opts === null || opts[0] === null) return;
-            const shareOpts = { expireMinutes: opts[0], password: opts[1], recoveryKey: opts[2] || '' };
+            const shareOpts = { expireMinutes: opts[0], password: opts[1], recoveryKey: opts[2] || '', category: opts[3] || '未分类' };
             let success = 0, fail = 0;
             for (const idx of indices) {
                 const file = txtFiles[idx];

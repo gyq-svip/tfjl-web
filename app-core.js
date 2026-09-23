@@ -7116,7 +7116,7 @@
                 sharePassword = shareOpts.password;
                 recoveryKey = shareOpts.recoveryKey || '';
             } else {
-                const opts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk, cat) { resolve([e, p, rk, cat]); }); });
+                const opts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk, cat) { resolve([e, p, rk, cat]); }, window.inferScriptCat(realName)); });
                 if (opts === null || opts[0] === null) return false;
                 expireMinutes = opts[0];
                 sharePassword = opts[1];
@@ -7199,7 +7199,7 @@
             // 批量统一选择分享选项
             const opts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk, cat) { resolve([e, p, rk, cat]); }); });
             if (opts === null || opts[0] === null) return;
-            const shareOpts = { expireMinutes: opts[0], password: opts[1], recoveryKey: opts[2] || '' };
+            const shareOpts = { expireMinutes: opts[0], password: opts[1], recoveryKey: opts[2] || '', category: opts[3] || '未分类' };
             let success = 0, fail = 0;
             for (const f of fileList) {
                 if (!f || !f.path || !f.name) continue;
@@ -21744,6 +21744,16 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         //    该数组同时用于：分享脚本时的「🏷️ 分类标签」下拉、「我的」页面分类筛选。
         window.WORK_CATEGORIES = ['未分类', '寒冰', '暗月', '漩涡', '深海', '对战', '隐藏', '活动'];
         window.WALL_CATEGORIES = window.WORK_CATEGORIES;
+    // 根据文件名智能推断需求墙分类，避免用户漏选分类导致消息落“未分类”、没有标签
+    window.inferScriptCat = function (name) {
+        if (!name) return '';
+        var n = String(name);
+        var cats = window.WALL_CATEGORIES || [];
+        for (var i = 0; i < cats.length; i++) {
+            if (cats[i] !== '未分类' && n.indexOf(cats[i]) >= 0) return cats[i];
+        }
+        return '';
+    };
         async function fetchWorksGist() {
             try {
                 const token = getGistToken();
@@ -25062,6 +25072,7 @@ ${maSection}
             const expireMinutes = opts[0];
             const sharePassword = opts[1];
             const recoveryKey = opts[2] || '';
+            const category = opts[3] || '未分类';
             let passwordHash = null;
             if (sharePassword || recoveryKey) passwordHash = await hashPassword(sharePassword || '');
 
@@ -25127,6 +25138,7 @@ ${maSection}
                     const msg = {
                         id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
                         nickname: nickname,
+                        category: category,
                         text: `分享了脚本: ${fileName}`,
                         scriptUrl: scriptUrl,
                         timestamp: Date.now(),
@@ -25639,7 +25651,7 @@ ${maSection}
                 if (pendingScriptFile) {
                     // 弹出分享选项（加密方式 / 查看密码 / 有效期），与「分享到需求墙」一致
                     const shareOpts = await new Promise(function(resolve) {
-                        showShareOptionsDialog(function(e, p, rk, cat) { resolve([e, p, rk, cat]); });
+                        showShareOptionsDialog(function(e, p, rk, cat) { resolve([e, p, rk, cat]); }, window.inferScriptCat(pendingScriptFile ? pendingScriptFile.name : ''));
                     });
                     if (shareOpts === null || shareOpts[0] === null) {
                         // 用户取消 → 中止发布，保留已选文件供再次发布
