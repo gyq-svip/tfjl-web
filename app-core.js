@@ -25702,6 +25702,7 @@ ${maSection}
                     scriptUrl: scriptUrl,
                     expireMinutes: expireMinutesValue > 0 ? expireMinutesValue : null,
                     isShare: !!scriptUrl,
+                    category: category,
                     likes: 0,
                     dislikes: 0,
                     copyCount: 0,
@@ -25746,7 +25747,11 @@ ${maSection}
                 setTimeout(() => _toast.remove(), 2000);
             } catch (error) {
                 console.error('发布失败:', error);
-                alert('发布失败: ' + error.message);
+                let msg = error.message || '未知错误';
+                if (msg === 'Failed to fetch' || msg.includes('NetworkError') || msg.toLowerCase().includes('network')) {
+                    msg = '网络请求失败（GitHub 接口暂时无法访问或本地网络波动），请检查网络后刷新页面重试。';
+                }
+                alert('发布失败: ' + msg);
             } finally {
                 if (btn) { btn.disabled = false; btn.textContent = originalText; }
             }
