@@ -327,8 +327,15 @@
                 prow.style.backdropFilter = pBlur;
                 prow.style.webkitBackdropFilter = pBlur;
             }
+            _syncScrollableSpacer();
             return lv;
         }
+        function _syncScrollableSpacer() {
+            const hdr = document.getElementById('fixedHeader');
+            const sc = document.getElementById('scrollableContent');
+            if (hdr && sc) sc.style.paddingTop = hdr.offsetHeight + 'px';
+        }
+        window.addEventListener('resize', _syncScrollableSpacer);
         window.__bgSetBlur = function (v) {
             const lv = Math.max(0, Math.min(100, Math.round(parseFloat(v) || 0)));
             localStorage.setItem(BG_BLUR_KEY, String(lv));
