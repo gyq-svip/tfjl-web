@@ -8381,7 +8381,14 @@
                 const skins = window.getHeroSkins ? window.getHeroSkins(subHero) : [];
                 // 保留副卡同名的默认皮条目，让默认皮也能循环切到
                 const names = skins.map(s => s.name);
-                for (const n of names) entries.push({ variant: v, subHero: subHero, skin: n });
+                // 🔴 2026-09-24 用户要求：把「卡池里给这张副卡设的那张皮」排在本变体第一位 —— 切一下就是最常用的皮，
+                //    不用再把十几张皮轮一遍；其余皮（含副卡同名默认皮）照旧排在后面，仍可继续循环。
+                const poolSkin = (window.getPoolOnlySkin ? (window.getPoolOnlySkin(null, subHero) || '') : '')
+                    || (window.heroSkinSelections ? (window.heroSkinSelections[subHero] || '') : '');
+                const ordered = [];
+                if (poolSkin && poolSkin !== '默认' && names.indexOf(poolSkin) >= 0) ordered.push(poolSkin);
+                names.forEach(n => { if (ordered.indexOf(n) < 0) ordered.push(n); });
+                for (const n of ordered) entries.push({ variant: v, subHero: subHero, skin: n });
             }
             const CLOSE = '__FUSION_CLOSE__';
             const totalLen = entries.length + 1;  // 末尾 +1 =「关闭融合」
@@ -10875,6 +10882,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
             return '默认';
         }
+        // 🔴 2026-09-24 暴露：融合切皮循环要把「卡池里设置的那张皮」排到第一位（只读全局卡池皮，不受项目内换皮影响）
+        try { window.getPoolOnlySkin = getPoolOnlySkin; } catch (e) {}
 
         function getHeroDefaultSkin(heroName) {
             // 英雄名 → cardId（卡池静态映射）→ defaultCardSkins，回退 heroSkinSelections（均为全局预设）

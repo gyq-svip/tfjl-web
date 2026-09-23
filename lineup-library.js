@@ -370,7 +370,14 @@
         variants.forEach(function (v) {
             const parts = (window.getFusionParts ? window.getFusionParts(v) : null) || [];
             const sub = _norm(parts[1] || '');
-            const skins = [''].concat(((sub && window.getHeroSkins) ? window.getHeroSkins(sub) : []).map(_nm).filter(Boolean));
+            const subSkins = ((sub && window.getHeroSkins) ? window.getHeroSkins(sub) : []).map(_nm).filter(Boolean);
+            // 🔴 2026-09-24 用户要求：卡池里给副卡设的那张皮排第一 —— 切一下就是它，不用点十几下（默认皮仍在末尾可循环到）
+            const poolSkin = (sub && window.getPoolOnlySkin) ? (window.getPoolOnlySkin(null, sub) || '') : '';
+            const ordered = [];
+            const hasPool = !!(poolSkin && poolSkin !== '默认' && subSkins.indexOf(poolSkin) >= 0);
+            if (hasPool) ordered.push(poolSkin);
+            subSkins.forEach(function (sk) { if (ordered.indexOf(sk) < 0) ordered.push(sk); });
+            const skins = hasPool ? ordered.concat(['']) : [''].concat(ordered);
             skins.forEach(function (sk) { steps.push({ v: v, sub: sub, skin: sk }); });
         });
         const curFuse = (L.fus && L.fus[hero]) || '';
