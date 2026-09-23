@@ -916,7 +916,6 @@
         
         <!-- 网页版皮肤系统（仅非 Tauri 浏览器执行；Tauri 由 app-local.js 负责，文件内部自动跳过） -->
         <script defer src="skins-web.js?v=CI_AUTO"></script>
-        <script defer src="daily-rotation.js?v=CI_AUTO"></script>
         <script defer src="lineup-data.js?v=CI_AUTO"></script>
         <script defer src="lineup-library.js?v=CI_AUTO"></script>
 
@@ -1169,7 +1168,6 @@
                     <button onclick="showDamageReductionDialog()" data-tip="设置/导出/导入各卡组的洗炼减伤数据（用于计算实际承伤）：多张减伤表的导入导出都在弹窗里，按当前表分别操作" style="background:rgba(78,205,196,0.2);border:1px solid rgba(78,205,196,0.4);color:#4ecdc4;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🛡️ 减伤</button>
                     <button onclick="resetAll()" data-tip="重置当前卡组：清空我方/队友全部卡槽（不删项目数据，手牌回到未上阵状态）" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🔄 重置</button>
                     <button id="battleShareBtn" onclick="if(typeof shareLineupImage==='function')shareLineupImage();else showToast('分享功能加载中，请稍候...','info');" data-tip="生成阵容分享图：双方卡组+手牌（每人最多10张，职业渐变+真实皮肤+等级/魔化/融合副卡），可设有效期/密码，对方扫码、报 8 位短码或点链接一键复刻" style="background:linear-gradient(135deg,#f093fb,#f5576c);border:none;color:#fff;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:bold;box-shadow:0 2px 8px rgba(240,147,251,0.3);">📸 分享</button>
-                    <button id="dailyRotationBtn" onclick="if(typeof openDailyRotationPanel==='function')openDailyRotationPanel();else showToast('轮换功能加载中，请稍候...','info');" data-tip="每日卡组轮换：活动 7 天×A/B 两套卡组，提前排好、自动高亮今天，一键导出海报 PNG（卡名是源数据，皮肤头像自动配）" style="background:linear-gradient(135deg,#ffd700,#ff9800);border:none;color:#1a1a2e;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:bold;box-shadow:0 2px 8px rgba(255,215,0,0.3);">📅 轮换</button>
                 </div>
             </div>
 
