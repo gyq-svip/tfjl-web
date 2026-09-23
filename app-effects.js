@@ -333,7 +333,21 @@
         function _syncScrollableSpacer() {
             const hdr = document.getElementById('fixedHeader');
             const sc = document.getElementById('scrollableContent');
-            if (hdr && sc) sc.style.paddingTop = hdr.getBoundingClientRect().bottom + 'px';
+            if (!hdr || !sc) return;
+            const rect = hdr.getBoundingClientRect();
+            // 让公告栏以下区域独立滚动，滚动条从公告栏下方开始，头部完全固定
+            sc.style.position = 'fixed';
+            sc.style.top = rect.bottom + 'px';
+            sc.style.left = rect.left + 'px';
+            sc.style.width = rect.width + 'px';
+            sc.style.bottom = '0px';
+            sc.style.overflowY = 'auto';
+            sc.style.overflowX = 'hidden';
+            sc.style.boxSizing = 'border-box';
+            sc.style.zIndex = '1';
+            sc.style.paddingTop = '0px';
+            document.body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
         }
         window.addEventListener('resize', _syncScrollableSpacer);
         window.__bgSetBlur = function (v) {
