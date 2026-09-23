@@ -333,13 +333,18 @@
         function _syncScrollableSpacer() {
             const hdr = document.getElementById('fixedHeader');
             const sc = document.getElementById('scrollableContent');
-            if (!hdr || !sc) return;
+            if (!hdr) return;
+            if (!sc) return;
             const rect = hdr.getBoundingClientRect();
+            // 用 header 的渲染位置计算；若主内容区尚未显示（rect=0）则回退到样式值
+            const fallbackTop = (parseFloat(hdr.style.top) ? parseFloat(hdr.style.top) : 20) + hdr.offsetHeight;
+            const top = rect.bottom ? rect.bottom : fallbackTop;
             // 让公告栏以下区域独立滚动，滚动条从公告栏下方开始，头部完全固定
             sc.style.position = 'fixed';
-            sc.style.top = rect.bottom + 'px';
-            sc.style.left = rect.left + 'px';
-            sc.style.width = rect.width + 'px';
+            sc.style.top = top + 'px';
+            sc.style.left = hdr.style.left ? hdr.style.left : '50%';
+            sc.style.width = hdr.style.width ? hdr.style.width : 'min(1400px,calc(100% - 20px))';
+            sc.style.transform = hdr.style.transform ? hdr.style.transform : 'translateX(-50%)';
             sc.style.bottom = '0px';
             sc.style.overflowY = 'auto';
             sc.style.overflowX = 'hidden';
@@ -350,6 +355,15 @@
             document.documentElement.style.overflow = 'hidden';
         }
         window.addEventListener('resize', _syncScrollableSpacer);
+        window.addEventListener('load', _syncScrollableSpacer);
+        // 主内容区显示/隐藏时重新计算（登录前 hidden，显示后 header 才有实际高度）
+        (function () {
+            const mc = document.getElementById('mainContent');
+            if (!mc) return;
+            if (!window.MutationObserver) return;
+            const obs = new MutationObserver(_syncScrollableSpacer);
+            obs.observe(mc, { attributes: true, attributeFilter: ['class'] });
+        })();
         window.__bgSetBlur = function (v) {
             const lv = Math.max(0, Math.min(100, Math.round(parseFloat(v) || 0)));
             localStorage.setItem(BG_BLUR_KEY, String(lv));
