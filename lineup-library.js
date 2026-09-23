@@ -641,7 +641,8 @@
     // ---------- 活动阵容卡片（左 A/B 卡组 右战车） ----------
     function _actCard(a) {
         let h = '<div class="ll-card" style="border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:6px 9px;margin-bottom:10px;background:rgba(0,0,0,0.22);">';
-        h += '<div style="display:flex;align-items:flex-start;gap:10px;">';
+        h += '<div style="display:flex;align-items:flex-start;gap:14px;">';
+        // 🔴 2026-09-24 用户反馈：A/B 两组间距太小不好区分 → 两组间距 10→14px，并给每组加淡色描边+底色（A 青 / B 橙）
         // 🔴 2026-09-23 用户要求：删掉左侧「第N天 + ↺重置」竖列，两者都塞进第一行（A 组组头行）
         //    行内顺序：第N天 → A组 → 主车 → 副车 → 🛡️减伤 → ↺重置（重置放在减伤后面）
         //    竖列腾出的宽度留给战车下拉，车名能多显示几个字
@@ -650,7 +651,8 @@
             const id = 'd' + a.day + ab;
             const L = _slot('activity', id);
             const st = (ab === 'A') ? { side: 'my', table: '我的' } : { side: 'teammate', table: '队友' };
-            h += '<div>';
+            // 🔴 2026-09-24 A 组淡青框 / B 组淡橙框：两块一眼分得开（颜色与「A组/B组」文字色一致）
+            h += '<div style="border-radius:9px;padding:4px 7px 7px;background:' + (ab === 'A' ? 'rgba(78,205,196,0.07)' : 'rgba(240,147,43,0.07)') + ';border:1px solid ' + (ab === 'A' ? 'rgba(78,205,196,0.32)' : 'rgba(240,147,43,0.32)') + ';">';
             h += '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:4px;">';
             if (ab === 'A') h += '<b style="color:#ffd700;font-size:0.8rem;margin-right:2px;white-space:nowrap;">第' + a.day + '天</b>';
             h += '<span style="font-weight:800;color:' + (ab === 'A' ? '#4ecdc4' : '#f0932b') + ';font-size:0.76rem;">' + ab + '组</span>';
