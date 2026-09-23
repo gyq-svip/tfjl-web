@@ -139,13 +139,24 @@
         _llTrack('阵容图库');
         ov = document.createElement('div');
         ov.id = 'lineupLibWin';
-        ov.style.cssText = 'position:fixed;top:80px;right:20px;width:min(1180px,96vw);height:min(86vh,900px);min-width:780px;min-height:360px;z-index:99996;display:flex;flex-direction:column;background:linear-gradient(160deg,#141a33,#0d1b2a);border:1px solid rgba(78,205,196,0.4);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.6);overflow:auto;resize:both;';
+        // 🔴 2026-09-23 用户要求：默认窗口改小（原 min(1180px,96vw)×min(86vh,900px) 太大，右下角缩放手柄/关闭按钮都难点到）
+        //    默认 940×620，并随视口自适应（底部永远留出余量，不贴边）；用户自己拉大后记住尺寸，下次沿用（仍限制在视口内）
+        let _llWinW = Math.min(940, Math.round(window.innerWidth * 0.92));
+        let _llWinH = Math.min(620, Math.round(window.innerHeight * 0.70));
+        try {
+            const _llSv = JSON.parse(localStorage.getItem('tdjl_llWinSize') || 'null');
+            if (_llSv && _llSv.w > 0 && _llSv.h > 0) {
+                _llWinW = Math.min(_llSv.w, window.innerWidth - 32);
+                _llWinH = Math.min(_llSv.h, window.innerHeight - 110);
+            }
+        } catch (e) {}
+        ov.style.cssText = 'position:fixed;top:64px;right:16px;width:' + _llWinW + 'px;height:' + _llWinH + 'px;min-width:min(620px,90vw);min-height:280px;z-index:99996;display:flex;flex-direction:column;background:linear-gradient(160deg,#141a33,#0d1b2a);border:1px solid rgba(78,205,196,0.4);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.6);overflow:auto;resize:both;';
         ov.innerHTML =
             '<div id="llDrag" style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:linear-gradient(135deg,#0f3d3a,#123c5c);border-radius:12px 12px 0 0;cursor:move;user-select:none;">'
             + '<span style="font-size:1.05rem;font-weight:800;color:#4ecdc4;">📚 阵容图库</span>'
             + '<span style="color:rgba(255,255,255,0.45);font-size:0.72rem;">卡组共享 · 等级/皮肤/融合/战车/笔记 只存本机</span>'
             + '<span style="flex:1;"></span>'
-            + '<button onclick="closeLineupLibraryPanel()" style="background:transparent;border:none;color:#fff;font-size:1.4rem;cursor:pointer;line-height:1;">×</button>'
+            + '<button onclick="closeLineupLibraryPanel()" title="关闭" style="background:transparent;border:none;color:#fff;font-size:1.5rem;cursor:pointer;line-height:1;padding:2px 12px;border-radius:8px;">×</button>'
             + '</div>'
             + '<div id="llHead" style="padding:10px 14px 6px;"></div>'
             + '<div id="llList" style="padding:0 14px 14px;"></div>';
@@ -173,6 +184,16 @@
         });
         _renderHead();
         _renderList();
+        // 🔴 2026-09-23 记住用户拉伸后的窗口尺寸（防抖 500ms 存 localStorage，刷新后沿用；窗口被限制在视口内）
+        if (window.ResizeObserver) {
+            let _llSizeT = null;
+            new ResizeObserver(function () {
+                clearTimeout(_llSizeT);
+                _llSizeT = setTimeout(function () {
+                    try { localStorage.setItem('tdjl_llWinSize', JSON.stringify({ w: ov.offsetWidth, h: ov.offsetHeight })); } catch (e) {}
+                }, 500);
+            }).observe(ov);
+        }
         // 🔴 后台拉取云端共享脚本并刷新各天列表（不阻塞首屏：先渲染本机，云端到了再补）
         setTimeout(function () { try { _llRefreshCloud(); } catch (e) {} }, 400);
     };
