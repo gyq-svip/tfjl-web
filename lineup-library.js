@@ -197,7 +197,7 @@
             + '<button onclick="_llTab(\'act\')" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (!isSail ? 'rgba(255,215,0,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (!isSail ? 'rgba(255,215,0,0.15)' : 'transparent') + ';color:' + (!isSail ? '#ffd700' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">🏆 活动阵容(' + D.activity.length + '天)</button>'
             + '<input id="llSearch" value="' + _esc(state.q) + '" oninput="_llSearch(this.value)" placeholder="🔍 多个英雄用空格/逗号分隔（同时含才显示）：如 电法 炎魔 悟空" style="flex:1;min-width:200px;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;">'
             + '</div>'
-            + '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-top:4px;">左卡组右笔记 · <b style="color:#ce93d8;">左键=轮流切融合卡（含副卡皮肤，末尾关闭）</b> · <b style="color:rgba(255,255,255,0.7);">右键=主卡皮肤（融合后也可切）</b> · 活动 📜=脚本 ·（个人设置只存本机）· 拖标题栏移动窗口，右下角拉伸大小</div>';
+            + '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-top:4px;">左卡组右笔记 · <b style="color:#ce93d8;">左键=轮流切融合卡（含副卡皮肤，末尾关闭）</b> · <b style="color:rgba(255,255,255,0.7);">右键=主卡皮肤（融合后也可切）</b> · <b style="color:#ff8a80;">🛡️减伤=鼠标悬浮查看每张卡的减伤明细（0% 减伤的卡自动隐藏）</b> · 活动 📜=脚本 ·（个人设置只存本机）· 拖标题栏移动窗口，右下角拉伸大小</div>';
     }
     // 🔴 2026-09-23 多关键词搜索：空格/逗号/顿号分隔，必须【同时包含】（AND）——搜"电法 炎魔 悟空"才精准
     function _qTerms() {
@@ -290,12 +290,14 @@
                 el.textContent = '🛡️' + all.total + '%';
                 // 🔴 2026-09-23 逐卡明细（用户要求）：10 张只能上 7 张，悬浮看到每张卡的减伤才能核算去掉哪 3 张。
                 //    单卡计算 skipChariot=true（战车不摊到卡上，主页「单卡明细」同款），战车单列一行。
-                const lines = cards.map(function (c) {
+                // 🔴 2026-09-23 用户要求：明细里 0% 减伤的卡直接过滤不显示（只列真正有减伤的卡）
+                const lines = [];
+                cards.forEach(function (c) {
                     const v = calc([c.name], side, table, true);
-                    return c.name.replace(/\+/g, '·') + ' ' + v + '%';
+                    if (v > 0) lines.push(c.name.replace(/\+/g, '·') + ' ' + v + '%');
                 });
                 if (all.chariot > 0) lines.push('战车 ' + all.chariot + '%');
-                const tip = lines.join('｜') + ' ｜ 合计 ' + all.total + '%';
+                const tip = (lines.length ? lines.join('｜') + ' ｜ ' : '') + '合计 ' + all.total + '%';
                 el.title = tip;
                 el.setAttribute('data-tip', tip);
             } catch (e) {}
@@ -619,9 +621,9 @@
     function _actCard(a) {
         let h = '<div class="ll-card" style="border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:6px 9px;margin-bottom:10px;background:rgba(0,0,0,0.22);">';
         h += '<div style="display:flex;align-items:flex-start;gap:10px;">';
-        // 第N天 + 重置按钮（🔴 用户要求上移，放在第N天标题下方更显眼）
-        h += '<div style="min-width:34px;padding-top:6px;display:flex;flex-direction:column;align-items:center;gap:4px;"><b style="color:#ffd700;font-size:0.8rem;">第' + a.day + '天</b>'
-            + '<button onclick="_llReset(\'activity\',\'d' + a.day + '\')" title="重置该天个人设置（英雄/融合/皮肤/脚本）" style="padding:2px 4px;border-radius:6px;border:1px solid rgba(255,107,107,0.45);background:rgba(255,107,107,0.14);color:#ff6b6b;cursor:pointer;font-size:0.62rem;font-weight:700;">↺ 重置</button></div>';
+        // 🔴 2026-09-23 用户要求：删掉左侧「第N天 + ↺重置」竖列，两者都塞进第一行（A 组组头行）
+        //    行内顺序：第N天 → A组 → 主车 → 副车 → 🛡️减伤 → ↺重置（重置放在减伤后面）
+        //    竖列腾出的宽度留给战车下拉，车名能多显示几个字
         // A/B 两组并排：组头（A/B + 主车 + 副车 + 减伤）在上，5×2 网格在下
         ['A', 'B'].forEach(function (ab) {
             const id = 'd' + a.day + ab;
@@ -629,10 +631,12 @@
             const st = (ab === 'A') ? { side: 'my', table: '我的' } : { side: 'teammate', table: '队友' };
             h += '<div>';
             h += '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:4px;">';
+            if (ab === 'A') h += '<b style="color:#ffd700;font-size:0.8rem;margin-right:2px;white-space:nowrap;">第' + a.day + '天</b>';
             h += '<span style="font-weight:800;color:' + (ab === 'A' ? '#4ecdc4' : '#f0932b') + ';font-size:0.76rem;">' + ab + '组</span>';
             h += '<span style="color:rgba(255,255,255,0.45);font-size:0.62rem;">主</span>' + _cartSelect('activity', id, 'cart', L.cart);
             h += '<span style="color:rgba(255,255,255,0.45);font-size:0.62rem;">副</span>' + _cartSelect('activity', id, 'cart2', L.cart2);
             h += '<span class="ll-drsum" data-tab="activity" data-lid="d' + a.day + '" data-side="' + st.side + '" data-table="' + st.table + '" data-heroes="' + _esc(JSON.stringify(a[ab] || [])) + '" title="减伤明细" style="color:#ff8a80;font-size:0.64rem;font-weight:700;cursor:help;">🛡️…</span>';
+            if (ab === 'A') h += '<button onclick="_llReset(\'activity\',\'d' + a.day + '\')" title="重置该天个人设置（英雄/融合/皮肤/脚本）" style="padding:2px 6px;border-radius:6px;border:1px solid rgba(255,107,107,0.45);background:rgba(255,107,107,0.14);color:#ff6b6b;cursor:pointer;font-size:0.62rem;font-weight:700;white-space:nowrap;">↺ 重置</button>';
             h += '</div>';
             h += '<div style="display:grid;grid-template-columns:repeat(5,94px);gap:6px;">';
             (a[ab] || []).forEach(function (n, i) { h += _slotHtml(ab.toLowerCase(), i, n, 'activity', 'd' + a.day, 94); });
