@@ -342,9 +342,13 @@
             // 让公告栏以下区域独立滚动，滚动条从公告栏下方开始，头部完全固定
             sc.style.position = 'fixed';
             sc.style.top = top + 'px';
-            sc.style.left = hdr.style.left ? hdr.style.left : '50%';
-            sc.style.width = hdr.style.width ? hdr.style.width : 'min(1400px,calc(100% - 20px))';
-            sc.style.transform = hdr.style.transform ? hdr.style.transform : 'translateX(-50%)';
+            // 不用 transform，否则 scrollableContent 内的 position:fixed 子元素会相对于它定位
+            sc.style.left = '10px';
+            sc.style.right = '10px';
+            sc.style.width = 'auto';
+            sc.style.maxWidth = '1400px';
+            sc.style.margin = '0 auto';
+            sc.style.transform = 'none';
             sc.style.bottom = '0px';
             sc.style.overflowY = 'auto';
             sc.style.overflowX = 'hidden';
