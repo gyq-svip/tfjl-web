@@ -333,7 +333,7 @@
         function _syncScrollableSpacer() {
             const hdr = document.getElementById('fixedHeader');
             const sc = document.getElementById('scrollableContent');
-            if (hdr && sc) sc.style.paddingTop = hdr.offsetHeight + 'px';
+            if (hdr && sc) sc.style.paddingTop = hdr.getBoundingClientRect().bottom + 'px';
         }
         window.addEventListener('resize', _syncScrollableSpacer);
         window.__bgSetBlur = function (v) {
