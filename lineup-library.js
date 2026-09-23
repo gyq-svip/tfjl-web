@@ -249,6 +249,8 @@
         p.innerHTML = h;
         _applySlots(p);
         _refreshDrSums(p);
+        // 每次重绘活动卡片后，异步合并云端共享脚本刷新（切 tab/搜索/分页后，上传的云端脚本不会从卡片消失）
+        if (!isSail) setTimeout(function () { try { _llRefreshCloud(); } catch (e) {} }, 300);
     }
     // ---------- 主页同款卡槽 ----------
     // battle-slot 结构 + 主页渲染管线 applySkinBgToSlot(slot, hero, hero, 'my', forceSkin)
@@ -638,7 +640,7 @@
         });
         const _arrScripts = _dayScripts('d' + a.day);   // 🔴 天级多脚本（与 A/B 槽位分开）
         h += '<div style="align-self:flex-start;display:flex;flex-direction:column;gap:5px;min-width:128px;">';
-        h += '<button onclick="_llScriptDlg(\'d' + a.day + '\')" title="管理该天活动脚本（TXT 上传分享 / 记事本打开 / 导入老马）" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(240,147,43,0.45);background:rgba(240,147,43,0.12);color:#f0932b;font-size:0.74rem;font-weight:700;cursor:pointer;text-align:left;">📜 阵容脚本（' + _arrScripts.length + '）</button>';
+        h += '<button id="llScriptBtn-d' + a.day + '" onclick="_llScriptDlg(\'d' + a.day + '\')" title="管理该天活动脚本（TXT 上传分享 / 记事本打开 / 导入老马）" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(240,147,43,0.45);background:rgba(240,147,43,0.12);color:#f0932b;font-size:0.74rem;font-weight:700;cursor:pointer;text-align:left;">📜 阵容脚本（' + _arrScripts.length + '）</button>';
         h += '<div id="llScripts-d' + a.day + '">' + _scriptsHtml(_arrScripts, 'd' + a.day) + '</div>';
         h += '</div>';
         h += '</div></div>';
@@ -678,5 +680,13 @@
         }).join('');
     }
     // 🔴 异步：本机 + 云端共享脚本合并渲染（这样别人分享的脚本在网页端也能看到）
-    window._llRenderScripts = async function (id) { const el = document.getElementById('llScripts-' + id); if (!el) return; const arr = await _llDayScriptsAll(id); el.innerHTML = _scriptsHtml(arr, id); };
+    window._llRenderScripts = async function (id) {
+        const el = document.getElementById('llScripts-' + id);
+        if (!el) return;
+        const arr = await _llDayScriptsAll(id);
+        el.innerHTML = _scriptsHtml(arr, id);
+        // 同步更新按钮上的计数（初始只显示本机数量，云端合并后修正）
+        const btn = document.getElementById('llScriptBtn-' + id);
+        if (btn) btn.innerHTML = btn.innerHTML.replace(/（\d+）/, '（' + arr.length + '）');
+    };
 })();
