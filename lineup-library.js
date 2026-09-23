@@ -618,10 +618,10 @@
     // ---------- 活动阵容卡片（左 A/B 卡组 右战车） ----------
     function _actCard(a) {
         let h = '<div class="ll-card" style="border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:6px 9px;margin-bottom:10px;background:rgba(0,0,0,0.22);">';
-        h += '<div style="display:flex;align-items:flex-start;gap:18px;">';
+        h += '<div style="display:flex;align-items:flex-start;gap:10px;">';
         // 第N天 + 重置按钮（🔴 用户要求上移，放在第N天标题下方更显眼）
-        h += '<div style="min-width:52px;padding-top:6px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;"><b style="color:#ffd700;font-size:0.85rem;">第' + a.day + '天</b>'
-            + '<button onclick="_llReset(\'activity\',\'d' + a.day + '\')" title="重置该天个人设置（英雄/融合/皮肤/脚本）" style="padding:3px 10px;border-radius:7px;border:1px solid rgba(255,107,107,0.45);background:rgba(255,107,107,0.14);color:#ff6b6b;cursor:pointer;font-size:0.7rem;font-weight:700;">↺ 重置改天个人设置</button></div>';
+        h += '<div style="min-width:34px;padding-top:6px;display:flex;flex-direction:column;align-items:center;gap:4px;"><b style="color:#ffd700;font-size:0.8rem;">第' + a.day + '天</b>'
+            + '<button onclick="_llReset(\'activity\',\'d' + a.day + '\')" title="重置该天个人设置（英雄/融合/皮肤/脚本）" style="padding:2px 4px;border-radius:6px;border:1px solid rgba(255,107,107,0.45);background:rgba(255,107,107,0.14);color:#ff6b6b;cursor:pointer;font-size:0.62rem;font-weight:700;">↺ 重置</button></div>';
         // A/B 两组并排：组头（A/B + 主车 + 副车 + 减伤）在上，5×2 网格在下
         ['A', 'B'].forEach(function (ab) {
             const id = 'd' + a.day + ab;
@@ -634,12 +634,12 @@
             h += '<span style="color:rgba(255,255,255,0.45);font-size:0.62rem;">副</span>' + _cartSelect('activity', id, 'cart2', L.cart2);
             h += '<span class="ll-drsum" data-tab="activity" data-lid="d' + a.day + '" data-side="' + st.side + '" data-table="' + st.table + '" data-heroes="' + _esc(JSON.stringify(a[ab] || [])) + '" title="减伤明细" style="color:#ff8a80;font-size:0.64rem;font-weight:700;cursor:help;">🛡️…</span>';
             h += '</div>';
-            h += '<div style="display:grid;grid-template-columns:repeat(5,72px);gap:6px;">';
-            (a[ab] || []).forEach(function (n, i) { h += _slotHtml(ab.toLowerCase(), i, n, 'activity', 'd' + a.day, 72); });
+            h += '<div style="display:grid;grid-template-columns:repeat(5,94px);gap:6px;">';
+            (a[ab] || []).forEach(function (n, i) { h += _slotHtml(ab.toLowerCase(), i, n, 'activity', 'd' + a.day, 94); });
             h += '</div></div>';
         });
         const _arrScripts = _dayScripts('d' + a.day);   // 🔴 天级多脚本（与 A/B 槽位分开）
-        h += '<div style="align-self:flex-start;display:flex;flex-direction:column;gap:5px;min-width:128px;">';
+        h += '<div style="align-self:flex-start;display:flex;flex-direction:column;gap:5px;min-width:108px;">';
         h += '<button id="llScriptBtn-d' + a.day + '" onclick="_llScriptDlg(\'d' + a.day + '\')" title="管理该天活动脚本（TXT 上传分享 / 记事本打开 / 导入老马）" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(240,147,43,0.45);background:rgba(240,147,43,0.12);color:#f0932b;font-size:0.74rem;font-weight:700;cursor:pointer;text-align:left;">📜 阵容脚本（' + _arrScripts.length + '）</button>';
         h += '<div id="llScripts-d' + a.day + '">' + _scriptsHtml(_arrScripts, 'd' + a.day) + '</div>';
         h += '</div>';
