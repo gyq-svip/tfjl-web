@@ -598,8 +598,8 @@
         h += '</div>';
         // 卡组（5×2）+ 右侧波次备注列（🔴 2026-09-22 用户要求：备注放卡组右边，正好填补空白）
         h += '<div style="display:flex;align-items:flex-start;gap:10px;">';
-        h += '<div style="display:grid;grid-template-columns:repeat(5,60px);gap:5px;">';
-        s.heroes.forEach(function (n, i) { h += _slotHtml(i < 5 ? 'u' : 'd', i % 5, n, 'sailing', s.id, 60); });
+        h += '<div style="display:grid;grid-template-columns:repeat(5,72px);gap:6px;">';
+        s.heroes.forEach(function (n, i) { h += _slotHtml(i < 5 ? 'u' : 'd', i % 5, n, 'sailing', s.id, 72); });
         h += '</div>';
         h += '<div style="flex:1;min-width:150px;display:flex;flex-direction:column;gap:3px;padding-top:2px;">';
         [['n219', '219波'], ['n229', '229波'], ['n230', '230波'], ['other', '其他']].forEach(function (p2) {
@@ -634,8 +634,8 @@
             h += '<span style="color:rgba(255,255,255,0.45);font-size:0.62rem;">副</span>' + _cartSelect('activity', id, 'cart2', L.cart2);
             h += '<span class="ll-drsum" data-tab="activity" data-lid="d' + a.day + '" data-side="' + st.side + '" data-table="' + st.table + '" data-heroes="' + _esc(JSON.stringify(a[ab] || [])) + '" title="减伤明细" style="color:#ff8a80;font-size:0.64rem;font-weight:700;cursor:help;">🛡️…</span>';
             h += '</div>';
-            h += '<div style="display:grid;grid-template-columns:repeat(5,60px);gap:5px;">';
-            (a[ab] || []).forEach(function (n, i) { h += _slotHtml(ab.toLowerCase(), i, n, 'activity', 'd' + a.day, 60); });
+            h += '<div style="display:grid;grid-template-columns:repeat(5,72px);gap:6px;">';
+            (a[ab] || []).forEach(function (n, i) { h += _slotHtml(ab.toLowerCase(), i, n, 'activity', 'd' + a.day, 72); });
             h += '</div></div>';
         });
         const _arrScripts = _dayScripts('d' + a.day);   // 🔴 天级多脚本（与 A/B 槽位分开）
