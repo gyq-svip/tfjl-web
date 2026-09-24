@@ -15869,7 +15869,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 // ⚠️ 重要：这个 GIST_ID 是索引文件的固定 ID，所有设备必须使用同一个！
 const GIST_ID = 'a32a0628bd9275f3a4922cd12cf298c9';
 const COUNTER_GIST_ID = 'e1bd9a5139e1c4e011bfea707e917d61';
-const MESSAGES_GIST_ID = 'b02794a8d5c43874b76286185f7b1f7f';
+const MESSAGES_GIST_ID = 'e3b04d325348b6756c1658d9e1e52b69'; // 🔴 2026-09-24 messages Gist 被删后已重建为新 ID（room_index 指针已同步），更新硬编码兜底
 // ⚠️ 写死固定 ID：诊断 Gist（写操作诊断上报分片）。所有设备/客户端必须使用同一个，
 // 否则浏览器端、App 端各建各的 Gist，管理员在任一端都看不到另一端的上报。
 // 首次从 App 端自动创建后确认存在，固定为下方 ID（不再依赖 localStorage 动态创建，避免多设备竞态）。
@@ -21194,25 +21194,25 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 }
 
                 const gistDeleted = localStorage.getItem('messages_gist_deleted') === 'true';
-                let messagesGistId = (!gistDeleted && MESSAGES_GIST_ID) ? MESSAGES_GIST_ID : (localStorage.getItem('messages_gist_id') || '');
-                // 若未确认删除，从索引拿最新 ID（防止硬编码的旧 Gist 被删后卡死、消息全空）
-                if (!gistDeleted) {
-                    try {
-                        const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) } });
-                        if (idxResp.ok) {
-                            const idxData = await idxResp.json();
-                            const ri = idxData.files && idxData.files['room_index.json'];
-                            if (ri && ri.content) {
-                                const idx = JSON.parse(ri.content);
-                                if (idx.messages) {
-                                    // 🔴 同样要验证，避免死链（与 wallResolveMessagesGistId 一致）
-                                    if (await wallGistExists(idx.messages, token)) { messagesGistId = idx.messages; localStorage.setItem('messages_gist_id', messagesGistId); }
-                                    else console.warn('[消息] 总表 messages 指针已失效，忽略:', idx.messages);
-                                }
+                // 🔴 2026-09-24 修复：某端把被删的 messages Gist 重建后会在 room_index 写入新指针，但其它端 localStorage 残留的
+                //    messages_gist_deleted 死锁标记会阻止读取 room_index，导致「只有发布者看得到、其他人看不到」。
+                //    改为：无论是否曾删除，都先从 room_index（权威指针）取最新 messages Gist ID。
+                let messagesGistId = localStorage.getItem('messages_gist_id') || MESSAGES_GIST_ID || '';
+                try {
+                    const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) } });
+                    if (idxResp.ok) {
+                        const idxData = await idxResp.json();
+                        const ri = idxData.files && idxData.files['room_index.json'];
+                        if (ri && ri.content) {
+                            const idx = JSON.parse(ri.content);
+                            if (idx.messages) {
+                                // 🔴 同样要验证，避免死链（与 wallResolveMessagesGistId 一致）
+                                if (await wallGistExists(idx.messages, token)) { messagesGistId = idx.messages; localStorage.setItem('messages_gist_id', messagesGistId); }
+                                else console.warn('[消息] 总表 messages 指针已失效，忽略:', idx.messages);
                             }
                         }
-                    } catch (e) { console.warn('[消息] 索引解析失败，用硬编码兜底:', e); }
-                }
+                    }
+                } catch (e) { console.warn('[消息] 索引解析失败，用本地/硬编码兜底:', e); }
 
                 // ★ 根治 Actions 备份 404：把当前确定的消息 Gist ID 写回总表 room_index.json.messages
                 if (token && messagesGistId && !gistDeleted) {
@@ -25816,21 +25816,19 @@ ${maSection}
 
             // ★ 权威指针：消息Gist ID 优先取索引 room_index.messages（免部署即可迁移Gist），其次硬编码常量
             const gistDeleted = localStorage.getItem('messages_gist_deleted') === 'true';
-            let messagesGistId = (!gistDeleted && MESSAGES_GIST_ID) ? MESSAGES_GIST_ID : (localStorage.getItem('messages_gist_id') || '');
-            // 若未确认删除，从索引拿最新 ID（防止硬编码的旧 Gist 被删后卡死、消息全空）
-            if (!gistDeleted) {
-                try {
-                    const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) } });
-                    if (idxResp.ok) {
-                        const idxData = await idxResp.json();
-                        const ri = idxData.files && idxData.files['room_index.json'];
-                        if (ri && ri.content) {
-                            const idx = JSON.parse(ri.content);
-                            if (idx.messages) { messagesGistId = idx.messages; localStorage.setItem('messages_gist_id', messagesGistId); }
-                        }
+            // 🔴 2026-09-24 修复：保存时也始终从 room_index 取权威 messages 指针，避免曾删标记导致本地为空、重复新建 Gist 造成消息分裂
+            let messagesGistId = localStorage.getItem('messages_gist_id') || MESSAGES_GIST_ID || '';
+            try {
+                const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) } });
+                if (idxResp.ok) {
+                    const idxData = await idxResp.json();
+                    const ri = idxData.files && idxData.files['room_index.json'];
+                    if (ri && ri.content) {
+                        const idx = JSON.parse(ri.content);
+                        if (idx.messages) { messagesGistId = idx.messages; localStorage.setItem('messages_gist_id', messagesGistId); }
                     }
-                } catch (e) { console.warn('[消息] 索引解析失败，用硬编码兜底:', e); }
-            }
+                }
+            } catch (e) { console.warn('[消息] 索引解析失败，用本地/硬编码兜底:', e); }
 
             // 【关键安全标记】保存前先尝试获取远程消息
             // 注意：如果 messagesGistId 存在，就必须成功获取到远程消息
