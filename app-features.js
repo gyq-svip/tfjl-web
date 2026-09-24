@@ -8800,28 +8800,49 @@
         }
 
         // 批量分享项目文件到需求墙
+                // 批量分享项目文件到需求墙
+        // 🔴 2026-09-24 改为「打包成一个多文件 Gist + 一条需求墙消息」：多个 txt 脚本一起发（不再每条消息一个文件刷屏）
         async function batchShareTxtFilesToWall(indices) {
             if (!indices || indices.length === 0) return;
             if (!getGistToken()) { alert('离线版暂不支持发送，请检查网络连接'); return; }
             const now = new Date();
             const suffix = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
-            const baseName = await askTextInputAsync({ title: '批量分享', label: '文件名前缀（留空则每个用原文件名）：', defaultValue: '' });
+            const baseName = await askTextInputAsync({ title: '打包分享', label: '打包名（作为分享标题，如「周三活动脚本」）：', defaultValue: `脚本包_${suffix}` });
             if (baseName === null) return;
-            // 批量统一选择分享选项
             const opts = await new Promise(function(resolve) { showShareOptionsDialog(function(e, p, rk, cat) { resolve([e, p, rk, cat]); }); });
             if (opts === null || opts[0] === null) return;
-            const shareOpts = { expireMinutes: opts[0], password: opts[1], recoveryKey: opts[2] || '', category: opts[3] || '未分类' };
-            let success = 0, fail = 0;
+            const expireMinutes = opts[0], sharePassword = opts[1], recoveryKey = opts[2] || '', category = opts[3] || '未分类';
+            const nickname = localStorage.getItem('TFJL_UserName') || '匿名用户';
+            const files = {};
             for (const idx of indices) {
                 const file = txtFiles[idx];
                 if (!file) continue;
-                const name = baseName ? `${baseName}_${file.name.replace(/\.txt$/,'')}_${suffix}.txt` : `${file.name.replace(/\.txt$/,'')}_${suffix}.txt`;
-                const ok = await shareTxtFileToWall(idx, name, shareOpts);
-                if (ok) success++; else fail++;
+                let fname = file.name.endsWith('.txt') ? file.name : (file.name + '.txt');
+                if (files[fname]) { let k = 1; while (files[fname + '_' + k + '.txt'] || files[fname + '_' + k]) k++; fname = file.name.replace(/\.txt$/, '') + '_' + k + '.txt'; }
+                let content = file.content || '';
+                if (sharePassword || recoveryKey) { content = recoveryKey ? await encryptContentB(content, sharePassword, recoveryKey) : await encryptContent(content, sharePassword); }
+                files[fname] = { content: content };
             }
-            showToast(`✅ 批量分享完成：成功 ${success} 个${fail ? '，失败 ' + fail + ' 个' : ''}`);
+            if (!Object.keys(files).length) { alert('没有可分享的文件'); return; }
+            try {
+                const token = getGistToken();
+                const resp = await fetch('https://api.github.com/gists', { method: 'POST', headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': `token ${token}` }, body: JSON.stringify({ description: `脚本包: ${baseName}` + (sharePassword ? ' [加密]' : ''), public: true, files: files }) });
+                if (!resp.ok) throw new Error('上传失败 (' + resp.status + ')');
+                const data = await resp.json();
+                const multi = [];
+                for (const f of Object.values(data.files)) { multi.push({ name: f.filename, url: f.raw_url || (`https://gist.githubusercontent.com/${data.id}/raw/` + encodeURIComponent(f.filename)) }); }
+                const gistUrl = data.html_url || (`https://gist.github.com/${data.id}`);
+                const newMsg = { content: `📦 脚本包(${multi.length}个): ${baseName}`, author: nickname, time: Date.now(), scriptUrl: gistUrl, multiFiles: multi, expireMinutes: expireMinutes > 0 ? expireMinutes : null, isEncrypted: !!(sharePassword || recoveryKey), category: category || '未分类' };
+                if (sharePassword) newMsg.passwordHash = await hashPassword(sharePassword);
+                if (recoveryKey) newMsg.encScheme = 'B';
+                wallMessages.unshift(newMsg);
+                if (wallMessages.length > MAX_MESSAGES) wallMessages = wallMessages.slice(0, MAX_MESSAGES);
+                await saveMessagesToGist();
+                renderMessages();
+                showToast(`✅ 已打包分享 ${multi.length} 个脚本到需求墙（1 条消息）！`);
+            } catch (err) { console.error('打包分享失败:', err); alert('打包分享失败: ' + err.message); }
         }
-
+        window.batchShareTxtFilesToWall = batchShareTxtFilesToWall;
         // type: 'activity' | 'dungeon' | 任意自定义标签（externalContent/windowId 提供时为通用"另存为副本"）
         function showSaveScriptDialog(type, externalContent, windowId) {
             let scriptContent = externalContent || '';
