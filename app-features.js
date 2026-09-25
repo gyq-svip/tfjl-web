@@ -70,7 +70,7 @@
         // 存储：活动数据在索引 Gist 的 activity_tabs.json：{ tabs: [{ id, name, items:[{name,cost}], params:{...} ] }
         //   旧活动（old_activity_items.json）**保持原样不动**，两边互不影响。
         // 参数里 packs / waveRef 用「一行文本」存（管理端一个输入框即可改，避免嵌套表格 UI）：
-        //   packs   = 名称:金额:材料:金卡:限购  用 | 分隔（限购 0 = 不限）
+        //   packs   = 名称:金额:材料:金卡:限购:紫卡  用 | 分隔（限购 0 = 不限；紫卡可省略，默认 0）
         //   waveRef = 档位:每日波数           用 | 分隔（纯参考展示）
         const ACTIVITY_TABS_FILE = 'activity_tabs.json';
         const ACTIVITY_TABS_DEFAULT = [
@@ -93,7 +93,7 @@
                     maxWaves: 200,                          // 每天最多波数（提示用）
                     bonusWaves: 0, bonusShards: 0,        // 🔴 2026-09-25 去掉打满额外+2：200波=40材料、190波=38（每10波=2材料）
                     zhanlingCost: 98, zhanlingMat: 200,
-                    packs: '30礼包:30:20:0:3|128礼包:128:60:0:3|328礼包:328:120:0:3|648礼包:648:240:0:0',
+                    packs: '30礼包:30:20:0:3:5|128礼包:128:60:2:3:0|328礼包:328:120:5:3:0|648礼包:648:240:9:0:90',
                     waveRef: '480:129|640:169|720:189|960:200|1280:200'
                 }
             }
@@ -172,7 +172,7 @@
             return String(str || '').split('|').map(function (s) {
                 const a = s.split(':');
                 if (a.length < 3 || !a[0].trim()) return null;
-                return { name: a[0].trim(), cost: Number(a[1]) || 0, mat: Number(a[2]) || 0, gold: Number(a[3]) || 0, max: a[4] === undefined ? 0 : (Number(a[4]) || 0) };
+                return { name: a[0].trim(), cost: Number(a[1]) || 0, mat: Number(a[2]) || 0, gold: Number(a[3]) || 0, max: a[4] === undefined ? 0 : (Number(a[4]) || 0), purple: a[5] === undefined ? 0 : (Number(a[5]) || 0) };
             }).filter(Boolean);
         }
         function _actParseWaveRef(str) {
@@ -296,9 +296,9 @@
                 + '每天最多：<b style="color:#ffd700;">' + (p.maxWaves || 200) + ' 波</b></div>';
             html += '<div style="color:#4ecdc4;font-weight:600;margin-bottom:8px;font-size:0.85rem;">🎁 礼包（元 → 材料）</div>';
             html += '<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px;margin-bottom:12px;"><table style="width:100%;font-size:0.78rem;color:rgba(255,255,255,0.8);border-collapse:collapse;">'
-                + '<tr style="border-bottom:1px solid rgba(255,255,255,0.1);"><th style="text-align:left;padding:4px;">礼包</th><th style="text-align:right;padding:4px;">金额</th><th style="text-align:right;padding:4px;">材料</th><th style="text-align:right;padding:4px;">金卡</th><th style="text-align:right;padding:4px;">限购</th></tr>';
+                + '<tr style="border-bottom:1px solid rgba(255,255,255,0.1);"><th style="text-align:left;padding:4px;">礼包</th><th style="text-align:right;padding:4px;">金额</th><th style="text-align:right;padding:4px;">材料</th><th style="text-align:right;padding:4px;">金卡</th><th style="text-align:right;padding:4px;">紫卡</th><th style="text-align:right;padding:4px;">限购</th></tr>';
             packs.forEach(function (k) {
-                html += '<tr><td style="padding:4px;">' + _oldNameEsc(k.name) + '</td><td style="text-align:right;padding:4px;">' + k.cost + '元</td><td style="text-align:right;padding:4px;">' + k.mat + '</td><td style="text-align:right;padding:4px;">' + (k.gold || 0) + '</td><td style="text-align:right;padding:4px;">' + (k.max ? k.max : '不限') + '</td></tr>';
+                html += '<tr><td style="padding:4px;">' + _oldNameEsc(k.name) + '</td><td style="text-align:right;padding:4px;">' + k.cost + '元</td><td style="text-align:right;padding:4px;">' + k.mat + '</td><td style="text-align:right;padding:4px;">' + (k.gold || 0) + '</td><td style="text-align:right;padding:4px;">' + (k.purple || 0) + '</td><td style="text-align:right;padding:4px;">' + (k.max ? k.max : '不限') + '</td></tr>';
             });
             html += '</table></div>';
             if (ref.length) {
