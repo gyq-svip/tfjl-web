@@ -184,33 +184,51 @@
                 return { cost: cost, waves: waves };
             }).filter(Boolean).sort(function (x, y) { return x.cost - y.cost; });
         }
-        // 最优礼包组合：按该 tab 自己的礼包表做 DP（礼包少、量级小，枚举 + 余额用最大包补）
-        function _actOptimalPurchase(need, packs) {
+        // 最优礼包组合：在「每日限购 x 天数」的全局上限内，求花钱最少、材料尽量不浪费的组合
+        //   限购礼包全局上限 = 每日限购次数 x 天数（如 3x21=63）；max<=0 表示该礼包不限购。
+        //   不限购礼包里只用性价比最高（cost/mat 最小）的那个来补差额，其余不限购更贵不会被选中。
+        //   枚举所有限购礼包的数量组合（范围受 need 收敛，不会爆），在 材料>=need 中挑 花费最小、并列则材料最少（不浪费）。
+        function _actOptimalPurchase(need, packs, days) {
             const list = (packs || []).filter(function (p) { return p.mat > 0 && p.cost > 0; });
-            if (!list.length || need <= 0) return { cost: 0, plan: {}, totalMat: 0 };
-            const sorted = list.slice().sort(function (a, b) { return (a.cost / a.mat) - (b.cost / b.mat); });
-            let best = { cost: Infinity, plan: {}, totalMat: 0 };
-            const tryCombo = function (idx, matSum, costSum, plan) {
-                if (costSum >= best.cost) return;
-                if (matSum >= need) { if (costSum < best.cost) best = { cost: costSum, plan: Object.assign({}, plan), totalMat: matSum }; return; }
-                if (idx >= sorted.length) {
-                    // 剩下的用一个"每元材料最多"的包补齐
-                    const p = sorted[0];
-                    const cnt = Math.ceil((need - matSum) / p.mat);
-                    const capped = (p.max && p.max > 0) ? Math.ceil(cnt / p.max) * p.max : cnt;  // 有上限时按上限整批
-                    const c2 = costSum + capped * p.cost, m2 = matSum + capped * p.mat;
-                    if (c2 < best.cost) { const pl = Object.assign({}, plan); pl[p.name] = (pl[p.name] || 0) + capped; best = { cost: c2, plan: pl, totalMat: m2 }; }
+            if (!list.length || need <= 0) return { cost: 0, plan: {}, totalMat: 0, gold: 0, purple: 0 };
+            days = Math.max(1, Number(days) || 21);
+            const items = list.map(function (p) {
+                const lim = p.max > 0;
+                const cap = lim ? p.max * days : Infinity;   // 每日限购 x 天数 = 全局上限；max=0 不限
+                return { name: p.name, mat: p.mat, cost: p.cost, gold: p.gold || 0, purple: p.purple || 0, cap: cap, lim: lim };
+            });
+            const limList = items.filter(function (x) { return x.lim; });
+            const unlimList = items.filter(function (x) { return !x.lim; });
+            let filler = null;
+            unlimList.forEach(function (x) { if (!filler || (x.cost / x.mat) < (filler.cost / filler.mat)) filler = x; });
+            const capOf = function (x) {
+                const byNeed = Math.ceil(need / x.mat) + (filler ? Math.ceil(filler.mat / x.mat) : 1) + 2;
+                return Math.min(x.cap, byNeed);
+            };
+            let best = { cost: Infinity, plan: {}, totalMat: 0, gold: 0, purple: 0 };
+            const n = limList.length;
+            const planArr = new Array(n).fill(0);
+            function rec(i, matSum, costSum) {
+                if (i === n) {
+                    let m = matSum, c = costSum, nf = 0;
+                    if (m < need && filler) { nf = Math.ceil((need - m) / filler.mat); m += nf * filler.mat; c += nf * filler.cost; }
+                    if (m >= need && (c < best.cost || (c === best.cost && m < best.totalMat))) {
+                        const pl = {};
+                        for (let k = 0; k < n; k++) if (planArr[k] > 0) pl[limList[k].name] = planArr[k];
+                        if (nf > 0) pl[filler.name] = (pl[filler.name] || 0) + nf;
+                        best = { cost: c, plan: pl, totalMat: m, gold: 0, purple: 0 };
+                    }
                     return;
                 }
-                const p = sorted[idx];
-                const maxCnt = p.max && p.max > 0 ? p.max : 999;
-                for (let c = 0; c <= maxCnt; c++) {
-                    if (matSum + c * p.mat >= need) { const c2 = costSum + c * p.cost, m2 = matSum + c * p.mat; if (c2 < best.cost) { const pl = Object.assign({}, plan); if (c) pl[p.name] = c; best = { cost: c2, plan: pl, totalMat: m2 }; } break; }
-                    const pl = Object.assign({}, plan); if (c) pl[p.name] = c;
-                    tryCombo(idx + 1, matSum + c * p.mat, costSum + c * p.cost, pl);
-                }
-            };
-            tryCombo(0, 0, 0, {});
+                const x = limList[i], top = capOf(x);
+                for (let cnt = 0; cnt <= top; cnt++) { planArr[i] = cnt; rec(i + 1, matSum + cnt * x.mat, costSum + cnt * x.cost); }
+            }
+            rec(0, 0, 0);
+            if (best.cost === Infinity) return { cost: 0, plan: {}, totalMat: 0, gold: 0, purple: 0 };
+            Object.keys(best.plan).forEach(function (nm) {
+                const it = items.find(function (x) { return x.name === nm; });
+                if (it) { best.gold += it.gold * best.plan[nm]; best.purple += it.purple * best.plan[nm]; }
+            });
             return best;
         }
 
@@ -332,7 +350,7 @@
             const haveAll = freeShards + zlMat;
             const packs = _actParsePacks(p.packs);
             const needMat = Math.max(0, target - haveAll);
-            const best = _actOptimalPurchase(needMat, packs);
+            const best = _actOptimalPurchase(needMat, packs, days);
             const totalCost = zlCost + (best.cost || 0);
             let html = '';
             html += '<div style="font-size:0.82rem;line-height:1.9;color:rgba(255,255,255,0.85);">';
@@ -350,6 +368,7 @@
                 Object.keys(best.plan || {}).forEach(function (k) { if (best.plan[k] > 0) html += '· ' + _oldNameEsc(k) + ' × <b>' + best.plan[k] + '</b><br>'; });
                 if (!Object.keys(best.plan || {}).length) html += '（按当前礼包表算不出更省方案，请检查参数）<br>';
                 html += '合计花费：<b style="color:#ffd700;">' + totalCost + ' 元</b>（含战令 ' + zlCost + ' 元），可得材料 <b>' + (haveAll + (best.totalMat || 0)) + '</b></div>';
+                if (best.gold || best.purple) html += '<div style="margin-top:4px;color:#ffd700;font-size:0.78rem;">🎴 可得：金卡 <b>' + (best.gold || 0) + '</b> / 紫卡 <b>' + (best.purple || 0) + '</b></div>';
             }
             html += '</div>';
             box.innerHTML = html;
