@@ -3375,22 +3375,9 @@
             }
 
             let html = '';
-            // 🔴 2026-09-24 记事本批量分享模式：勾选多个 txt 后打包成一个多文件分享发到需求墙
-            if (_txtShareMode) {
-                html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:6px 0;color:rgba(255,255,255,0.7);font-size:0.75rem;flex-wrap:wrap;">'
-                    + '<span>📢 批量分享模式：勾选文件后打包成 <b style="color:#ce93d8;">1 个</b> 分享（含多个脚本文件）</span>'
-                    + '<div style="display:flex;align-items:center;gap:8px;">'
-                    + '<button id="txtPackShareBtn" onclick="doBatchShareTxtPack()" style="background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:#fff;border:none;padding:4px 12px;border-radius:5px;cursor:pointer;font-size:0.75rem;font-weight:bold;white-space:nowrap;">📦 打包分享 (' + _txtSelSet.size + ')</button>'
-                    + '<label style="cursor:pointer;font-size:0.7rem;"><input type="checkbox" onchange="toggleAllTxtShareSelects(this.checked)" style="cursor:pointer;vertical-align:middle;"> 全选</label>'
-                    + '<a href="javascript:void(0)" onclick="toggleTxtShareMode(false)" style="color:#ff6b6b;cursor:pointer;font-size:0.7rem;">退出</a>'
-                    + '</div></div>';
-            } else {
-                html += '<div style="margin:6px 0;"><a href="javascript:void(0)" onclick="toggleTxtShareMode(true)" style="color:#ce93d8;cursor:pointer;font-size:0.75rem;font-weight:bold;">📢 批量分享（勾选多个文件一起发）</a></div>';
-            }
             txtFiles.forEach((file, i) => {
                 html += `
                     <div style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:12px;">
-                        ${_txtShareMode ? '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;"><input type="checkbox" ' + (_txtSelSet.has(i) ? 'checked' : '') + ' onchange="toggleTxtShareSelect(' + i + ', this.checked)" style="accent-color:#9c27b0;cursor:pointer;"> <span style="color:rgba(255,255,255,0.5);font-size:0.7rem;">勾选后与其他选中文件一起打包</span></div>' : ''}
                         <div style="display:flex;justify-content:space-between;align-items:center;">
                             <div style="flex:1;overflow:hidden;">
                                 <div style="color:#ffd700;font-weight:bold;margin-bottom:4px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;padding:2px 6px 2px 0;border-radius:4px;transition:background 0.15s;" onclick="openScriptEditorTab(${i})" onmouseover="this.style.background='rgba(255,215,0,0.12)'" onmouseout="this.style.background='transparent'" title="点击在下方标签中打开编辑">📄 ${escapeHtml(file.name)}</div>
@@ -3414,13 +3401,6 @@
         window._selImportPaths = new Set();
         window._selShareIndices = new Set(); // 分享模式下选中的项目文件索引
         window._selShareScannedPaths = new Set(); // 分享模式下选中的扫描文件路径
-        // 🔴 2026-09-24 记事本 txt 批量分享模式状态与交互
-        let _txtShareMode = false;
-        let _txtSelSet = new Set();
-        window.toggleTxtShareMode = function (on) { _txtShareMode = !!on; if (!on) _txtSelSet.clear(); updateTxtFilesList(); };
-        window.toggleTxtShareSelect = function (idx, checked) { if (checked) _txtSelSet.add(idx); else _txtSelSet.delete(idx); const b = document.getElementById('txtPackShareBtn'); if (b) b.textContent = '📦 打包分享 (' + _txtSelSet.size + ')'; };
-        window.toggleAllTxtShareSelects = function (checked) { _txtSelSet.clear(); if (checked) txtFiles.forEach(function (f, i) { _txtSelSet.add(i); }); updateTxtFilesList(); };
-        window.doBatchShareTxtPack = function () { const idxs = Array.from(_txtSelSet); if (!idxs.length) { alert('请先勾选要分享的 txt 文件'); return; } if (window.batchShareTxtFilesToWall) window.batchShareTxtFilesToWall(idxs); };
 
         function toggleImportSelect(path, checked) {
             if (checked) { window._selImportPaths.add(path); }
@@ -8401,14 +8381,7 @@
                 const skins = window.getHeroSkins ? window.getHeroSkins(subHero) : [];
                 // 保留副卡同名的默认皮条目，让默认皮也能循环切到
                 const names = skins.map(s => s.name);
-                // 🔴 2026-09-24 用户要求：把「卡池里给这张副卡设的那张皮」排在本变体第一位 —— 切一下就是最常用的皮，
-                //    不用再把十几张皮轮一遍；其余皮（含副卡同名默认皮）照旧排在后面，仍可继续循环。
-                const poolSkin = (window.getPoolOnlySkin ? (window.getPoolOnlySkin(null, subHero) || '') : '')
-                    || (window.heroSkinSelections ? (window.heroSkinSelections[subHero] || '') : '');
-                const ordered = [];
-                if (poolSkin && poolSkin !== '默认' && names.indexOf(poolSkin) >= 0) ordered.push(poolSkin);
-                names.forEach(n => { if (ordered.indexOf(n) < 0) ordered.push(n); });
-                for (const n of ordered) entries.push({ variant: v, subHero: subHero, skin: n });
+                for (const n of names) entries.push({ variant: v, subHero: subHero, skin: n });
             }
             const CLOSE = '__FUSION_CLOSE__';
             const totalLen = entries.length + 1;  // 末尾 +1 =「关闭融合」
@@ -10902,8 +10875,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
             return '默认';
         }
-        // 🔴 2026-09-24 暴露：融合切皮循环要把「卡池里设置的那张皮」排到第一位（只读全局卡池皮，不受项目内换皮影响）
-        try { window.getPoolOnlySkin = getPoolOnlySkin; } catch (e) {}
 
         function getHeroDefaultSkin(heroName) {
             // 英雄名 → cardId（卡池静态映射）→ defaultCardSkins，回退 heroSkinSelections（均为全局预设）
@@ -15889,7 +15860,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 // ⚠️ 重要：这个 GIST_ID 是索引文件的固定 ID，所有设备必须使用同一个！
 const GIST_ID = 'a32a0628bd9275f3a4922cd12cf298c9';
 const COUNTER_GIST_ID = 'e1bd9a5139e1c4e011bfea707e917d61';
-const MESSAGES_GIST_ID = 'e3b04d325348b6756c1658d9e1e52b69'; // 🔴 2026-09-24 messages Gist 被删后已重建为新 ID（room_index 指针已同步），更新硬编码兜底
+const MESSAGES_GIST_ID = 'b02794a8d5c43874b76286185f7b1f7f';
 // ⚠️ 写死固定 ID：诊断 Gist（写操作诊断上报分片）。所有设备/客户端必须使用同一个，
 // 否则浏览器端、App 端各建各的 Gist，管理员在任一端都看不到另一端的上报。
 // 首次从 App 端自动创建后确认存在，固定为下方 ID（不再依赖 localStorage 动态创建，避免多设备竞态）。
@@ -21214,25 +21185,25 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 }
 
                 const gistDeleted = localStorage.getItem('messages_gist_deleted') === 'true';
-                // 🔴 2026-09-24 修复：某端把被删的 messages Gist 重建后会在 room_index 写入新指针，但其它端 localStorage 残留的
-                //    messages_gist_deleted 死锁标记会阻止读取 room_index，导致「只有发布者看得到、其他人看不到」。
-                //    改为：无论是否曾删除，都先从 room_index（权威指针）取最新 messages Gist ID。
-                let messagesGistId = localStorage.getItem('messages_gist_id') || MESSAGES_GIST_ID || '';
-                try {
-                    const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) } });
-                    if (idxResp.ok) {
-                        const idxData = await idxResp.json();
-                        const ri = idxData.files && idxData.files['room_index.json'];
-                        if (ri && ri.content) {
-                            const idx = JSON.parse(ri.content);
-                            if (idx.messages) {
-                                // 🔴 同样要验证，避免死链（与 wallResolveMessagesGistId 一致）
-                                if (await wallGistExists(idx.messages, token)) { messagesGistId = idx.messages; localStorage.setItem('messages_gist_id', messagesGistId); }
-                                else console.warn('[消息] 总表 messages 指针已失效，忽略:', idx.messages);
+                let messagesGistId = (!gistDeleted && MESSAGES_GIST_ID) ? MESSAGES_GIST_ID : (localStorage.getItem('messages_gist_id') || '');
+                // 若未确认删除，从索引拿最新 ID（防止硬编码的旧 Gist 被删后卡死、消息全空）
+                if (!gistDeleted) {
+                    try {
+                        const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) } });
+                        if (idxResp.ok) {
+                            const idxData = await idxResp.json();
+                            const ri = idxData.files && idxData.files['room_index.json'];
+                            if (ri && ri.content) {
+                                const idx = JSON.parse(ri.content);
+                                if (idx.messages) {
+                                    // 🔴 同样要验证，避免死链（与 wallResolveMessagesGistId 一致）
+                                    if (await wallGistExists(idx.messages, token)) { messagesGistId = idx.messages; localStorage.setItem('messages_gist_id', messagesGistId); }
+                                    else console.warn('[消息] 总表 messages 指针已失效，忽略:', idx.messages);
+                                }
                             }
                         }
-                    }
-                } catch (e) { console.warn('[消息] 索引解析失败，用本地/硬编码兜底:', e); }
+                    } catch (e) { console.warn('[消息] 索引解析失败，用硬编码兜底:', e); }
+                }
 
                 // ★ 根治 Actions 备份 404：把当前确定的消息 Gist ID 写回总表 room_index.json.messages
                 if (token && messagesGistId && !gistDeleted) {
@@ -23422,11 +23393,6 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             renderMessages();
         }
         window.setWallCatFilter = setWallCatFilter;
-
-        // 🔴 2026-09-24 需求墙多文件脚本包的预览/下载/导入转发：从 data-* 属性读取，避免 onclick 内拼引号
-        window.wallPreviewFile = function (el) { const u = el.getAttribute('data-murl'); const enc = el.getAttribute('data-enc') === '1'; const h = el.getAttribute('data-hash') || ''; if (window.previewScriptFile) window.previewScriptFile(u, enc, h); };
-        window.wallDownloadFile = function (el) { const u = el.getAttribute('data-murl'); const enc = el.getAttribute('data-enc') === '1'; const h = el.getAttribute('data-hash') || ''; if (window.downloadScript) window.downloadScript(u, enc, h); };
-        window.wallImportFile = function (el) { const u = el.getAttribute('data-murl'); const enc = el.getAttribute('data-enc') === '1'; const h = el.getAttribute('data-hash') || ''; if (window.importScriptToTxtFiles) window.importScriptToTxtFiles(u, enc, h); };
 
         // 预览需求墙分享的脚本文件
         // isEncrypted: 是否加密, passwordHash: v2 PBKDF2 哈希(或旧 SHA-256/fnv) 用于验证密码
@@ -25736,7 +25702,6 @@ ${maSection}
                     scriptUrl: scriptUrl,
                     expireMinutes: expireMinutesValue > 0 ? expireMinutesValue : null,
                     isShare: !!scriptUrl,
-                    category: category,
                     likes: 0,
                     dislikes: 0,
                     copyCount: 0,
@@ -25781,11 +25746,7 @@ ${maSection}
                 setTimeout(() => _toast.remove(), 2000);
             } catch (error) {
                 console.error('发布失败:', error);
-                let msg = error.message || '未知错误';
-                if (msg === 'Failed to fetch' || msg.includes('NetworkError') || msg.toLowerCase().includes('network')) {
-                    msg = '网络请求失败（GitHub 接口暂时无法访问或本地网络波动），请检查网络后刷新页面重试。';
-                }
-                alert('发布失败: ' + msg);
+                alert('发布失败: ' + error.message);
             } finally {
                 if (btn) { btn.disabled = false; btn.textContent = originalText; }
             }
@@ -25841,19 +25802,21 @@ ${maSection}
 
             // ★ 权威指针：消息Gist ID 优先取索引 room_index.messages（免部署即可迁移Gist），其次硬编码常量
             const gistDeleted = localStorage.getItem('messages_gist_deleted') === 'true';
-            // 🔴 2026-09-24 修复：保存时也始终从 room_index 取权威 messages 指针，避免曾删标记导致本地为空、重复新建 Gist 造成消息分裂
-            let messagesGistId = localStorage.getItem('messages_gist_id') || MESSAGES_GIST_ID || '';
-            try {
-                const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) } });
-                if (idxResp.ok) {
-                    const idxData = await idxResp.json();
-                    const ri = idxData.files && idxData.files['room_index.json'];
-                    if (ri && ri.content) {
-                        const idx = JSON.parse(ri.content);
-                        if (idx.messages) { messagesGistId = idx.messages; localStorage.setItem('messages_gist_id', messagesGistId); }
+            let messagesGistId = (!gistDeleted && MESSAGES_GIST_ID) ? MESSAGES_GIST_ID : (localStorage.getItem('messages_gist_id') || '');
+            // 若未确认删除，从索引拿最新 ID（防止硬编码的旧 Gist 被删后卡死、消息全空）
+            if (!gistDeleted) {
+                try {
+                    const idxResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `token ${token}` }) } });
+                    if (idxResp.ok) {
+                        const idxData = await idxResp.json();
+                        const ri = idxData.files && idxData.files['room_index.json'];
+                        if (ri && ri.content) {
+                            const idx = JSON.parse(ri.content);
+                            if (idx.messages) { messagesGistId = idx.messages; localStorage.setItem('messages_gist_id', messagesGistId); }
+                        }
                     }
-                }
-            } catch (e) { console.warn('[消息] 索引解析失败，用本地/硬编码兜底:', e); }
+                } catch (e) { console.warn('[消息] 索引解析失败，用硬编码兜底:', e); }
+            }
 
             // 【关键安全标记】保存前先尝试获取远程消息
             // 注意：如果 messagesGistId 存在，就必须成功获取到远程消息
