@@ -744,11 +744,17 @@ let _adminVerified=false, _adminLastTok='', _featItems=[], _featData=null, _feat
         _featStartHeartbeat();
     }
     let _featHbTimer=null, _featCacheHash='';
+    function _featHbIntervalMs(){
+        // 与诊断心跳一致：基础间隔 + 抖动均来自「索引配置」(heartbeatMin / heartbeatJitterMin)，管理员可在功能开关面板实时调；默认 15±5 分钟
+        let baseMin=15, jitterMin=5;
+        try{ const d=_llCloudCache && _llCloudCache.data; if(d){ if(d.heartbeatMin){ const v=parseFloat(d.heartbeatMin); if(v>0) baseMin=v; } if(d.heartbeatJitterMin!=null){ const v=parseFloat(d.heartbeatJitterMin); if(v>=0) jitterMin=v; } } }catch(e){}
+        return baseMin*60000 + Math.random()*jitterMin*60000;
+    }
     function _featStartHeartbeat(){
-        if(_featHbTimer) return;
-        _featHbTimer=setInterval(async function(){
-            try{ if(document.hidden || state.tab!=='featured') return; const list=await _featuredLoadRaw(); if(!list||!Array.isArray(list.items)) return; const h=_featHash(JSON.stringify(list.items)); if(h===_featCacheHash) return; const projs=await _featResolve(list.items); _featApplyPub(list.items, projs); await _idbSet('pub',{hash:h,items:list.items,projs:projs}); _renderFeaturedBody(document.getElementById('llList')); }catch(e){}
-        }, 30000);
+        const _restart=function(){ if(_featHbTimer) clearInterval(_featHbTimer); _featHbTimer=setInterval(async function(){ try{ if(document.hidden || state.tab!=='featured') return; const list=await _featuredLoadRaw(); if(!list||!Array.isArray(list.items)) return; const h=_featHash(JSON.stringify(list.items)); if(h===_featCacheHash) return; const projs=await _featResolve(list.items); _featApplyPub(list.items, projs); await _idbSet('pub',{hash:h,items:list.items,projs:projs}); _renderFeaturedBody(document.getElementById('llList')); }catch(e){} }, _featHbIntervalMs()); };
+        _restart();
+        // 索引配置可能随后到位 / 被管理员调频：拿到后按最新间隔重启，使远程调频对精选检测也立即生效
+        _llIdxLoad().then(function(){ try{ _restart(); }catch(e){} }).catch(function(){});
     }
     function _renderFeaturedBody(p){
         if(!p) return;
