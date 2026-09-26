@@ -705,22 +705,51 @@ let _adminVerified=false, _adminLastTok='', _featItems=[], _featData=null, _feat
     function _featSlug(item){ return 'feat_' + String(item.id || item.name || 'x').replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g,'_'); }
     function _featuredSync(item,pj){ const slug=_featSlug(item); const o=_load(); ['A','B'].forEach(function(ab){ const id=slug+'_'+ab; o['featured']=o['featured']||{}; o['featured'][id]=o['featured'][id]||{}; const slot=o['featured'][id]; const prefix=(ab==='A')?'my_':'teammate_'; const cards=(ab==='A'?pj.myHandCards:pj.teammateHandCards)||[]; const rawSkins=pj.cardSkins||{}; if(!slot.skin || !Object.keys(slot.skin).length){ slot.skin=slot.skin||{}; cards.forEach(function(c){ if(!c||c.id==null) return; const sv=rawSkins[prefix+c.id]; if(c.name&&sv!=null) slot.skin[c.name]=sv; }); } if(!slot.fus || !Object.keys(slot.fus).length){ slot.fus=slot.fus||{}; cards.forEach(function(c){ const nm=(c&&c.name)||''; if(!nm) return; const parts=(window.getFusionParts?window.getFusionParts(nm):null); if(parts&&parts.length>=2) slot.fus[nm]=nm; }); } const ch=(ab==='A'?pj.myChariot:pj.teammateChariot); if(!slot.cart && ch && ch.main) slot.cart=String(ch.main); if(!slot.cart2 && ch && ch.sub) slot.cart2=String(ch.sub); }); const fs=pj.fusionSkins||{}; window.fusionSkins=window.fusionSkins||{}; Object.keys(fs).forEach(function(h){ if(fs[h]!==undefined) window.fusionSkins[h]=fs[h]; }); _save(o); }
     function _featuredCard(item,pj,idx){ const slug=_featSlug(item); const title=item.name || pj.name || '未命名'; const aH=(pj.myHandCards||[]).map(function(c){return c.name||c;}); const bH=(pj.teammateHandCards||[]).map(function(c){return c.name||c;}); let h='<div class="ll-card" style="border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:6px 9px;margin-bottom:10px;background:rgba(0,0,0,0.22);">'; h+='<div style="display:flex;align-items:flex-start;gap:14px;">'; ['A','B'].forEach(function(ab){ const id=slug+'_'+ab; const L=_slot('featured',id); const st=(ab==='A')?{side:'my',table:'我的'}:{side:'teammate',table:'队友'}; h+='<div style="border-radius:9px;padding:4px 7px 7px;background:'+(ab==='A'?'rgba(78,205,196,0.07)':'rgba(240,147,43,0.07)')+';border:1px solid '+(ab==='A'?'rgba(78,205,196,0.32)':'rgba(240,147,43,0.32)')+';">'; h+='<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:4px;">'; if(ab==='A') h+='<b style="color:#ffd700;font-size:0.82rem;margin-right:4px;white-space:nowrap;">'+_esc(title)+'</b>'; h+='<span style="font-weight:800;color:'+(ab==='A'?'#4ecdc4':'#f0932b')+';font-size:0.76rem;">'+ab+'组</span>'; h+='<span style="color:rgba(255,255,255,0.45);font-size:0.62rem;">主</span>'+_cartSelect('featured',id,'cart',L.cart); h+='<span style="color:rgba(255,255,255,0.45);font-size:0.62rem;">副</span>'+_cartSelect('featured',id,'cart2',L.cart2); h+='<span class="ll-drsum" data-tab="featured" data-lid="'+id+'" data-side="'+st.side+'" data-table="'+st.table+'" data-heroes="'+_esc(JSON.stringify(ab==='A'?aH:bH))+'" title="减伤明细" style="color:#ff8a80;font-size:0.64rem;font-weight:700;cursor:help;">减伤</span>'; if(ab==='A'){ h+='<button onclick="_llReset(&quot;featured&quot;,&quot;'+slug+'_A&quot;)" title="重置该阵容个人设置" style="padding:2px 6px;border-radius:6px;border:1px solid rgba(255,107,107,0.45);background:rgba(255,107,107,0.14);color:#ff6b6b;cursor:pointer;font-size:0.62rem;font-weight:700;white-space:nowrap;">重置</button>'; if(_isAdmin()) h+='<button onclick="_featuredRemove('+idx+')" title="删除该精选阵容（所有人都会看不到）" style="padding:2px 6px;border-radius:6px;border:1px solid rgba(255,107,107,0.45);background:rgba(255,107,107,0.14);color:#ff6b6b;cursor:pointer;font-size:0.62rem;font-weight:700;white-space:nowrap;">删除</button>'; } h+='</div>'; h+='<div style="display:grid;grid-template-columns:repeat(5,94px);gap:6px;">'; (ab==='A'?aH:bH).forEach(function(n,i){ h+=_slotHtml(ab.toLowerCase(),i,n,'featured',id,94); }); h+='</div></div>'; }); const sc=_dayScripts(slug); h+='<div style="align-self:flex-start;display:flex;flex-direction:column;gap:5px;min-width:108px;">'; h+='<button id="llScriptBtn-'+slug+'" onclick="_llScriptDlg(&quot;'+slug+'&quot;)" title="管理该阵容脚本" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(240,147,43,0.45);background:rgba(240,147,43,0.12);color:#f0932b;font-size:0.74rem;font-weight:700;cursor:pointer;text-align:left;">阵容脚本（'+sc.length+'）</button>'; h+='<div id="llScripts-'+slug+'">'+(typeof _scriptsHtml==='function'?_scriptsHtml(sc,slug):'')+'</div>'; h+='</div>'; h+='</div></div>'; return h; }
+    function _featHash(s){ let h=5381; for(let i=0;i<s.length;i++){ h=((h<<5)+h+s.charCodeAt(i))>>>0; } return h.toString(36); }
+    function _featCacheKey(){ return 'tfjl_feat_cache_v1'; }
+    function _featCacheLoad(){ try{ const s=localStorage.getItem(_featCacheKey()); if(!s) return null; const o=JSON.parse(s); if(!o||!Array.isArray(o.items)) return null; return o; }catch(e){ return null; } }
+    function _featCacheSave(items,projs){ try{ localStorage.setItem(_featCacheKey(), JSON.stringify({ts:Date.now(), hash:_featHash(JSON.stringify(items)), items:items, projs:projs})); }catch(e){} }
+    async function _featResolve(items){
+        items.forEach(function(it,i){ if(!it.id) it.id=_featSlug({name:(it.name||'x')+'_'+i}); });
+        const projs=await Promise.all(items.map(async function(it,i){
+            let pj=null; try{ if(it.data) pj=_normPj(it.data); else if(it.file){ const pr=await fetch('projects/'+it.file); if(pr.ok) pj=_normPj(await pr.json()); } }catch(e){}
+            return {item:it,pj:pj,idx:i};
+        }));
+        projs.forEach(function(o){ try{ if(o.pj) _featuredSync(o.item,o.pj); }catch(e){} });
+        return projs;
+    }
+    function _featApply(items,projs,fromCache){
+        _featData={items:items,projs:projs};
+        _featCacheHash=_featHash(JSON.stringify(items));
+        if(!fromCache) _featCacheSave(items,projs);
+        const p=document.getElementById('llList'); if(p) _renderFeaturedBody(p);
+    }
+    async function _featuredLoadRaw(){
+        try{ const r=await fetch('https://gist.githubusercontent.com/gyq-svip/'+_LL_IDX_GIST+'/raw/featured_lineups.json',{cache:'no-store'}); if(!r.ok) return null; const txt=await r.text(); try{ const j=JSON.parse(txt); return (j&&Array.isArray(j.items))?j:{items:[]}; }catch(e){ return null; } }catch(e){ return null; }
+    }
     async function _renderFeatured(force){
         const p=document.getElementById('llList'); if(!p) return;
-        if(force!==false && !_featData){
+        await _ensureAdmin();
+        const cache=_featCacheLoad();
+        if(!force && cache && cache.items && cache.items.length){
+            _featApply(cache.items, cache.projs, true);
+        } else {
             p.innerHTML='<div style="color:rgba(255,255,255,0.5);padding:16px;">加载精选阵容中</div>';
-            await _ensureAdmin();
             let list={items:[]}; try{ list=await _featuredLoad()||{items:[]}; }catch(e){}
-            let items=list.items||[]; items.forEach(function(it,i){ if(!it.id) it.id=_featSlug({name:(it.name||'x')+'_'+i}); });
-            const projs=await Promise.all(items.map(async function(it,i){
-                let pj=null; try{ if(it.data) pj=_normPj(it.data); else if(it.file){ const pr=await fetch('projects/'+it.file); if(pr.ok) pj=_normPj(await pr.json()); } }catch(e){}
-                return {item:it,pj:pj,idx:i};
-            }));
-            projs.forEach(function(o){ try{ if(o.pj) _featuredSync(o.item,o.pj); }catch(e){} });
-            _featData={items:items,projs:projs};
+            const items=list.items||[];
+            const projs=await _featResolve(items);
+            _featApply(items, projs, false);
         }
-        _renderFeaturedBody(p);
+        _featStartHeartbeat();
     }
+    let _featHbTimer=null, _featCacheHash='';
+    function _featStartHeartbeat(){
+        if(_featHbTimer) return;
+        _featHbTimer=setInterval(async function(){
+            try{ if(document.hidden || state.tab!=='featured') return; const list=await _featuredLoadRaw(); if(!list||!Array.isArray(list.items)) return; const h=_featHash(JSON.stringify(list.items)); if(h===_featCacheHash) return; const projs=await _featResolve(list.items); _featApply(list.items, projs, false); }catch(e){}
+        }, 30000);
+    }
+
     function _renderFeaturedBody(p){
         if(!p) return;
         const items=(_featData&&_featData.items)||[]; const projs=(_featData&&_featData.projs)||[];
@@ -782,7 +811,7 @@ let _adminVerified=false, _adminLastTok='', _featItems=[], _featData=null, _feat
                 if(data){ const kf=c.getAttribute('data-file'); if(!seen[name] && (!kf || !seen[kf])){ if(name) seen[name]=1; if(kf) seen[kf]=1; items.push({id:_featSlug({name:name+'_'+i}),name:name,category:category,data:data}); } }
             }
             const ok=await _featuredSave(items);
-            if(ok){ try{ if(typeof showToast==='function') showToast('已保存精选阵容（全员可见）','success'); }catch(e){} m.remove(); _featData=null; _llTab('featured'); }
+            if(ok){ try{ if(typeof showToast==='function') showToast('已保存精选阵容（全员可见）','success'); }catch(e){} m.remove(); try{ localStorage.removeItem(_featCacheKey()); }catch(e){} _featData=null; _llTab('featured'); }
             else { try{ if(typeof showToast==='function') showToast('保存失败：需配置管理员 Gist Token','error'); }catch(e){} }
         });
     }
@@ -793,7 +822,7 @@ let _adminVerified=false, _adminLastTok='', _featItems=[], _featData=null, _feat
         if(!confirm('确定删除该精选阵容？（所有人都会看不到）')) return;
         const newItems=_featData.items.filter(function(x,i){ return i!==idx; });
         const ok=await _featuredSave(newItems);
-        if(ok){ _featData.items=newItems; _featData.projs=_featData.projs.filter(function(o){ return o.idx!==idx; }).map(function(o,i){ o.idx=i; return o; }); _renderFeaturedBody(document.getElementById('llList')); try{ if(typeof showToast==='function') showToast('已删除精选阵容','success'); }catch(e){} }
+        if(ok){ _featData.items=newItems; _featData.projs=_featData.projs.filter(function(o){ return o.idx!==idx; }).map(function(o,i){ o.idx=i; return o; }); _featCacheHash=_featHash(JSON.stringify(newItems)); _featCacheSave(newItems,_featData.projs); _renderFeaturedBody(document.getElementById('llList')); try{ if(typeof showToast==='function') showToast('已删除精选阵容','success'); }catch(e){} }
         else { try{ if(typeof showToast==='function') showToast('删除失败','error'); }catch(e){} }
     };
 
