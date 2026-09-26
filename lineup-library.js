@@ -727,7 +727,8 @@
         m.addEventListener('click',function(e){ if(e.target===m) m.remove(); });
         m.querySelector('#featAddSave').addEventListener('click',async function(){
             const checked=Array.from(box.querySelectorAll('input[data-source]')).filter(function(c){return c.checked;});
-            const items=[];
+            const items=(cur.items||[]).slice();
+            const seen={}; items.forEach(function(x){ if(x.name) seen[x.name]=1; if(x.file) seen[x.file]=1; });
             for(let i=0;i<checked.length;i++){
                 const c=checked[i]; const source=c.getAttribute('data-source'); const name=c.getAttribute('data-name'); const category=c.getAttribute('data-category')||'其他';
                 let data=null;
@@ -740,7 +741,7 @@
                         if(file){ const r=await fetch('projects/'+file); if(r.ok) data=_normPj(await r.json()); }
                     }
                 }catch(e){}
-                if(data) items.push({id:_featSlug({name:name+'_'+i}),name:name,category:category,data:data});
+                if(data){ const kf=c.getAttribute('data-file'); if(!seen[name] && (!kf || !seen[kf])){ if(name) seen[name]=1; if(kf) seen[kf]=1; items.push({id:_featSlug({name:name+'_'+i}),name:name,category:category,data:data}); } }
             }
             const ok=await _featuredSave(items);
             if(ok){ try{ if(typeof showToast==='function') showToast('已保存精选阵容（全员可见）','success'); }catch(e){} m.remove(); _llTab('featured'); }
