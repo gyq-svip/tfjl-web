@@ -216,7 +216,7 @@
             '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
             + '<button onclick="_llTab(\'sail\')" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (isSail ? 'rgba(78,205,196,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (isSail ? 'rgba(78,205,196,0.18)' : 'transparent') + ';color:' + (isSail ? '#4ecdc4' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">🚢 大航海(' + D.sailing.length + ')</button>'
             + '<button onclick="_llTab(\'act\')" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (!isSail ? 'rgba(255,215,0,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (!isSail ? 'rgba(255,215,0,0.15)' : 'transparent') + ';color:' + (!isSail ? '#ffd700' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">🏆 活动阵容(' + D.activity.length + '天)</button>'
-            + '<button onclick="_llTab(&quot;featured&quot;)" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (state.tab === 'featured' ? 'rgba(156,39,176,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (state.tab === 'featured' ? 'rgba(156,39,176,0.18)' : 'transparent') + ';color:' + (state.tab === 'featured' ? '#ce93d8' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">精选</button>' + (state.tab === 'featured' && _isAdmin() ? '<button onclick="_featuredAddDlg()" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(240,147,43,0.6);background:rgba(240,147,43,0.18);color:#f0932b;cursor:pointer;font-size:0.8rem;font-weight:700;">添加精选</button>' : '') + '<input id="llSearch" value="' + _esc(state.q) + '" oninput="_llSearch(this.value)" placeholder="🔍 多个英雄用空格/逗号分隔（同时含才显示）：如 电法 炎魔 悟空" style="flex:1;min-width:200px;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;">'
+            + '<button onclick="_llTab(&quot;featured&quot;)" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (state.tab === 'featured' ? 'rgba(156,39,176,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (state.tab === 'featured' ? 'rgba(156,39,176,0.18)' : 'transparent') + ';color:' + (state.tab === 'featured' ? '#ce93d8' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">精选</button>' + (state.tab === 'featured' ? '<button onclick="_featLocalAddDlg()" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(78,205,196,0.6);background:rgba(78,205,196,0.18);color:#4ecdc4;cursor:pointer;font-size:0.8rem;font-weight:700;">添加本地阵容</button>' + (_isAdmin() ? '<button onclick="_featuredAddDlg()" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(240,147,43,0.6);background:rgba(240,147,43,0.18);color:#f0932b;cursor:pointer;font-size:0.8rem;font-weight:700;">添加精选</button>' : '') : '') + '<input id="llSearch" value="' + _esc(state.q) + '" oninput="_llSearch(this.value)" placeholder="🔍 多个英雄用空格/逗号分隔（同时含才显示）：如 电法 炎魔 悟空" style="flex:1;min-width:200px;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;">'
             + '</div>'
             + '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-top:4px;">左卡组右笔记 · <b style="color:#ce93d8;">左键=轮流切融合卡（含副卡皮肤，末尾关闭）</b> · <b style="color:rgba(255,255,255,0.7);">右键=主卡皮肤（融合后也可切）</b> · <b style="color:#ff8a80;">🛡️减伤=鼠标悬浮查看每张卡的减伤明细（0% 减伤的卡自动隐藏）</b> · 活动 📜=脚本 ·（个人设置只存本机）· 拖标题栏移动窗口，右下角拉伸大小</div>';
         _ensureAdmin();
@@ -685,7 +685,7 @@
     }
 
     /* ===== 精选阵容：管理员从本机项目 / projects 勾选添加，按 category 分区展示（复用活动阵容渲染） ===== */
-let _adminVerified=false, _adminLastTok='', _featItems=[], _featData=null, _featCollapsed={}, _featCats=[];
+let _adminVerified=false, _adminLastTok='', _featItems=[], _featData=null, _featCollapsed={}, _featCats=[], _featLocal=null;
     function _isAdmin(){ return _adminVerified; }
     async function _ensureAdmin(){
         const tok=_llTok();
@@ -704,11 +704,14 @@ let _adminVerified=false, _adminLastTok='', _featItems=[], _featData=null, _feat
     function _normPj(pj){ return (pj && pj.project) ? pj.project : (pj || {}); }
     function _featSlug(item){ return 'feat_' + String(item.id || item.name || 'x').replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g,'_'); }
     function _featuredSync(item,pj){ const slug=_featSlug(item); const o=_load(); ['A','B'].forEach(function(ab){ const id=slug+'_'+ab; o['featured']=o['featured']||{}; o['featured'][id]=o['featured'][id]||{}; const slot=o['featured'][id]; const prefix=(ab==='A')?'my_':'teammate_'; const cards=(ab==='A'?pj.myHandCards:pj.teammateHandCards)||[]; const rawSkins=pj.cardSkins||{}; if(!slot.skin || !Object.keys(slot.skin).length){ slot.skin=slot.skin||{}; cards.forEach(function(c){ if(!c||c.id==null) return; const sv=rawSkins[prefix+c.id]; if(c.name&&sv!=null) slot.skin[c.name]=sv; }); } if(!slot.fus || !Object.keys(slot.fus).length){ slot.fus=slot.fus||{}; cards.forEach(function(c){ const nm=(c&&c.name)||''; if(!nm) return; const parts=(window.getFusionParts?window.getFusionParts(nm):null); if(parts&&parts.length>=2) slot.fus[nm]=nm; }); } const ch=(ab==='A'?pj.myChariot:pj.teammateChariot); if(!slot.cart && ch && ch.main) slot.cart=String(ch.main); if(!slot.cart2 && ch && ch.sub) slot.cart2=String(ch.sub); }); const fs=pj.fusionSkins||{}; window.fusionSkins=window.fusionSkins||{}; Object.keys(fs).forEach(function(h){ if(fs[h]!==undefined) window.fusionSkins[h]=fs[h]; }); _save(o); }
-    function _featuredCard(item,pj,idx){ const slug=_featSlug(item); const title=item.name || pj.name || '未命名'; const aH=(pj.myHandCards||[]).map(function(c){return c.name||c;}); const bH=(pj.teammateHandCards||[]).map(function(c){return c.name||c;}); let h='<div class="ll-card" style="border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:6px 9px;margin-bottom:10px;background:rgba(0,0,0,0.22);">'; h+='<div style="display:flex;align-items:flex-start;gap:14px;">'; ['A','B'].forEach(function(ab){ const id=slug+'_'+ab; const L=_slot('featured',id); const st=(ab==='A')?{side:'my',table:'我的'}:{side:'teammate',table:'队友'}; h+='<div style="border-radius:9px;padding:4px 7px 7px;background:'+(ab==='A'?'rgba(78,205,196,0.07)':'rgba(240,147,43,0.07)')+';border:1px solid '+(ab==='A'?'rgba(78,205,196,0.32)':'rgba(240,147,43,0.32)')+';">'; h+='<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:4px;">'; if(ab==='A') h+='<b style="color:#ffd700;font-size:0.82rem;margin-right:4px;white-space:nowrap;">'+_esc(title)+'</b>'; h+='<span style="font-weight:800;color:'+(ab==='A'?'#4ecdc4':'#f0932b')+';font-size:0.76rem;">'+ab+'组</span>'; h+='<span style="color:rgba(255,255,255,0.45);font-size:0.62rem;">主</span>'+_cartSelect('featured',id,'cart',L.cart); h+='<span style="color:rgba(255,255,255,0.45);font-size:0.62rem;">副</span>'+_cartSelect('featured',id,'cart2',L.cart2); h+='<span class="ll-drsum" data-tab="featured" data-lid="'+id+'" data-side="'+st.side+'" data-table="'+st.table+'" data-heroes="'+_esc(JSON.stringify(ab==='A'?aH:bH))+'" title="减伤明细" style="color:#ff8a80;font-size:0.64rem;font-weight:700;cursor:help;">减伤</span>'; if(ab==='A'){ h+='<button onclick="_llReset(&quot;featured&quot;,&quot;'+slug+'_A&quot;)" title="重置该阵容个人设置" style="padding:2px 6px;border-radius:6px;border:1px solid rgba(255,107,107,0.45);background:rgba(255,107,107,0.14);color:#ff6b6b;cursor:pointer;font-size:0.62rem;font-weight:700;white-space:nowrap;">重置</button>'; if(_isAdmin()) h+='<button onclick="_featuredRemove('+idx+')" title="删除该精选阵容（所有人都会看不到）" style="padding:2px 6px;border-radius:6px;border:1px solid rgba(255,107,107,0.45);background:rgba(255,107,107,0.14);color:#ff6b6b;cursor:pointer;font-size:0.62rem;font-weight:700;white-space:nowrap;">删除</button>'; } h+='</div>'; h+='<div style="display:grid;grid-template-columns:repeat(5,94px);gap:6px;">'; (ab==='A'?aH:bH).forEach(function(n,i){ h+=_slotHtml(ab.toLowerCase(),i,n,'featured',id,94); }); h+='</div></div>'; }); const sc=_dayScripts(slug); h+='<div style="align-self:flex-start;display:flex;flex-direction:column;gap:5px;min-width:108px;">'; h+='<button id="llScriptBtn-'+slug+'" onclick="_llScriptDlg(&quot;'+slug+'&quot;)" title="管理该阵容脚本" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(240,147,43,0.45);background:rgba(240,147,43,0.12);color:#f0932b;font-size:0.74rem;font-weight:700;cursor:pointer;text-align:left;">阵容脚本（'+sc.length+'）</button>'; h+='<div id="llScripts-'+slug+'">'+(typeof _scriptsHtml==='function'?_scriptsHtml(sc,slug):'')+'</div>'; h+='</div>'; h+='</div></div>'; return h; }
+    function _featuredCard(item,pj,idx,src){ const slug=_featSlug(item); const title=item.name || pj.name || '未命名'; const aH=(pj.myHandCards||[]).map(function(c){return c.name||c;}); const bH=(pj.teammateHandCards||[]).map(function(c){return c.name||c;}); let h='<div class="ll-card" style="border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:6px 9px;margin-bottom:10px;background:rgba(0,0,0,0.22);">'; h+='<div style="display:flex;align-items:flex-start;gap:14px;">'; ['A','B'].forEach(function(ab){ const id=slug+'_'+ab; const L=_slot('featured',id); const st=(ab==='A')?{side:'my',table:'我的'}:{side:'teammate',table:'队友'}; h+='<div style="border-radius:9px;padding:4px 7px 7px;background:'+(ab==='A'?'rgba(78,205,196,0.07)':'rgba(240,147,43,0.07)')+';border:1px solid '+(ab==='A'?'rgba(78,205,196,0.32)':'rgba(240,147,43,0.32)')+';">'; h+='<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:4px;">'; if(ab==='A') h+='<b style="color:#ffd700;font-size:0.82rem;margin-right:4px;white-space:nowrap;">'+_esc(title)+'</b>'; h+='<span style="font-weight:800;color:'+(ab==='A'?'#4ecdc4':'#f0932b')+';font-size:0.76rem;">'+ab+'组</span>'; h+='<span style="color:rgba(255,255,255,0.45);font-size:0.62rem;">主</span>'+_cartSelect('featured',id,'cart',L.cart); h+='<span style="color:rgba(255,255,255,0.45);font-size:0.62rem;">副</span>'+_cartSelect('featured',id,'cart2',L.cart2); h+='<span class="ll-drsum" data-tab="featured" data-lid="'+id+'" data-side="'+st.side+'" data-table="'+st.table+'" data-heroes="'+_esc(JSON.stringify(ab==='A'?aH:bH))+'" title="减伤明细" style="color:#ff8a80;font-size:0.64rem;font-weight:700;cursor:help;">减伤</span>'; if(ab==='A'){ h+='<button onclick="_llReset(&quot;featured&quot;,&quot;'+slug+'_A&quot;)" title="重置该阵容个人设置" style="padding:2px 6px;border-radius:6px;border:1px solid rgba(255,107,107,0.45);background:rgba(255,107,107,0.14);color:#ff6b6b;cursor:pointer;font-size:0.62rem;font-weight:700;white-space:nowrap;">重置</button>'; if(src==='local'){ h+='<button onclick="_featuredRemove('+idx+',\'local\')" title="删除该本地阵容（仅本机移除）" style="padding:2px 6px;border-radius:6px;border:1px solid rgba(255,107,107,0.45);background:rgba(255,107,107,0.14);color:#ff6b6b;cursor:pointer;font-size:0.62rem;font-weight:700;white-space:nowrap;">删除(本机)</button>'; } else if(_isAdmin()){ h+='<button onclick="_featuredRemove('+idx+',\'pub\')" title="删除该精选阵容（所有人都会看不到）" style="padding:2px 6px;border-radius:6px;border:1px solid rgba(255,107,107,0.45);background:rgba(255,107,107,0.14);color:#ff6b6b;cursor:pointer;font-size:0.62rem;font-weight:700;white-space:nowrap;">删除</button>'; } } h+='</div>'; h+='<div style="display:grid;grid-template-columns:repeat(5,94px);gap:6px;">'; (ab==='A'?aH:bH).forEach(function(n,i){ h+=_slotHtml(ab.toLowerCase(),i,n,'featured',id,94); }); h+='</div></div>'; }); const sc=_dayScripts(slug); h+='<div style="align-self:flex-start;display:flex;flex-direction:column;gap:5px;min-width:108px;">'; h+='<button id="llScriptBtn-'+slug+'" onclick="_llScriptDlg(&quot;'+slug+'&quot;)" title="管理该阵容脚本" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(240,147,43,0.45);background:rgba(240,147,43,0.12);color:#f0932b;font-size:0.74rem;font-weight:700;cursor:pointer;text-align:left;">阵容脚本（'+sc.length+'）</button>'; h+='<div id="llScripts-'+slug+'">'+(typeof _scriptsHtml==='function'?_scriptsHtml(sc,slug):'')+'</div>'; h+='</div>'; h+='</div></div>'; return h; }
     function _featHash(s){ let h=5381; for(let i=0;i<s.length;i++){ h=((h<<5)+h+s.charCodeAt(i))>>>0; } return h.toString(36); }
     function _featCacheKey(){ return 'tfjl_feat_cache_v1'; }
-    function _featCacheLoad(){ try{ const s=localStorage.getItem(_featCacheKey()); if(!s) return null; const o=JSON.parse(s); if(!o||!Array.isArray(o.items)) return null; return o; }catch(e){ return null; } }
-    function _featCacheSave(items,projs){ try{ localStorage.setItem(_featCacheKey(), JSON.stringify({ts:Date.now(), hash:_featHash(JSON.stringify(items)), items:items, projs:projs})); }catch(e){} }
+    function _idbOpen(){ return new Promise(function(res,rej){ try{ const r=indexedDB.open('tfjl_feat',1); r.onupgradeneeded=function(){ const db=r.result; if(!db.objectStoreNames.contains('kv')) db.createObjectStore('kv'); }; r.onsuccess=function(){ res(r.result); }; r.onerror=function(){ rej(r.error); }; }catch(e){ rej(e); } }); }
+    async function _idbGet(k){ try{ const db=await _idbOpen(); return await new Promise(function(res){ const tx=db.transaction('kv','readonly'); const rq=tx.objectStore('kv').get(k); rq.onsuccess=function(){ res(rq.result); }; rq.onerror=function(){ res(null); }; }); }catch(e){ return null; } }
+    async function _idbSet(k,v){ try{ const db=await _idbOpen(); return await new Promise(function(res){ const tx=db.transaction('kv','readwrite'); tx.objectStore('kv').put(v,k); tx.oncomplete=function(){ res(true); }; tx.onerror=function(){ res(false); }; }); }catch(e){ return false; } }
+    async function _featLocalLoad(){ const v=await _idbGet('local'); return (v&&Array.isArray(v.items))?v:null; }
+    async function _featLocalSave(items){ await _idbSet('local',{ts:Date.now(),items:items}); }
     async function _featResolve(items){
         items.forEach(function(it,i){ if(!it.id) it.id=_featSlug({name:(it.name||'x')+'_'+i}); });
         const projs=await Promise.all(items.map(async function(it,i){
@@ -718,61 +721,64 @@ let _adminVerified=false, _adminLastTok='', _featItems=[], _featData=null, _feat
         projs.forEach(function(o){ try{ if(o.pj) _featuredSync(o.item,o.pj); }catch(e){} });
         return projs;
     }
-    function _featApply(items,projs,fromCache){
-        _featData={items:items,projs:projs};
-        _featCacheHash=_featHash(JSON.stringify(items));
-        if(!fromCache) _featCacheSave(items,projs);
-        const p=document.getElementById('llList'); if(p) _renderFeaturedBody(p);
-    }
+    function _featApplyPub(items,projs){ _featData={items:items,projs:projs}; _featCacheHash=_featHash(JSON.stringify(items)); }
     async function _featuredLoadRaw(){
         try{ const r=await fetch('https://gist.githubusercontent.com/gyq-svip/'+_LL_IDX_GIST+'/raw/featured_lineups.json',{cache:'no-store'}); if(!r.ok) return null; const txt=await r.text(); try{ const j=JSON.parse(txt); return (j&&Array.isArray(j.items))?j:{items:[]}; }catch(e){ return null; } }catch(e){ return null; }
     }
     async function _renderFeatured(force){
         const p=document.getElementById('llList'); if(!p) return;
-        await _ensureAdmin();
-        const cache=_featCacheLoad();
+        try{ const lc=await _featLocalLoad(); _featLocal=(lc&&lc.items&&lc.items.length)?{items:lc.items,projs:await _featResolve(lc.items)}:{items:[],projs:[]}; }catch(e){ _featLocal={items:[],projs:[]}; }
+        const cache=await _idbGet('pub');
         if(!force && cache && cache.items && cache.items.length){
-            _featApply(cache.items, cache.projs, true);
+            _featApplyPub(cache.items, cache.projs);
         } else {
             p.innerHTML='<div style="color:rgba(255,255,255,0.5);padding:16px;">加载精选阵容中</div>';
+            await _ensureAdmin();
             let list={items:[]}; try{ list=await _featuredLoad()||{items:[]}; }catch(e){}
-            const items=list.items||[];
-            const projs=await _featResolve(items);
-            _featApply(items, projs, false);
+            const items=list.items||[]; const projs=await _featResolve(items);
+            _featApplyPub(items, projs);
+            await _idbSet('pub',{hash:_featCacheHash,items:items,projs:projs});
         }
+        _renderFeaturedBody(p);
+        if(!_adminVerified){ await _ensureAdmin(); if(state.tab==='featured') _renderFeaturedBody(p); }
         _featStartHeartbeat();
     }
     let _featHbTimer=null, _featCacheHash='';
     function _featStartHeartbeat(){
         if(_featHbTimer) return;
         _featHbTimer=setInterval(async function(){
-            try{ if(document.hidden || state.tab!=='featured') return; const list=await _featuredLoadRaw(); if(!list||!Array.isArray(list.items)) return; const h=_featHash(JSON.stringify(list.items)); if(h===_featCacheHash) return; const projs=await _featResolve(list.items); _featApply(list.items, projs, false); }catch(e){}
+            try{ if(document.hidden || state.tab!=='featured') return; const list=await _featuredLoadRaw(); if(!list||!Array.isArray(list.items)) return; const h=_featHash(JSON.stringify(list.items)); if(h===_featCacheHash) return; const projs=await _featResolve(list.items); _featApplyPub(list.items, projs); await _idbSet('pub',{hash:h,items:list.items,projs:projs}); _renderFeaturedBody(document.getElementById('llList')); }catch(e){}
         }, 30000);
     }
-
     function _renderFeaturedBody(p){
         if(!p) return;
-        const items=(_featData&&_featData.items)||[]; const projs=(_featData&&_featData.projs)||[];
-        if(!items.length){ p.innerHTML='<div style="color:rgba(255,255,255,0.4);padding:20px;text-align:center;">还没有精选阵容。'+(_isAdmin()?'点上方「添加精选」从本机项目里勾选添加。':'等待管理员添加。')+'</div>'; return; }
-        const groups={}; projs.forEach(function(o){ const cat=o.item.category || (o.pj&&o.pj.category) || '其他'; (groups[cat]=groups[cat]||[]).push(o); });
-        _featCats=Object.keys(groups);
-        const _badCard=function(idx){ return '<div style="border:1px solid rgba(255,107,107,0.4);border-radius:10px;padding:8px;margin-bottom:10px;background:rgba(255,107,107,0.1);color:#ff6b6b;font-size:0.78rem;">该精选数据异常，无法渲染。<button onclick="_featuredRemove('+idx+')" style="margin-left:8px;padding:2px 8px;border-radius:6px;border:1px solid rgba(255,107,107,0.5);background:rgba(255,107,107,0.15);color:#ff6b6b;cursor:pointer;">删除</button></div>'; };
+        const pubItems=(_featData&&_featData.items)||[]; const pubProjs=(_featData&&_featData.projs)||[];
+        const locItems=(_featLocal&&_featLocal.items)||[]; const locProjs=(_featLocal&&_featLocal.projs)||[];
         let h='';
-        _featCats.forEach(function(cat,ci){
-            if(_featCollapsed[cat]===undefined) _featCollapsed[cat]=(cat!=='深海');
-            const collapsed=_featCollapsed[cat];
-            const cid=cat.replace(/[^A-Za-z0-9_\u4e00-\u9fa5]/g,'_');
-            h+='<div style="margin:10px 0 4px;">';
-            h+='<div onclick="_featToggleCat('+ci+')" style="cursor:pointer;display:flex;align-items:center;gap:6px;color:#4ecdc4;font-weight:800;font-size:0.92rem;user-select:none;"><span style="display:inline-block;transform:rotate('+(collapsed?-90:0)+'deg);transition:transform .15s;">\u25be</span><span>'+_esc(cat)+'</span><span style="color:rgba(255,255,255,0.4);font-size:0.7rem;font-weight:400;">('+groups[cat].length+')</span></div>';
-            h+='<div id="featCat-'+cid+'" style="'+(collapsed?'display:none;':'')+'">';
-            groups[cat].forEach(function(o){ if(!o.pj){ if(_isAdmin()) h+=_badCard(o.idx); return; } try{ h+=_featuredCard(o.item,o.pj,o.idx); }catch(e){ if(_isAdmin()) h+=_badCard(o.idx); } });
-            h+='</div></div>';
-        });
-        if(!h) h='<div style="color:rgba(255,255,255,0.4);padding:20px;">（项目数据加载失败）</div>';
+        if(locItems.length){
+            h+='<div style="margin:10px 0 4px;color:#f0932b;font-weight:800;font-size:0.92rem;">我的本地阵容（仅本机显示）</div>';
+            const _badLocalCard=function(li){ return '<div style="border:1px solid rgba(255,107,107,0.4);border-radius:10px;padding:8px;margin-bottom:10px;background:rgba(255,107,107,0.1);color:#ff6b6b;font-size:0.78rem;">该本地阵容数据异常。<button onclick="_featuredRemove('+li+',\'local\')" style="margin-left:8px;padding:2px 8px;border-radius:6px;border:1px solid rgba(255,107,107,0.5);background:rgba(255,107,107,0.15);color:#ff6b6b;cursor:pointer;">删除</button></div>'; };
+            locProjs.forEach(function(o,li){ if(!o.pj){ h+=_badLocalCard(li); return; } try{ h+=_featuredCard(o.item,o.pj,li,'local'); }catch(e){ h+=_badLocalCard(li); } });
+        }
+        if(pubItems.length){
+            const groups={}; pubProjs.forEach(function(o){ const cat=o.item.category || (o.pj&&o.pj.category) || '其他'; (groups[cat]=groups[cat]||[]).push(o); });
+            _featCats=Object.keys(groups);
+            const _badCard=function(idx){ return '<div style="border:1px solid rgba(255,107,107,0.4);border-radius:10px;padding:8px;margin-bottom:10px;background:rgba(255,107,107,0.1);color:#ff6b6b;font-size:0.78rem;">该精选数据异常，无法渲染。<button onclick="_featuredRemove('+idx+',\'pub\')" style="margin-left:8px;padding:2px 8px;border-radius:6px;border:1px solid rgba(255,107,107,0.5);background:rgba(255,107,107,0.15);color:#ff6b6b;cursor:pointer;">删除</button></div>'; };
+            _featCats.forEach(function(cat,ci){
+                if(_featCollapsed[cat]===undefined) _featCollapsed[cat]=(cat!=='深海');
+                const collapsed=_featCollapsed[cat];
+                const cid=cat.replace(/[^A-Za-z0-9_\u4e00-\u9fa5]/g,'_');
+                h+='<div style="margin:10px 0 4px;">';
+                h+='<div onclick="_featToggleCat('+ci+')" style="cursor:pointer;display:flex;align-items:center;gap:6px;color:#4ecdc4;font-weight:800;font-size:0.92rem;user-select:none;"><span style="display:inline-block;transform:rotate('+(collapsed?-90:0)+'deg);transition:transform .15s;">\u25be</span><span>'+_esc(cat)+'</span><span style="color:rgba(255,255,255,0.4);font-size:0.7rem;font-weight:400;">('+groups[cat].length+')</span></div>';
+                h+='<div id="featCat-'+cid+'" style="'+(collapsed?'display:none;':'')+'">';
+                groups[cat].forEach(function(o){ if(!o.pj){ if(_isAdmin()) h+=_badCard(o.idx); return; } try{ h+=_featuredCard(o.item,o.pj,o.idx,'pub'); }catch(e){ if(_isAdmin()) h+=_badCard(o.idx); } });
+                h+='</div></div>';
+            });
+        }
+        if(!h){ p.innerHTML='<div style="color:rgba(255,255,255,0.4);padding:20px;text-align:center;">还没有阵容。'+(_isAdmin()?'点上方「添加精选」贡献，或「添加本地阵容」展示自己的。':'点上方「添加本地阵容」展示自己的阵容。')+'</div>'; return; }
         p.innerHTML=h; _applySlots(p); _refreshDrSums(p);
     }
     window._featToggleCat=function(ci){ const cat=_featCats[ci]; if(!cat) return; if(_featCollapsed[cat]===undefined) _featCollapsed[cat]=(cat!=='深海'); _featCollapsed[cat]=!_featCollapsed[cat]; _renderFeaturedBody(document.getElementById('llList')); };
-
     window._featuredAddDlg = async function(){
         const old=document.getElementById('featAddDlg'); if(old) old.remove();
         if(!await _ensureAdmin()){ try{ if(typeof showToast==='function') showToast('仅管理员可添加精选阵容','error'); }catch(e){} return; }
@@ -811,18 +817,58 @@ let _adminVerified=false, _adminLastTok='', _featItems=[], _featData=null, _feat
                 if(data){ const kf=c.getAttribute('data-file'); if(!seen[name] && (!kf || !seen[kf])){ if(name) seen[name]=1; if(kf) seen[kf]=1; items.push({id:_featSlug({name:name+'_'+i}),name:name,category:category,data:data}); } }
             }
             const ok=await _featuredSave(items);
-            if(ok){ try{ if(typeof showToast==='function') showToast('已保存精选阵容（全员可见）','success'); }catch(e){} m.remove(); try{ localStorage.removeItem(_featCacheKey()); }catch(e){} _featData=null; _llTab('featured'); }
+            if(ok){ try{ if(typeof showToast==='function') showToast('已保存精选阵容（全员可见）','success'); }catch(e){} m.remove(); try{ await _idbSet('pub',{items:[],projs:[]}); }catch(e){} _featData=null; _llTab('featured'); }
             else { try{ if(typeof showToast==='function') showToast('保存失败：需配置管理员 Gist Token','error'); }catch(e){} }
         });
-    }
-
-    window._featuredRemove = async function(idx){
+    };
+    window._featLocalAddDlg = async function(){
+        const old=document.getElementById('featLocalAddDlg'); if(old) old.remove();
+        let local=[]; try{ if(typeof window.__tfjlLoadProjectList==='function'){ const arr=await window.__tfjlLoadProjectList(); if(Array.isArray(arr)) local=arr.map(function(x){return {source:'local',proj:x,name:x.name||'未命名',category:x.category||'其他'};}); } }catch(e){}
+        const loc=await _featLocalLoad(); const locSet={}; (loc&&loc.items||[]).forEach(function(x){ locSet[x.name]=1; });
+        const opts=local.filter(function(x){ return !locSet[x.name]; });
+        const cats={}; opts.forEach(function(x){ const c=x.category||'其他'; (cats[c]=cats[c]||[]).push(x); });
+        let body=''; Object.keys(cats).forEach(function(c){ body+='<div style="color:#4ecdc4;font-weight:700;margin:6px 0 2px;">'+_esc(c)+'</div>'; cats[c].forEach(function(x){ body+='<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:0.82rem;color:rgba(255,255,255,0.85);cursor:pointer;"><input type="checkbox" data-name="'+_esc(x.name)+'" data-category="'+_esc(x.category||'其他')+'" style="accent-color:#4ecdc4;cursor:pointer;"><span style="flex:1;">'+_esc(x.name)+'</span><span style="color:rgba(255,255,255,0.4);font-size:0.65rem;">本机</span></label>'; }); });
+        if(!body) body='<div style="color:rgba(255,255,255,0.4);padding:10px;text-align:center;">没有可添加的本机项目</div>';
+        const m=document.createElement('div'); m.id='featLocalAddDlg'; m.style.cssText='position:fixed;inset:0;z-index:100004;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;';
+        const box=document.createElement('div'); box.style.cssText='width:min(460px,92vw);max-height:86vh;overflow:auto;background:linear-gradient(160deg,#141a33,#0d1b2a);border:1px solid rgba(78,205,196,0.5);border-radius:12px;padding:14px;';
+        box.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><b style="color:#4ecdc4;font-size:0.95rem;">添加本地阵容</b><span style="flex:1;"></span><button id="featLocalClose" style="background:transparent;border:none;color:#fff;font-size:1.2rem;cursor:pointer;">x</button></div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;margin-bottom:8px;">勾选本机项目，添加到「我的本地阵容」（仅保存在你这台设备，别人看不到）</div>'+body+'<div style="display:flex;gap:8px;margin-top:12px;"><button id="featLocalSave" style="flex:1;padding:9px;border:none;border-radius:8px;background:linear-gradient(135deg,#4ecdc4,#16a085);color:#04221f;cursor:pointer;font-size:0.85rem;font-weight:700;">保存</button><button id="featLocalCancel" style="padding:9px 14px;border:none;border-radius:8px;background:#666;color:#fff;cursor:pointer;font-size:0.85rem;">取消</button></div>';
+        m.appendChild(box); document.body.appendChild(m);
+        m.querySelector('#featLocalClose').addEventListener('click',function(){m.remove();});
+        m.querySelector('#featLocalCancel').addEventListener('click',function(){m.remove();});
+        m.addEventListener('click',function(e){ if(e.target===m) m.remove(); });
+        m.querySelector('#featLocalSave').addEventListener('click',async function(){
+            const checked=Array.from(box.querySelectorAll('input[data-name]')).filter(function(c){return c.checked;});
+            const loc0=await _featLocalLoad(); const items=((loc0&&loc0.items)||[]).slice();
+            const seen={}; items.forEach(function(x){ if(x.name) seen[x.name]=1; });
+            for(let i=0;i<checked.length;i++){
+                const c=checked[i]; const name=c.getAttribute('data-name'); const category=c.getAttribute('data-category')||'其他';
+                const x=local.find(function(z){return z.name===name;});
+                if(x && x.proj && !seen[name]){ seen[name]=1; items.push({id:_featSlug({name:name+'_'+items.length}),name:name,category:category,data:JSON.parse(JSON.stringify(x.proj))}); }
+            }
+            await _featLocalSave(items);
+            const projs=await _featResolve(items); _featLocal={items:items,projs:projs};
+            _renderFeaturedBody(document.getElementById('llList'));
+            try{ if(typeof showToast==='function') showToast('已添加本地阵容（仅本机）','success'); }catch(e){}
+            m.remove();
+        });
+    };
+    window._featuredRemove = async function(idx, src){
+        if(src==='local'){
+            if(!confirm('确定删除该本地阵容？（仅本机移除，不影响他人）')) return;
+            if(!_featLocal) return;
+            _featLocal.items.splice(idx,1);
+            _featLocal.projs.splice(idx,1);
+            await _featLocalSave(_featLocal.items);
+            _renderFeaturedBody(document.getElementById('llList'));
+            try{ if(typeof showToast==='function') showToast('已删除本地阵容','success'); }catch(e){}
+            return;
+        }
         if(!await _ensureAdmin()){ try{ if(typeof showToast==='function') showToast('仅管理员可删除','error'); }catch(e){} return; }
         if(!_featData || !_featData.items[idx]) return;
         if(!confirm('确定删除该精选阵容？（所有人都会看不到）')) return;
         const newItems=_featData.items.filter(function(x,i){ return i!==idx; });
         const ok=await _featuredSave(newItems);
-        if(ok){ _featData.items=newItems; _featData.projs=_featData.projs.filter(function(o){ return o.idx!==idx; }).map(function(o,i){ o.idx=i; return o; }); _featCacheHash=_featHash(JSON.stringify(newItems)); _featCacheSave(newItems,_featData.projs); _renderFeaturedBody(document.getElementById('llList')); try{ if(typeof showToast==='function') showToast('已删除精选阵容','success'); }catch(e){} }
+        if(ok){ _featData.items=newItems; _featData.projs=_featData.projs.filter(function(o){ return o.idx!==idx; }).map(function(o,i){ o.idx=i; return o; }); const h=_featHash(JSON.stringify(newItems)); _featCacheHash=h; await _idbSet('pub',{hash:h,items:newItems,projs:_featData.projs}); _renderFeaturedBody(document.getElementById('llList')); try{ if(typeof showToast==='function') showToast('已删除精选阵容','success'); }catch(e){} }
         else { try{ if(typeof showToast==='function') showToast('删除失败','error'); }catch(e){} }
     };
 
