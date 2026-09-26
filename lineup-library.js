@@ -727,7 +727,8 @@
         m.addEventListener('click',function(e){ if(e.target===m) m.remove(); });
         m.querySelector('#featAddSave').addEventListener('click',async function(){
             const checked=Array.from(box.querySelectorAll('input[data-source]')).filter(function(c){return c.checked;});
-            const items=[];
+            const items=(cur.items||[]).slice();
+            const seen={}; items.forEach(function(x){ if(x.name) seen[x.name]=1; if(x.file) seen[x.file]=1; });
             for(let i=0;i<checked.length;i++){
                 const c=checked[i]; const source=c.getAttribute('data-source'); const name=c.getAttribute('data-name'); const category=c.getAttribute('data-category')||'其他';
                 let data=null;
