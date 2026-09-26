@@ -305,7 +305,7 @@
             const p = tab.params || {};
             const packs = _actParsePacks(p.packs);
             const ref = _actParseWaveRef(p.waveRef);
-            let html = '<div style="color:#4ecdc4;font-weight:600;margin-bottom:8px;font-size:0.85rem;">📊 ' + _oldNameEsc(tab.name) + ' · 参数（管理员可在「🎪 活动道具」里改）</div>';
+            let html = '<div style="color:#4ecdc4;font-weight:600;margin-bottom:8px;font-size:0.85rem;">📊 ' + _oldNameEsc(tab.name) + ' · 参数 </div>';
             html += '<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px;margin-bottom:12px;font-size:0.78rem;line-height:1.7;color:rgba(255,255,255,0.8);">'
                 + '活动天数（默认）：<b style="color:#ffd700;">' + (p.days || 21) + ' 天</b><br>'
                 + '产出换算：<b style="color:#ffd700;">每 ' + (p.waveStepWaves || 10) + ' 波 = ' + (p.waveStepShards || 2) + ' 碎片</b>'
