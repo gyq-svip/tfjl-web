@@ -10389,7 +10389,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
         }
 
-        // 创建等级徽章HTML
+        // 创建等级徽章HTML（等级 / 魔化拆分，融合卡角标位置不同）
         function createLevelBadgeHTML(cardId, cardType, handType = 'my', cardName = '') {
             const level = getCardLevel(cardId, cardType, handType);
             const skin = getCardSkin(cardId, cardName, handType);
@@ -10399,8 +10399,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (hasCustomSkin && hasMoHua) skinClass = 'has-skin has-mohua';
             else if (hasCustomSkin) skinClass = 'has-skin';
             else if (hasMoHua) skinClass = 'has-mohua';
-            const levelBadge = `<span class="card-level-badge ${skinClass}" data-card-id="${cardId}" data-card-type="${cardType}" data-hand-type="${handType}" data-card-name="${cardName}" data-skin="${skin}">${level}${hasMoHua ? '🔮' : ''}</span>`;
-            return levelBadge;
+            const parts = (typeof getFusionParts === 'function') ? getFusionParts(cardName) : null;
+            const isFusion = !!(parts && parts.length >= 2);
+            const levelBadge = `<span class="card-level-badge card-level-number ${skinClass}${isFusion ? ' card-level-fusion' : ''}" data-card-id="${cardId}" data-card-type="${cardType}" data-hand-type="${handType}" data-card-name="${cardName}" data-skin="${skin}">${level}</span>`;
+            const mohuaIcon = hasMoHua ? `<span class="card-level-badge card-mohua-icon${isFusion ? ' card-mohua-fusion' : ''}" data-card-id="${cardId}" data-card-type="${cardType}" data-hand-type="${handType}" data-card-name="${cardName}" title="已魔化">🔮</span>` : '';
+            return levelBadge + mohuaIcon;
         }
 
         // 显示等级下拉选择器
