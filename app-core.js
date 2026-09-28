@@ -8559,7 +8559,8 @@ function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
     const _handName = (card && card.getAttribute) ? (card.getAttribute('data-name') || (card.dataset && card.dataset.name) || '') : '';
     const _handParts = (typeof getFusionParts === 'function') ? getFusionParts(_handName) : null;
     const _subHero = (_handParts && _handParts.length >= 2) ? _handParts[1] : '';
-    const _subMhOn = !!card.querySelector('.card-mohua-icon') && !!fusedUrl && _subHero && (typeof getFusionComponentMoHua === 'function') && getFusionComponentMoHua(_subHero);
+    const _subHidden = !!(window.fusionSkins && window.fusionSkins[_subHero] === '');
+    const _subMhOn = !!card.querySelector('.card-mohua-icon') && _subHero && !_subHidden && (typeof getFusionComponentMoHua === 'function') && getFusionComponentMoHua(_subHero);
     let fm = card.querySelector('.fused-mohua-icon');
     if (_subMhOn) {
         if (!fm) {
@@ -8661,7 +8662,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
     const _slotParts = (typeof getFusionParts === 'function') ? getFusionParts(_slotName) : null;
     const _slotSub = (_slotParts && _slotParts.length >= 2) ? _slotParts[1] : '';
     const mainMohua = !!slot.querySelector('.card-mohua-icon');
-    const _slotSubMhOn = mainMohua && !!fusedUrl && _slotSub && (typeof getFusionComponentMoHua === 'function') && getFusionComponentMoHua(_slotSub);
+    const _slotSubHidden = !!(window.fusionSkins && window.fusionSkins[_slotSub] === '');
+    const _slotSubMhOn = mainMohua && _slotSub && !_slotSubHidden && (typeof getFusionComponentMoHua === 'function') && getFusionComponentMoHua(_slotSub);
     let fm = slot.querySelector('.fused-mohua-icon');
     if (_slotSubMhOn) {
         if (!fm) {
@@ -10528,7 +10530,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const fusionParts = (typeof getFusionParts === 'function') ? getFusionParts(cardName) : null;
             const isFusion = !!(fusionParts && fusionParts.length >= 2);
             const subHero = isFusion ? fusionParts[1] : '';
-            const baseHero = (typeof getBaseHeroName === 'function') ? getBaseHeroName(cardName).heroName : cardName;
+            const baseHero = isFusion ? fusionParts[0] : ((typeof getBaseHeroName === 'function') ? getBaseHeroName(cardName).heroName : cardName);
             const variants = (typeof getFusionVariantsForBase === 'function') ? getFusionVariantsForBase(baseHero) : [];
             const hasVariants = variants.length > 0;
 
@@ -10605,6 +10607,86 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 box.appendChild(mhBtn);
             }
 
+            // 融合副卡设置（渲染函数，初始化与切换变体后复用）
+            function renderFusionSubSection(container, _cardName) {
+                const old = container.querySelector('#csFusionSubSection');
+                if (old) old.remove();
+                const _parts = (typeof getFusionParts === 'function') ? getFusionParts(_cardName) : null;
+                const _isFusion = !!(_parts && _parts.length >= 2);
+                const _subHero = _isFusion ? _parts[1] : '';
+                if (!_isFusion || !_subHero) return;
+
+                const _currentMoHua = getCardMoHua(cardId, handType);
+
+                const sec = document.createElement('div');
+                sec.id = 'csFusionSubSection';
+                sec.style.cssText = 'margin-top:10px;border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;';
+
+                const fTitle = document.createElement('div');
+                fTitle.style.cssText = 'color:#60a5fa;margin:0 0 6px;';
+                fTitle.textContent = '🔗 融合副卡：' + _subHero;
+                sec.appendChild(fTitle);
+
+                const subSkinTitle = document.createElement('div');
+                subSkinTitle.style.cssText = 'color:#ff9800;margin:6px 0 4px;font-size:0.78rem;';
+                subSkinTitle.textContent = '🎨 副卡皮肤';
+                sec.appendChild(subSkinTitle);
+                const subSkinWrap = document.createElement('div');
+                subSkinWrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;';
+                const subSkins = getAvailableSkins(_subHero);
+                const subCurSkin = (typeof getFusionComponentSkin === 'function') ? getFusionComponentSkin(_subHero) : '默认';
+                subSkins.forEach(skin => {
+                    const b = document.createElement('button');
+                    const sel = skin === subCurSkin;
+                    b.textContent = skin;
+                    b.style.cssText = 'padding:4px 8px;border-radius:7px;border:1px solid ' + (sel ? '#ff9800' : 'rgba(255,255,255,0.2)') + ';background:' + (sel ? '#ff9800' : 'transparent') + ';color:' + (sel ? '#1a1a2e' : '#fff') + ';cursor:pointer;font-size:0.76rem;font-weight:' + (sel ? '600' : '400') + ';';
+                    b.onclick = () => {
+                        if (typeof setFusionSkin === 'function') setFusionSkin(_subHero, skin);
+                        subSkinWrap.querySelectorAll('button').forEach(x => { x.style.borderColor = 'rgba(255,255,255,0.2)'; x.style.background = 'transparent'; x.style.color = '#fff'; x.style.fontWeight = '400'; });
+                        b.style.borderColor = '#ff9800'; b.style.background = '#ff9800'; b.style.color = '#1a1a2e'; b.style.fontWeight = '600';
+                        _reapplyCard();
+                    };
+                    subSkinWrap.appendChild(b);
+                });
+                sec.appendChild(subSkinWrap);
+
+                const subLvTitle = document.createElement('div');
+                subLvTitle.style.cssText = 'color:#4ecdc4;margin:8px 0 4px;font-size:0.78rem;';
+                subLvTitle.textContent = '📊 副卡等级';
+                sec.appendChild(subLvTitle);
+                const subLvInput = document.createElement('input');
+                subLvInput.type = 'number'; subLvInput.min = '1'; subLvInput.max = '30';
+                subLvInput.value = String((typeof getFusionComponentLevel === 'function') ? getFusionComponentLevel(_subHero) : 1);
+                subLvInput.style.cssText = 'width:60px;padding:4px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;';
+                subLvInput.onchange = () => { if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(_subHero, subLvInput.value); updateAllCardLevelBadges(); _reapplyCard(); };
+                sec.appendChild(subLvInput);
+
+                const subMhTitle = document.createElement('div');
+                subMhTitle.style.cssText = 'color:#a855f7;margin:8px 0 4px;font-size:0.78rem;';
+                subMhTitle.textContent = '👹 副卡魔化（需主卡已魔化）';
+                sec.appendChild(subMhTitle);
+                const subMhBtn = document.createElement('button');
+                subMhBtn.id = 'csSubMh';
+                const subMhOn = _currentMoHua && (typeof getFusionComponentMoHua === 'function') && getFusionComponentMoHua(_subHero);
+                const setSubMh = (on) => { subMhBtn.textContent = on ? '✅ 副卡魔化已开启' : '副卡魔化未开启'; subMhBtn.style.background = on ? '#a855f7' : 'transparent'; subMhBtn.style.borderColor = on ? '#a855f7' : 'rgba(255,255,255,0.2)'; subMhBtn.style.color = '#fff'; };
+                setSubMh(subMhOn);
+                subMhBtn.disabled = !_currentMoHua;
+                subMhBtn.style.cssText = 'padding:5px 12px;border-radius:8px;border:1px solid ' + (subMhOn ? '#a855f7' : 'rgba(255,255,255,0.2)') + ';background:' + (subMhOn ? '#a855f7' : 'transparent') + ';color:#fff;cursor:pointer;font-size:0.8rem;' + (_currentMoHua ? '' : 'opacity:0.4;');
+                subMhBtn.onclick = () => {
+                    if (!getCardMoHua(cardId, handType)) { if (typeof showToast === 'function') showToast('请先开启主卡魔化'); return; }
+                    const on = !(getFusionComponentMoHua(_subHero));
+                    setFusionComponentMoHua(_subHero, on);
+                    setSubMh(on);
+                    updateAllCardLevelBadges();
+                    _reapplyCard();
+                };
+                sec.appendChild(subMhBtn);
+
+                const anchor = container.querySelector('#csDrSection');
+                if (anchor && anchor.parentNode === container) container.insertBefore(sec, anchor);
+                else container.appendChild(sec);
+            }
+
             // 融合变体选择（只对基础英雄且存在融合变体时显示；卡池/收藏中不处理上阵关系）
             if (isProjectScope && hasVariants) {
                 const fvTitle = document.createElement('div');
@@ -10617,101 +10699,62 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 opts.forEach(opt => {
                     const b = document.createElement('button');
                     const sel = opt === cardName;
-                    const label = opt === baseHero ? '不融合' : opt;
+                    const parts = (typeof getFusionParts === 'function') ? getFusionParts(opt) : null;
+                    const label = opt === baseHero ? '不融合' : ((parts && parts.length >= 2) ? parts[1] : opt);
+                    b.dataset.value = opt;
                     b.textContent = label;
                     b.style.cssText = 'padding:4px 8px;border-radius:7px;border:1px solid ' + (sel ? '#60a5fa' : 'rgba(255,255,255,0.2)') + ';background:' + (sel ? '#60a5fa' : 'transparent') + ';color:' + (sel ? '#1a1a2e' : '#fff') + ';cursor:pointer;font-size:0.76rem;font-weight:' + (sel ? '600' : '400') + ';';
                     b.onclick = () => {
-                        // 直接改名即可：槽位用现有 upgradeCardToFusion；手牌直接改手牌数组 + 刷新显示
+                        const pick = b.dataset.value;
+                        // 直接改名即可：槽位用现有 upgradeCardToFusion；手牌直接改手牌数组 + 原地重绘
                         const slotEl = badge.closest('.battle-slot');
                         if (slotEl && typeof upgradeCardToFusion === 'function') {
-                            upgradeCardToFusion(slotEl, opt);
+                            upgradeCardToFusion(slotEl, pick);
                         } else {
                             const handArr = (handType === 'my') ? myHandCards : teammateHandCards;
                             const hc = handArr && handArr.find(c => c.id === cardId);
-                            if (hc) { hc.name = opt; }
-                            if (typeof updateHandDisplay === 'function') updateHandDisplay(handType);
+                            if (hc) hc.name = pick;
+                            const handCard = badge.closest('.selected-card.card-item');
+                            if (handCard) { handCard.dataset.name = pick; }
+                            if (typeof reapplySingleHandCard === 'function' && handCard) { reapplySingleHandCard(handCard, cardId, handType); }
                             if (typeof autoSaveProject === 'function') autoSaveProject();
                         }
-                        root.remove();
+                        // 刷新弹窗状态，不关闭
+                        cardName = pick;
+                        const newParts = (typeof getFusionParts === 'function') ? getFusionParts(cardName) : null;
+                        isFusion = !!(newParts && newParts.length >= 2);
+                        subHero = isFusion ? newParts[1] : '';
+                        baseHero = isFusion ? newParts[0] : ((typeof getBaseHeroName === 'function') ? getBaseHeroName(cardName).heroName : cardName);
+                        title.querySelector('span').textContent = '⚙️ ' + (cardName || cardId);
+                        renderFusionSubSection(box, cardName);
                         updateAllCardLevelBadges();
+                        _reapplyCard();
+                        // 同步刷新减伤值输入（因为 baseHero 可能已变）
+                        const drInput = box.querySelector('#csDrInput');
+                        if (drInput) {
+                            const drTable = (window.drTables && (window.drTables[window.drActiveTable || '我的'])) || (window.drTables && window.drTables['我的']) || { 洗炼: {} };
+                            drInput.value = (drTable.洗炼 && baseHero && drTable.洗炼[baseHero] !== undefined) ? drTable.洗炼[baseHero] : '';
+                        }
                     };
                     fvWrap.appendChild(b);
                 });
                 box.appendChild(fvWrap);
             }
 
-            // 融合副卡设置
-            if (isFusion && subHero) {
-                const fTitle = document.createElement('div');
-                fTitle.style.cssText = 'color:#60a5fa;margin:14px 0 6px;border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;';
-                fTitle.textContent = '🔗 融合副卡：' + subHero;
-                box.appendChild(fTitle);
-
-                const subSkinTitle = document.createElement('div');
-                subSkinTitle.style.cssText = 'color:#ff9800;margin:6px 0 4px;font-size:0.78rem;';
-                subSkinTitle.textContent = '🎨 副卡皮肤';
-                box.appendChild(subSkinTitle);
-                const subSkinWrap = document.createElement('div');
-                subSkinWrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;';
-                const subSkins = getAvailableSkins(subHero);
-                const subCurSkin = (typeof getFusionComponentSkin === 'function') ? getFusionComponentSkin(subHero) : '默认';
-                subSkins.forEach(skin => {
-                    const b = document.createElement('button');
-                    const sel = skin === subCurSkin;
-                    b.textContent = skin;
-                    b.style.cssText = 'padding:4px 8px;border-radius:7px;border:1px solid ' + (sel ? '#ff9800' : 'rgba(255,255,255,0.2)') + ';background:' + (sel ? '#ff9800' : 'transparent') + ';color:' + (sel ? '#1a1a2e' : '#fff') + ';cursor:pointer;font-size:0.76rem;font-weight:' + (sel ? '600' : '400') + ';';
-                    b.onclick = () => {
-                        if (typeof setFusionSkin === 'function') setFusionSkin(subHero, skin);
-                        subSkinWrap.querySelectorAll('button').forEach(x => { x.style.borderColor = 'rgba(255,255,255,0.2)'; x.style.background = 'transparent'; x.style.color = '#fff'; x.style.fontWeight = '400'; });
-                        b.style.borderColor = '#ff9800'; b.style.background = '#ff9800'; b.style.color = '#1a1a2e'; b.style.fontWeight = '600';
-                    _reapplyCard();
-                    };
-                    subSkinWrap.appendChild(b);
-                });
-                box.appendChild(subSkinWrap);
-
-                const subLvTitle = document.createElement('div');
-                subLvTitle.style.cssText = 'color:#4ecdc4;margin:8px 0 4px;font-size:0.78rem;';
-                subLvTitle.textContent = '📊 副卡等级';
-                box.appendChild(subLvTitle);
-                const subLvInput = document.createElement('input');
-                subLvInput.type = 'number'; subLvInput.min = '1'; subLvInput.max = '30';
-                subLvInput.value = String((typeof getFusionComponentLevel === 'function') ? getFusionComponentLevel(subHero) : 1);
-                subLvInput.style.cssText = 'width:60px;padding:4px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;';
-                subLvInput.onchange = () => { if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(subHero, subLvInput.value); updateAllCardLevelBadges(); _reapplyCard(); };
-                box.appendChild(subLvInput);
-
-                const subMhTitle = document.createElement('div');
-                subMhTitle.style.cssText = 'color:#a855f7;margin:8px 0 4px;font-size:0.78rem;';
-                subMhTitle.textContent = '👹 副卡魔化（需主卡已魔化）';
-                box.appendChild(subMhTitle);
-                const subMhBtn = document.createElement('button');
-                subMhBtn.id = 'csSubMh';
-                const subMhOn = currentMoHua && (typeof getFusionComponentMoHua === 'function') && getFusionComponentMoHua(subHero);
-                const setSubMh = (on) => { subMhBtn.textContent = on ? '✅ 副卡魔化已开启' : '副卡魔化未开启'; subMhBtn.style.background = on ? '#a855f7' : 'transparent'; subMhBtn.style.borderColor = on ? '#a855f7' : 'rgba(255,255,255,0.2)'; subMhBtn.style.color = '#fff'; };
-                setSubMh(subMhOn);
-                subMhBtn.disabled = !currentMoHua;
-                subMhBtn.style.cssText = 'padding:5px 12px;border-radius:8px;border:1px solid ' + (subMhOn ? '#a855f7' : 'rgba(255,255,255,0.2)') + ';background:' + (subMhOn ? '#a855f7' : 'transparent') + ';color:#fff;cursor:pointer;font-size:0.8rem;' + (currentMoHua ? '' : 'opacity:0.4;');
-                subMhBtn.onclick = () => {
-                    if (!getCardMoHua(cardId, handType)) { if (typeof showToast === 'function') showToast('请先开启主卡魔化'); return; }
-                    const on = !(getFusionComponentMoHua(subHero));
-                    setFusionComponentMoHua(subHero, on);
-                    setSubMh(on);
-                    updateAllCardLevelBadges();
-                    _reapplyCard();
-                };
-                box.appendChild(subMhBtn);
-            }
+            // 初始化融合副卡设置
+            renderFusionSubSection(box, cardName);
 
             // 减伤值（与减伤记录当前表同步）
             try {
                 const drTable = (window.drTables && (window.drTables[window.drActiveTable || '我的'])) || (window.drTables && window.drTables['我的']) || { 洗炼: {} };
                 const drVal = (drTable.洗炼 && baseHero && drTable.洗炼[baseHero] !== undefined) ? drTable.洗炼[baseHero] : '';
                 const drTitle = document.createElement('div');
+                drTitle.id = 'csDrSection';
                 drTitle.style.cssText = 'color:#ffd700;margin:14px 0 6px;border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;';
                 drTitle.textContent = '🛡️ 减伤值（' + (window.drActiveTable || '我的') + '）';
                 box.appendChild(drTitle);
                 const drInput = document.createElement('input');
+                drInput.id = 'csDrInput';
                 drInput.type = 'number'; drInput.placeholder = '如 12'; drInput.value = drVal;
                 drInput.style.cssText = 'width:90px;padding:5px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;';
                 drInput.onchange = () => {
