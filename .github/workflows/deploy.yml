@@ -153,11 +153,22 @@ jobs:
           grep -nE 'id="versionTag"' _site/index.html || true
 
 
-      # 🔴 2026-09-28 安全修复：不再把 GIST_TOKEN 注入到前端 JS/HTML。
-      # 原因：前端代码会被任何访问者下载 →  anybody 都能 F12 提取 token → 可随意篡改你的 Gist。
-      # 这段时间 Gist 文件被异常改动、token 疑似泄露，很可能就是这里导致的。
-      # 替代方案：管理员在「系统设置 / Token 设置」里把 token 填入 localStorage（TFJL_Gist_Token），
-      # 只存在当前设备，不会随页面发布出去。后端工作流（diag-aggregate/wall-backup）仍从 secrets 读取。
+      - name: Inject Token (optional)
+        run: |
+          TOKEN="${{ secrets.GIST_TOKEN }}"
+          if [ -z "$TOKEN" ]; then
+            echo "⚠️ GIST_TOKEN 未设置，跳过注入（前端将回退到 parent.getGistToken()）"
+            exit 0
+          fi
+          echo "Injecting GitHub Token..."
+          # 注意：之前只注入 _site/*.html，但模块化后 getGistToken() 已移到 app-core.js(JS 文件)，
+          # 导致线上 app-core.js 的 HARDCODED_TOKEN 占位符从未被替换 → getGistToken() 返回空 →
+          # 需求墙/分享等写 Gist 功能误报“离线版”。现改为注入所有含占位符的文件（含 js）。
+          grep -rl "YOUR_GITHUB_TOKEN_HERE" _site/ 2>/dev/null | while read -r file; do
+            sed -i "s/YOUR_GITHUB_TOKEN_HERE/$TOKEN/g" "$file"
+            echo "✅ Token injected into $file"
+          done
+          echo "Token injection completed"
 
       - name: Verify staged site
         run: |
