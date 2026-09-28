@@ -8551,6 +8551,21 @@ function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
     } else if (overlay && overlay.parentNode) {
         overlay.remove();
     }
+
+    // 副卡魔化角标：主卡已魔化时，副卡右下角也叠一个小魔化图标（尺寸由 CSS .fused-mohua-icon 控制）
+    let fm = card.querySelector('.fused-mohua-icon');
+    const mainMohua = !!card.querySelector('.card-mohua-icon');
+    if (mainMohua && fusedUrl) {
+        if (!fm) {
+            fm = document.createElement('img');
+            fm.className = 'fused-mohua-icon';
+            fm.alt = '';
+            fm.src = 'skins/icons/mohua-icon.png';
+            card.appendChild(fm);
+        }
+    } else if (fm && fm.parentNode) {
+        fm.remove();
+    }
 }
 
 // 槽位：主卡用独立 <img class="skin-layer"> 满铺（与普通卡槽 applySkinBgToSlot 一致）
@@ -8619,6 +8634,22 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         // 同上：不 revoke 旧 blob
         overlay.remove();
     }
+
+    // 副卡魔化角标：主卡已魔化时，副卡右下角也叠一个小魔化图标（尺寸由 CSS .fused-mohua-icon 控制）
+    let fm = slot.querySelector('.fused-mohua-icon');
+    const mainMohua = !!slot.querySelector('.card-mohua-icon');
+    if (mainMohua && fusedUrl) {
+        if (!fm) {
+            fm = document.createElement('img');
+            fm.className = 'fused-mohua-icon';
+            fm.alt = '';
+            fm.src = 'skins/icons/mohua-icon.png';
+            slot.appendChild(fm);
+        }
+    } else if (fm && fm.parentNode) {
+        fm.remove();
+    }
+
     if (mainUrl || fusedUrl) slot.classList.add('skin-bg');
     else slot.classList.remove('skin-bg');
 }
@@ -10394,7 +10425,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const level = getCardLevel(cardId, cardType, handType);
             const skin = getCardSkin(cardId, cardName, handType);
             const hasMoHua = getCardMoHua(cardId, handType);
-            const levelBadge = `<span class="card-level-badge card-level-number" data-card-id="${cardId}" data-card-type="${cardType}" data-hand-type="${handType}" data-card-name="${cardName}" data-skin="${skin}">${level}</span>`;
+            const levelBadge = `<span class="card-level-badge card-level-number card-level-q-${cardType}" data-card-id="${cardId}" data-card-type="${cardType}" data-hand-type="${handType}" data-card-name="${cardName}" data-skin="${skin}">${level}</span>`;
             // 使用用户提供的恶魔/鬼面魔化图标（红色发光风格），尺寸由 CSS 控制在 18px
             const mohuaIcon = hasMoHua ? `<img class="card-level-badge card-mohua-icon" data-card-id="${cardId}" data-card-type="${cardType}" data-hand-type="${handType}" data-card-name="${cardName}" src="skins/icons/mohua-icon.png" alt="" title="已魔化">` : '';
             return levelBadge + mohuaIcon;
