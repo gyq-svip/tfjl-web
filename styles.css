@@ -3160,3 +3160,87 @@
         .tfjl-tooltip[data-pos="bottom"]::after { top: -5px; left: 14px; transform: rotate(45deg); }
         .tfjl-tooltip[data-pos="left"]::after { right: -5px; top: 12px; transform: rotate(135deg); }
         .tfjl-tooltip[data-pos="right"]::after { left: -5px; top: 12px; transform: rotate(315deg); }
+
+
+/* ===================== 手机版紧凑布局（卡槽左右并排，手牌下移） ===================== */
+/* 仅在窄屏（≤600px，主要手机竖屏）生效；桌面/平板保持原样 */
+@media (max-width: 600px) {
+  /* 战斗区：我的 / 队友 卡槽左右并排（不再上下堆叠） */
+  .battle-field {
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    max-width: 100% !important;
+    padding: 0 4px !important;
+  }
+  .battle-column {
+    flex: 1 1 0 !important;
+    width: 50% !important;
+    max-width: 50% !important;
+    min-width: 0 !important;
+  }
+  .battle-column h4 {
+    font-size: 0.66rem !important;
+    margin-bottom: 4px !important;
+  }
+  .battle-column #teammateDamageReduction,
+  .battle-column #myFusionLockRow,
+  .battle-column #teammateFusionLockRow {
+    font-size: 0.55rem !important;
+    flex-wrap: wrap !important;
+  }
+  /* 每列内的卡槽改为单列竖排（一列 7 格），契合“左右两柱”的图样 */
+  .battle-slots {
+    grid-template-columns: 1fr !important;
+    max-width: 100% !important;
+    gap: 5px !important;
+    padding: 6px 4px !important;
+  }
+  .battle-slot {
+    height: 46px !important;
+    min-height: 46px !important;
+    font-size: 0.6rem !important;
+    padding: 2px 3px !important;
+  }
+  .battle-slots-container .engineering-slot,
+  .engineering-slot {
+    max-width: 100% !important;
+    height: 26px !important;
+    font-size: 0.55rem !important;
+  }
+  /* 手牌区：我的 / 队友 手牌各自整行，横向滚动（不再挤成网格） */
+  .hands-area {
+    flex-direction: column !important;
+    gap: 8px !important;
+    max-width: 100% !important;
+    padding: 0 4px !important;
+  }
+  .hand-cards-column {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 auto !important;
+  }
+  .hand-cards-column h3 {
+    font-size: 0.72rem !important;
+    margin-bottom: 3px !important;
+  }
+  .selected-cards-container {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    grid-template-columns: none !important;
+    gap: 5px !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    padding-bottom: 4px !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .selected-card {
+    flex: 0 0 auto !important;
+    width: 52px !important;
+    min-height: 32px !important;
+    font-size: 0.58rem !important;
+    padding: 3px 2px !important;
+  }
+}
