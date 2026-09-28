@@ -10504,6 +10504,18 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const _scopeEl = (event.target && event.target.closest) ? event.target.closest('#myHandContainer, #teammateHandContainer, .battle-slot') : null;
             const isProjectScope = !!_scopeEl;
             const badge = event.target;
+            // 重新渲染当前卡（融合副卡魔化/等级/皮肤变更后需要重绘皮肤层）
+            function _reapplyCard() {
+                const slotEl = badge.closest('.battle-slot');
+                if (slotEl && typeof applySkinBgToSlot === 'function') {
+                    try { applySkinBgToSlot(slotEl, cardName); } catch (e) {}
+                } else {
+                    const handCard = badge.closest('.selected-card.card-item');
+                    if (handCard && typeof reapplySingleHandCard === 'function') {
+                        try { reapplySingleHandCard(handCard, cardId, handType); } catch (e) {}
+                    }
+                }
+            }
             // 关闭已有弹窗
             document.querySelectorAll('.card-settings-popup-root').forEach(el => el.remove());
 
@@ -10565,6 +10577,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     skinWrap.querySelectorAll('button').forEach(x => { x.style.borderColor = 'rgba(255,255,255,0.2)'; x.style.background = 'transparent'; x.style.color = '#fff'; x.style.fontWeight = '400'; });
                     b.style.borderColor = '#ff9800'; b.style.background = '#ff9800'; b.style.color = '#1a1a2e'; b.style.fontWeight = '600';
                     updateAllCardLevelBadges();
+                    _reapplyCard();
                 };
                 skinWrap.appendChild(b);
             });
@@ -10584,6 +10597,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     setCardMoHua(cardId, on, handType);
                     setMh(on);
                     updateAllCardLevelBadges();
+                    _reapplyCard();
                     // 主卡魔化变化 → 副卡魔化开关可用状态联动
                     const subMh = box.querySelector('#csSubMh');
                     if (subMh) { subMh.disabled = !on; subMh.style.opacity = on ? '1' : '0.4'; if (!on && typeof setFusionComponentMoHua === 'function') setFusionComponentMoHua(subHero, false); }
@@ -10650,6 +10664,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         if (typeof setFusionSkin === 'function') setFusionSkin(subHero, skin);
                         subSkinWrap.querySelectorAll('button').forEach(x => { x.style.borderColor = 'rgba(255,255,255,0.2)'; x.style.background = 'transparent'; x.style.color = '#fff'; x.style.fontWeight = '400'; });
                         b.style.borderColor = '#ff9800'; b.style.background = '#ff9800'; b.style.color = '#1a1a2e'; b.style.fontWeight = '600';
+                    _reapplyCard();
                     };
                     subSkinWrap.appendChild(b);
                 });
@@ -10663,7 +10678,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 subLvInput.type = 'number'; subLvInput.min = '1'; subLvInput.max = '30';
                 subLvInput.value = String((typeof getFusionComponentLevel === 'function') ? getFusionComponentLevel(subHero) : 1);
                 subLvInput.style.cssText = 'width:60px;padding:4px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;';
-                subLvInput.onchange = () => { if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(subHero, subLvInput.value); updateAllCardLevelBadges(); };
+                subLvInput.onchange = () => { if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(subHero, subLvInput.value); updateAllCardLevelBadges(); _reapplyCard(); };
                 box.appendChild(subLvInput);
 
                 const subMhTitle = document.createElement('div');
@@ -10683,6 +10698,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     setFusionComponentMoHua(subHero, on);
                     setSubMh(on);
                     updateAllCardLevelBadges();
+                    _reapplyCard();
                 };
                 box.appendChild(subMhBtn);
             }
