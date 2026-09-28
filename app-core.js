@@ -28850,7 +28850,7 @@ ${maSection}
                 <div id="frStatus" style="font-size:0.72rem;color:#ffd700;margin-top:8px;min-height:14px;"></div>
             </div>`;
 
-            // 🔴 2026-09-08：悬浮按钮（💬 问题反馈）hover 二维码设置——存 room_index.json 的 fabQrcode / fabQrcodeTip（全网生效）
+            // 🔴 2026-09-08：悬浮按钮（💬 问题反馈）hover 二维码设置——存独立私有 Gist（fabqrcode.json），room_index.json 仅留 Gist ID
             html += `
             <div style="grid-column:1/-1;margin-top:14px;padding:14px;border:1px solid rgba(79,195,247,0.45);border-radius:12px;background:rgba(79,195,247,0.06);">
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
@@ -28888,9 +28888,72 @@ ${maSection}
         window.renderFeatureToggles = renderFeatureToggles;
 
         // ==================== 悬浮按钮二维码（💬 问题反馈 hover 显示，全网生效）====================
-        // 存储：room_index.json 的 fabQrcode（图片 dataURL 或 http 链接）+ fabQrcodeTip（二维码下方文字）
+        // 存储：独立私有 Gist（fabqrcode.json）存 fabQrcode（图片 dataURL 或 http 链接）+ fabQrcodeTip（二维码下方文字）；room_index.json 仅存该 Gist 的 ID（fabQrGistId），避免大图撑爆索引。
         // 二维码有效期倒计时（群二维码 7 天）：以最后一次保存时间为准，按自然日每天 -1，第 7 天到期
         const FAB_QR_VALID_DAYS = 7;
+        const FAB_QR_FILE = 'fabqrcode.json';
+        // 🔴 2026-09-28：二维码不再内联进 room_index.json（曾因 base64 大图撑爆索引 Gist 导致网页无法显示/编辑）。
+        // 改为：二维码（含 tip/ts）存进一个独立私有 Gist（fabqrcode.json），room_index.json 只存该 Gist 的 ID（极小字符串）。
+        async function getFabQrConfig() {
+            try {
+                const cfg = await getRoomIndexConfig();
+                const gid = (cfg && cfg.fabQrGistId) || '';
+                if (!gid) return null;
+                const token = getGistToken();
+                const r = await fetch('https://api.github.com/gists/' + gid, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json', ...(token ? { 'Authorization': 'token ' + token } : {}) }
+                });
+                if (!r.ok) return null;
+                const d = await r.json();
+                const f = d.files && d.files[FAB_QR_FILE];
+                if (f && typeof f.content === 'string') { try { return JSON.parse(f.content); } catch (e) { return null; } }
+            } catch (e) {}
+            return null;
+        }
+        async function _createFabQrGist() {
+            const token = getGistToken();
+            if (!token) return '';
+            try {
+                const r = await fetch('https://api.github.com/gists', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
+                    body: JSON.stringify({ description: 'tfjl-web 悬浮按钮二维码（独立 Gist）', public: false, files: { [FAB_QR_FILE]: { content: JSON.stringify({ fabQrcode: '', fabQrcodeTip: '', fabQrcodeTs: '' }) } } })
+                });
+                if (!r.ok) return '';
+                const d = await r.json();
+                return d.id || '';
+            } catch (e) { return ''; }
+        }
+        async function _writeFabQrGist(gid, obj) {
+            const token = getGistToken();
+            if (!token) throw new Error('未配置 Gist Token');
+            const r = await fetch('https://api.github.com/gists/' + gid, {
+                method: 'PATCH',
+                headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
+                body: JSON.stringify({ files: { [FAB_QR_FILE]: { content: JSON.stringify(obj) } } })
+            });
+            if (!r.ok) { let t = ''; try { t = await r.text(); } catch (e) {} throw new Error('写二维码 Gist 失败 HTTP ' + r.status + (t ? (' | ' + t.slice(0, 120)) : '')); }
+        }
+        // 粘贴截图自动压缩：缩到 maxW 宽、转 JPEG，避免大图塞爆 Gist
+        function _compressQrImage(dataUrl, maxW, quality) {
+            return new Promise(function (resolve) {
+                try {
+                    const img = new Image();
+                    img.onload = function () {
+                        let w = img.width, h = img.height;
+                        if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+                        const c = document.createElement('canvas');
+                        c.width = w; c.height = h;
+                        const ctx = c.getContext('2d');
+                        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+                        ctx.drawImage(img, 0, 0, w, h);
+                        try { resolve(c.toDataURL('image/jpeg', quality)); } catch (e) { resolve(dataUrl); }
+                    };
+                    img.onerror = function () { resolve(dataUrl); };
+                    img.src = dataUrl;
+                } catch (e) { resolve(dataUrl); }
+            });
+        }
         function _fabQrDayStart(t) { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
         function fabQrExpiryInfo(cfg) {
             const src = (cfg && cfg.fabQrcode) || '';
@@ -28934,7 +28997,7 @@ ${maSection}
             if (!cfg) {
                 // 3 分钟内复用内存里的配置，避免反复读 Gist（API 用量敏感）
                 if (window.__fabQrCfg && (Date.now() - _fabQrCfgCacheAt) < 180000) { cfg = window.__fabQrCfg; }
-                else { try { cfg = await getRoomIndexConfig(); _fabQrCfgCacheAt = Date.now(); } catch (e) { cfg = window.__fabQrCfg || {}; } }
+                else { try { cfg = await getFabQrConfig(); _fabQrCfgCacheAt = Date.now(); } catch (e) { cfg = window.__fabQrCfg || {}; } }
             }
             if (cfg) window.__fabQrCfg = cfg;
             const info = fabQrExpiryInfo(cfg);
@@ -28952,8 +29015,10 @@ ${maSection}
             el.innerHTML = txt + '<span style="color:rgba(255,255,255,0.45);font-size:0.7rem;"> · 点此更换</span>';
         }
         window.renderAdminFabQrExpiry = renderAdminFabQrExpiry;
-        function initFabQrPreview(cfg) {
+        async function initFabQrPreview(cfg) {
             try {
+                const real = await getFabQrConfig();
+                cfg = real || cfg || {};
                 const src = (cfg && cfg.fabQrcode) || '';
                 const pv = document.getElementById('fabQrPreview');
                 if (pv) pv.innerHTML = src ? '<img src="' + src.replace(/"/g, '&quot;') + '" style="max-width:100%;max-height:100%;object-fit:contain;background:#fff;">' : '未设置';
@@ -29042,14 +29107,33 @@ ${maSection}
             const tip = (tipEl && tipEl.value.trim()) ? tipEl.value.trim() : '扫码加群';
             try {
                 if (st) st.textContent = '保存中…';
+                // 粘贴的是图片 → 先压缩（缩到 240px 宽，JPEG），再存到独立 Gist，避免撑爆索引
+                if (val && /^data:image\//i.test(val)) {
+                    if (st) st.textContent = '正在压缩图片…';
+                    val = await _compressQrImage(val, 240, 0.8);
+                }
                 const ts = val ? Date.now() : '';   // 记录保存时间 → 7 天有效期倒计时基准
-                await setRoomIndexConfigFields({ fabQrcode: val || '', fabQrcodeTip: val ? tip : '', fabQrcodeTs: ts });
+                if (val) {
+                    // 确保有独立二维码 Gist
+                    let gid = (await getRoomIndexConfig()).fabQrGistId || '';
+                    if (!gid) {
+                        if (st) st.textContent = '正在创建独立二维码 Gist…';
+                        gid = await _createFabQrGist();
+                        if (!gid) throw new Error('创建二维码 Gist 失败（检查 Token 权限）');
+                        await setRoomIndexConfigField('fabQrGistId', gid); // 极小字符串，不会撑爆索引
+                    }
+                    await _writeFabQrGist(gid, { fabQrcode: val, fabQrcodeTip: tip, fabQrcodeTs: ts });
+                } else {
+                    // 清除：把独立 Gist 内容置空
+                    const gid = (await getRoomIndexConfig()).fabQrGistId || '';
+                    if (gid) await _writeFabQrGist(gid, { fabQrcode: '', fabQrcodeTip: '', fabQrcodeTs: '' });
+                }
                 window.__fabQrPending = '';
                 window.__fabQrCfg = Object.assign({}, window.__fabQrCfg || {}, { fabQrcode: val || '', fabQrcodeTip: val ? tip : '', fabQrcodeTs: ts });
                 renderFabQrExpiry(window.__fabQrCfg);
                 _fabQrCfgCacheAt = Date.now();
                 if (typeof renderAdminFabQrExpiry === 'function') renderAdminFabQrExpiry(window.__fabQrCfg);
-                if (st) st.textContent = val ? '✅ 已保存（全网生效，用户刷新页面后 hover 可见）·有效期倒计时已重置为 7 天' : '✅ 已清除';
+                if (st) st.textContent = val ? '✅ 已保存（独立 Gist，全网生效，用户刷新页面后 hover 可见）·有效期倒计时已重置为 7 天' : '✅ 已清除';
             } catch (e) {
                 if (st) st.textContent = '❌ 保存失败：' + ((e && e.message) || e);
             }
@@ -29059,7 +29143,8 @@ ${maSection}
             const st = document.getElementById('fabQrStatus');
             if (!getGistToken()) { if (st) st.textContent = '⚠️ 未配置 Gist Token，无法清除'; return; }
             try {
-                await setRoomIndexConfigFields({ fabQrcode: '', fabQrcodeTip: '', fabQrcodeTs: '' });
+                const gid = (await getRoomIndexConfig()).fabQrGistId || '';
+                if (gid) await _writeFabQrGist(gid, { fabQrcode: '', fabQrcodeTip: '', fabQrcodeTs: '' });
                 window.__fabQrPending = '';
                 window.__fabQrCfg = Object.assign({}, window.__fabQrCfg || {}, { fabQrcode: '', fabQrcodeTip: '', fabQrcodeTs: '' });
                 renderFabQrExpiry(window.__fabQrCfg);
@@ -29078,7 +29163,7 @@ ${maSection}
             try {
                 const fab = document.getElementById('feedbackFab');
                 if (!fab || document.getElementById('fabQrcodePop')) return;
-                const cfg = await getRoomIndexConfig();
+                const cfg = await getFabQrConfig();
                 const src = (cfg && cfg.fabQrcode) || '';
                 if (!src) return;
                 const tip = (cfg && cfg.fabQrcodeTip) || '扫码加群';
