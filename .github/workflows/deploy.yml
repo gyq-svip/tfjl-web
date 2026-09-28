@@ -59,8 +59,6 @@ jobs:
           [ -d projects ] && cp -rv projects _site/ || true
           # 🔴 内置背景图（设置窗「内置背景图」直链 bg/xxx.jpg，白名单漏拷会导致线上 404 → 图片显示不出来）
           [ -d bg ] && cp -rv bg _site/ || true
-          # 自定义图标资源（如魔化角标 assets/icons/mohua-icon.png）
-          [ -d assets ] && cp -rv assets _site/ || true
 
           echo "=== staged size ==="
           du -sh _site
