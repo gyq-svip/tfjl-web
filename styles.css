@@ -3294,10 +3294,10 @@
     position: absolute !important;
     width: 18px !important;
     height: 18px !important;
-    left: calc(40% - 14px) !important;
-    top: calc(40% - 14px) !important;
+    left: calc(40% - 19px) !important;
+    bottom: calc(60% + 1px) !important;
     object-fit: contain;
-    z-index: 5 !important;
+    z-index: 6 !important;
     pointer-events: none;
     filter: drop-shadow(0 0 2px rgba(168, 85, 247, 0.9));
   }
@@ -3357,10 +3357,10 @@
     position: absolute;
     width: 18px;
     height: 18px;
-    left: calc(40% - 14px);
-    top: calc(40% - 14px);
+    left: calc(40% - 19px);
+    bottom: calc(60% + 1px);
     object-fit: contain;
-    z-index: 5;
+    z-index: 6;
     pointer-events: none;
     filter: drop-shadow(0 0 2px rgba(168, 85, 247, 0.9));
 }

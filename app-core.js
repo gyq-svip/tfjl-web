@@ -8560,7 +8560,7 @@ function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
     const _handParts = (typeof getFusionParts === 'function') ? getFusionParts(_handName) : null;
     const _subHero = (_handParts && _handParts.length >= 2) ? _handParts[1] : '';
     const _subHidden = !!(window.fusionSkins && window.fusionSkins[_subHero] === '');
-    const _subMhOn = !!card.querySelector('.card-mohua-icon') && _subHero && !_subHidden && (typeof getFusionComponentMoHua === 'function') && getFusionComponentMoHua(_subHero);
+    const _subMhOn = _subHero && !_subHidden && (typeof getFusionComponentMoHua === 'function') && getFusionComponentMoHua(_subHero);
     let fm = card.querySelector('.fused-mohua-icon');
     if (_subMhOn) {
         if (!fm) {
@@ -8574,14 +8574,14 @@ function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
         fm.remove();
     }
 
-    // 副卡等级角标（右下角小数字），与主卡等级角标(左上)区分
+    // 副卡等级角标（副卡左下角小数字），与主卡等级角标(主卡左下)区分
     let subLv = card.querySelector('.fused-sub-level');
     if (_subHero && !_subHidden) {
         const lv = (typeof getFusionComponentLevel === 'function') ? getFusionComponentLevel(_subHero) : 1;
         if (!subLv) {
             subLv = document.createElement('div');
             subLv.className = 'fused-sub-level';
-            subLv.style.cssText = 'position:absolute;right:1px;bottom:1px;background:rgba(0,0,0,0.7);color:#4ecdc4;border:1px solid #4ecdc4;border-radius:6px;font-size:0.6rem;line-height:1;padding:1px 4px;z-index:6;pointer-events:none;';
+            subLv.style.cssText = 'position:absolute;left:1px;bottom:calc(60% + 1px);background:rgba(0,0,0,0.7);color:#4ecdc4;border:1px solid #4ecdc4;border-radius:6px;font-size:0.6rem;line-height:1;padding:1px 4px;z-index:6;pointer-events:none;';
             card.appendChild(subLv);
         }
         subLv.textContent = lv;
@@ -8661,9 +8661,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
     const _slotName = (slot.querySelector('.card-item') && (slot.querySelector('.card-item').getAttribute('data-name') || (slot.querySelector('.card-item').dataset && slot.querySelector('.card-item').dataset.name))) || (slot.getAttribute('data-name') || '') || '';
     const _slotParts = (typeof getFusionParts === 'function') ? getFusionParts(_slotName) : null;
     const _slotSub = (_slotParts && _slotParts.length >= 2) ? _slotParts[1] : '';
-    const mainMohua = !!slot.querySelector('.card-mohua-icon');
     const _slotSubHidden = !!(window.fusionSkins && window.fusionSkins[_slotSub] === '');
-    const _slotSubMhOn = mainMohua && _slotSub && !_slotSubHidden && (typeof getFusionComponentMoHua === 'function') && getFusionComponentMoHua(_slotSub);
+    const _slotSubMhOn = _slotSub && !_slotSubHidden && (typeof getFusionComponentMoHua === 'function') && getFusionComponentMoHua(_slotSub);
     let fm = slot.querySelector('.fused-mohua-icon');
     if (_slotSubMhOn) {
         if (!fm) {
@@ -8677,14 +8676,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         fm.remove();
     }
 
-    // 副卡等级角标（右下角小数字），与主卡等级角标(左上)区分
+    // 副卡等级角标（副卡左下角小数字），与主卡等级角标(主卡左下)区分
     let subLv = slot.querySelector('.fused-sub-level');
     if (_slotSub && !_slotSubHidden) {
         const lv = (typeof getFusionComponentLevel === 'function') ? getFusionComponentLevel(_slotSub) : 1;
         if (!subLv) {
             subLv = document.createElement('div');
             subLv.className = 'fused-sub-level';
-            subLv.style.cssText = 'position:absolute;right:1px;bottom:1px;background:rgba(0,0,0,0.7);color:#4ecdc4;border:1px solid #4ecdc4;border-radius:6px;font-size:0.6rem;line-height:1;padding:1px 4px;z-index:6;pointer-events:none;';
+            subLv.style.cssText = 'position:absolute;left:1px;bottom:calc(60% + 1px);background:rgba(0,0,0,0.7);color:#4ecdc4;border:1px solid #4ecdc4;border-radius:6px;font-size:0.6rem;line-height:1;padding:1px 4px;z-index:6;pointer-events:none;';
             slot.appendChild(subLv);
         }
         subLv.textContent = lv;
@@ -10620,6 +10619,13 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
                 const _currentMoHua = getCardMoHua(cardId, handType);
 
+                // 副卡按自身品质取等级档位（紫卡用紫卡档、金卡用金卡档…），不从主卡继承
+                const _subCardType = (function () {
+                    const el = document.querySelector('.card-item[data-name="' + (_subHero || '').replace(/"/g, '\\"') + '"]');
+                    return el ? (el.dataset.type || 'gold') : 'gold';
+                })();
+                const subLevels = (typeof getAvailableLevels === 'function') ? getAvailableLevels(_subCardType) : [1, 5, 10, 15, 20, 25];
+
                 const sec = document.createElement('div');
                 sec.id = 'csFusionSubSection';
                 sec.style.cssText = 'margin-top:10px;border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;';
@@ -10659,33 +10665,31 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const subLvWrap = document.createElement('div');
                 subLvWrap.style.cssText = 'display:flex;align-items:center;gap:8px;';
                 const subLvInput = document.createElement('input');
-                subLvInput.type = 'range'; subLvInput.min = '0'; subLvInput.max = String(Math.max(0, levels.length - 1)); subLvInput.step = '1';
-                const subLvIndex = Math.max(0, levels.indexOf((typeof getFusionComponentLevel === 'function') ? getFusionComponentLevel(_subHero) : 1));
+                subLvInput.type = 'range'; subLvInput.min = '0'; subLvInput.max = String(Math.max(0, subLevels.length - 1)); subLvInput.step = '1';
+                const subLvIndex = Math.max(0, subLevels.indexOf((typeof getFusionComponentLevel === 'function') ? getFusionComponentLevel(_subHero) : 1));
                 subLvInput.value = String(subLvIndex);
                 subLvInput.style.cssText = 'flex:1;accent-color:#4ecdc4;';
                 const subLvVal = document.createElement('span');
                 subLvVal.id = 'csSubLvVal';
-                subLvVal.textContent = String(levels[subLvIndex]);
+                subLvVal.textContent = String(subLevels[subLvIndex]);
                 subLvVal.style.cssText = 'min-width:28px;text-align:right;color:#4ecdc4;font-weight:600;';
-                subLvInput.oninput = () => { subLvVal.textContent = String(levels[Number(subLvInput.value)]); };
-                subLvInput.onchange = () => { if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(_subHero, levels[Number(subLvInput.value)]); updateAllCardLevelBadges(); _reapplyCard(); };
+                subLvInput.oninput = () => { subLvVal.textContent = String(subLevels[Number(subLvInput.value)]); };
+                subLvInput.onchange = () => { if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(_subHero, subLevels[Number(subLvInput.value)]); updateAllCardLevelBadges(); _reapplyCard(); };
                 subLvWrap.appendChild(subLvInput);
                 subLvWrap.appendChild(subLvVal);
                 sec.appendChild(subLvWrap);
 
                 const subMhTitle = document.createElement('div');
                 subMhTitle.style.cssText = 'color:#a855f7;margin:8px 0 4px;font-size:0.78rem;';
-                subMhTitle.textContent = '👹 副卡魔化（需主卡已魔化）';
+                subMhTitle.textContent = '👹 副卡魔化';
                 sec.appendChild(subMhTitle);
                 const subMhBtn = document.createElement('button');
                 subMhBtn.id = 'csSubMh';
-                const subMhOn = _currentMoHua && (typeof getFusionComponentMoHua === 'function') && getFusionComponentMoHua(_subHero);
+                const subMhOn = (typeof getFusionComponentMoHua === 'function') && getFusionComponentMoHua(_subHero);
                 const setSubMh = (on) => { subMhBtn.textContent = on ? '✅ 副卡魔化已开启' : '副卡魔化未开启'; subMhBtn.style.background = on ? '#a855f7' : 'transparent'; subMhBtn.style.borderColor = on ? '#a855f7' : 'rgba(255,255,255,0.2)'; subMhBtn.style.color = '#fff'; };
                 setSubMh(subMhOn);
-                subMhBtn.disabled = !_currentMoHua;
-                subMhBtn.style.cssText = 'padding:5px 12px;border-radius:8px;border:1px solid ' + (subMhOn ? '#a855f7' : 'rgba(255,255,255,0.2)') + ';background:' + (subMhOn ? '#a855f7' : 'transparent') + ';color:#fff;cursor:pointer;font-size:0.8rem;' + (_currentMoHua ? '' : 'opacity:0.4;');
+                subMhBtn.style.cssText = 'padding:5px 12px;border-radius:8px;border:1px solid ' + (subMhOn ? '#a855f7' : 'rgba(255,255,255,0.2)') + ';background:' + (subMhOn ? '#a855f7' : 'transparent') + ';color:#fff;cursor:pointer;font-size:0.8rem;';
                 subMhBtn.onclick = () => {
-                    if (!getCardMoHua(cardId, handType)) { if (typeof showToast === 'function') showToast('请先开启主卡魔化'); return; }
                     const on = !(getFusionComponentMoHua(_subHero));
                     setFusionComponentMoHua(_subHero, on);
                     setSubMh(on);
