@@ -3259,19 +3259,17 @@
     margin-bottom: 3px !important;
   }
   .selected-cards-container {
-    display: flex !important;
-    flex-wrap: nowrap !important;
-    grid-template-columns: none !important;
-    gap: 5px !important;
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 4px !important;
     max-width: 100% !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
+    overflow: visible !important;
+    flex-wrap: unset !important;
     padding-bottom: 4px !important;
-    -webkit-overflow-scrolling: touch;
   }
   .selected-card {
-    flex: 0 0 auto !important;
-    width: 72px !important;
+    flex: 1 1 0 !important;
+    width: 100% !important;
     min-height: 46px !important;
     font-size: 0.68rem !important;
     padding: 4px 3px !important;
@@ -3289,8 +3287,14 @@
   }
   .battle-slot .card-level-badge.card-mohua-icon,
   .selected-card.card-item .card-level-badge.card-mohua-icon {
-    width: 16px !important;
-    height: 16px !important;
+    width: 22px !important;
+    height: 22px !important;
+  }
+  .fused-mohua-icon {
+    width: 14px !important;
+    height: 14px !important;
+    left: calc(40% - 11px);
+    top: calc(40% - 11px);
   }
 }
 
@@ -3328,8 +3332,8 @@
     left: auto !important;
     right: 2px !important;
     bottom: 2px !important;
-    width: 18px;
-    height: 18px;
+    width: 26px;
+    height: 26px;
     padding: 0 !important;
     display: block !important;
     background: transparent !important;
@@ -3339,4 +3343,32 @@
     pointer-events: auto;
     z-index: 10;
 }
+
+/* 融合副卡魔化角标：叠在副卡（左上 40% 圆角矩形）右下角，小尺寸 */
+.fused-mohua-icon {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    left: calc(40% - 14px);
+    top: calc(40% - 14px);
+    object-fit: contain;
+    z-index: 3;
+    pointer-events: none;
+    filter: drop-shadow(0 0 1px rgba(0,0,0,0.85));
+}
+
+/* 等级徽章背景按卡品质着色（金/紫/蓝/工程），与卡品质保持一致 */
+.card-level-badge.card-level-q-gold { background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%) !important; color: #1a1a2e !important; }
+.card-level-badge.card-level-q-purple { background: linear-gradient(135deg, #c471ed 0%, #a020f0 100%) !important; color: #fff !important; }
+.card-level-badge.card-level-q-blue { background: linear-gradient(135deg, #4fc3f7 0%, #4169e1 100%) !important; color: #fff !important; }
+.card-level-badge.card-level-q-engineering { background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%) !important; color: #1a1a2e !important; }
+/* 有皮肤时仍保留品质色（覆盖默认半透明黑底） */
+.selected-card.card-item.skin-bg .card-level-badge.card-level-q-gold { background: linear-gradient(135deg, #ffd700cc, #ff8c00cc) !important; }
+.selected-card.card-item.skin-bg .card-level-badge.card-level-q-purple { background: linear-gradient(135deg, #c471edcc, #a020f0cc) !important; }
+.selected-card.card-item.skin-bg .card-level-badge.card-level-q-blue { background: linear-gradient(135deg, #4fc3f7cc, #4169e1cc) !important; }
+.selected-card.card-item.skin-bg .card-level-badge.card-level-q-engineering { background: linear-gradient(135deg, #ff9800cc, #f57c00cc) !important; }
+.battle-slot.skin-bg .card-level-badge.card-level-q-gold { background: linear-gradient(135deg, #ffd700cc, #ff8c00cc) !important; }
+.battle-slot.skin-bg .card-level-badge.card-level-q-purple { background: linear-gradient(135deg, #c471edcc, #a020f0cc) !important; }
+.battle-slot.skin-bg .card-level-badge.card-level-q-blue { background: linear-gradient(135deg, #4fc3f7cc, #4169e1cc) !important; }
+.battle-slot.skin-bg .card-level-badge.card-level-q-engineering { background: linear-gradient(135deg, #ff9800cc, #f57c00cc) !important; }
 /* 融合卡不再特殊位置，与普通卡统一：左下等级、右下魔化 */
