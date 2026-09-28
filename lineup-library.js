@@ -699,8 +699,21 @@ let _adminVerified=false, _adminLastTok='', _featItems=[], _featData=null, _feat
         if(_adminVerified){ _renderHead(); if(state.tab==='featured') _renderList(); }
         return _adminVerified;
     }
-    async function _featuredLoad(){ const gid=_LL_IDX_GIST; const tok=_llTok(); const tries=tok?[tok,'']:['']; for(let k=0;k<tries.length;k++){ const t=tries[k]; try{ const r=await fetch('https://api.github.com/gists/'+gid,{headers:t?{'Accept':'application/vnd.github.v3+json','Authorization':'token '+t}:{'Accept':'application/vnd.github.v3+json'}}); if(!r.ok) continue; const d=await r.json(); const f=d.files && d.files['featured_lineups.json']; if(!f) return {items:[]}; let txt=f.content; if(f.truncated) txt=await fetch(f.raw_url).then(x=>x.text()); try{ const j=JSON.parse(txt); return (j && Array.isArray(j.items))?j:{items:[]}; }catch(e){ return {items:[]}; } }catch(e){} } return {items:[]}; }
-    async function _featuredSave(items){ if(!await _ensureAdmin()) return false; const tok=_llTok(); if(!tok) return false; try{ const r=await fetch('https://api.github.com/gists/'+_LL_IDX_GIST,{method:'PATCH',headers:{'Accept':'application/vnd.github.v3+json','Content-Type':'application/json','Authorization':'token '+tok},body:JSON.stringify({files:{'featured_lineups.json':{content:JSON.stringify({items:items},null,2)}}})}); return r.ok; }catch(e){ return false; } }
+    async function _featuredGistId(){
+        try{
+            const cfg = (typeof window.getRoomIndexConfig === 'function') ? (await window.getRoomIndexConfig()) : null;
+            const gid = (cfg && cfg.featuredLineupsGistId) || '';
+            if (gid) return gid;
+        }catch(e){}
+        return _LL_IDX_GIST;
+    }
+    async function _featuredLoad(){ const gid=await _featuredGistId(); const tok=_llTok(); const tries=tok?[tok,'']:['']; for(let k=0;k<tries.length;k++){ const t=tries[k]; try{ const r=await fetch('https://api.github.com/gists/'+gid,{headers:t?{'Accept':'application/vnd.github.v3+json','Authorization':'token '+t}:{'Accept':'application/vnd.github.v3+json'}}); if(!r.ok) continue; const d=await r.json(); const f=d.files && d.files['featured_lineups.json']; if(!f) return {items:[]}; let txt=f.content; if(f.truncated) txt=await fetch(f.raw_url).then(x=>x.text()); try{ const j=JSON.parse(txt); return (j && Array.isArray(j.items))?j:{items:[]}; }catch(e){ return {items:[]}; } }catch(e){} } return {items:[]}; }
+    async function _featuredSave(items){ if(!await _ensureAdmin()) return false; const tok=_llTok(); if(!tok) return false; try{
+        const maxItems = 20;
+        if (items.length > maxItems) { items = items.slice(items.length - maxItems); if(typeof showToast==='function') showToast('精选阵容超过 ' + maxItems + ' 条，已自动保留最新的','warn'); }
+        const body = JSON.stringify({ files: { 'featured_lineups.json': { content: JSON.stringify({ items: items }) } } });
+        if (body.length > 950000) { if(typeof showToast==='function') showToast('精选阵容数据过大，保存失败','error'); return false; }
+        const r=await fetch('https://api.github.com/gists/'+await _featuredGistId(),{method:'PATCH',headers:{'Accept':'application/vnd.github.v3+json','Content-Type':'application/json','Authorization':'token '+tok},body:body}); return r.ok; }catch(e){ return false; } }
     function _normPj(pj){ return (pj && pj.project) ? pj.project : (pj || {}); }
     function _featSlug(item){ return 'feat_' + String(item.id || item.name || 'x').replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g,'_'); }
     function _featuredSync(item,pj){ const slug=_featSlug(item); const o=_load(); ['A','B'].forEach(function(ab){ const id=slug+'_'+ab; o['featured']=o['featured']||{}; o['featured'][id]=o['featured'][id]||{}; const slot=o['featured'][id]; const prefix=(ab==='A')?'my_':'teammate_'; const cards=(ab==='A'?pj.myHandCards:pj.teammateHandCards)||[]; const rawSkins=pj.cardSkins||{}; if(!slot.skin || !Object.keys(slot.skin).length){ slot.skin=slot.skin||{}; cards.forEach(function(c){ if(!c||c.id==null) return; const sv=rawSkins[prefix+c.id]; if(c.name&&sv!=null) slot.skin[c.name]=sv; }); } if(!slot.fus || !Object.keys(slot.fus).length){ slot.fus=slot.fus||{}; cards.forEach(function(c){ const nm=(c&&c.name)||''; if(!nm) return; const parts=(window.getFusionParts?window.getFusionParts(nm):null); if(parts&&parts.length>=2) slot.fus[nm]=nm; }); } const ch=(ab==='A'?pj.myChariot:pj.teammateChariot); if(!slot.cart && ch && ch.main) slot.cart=String(ch.main); if(!slot.cart2 && ch && ch.sub) slot.cart2=String(ch.sub); }); const fs=pj.fusionSkins||{}; window.fusionSkins=window.fusionSkins||{}; Object.keys(fs).forEach(function(h){ if(fs[h]!==undefined) window.fusionSkins[h]=fs[h]; }); _save(o); }
@@ -723,7 +736,7 @@ let _adminVerified=false, _adminLastTok='', _featItems=[], _featData=null, _feat
     }
     function _featApplyPub(items,projs){ _featData={items:items,projs:projs}; _featCacheHash=_featHash(JSON.stringify(items)); }
     async function _featuredLoadRaw(){
-        try{ const r=await fetch('https://gist.githubusercontent.com/gyq-svip/'+_LL_IDX_GIST+'/raw/featured_lineups.json',{cache:'no-store'}); if(!r.ok) return null; const txt=await r.text(); try{ const j=JSON.parse(txt); return (j&&Array.isArray(j.items))?j:{items:[]}; }catch(e){ return null; } }catch(e){ return null; }
+        try{ const gid=await _featuredGistId(); const r=await fetch('https://gist.githubusercontent.com/gyq-svip/'+gid+'/raw/featured_lineups.json',{cache:'no-store'}); if(!r.ok) return null; const txt=await r.text(); try{ const j=JSON.parse(txt); return (j&&Array.isArray(j.items))?j:{items:[]}; }catch(e){ return null; } }catch(e){ return null; }
     }
     async function _renderFeatured(force){
         const p=document.getElementById('llList'); if(!p) return;
