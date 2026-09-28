@@ -218,12 +218,27 @@ jobs:
           # 仅提交 sw.js 的 CACHE_VERSION 自增 + app-picker.js 的 SW 注册 ?v= 时间戳（保持源码与部署一致）
           # 🔴 2026-08-30：version.json 的 frontVersion 也要提交回来，否则下次部署基于旧值，
           #    根目录 version.json 与线上脱节 → 远端版本比对永远对不上。
+          # 🔴 2026-09-28 修复：回推前先 pull --rebase 合并远端（手机客户端/其他 push 造成的）最新提交，
+          #    避免 non-fast-forward 被拒（之前这步失败会导致 sw.js 版本号不再递增 → 用户收不到前端更新）。
           git add sw.js app-picker.js version.json
           if git diff --cached --quiet; then
             echo "sw.js 无变化，跳过提交"
             exit 0
           fi
           git commit -m "chore(ci): bump sw.js CACHE_VERSION [skip ci]"
-          git push origin HEAD:main
+          ok=0
+          for i in 1 2 3; do
+            git pull --rebase origin main || { git rebase --abort 2>/dev/null || true; true; }
+            if git push origin HEAD:main; then
+              echo "✅ commit-back pushed (attempt $i)"
+              ok=1
+              break
+            fi
+            echo "push attempt $i 失败，重试…"
+            sleep 6
+          done
+          if [ "$ok" -ne 1 ]; then
+            echo "::warning::commit-back push 仍失败（远端可能存在文件冲突），下次部署会基于旧 CACHE_VERSION 继续。页面已正常发布，不影响本次上线。"
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
