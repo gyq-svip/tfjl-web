@@ -3289,14 +3289,14 @@
   }
   .battle-slot .card-level-badge.card-mohua-icon,
   .selected-card.card-item .card-level-badge.card-mohua-icon {
-    font-size: 0.62rem !important;
-    padding: 0 2px !important;
+    width: 16px !important;
+    height: 16px !important;
   }
 }
 
 
 /* ===================== 等级/魔化角标：统一左下等级、右下魔化（官方式位置） ===================== */
-/* createLevelBadgeHTML 现在输出两个 span：.card-level-number（左下金色盾牌） + .card-mohua-icon（右下红色魔化图标） */
+/* createLevelBadgeHTML 现在输出：.card-level-number（左下金色盾牌） + .card-mohua-icon（右下红色魔化图标 PNG） */
 .card-item .card-level-badge.card-level-number,
 .battle-slot .card-level-badge.card-level-number,
 .selected-card.card-item .card-level-badge.card-level-number,
@@ -3328,19 +3328,15 @@
     left: auto !important;
     right: 2px !important;
     bottom: 2px !important;
-    width: 20px;
-    height: 20px;
-    min-width: 20px;
+    width: 18px;
+    height: 18px;
     padding: 0 !important;
-    display: flex !important;
-    align-items: center;
-    justify-content: center;
-    background: radial-gradient(circle at 30% 30%, #ff6b6b, #c0392b) !important;
-    border: 1.5px solid rgba(255,255,255,0.45) !important;
-    border-radius: 50%;
-    color: #fff !important;
-    font-size: 0.72rem !important;
-    line-height: 1 !important;
+    display: block !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    object-fit: contain;
+    pointer-events: auto;
     z-index: 10;
 }
 /* 融合卡不再特殊位置，与普通卡统一：左下等级、右下魔化 */
