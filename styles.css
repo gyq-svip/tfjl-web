@@ -3291,10 +3291,15 @@
     height: 22px !important;
   }
   .fused-mohua-icon {
-    width: 14px !important;
-    height: 14px !important;
-    left: calc(40% - 11px);
-    top: calc(40% - 11px);
+    position: absolute !important;
+    width: 18px !important;
+    height: 18px !important;
+    left: calc(40% - 14px) !important;
+    top: calc(40% - 14px) !important;
+    object-fit: contain;
+    z-index: 5 !important;
+    pointer-events: none;
+    filter: drop-shadow(0 0 2px rgba(168, 85, 247, 0.9));
   }
 }
 
@@ -3352,9 +3357,9 @@
     left: calc(40% - 14px);
     top: calc(40% - 14px);
     object-fit: contain;
-    z-index: 3;
+    z-index: 5;
     pointer-events: none;
-    filter: drop-shadow(0 0 1px rgba(0,0,0,0.85));
+    filter: drop-shadow(0 0 2px rgba(168, 85, 247, 0.9));
 }
 
 /* 等级徽章背景按卡品质着色（金/紫/蓝/工程），与卡品质保持一致 */
@@ -3362,6 +3367,16 @@
 .card-level-badge.card-level-q-purple { background: linear-gradient(135deg, #c471ed 0%, #a020f0 100%) !important; color: #fff !important; }
 .card-level-badge.card-level-q-blue { background: linear-gradient(135deg, #4fc3f7 0%, #4169e1 100%) !important; color: #fff !important; }
 .card-level-badge.card-level-q-engineering { background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%) !important; color: #1a1a2e !important; }
+
+/* 等级数字加彩色外环，提高辨识度 */
+.card-level-badge.card-level-number {
+    border: 2px solid rgba(255, 255, 255, 0.9) !important;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 0 6px rgba(255, 255, 255, 0.5);
+}
+.card-level-badge.card-level-q-gold.card-level-number { border-color: #ffd700 !important; box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 0 8px #ffd700; }
+.card-level-badge.card-level-q-purple.card-level-number { border-color: #c471ed !important; box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 0 8px #c471ed; }
+.card-level-badge.card-level-q-blue.card-level-number { border-color: #4fc3f7 !important; box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 0 8px #4fc3f7; }
+.card-level-badge.card-level-q-engineering.card-level-number { border-color: #ff9800 !important; box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 0 8px #ff9800; }
 /* 有皮肤时仍保留品质色（覆盖默认半透明黑底） */
 .selected-card.card-item.skin-bg .card-level-badge.card-level-q-gold { background: linear-gradient(135deg, #ffd700cc, #ff8c00cc) !important; }
 .selected-card.card-item.skin-bg .card-level-badge.card-level-q-purple { background: linear-gradient(135deg, #c471edcc, #a020f0cc) !important; }
