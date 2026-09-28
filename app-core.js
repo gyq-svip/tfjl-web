@@ -10395,8 +10395,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const skin = getCardSkin(cardId, cardName, handType);
             const hasMoHua = getCardMoHua(cardId, handType);
             const levelBadge = `<span class="card-level-badge card-level-number" data-card-id="${cardId}" data-card-type="${cardType}" data-hand-type="${handType}" data-card-name="${cardName}" data-skin="${skin}">${level}</span>`;
-            // 使用官方恶魔/鬼面图标（👹），与参考站点红色魔化图标视觉一致
-            const mohuaIcon = hasMoHua ? `<span class="card-level-badge card-mohua-icon" data-card-id="${cardId}" data-card-type="${cardType}" data-hand-type="${handType}" data-card-name="${cardName}" title="已魔化">👹</span>` : '';
+            // 使用用户提供的恶魔/鬼面魔化图标（红色发光风格），尺寸由 CSS 控制在 18px
+            const mohuaIcon = hasMoHua ? `<img class="card-level-badge card-mohua-icon" data-card-id="${cardId}" data-card-type="${cardType}" data-hand-type="${handType}" data-card-name="${cardName}" src="assets/icons/mohua-icon.png" alt="" title="已魔化">` : '';
             return levelBadge + mohuaIcon;
         }
 
