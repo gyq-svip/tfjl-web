@@ -8576,7 +8576,7 @@ function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
 
     // 副卡等级角标（右下角小数字），与主卡等级角标(左上)区分
     let subLv = card.querySelector('.fused-sub-level');
-    if (fusedUrl && _subHero) {
+    if (_subHero && !_subHidden) {
         const lv = (typeof getFusionComponentLevel === 'function') ? getFusionComponentLevel(_subHero) : 1;
         if (!subLv) {
             subLv = document.createElement('div');
@@ -8679,7 +8679,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
     // 副卡等级角标（右下角小数字），与主卡等级角标(左上)区分
     let subLv = slot.querySelector('.fused-sub-level');
-    if (fusedUrl && _slotSub) {
+    if (_slotSub && !_slotSubHidden) {
         const lv = (typeof getFusionComponentLevel === 'function') ? getFusionComponentLevel(_slotSub) : 1;
         if (!subLv) {
             subLv = document.createElement('div');
@@ -10508,11 +10508,13 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const badge = event.target;
             // 重新渲染当前卡（融合副卡魔化/等级/皮肤变更后需要重绘皮肤层）
             function _reapplyCard() {
-                const slotEl = badge.closest('.battle-slot');
+                // updateAllCardLevelBadges 会替换 badge 元素，原 badge 引用可能失效，重新按 cardId 查找
+                const curBadge = document.querySelector(`.card-level-badge[data-card-id="${cardId}"][data-hand-type="${handType}"]`);
+                const slotEl = curBadge ? curBadge.closest('.battle-slot') : null;
                 if (slotEl && typeof applySkinBgToSlot === 'function') {
                     try { applySkinBgToSlot(slotEl, cardName); } catch (e) {}
                 } else {
-                    const handCard = badge.closest('.selected-card.card-item');
+                    const handCard = curBadge ? curBadge.closest('.selected-card.card-item') : null;
                     if (handCard && typeof reapplySingleHandCard === 'function') {
                         try { reapplySingleHandCard(handCard, cardId, handType); } catch (e) {}
                     }
@@ -10654,12 +10656,22 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 subLvTitle.style.cssText = 'color:#4ecdc4;margin:8px 0 4px;font-size:0.78rem;';
                 subLvTitle.textContent = '📊 副卡等级';
                 sec.appendChild(subLvTitle);
+                const subLvWrap = document.createElement('div');
+                subLvWrap.style.cssText = 'display:flex;align-items:center;gap:8px;';
                 const subLvInput = document.createElement('input');
-                subLvInput.type = 'number'; subLvInput.min = '1'; subLvInput.max = '30';
-                subLvInput.value = String((typeof getFusionComponentLevel === 'function') ? getFusionComponentLevel(_subHero) : 1);
-                subLvInput.style.cssText = 'width:60px;padding:4px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;';
-                subLvInput.onchange = () => { if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(_subHero, subLvInput.value); updateAllCardLevelBadges(); _reapplyCard(); };
-                sec.appendChild(subLvInput);
+                subLvInput.type = 'range'; subLvInput.min = '0'; subLvInput.max = String(Math.max(0, levels.length - 1)); subLvInput.step = '1';
+                const subLvIndex = Math.max(0, levels.indexOf((typeof getFusionComponentLevel === 'function') ? getFusionComponentLevel(_subHero) : 1));
+                subLvInput.value = String(subLvIndex);
+                subLvInput.style.cssText = 'flex:1;accent-color:#4ecdc4;';
+                const subLvVal = document.createElement('span');
+                subLvVal.id = 'csSubLvVal';
+                subLvVal.textContent = String(levels[subLvIndex]);
+                subLvVal.style.cssText = 'min-width:28px;text-align:right;color:#4ecdc4;font-weight:600;';
+                subLvInput.oninput = () => { subLvVal.textContent = String(levels[Number(subLvInput.value)]); };
+                subLvInput.onchange = () => { if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(_subHero, levels[Number(subLvInput.value)]); updateAllCardLevelBadges(); _reapplyCard(); };
+                subLvWrap.appendChild(subLvInput);
+                subLvWrap.appendChild(subLvVal);
+                sec.appendChild(subLvWrap);
 
                 const subMhTitle = document.createElement('div');
                 subMhTitle.style.cssText = 'color:#a855f7;margin:8px 0 4px;font-size:0.78rem;';
