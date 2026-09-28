@@ -16060,22 +16060,23 @@ function getMessagesGistUrl() {
     return `https://api.github.com/gists/${gistId}`;
 }
 
-// Gist Token 管理 - 优先部署注入的硬编码 Token（GitHub Actions 部署时把占位符替换为真实 Token）；
-// 其次 localStorage（用户手动填写/本地开发）；最后复用父窗口注入（iframe 内嵌）。
-// 安全说明：git 仓库内只有占位符 'YOUR_GITHUB_TOKEN_HERE'，真实 Token 由 deploy.yml 注入到 _site/，不进版本库。
+// Gist Token 管理 - 2026-09-28 改为：优先 localStorage（管理员手动填写），其次才是硬编码占位符（已废弃注入）。
+// 原因：deploy.yml 以前会把 secrets.GIST_TOKEN 注入到前端 JS，导致任何访问者都能 F12 拿到 token 并篡改 Gist。
+// 安全说明：git 仓库内只保留占位符 'YOUR_GITHUB_TOKEN_HERE'，线上不会再被替换为真实 Token。
 const GIST_TOKEN_KEY = 'TFJL_Gist_Token';
 var _tokenDiagShown = false;
 function getGistToken() {
-    // 优先使用部署注入的硬编码 Token（deploy.yml 的 Inject Token 步骤会把下方占位符替换为 secrets.GIST_TOKEN）
+    // 1) 优先读 localStorage（管理员在当前设备上填的 token，不随页面发布）
+    try { const ls = localStorage.getItem(GIST_TOKEN_KEY); if (ls && ls.length > 10 && !ls.startsWith('YOUR_')) return ls; } catch (e) {}
+
+    // 2) 兼容旧版：如果前端仍被注入过真实 token（旧部署缓存），也允许使用；
+    //    但 localStorage 优先级更高，这样管理员可以立刻覆盖已泄露的旧 token，无需等重新部署。
     const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
     if (HARDCODED_TOKEN && HARDCODED_TOKEN.length > 20 && HARDCODED_TOKEN.startsWith('ghp_')) {
         return HARDCODED_TOKEN;
     }
 
-    // 其次从 localStorage 读取（本地开发/用户手动填写时使用，iframe 同域共享）
-    try { const ls = localStorage.getItem(GIST_TOKEN_KEY); if (ls) return ls; } catch (e) {}
-
-    // iframe 内嵌时，复用父窗口（首页）已注入的真实 token（兜底，避免子页 token 为空）
+    // 3) iframe 内嵌时，复用父窗口（首页）已缓存的 token
     try {
         if (window.parent && window.parent !== window && typeof window.parent.getGistToken === 'function') {
             const pt = window.parent.getGistToken();
@@ -16083,14 +16084,11 @@ function getGistToken() {
         }
     } catch (e) {}
 
-    // 🔴 诊断：部署注入的 HARDCODED_TOKEN 仍是占位符 → 多为「浏览器缓存了旧版 app-core.js」或「部署未注入 secret」。
-    // 提示用户强刷，避免误以为代码 bug 而焦虑数据丢失（实际本地 localStorage 仍兜底，不会丢）。
     if (!_tokenDiagShown) {
         _tokenDiagShown = true;
         if (HARDCODED_TOKEN.indexOf('YOUR_') === 0) {
-            console.error('[GIST] 未读到 Token：当前 app-core.js 仍是部署占位符版（HARDCODED_TOKEN 未注入）。' +
-                '通常是浏览器缓存了旧版本，请 Ctrl+F5 强刷；若强刷后仍如此，检查仓库 Secrets.GIST_TOKEN 是否已设置。' +
-                '（注意：本地数据仍在 localStorage，不会因无 Token 而丢失）');
+            console.error('[GIST] 未读到有效 Token：前端已无部署注入，请在系统设置里填写 Gist Token（会存在当前设备 localStorage）。' +
+                '后端工作流仍使用仓库 Secrets.GIST_TOKEN，不受影响。');
         }
     }
 
@@ -28522,18 +28520,33 @@ ${maSection}
                 const url = await getIndexGistUrl();
                 const token = getGistToken();
                 const r = await fetch(url, { headers: { 'Accept': 'application/vnd.github.v3+json', ...(token ? { 'Authorization': 'token ' + token } : {}) } });
-                if (!r.ok) return {};
+                if (!r.ok) {
+                    console.warn('[room_index] 读取索引 Gist 失败 HTTP', r.status);
+                    return {};
+                }
                 const d = await r.json();
                 const f = d.files && d.files['room_index.json'];
-                if (f && f.content) { try { return JSON.parse(f.content) || {}; } catch (e) { return {}; } }
-            } catch (e) {}
+                if (f && typeof f.content === 'string') {
+                    const c = f.content.trim();
+                    if (!c) {
+                        console.warn('[room_index] room_index.json 内容为空，当作空对象处理');
+                        return {};
+                    }
+                    try { return JSON.parse(c) || {}; } catch (e) {
+                        console.error('[room_index] JSON 解析失败，内容片段:', c.slice(0, 120), e);
+                        throw new Error('room_index.json 内容已损坏（不是合法 JSON），请手动修复索引 Gist');
+                    }
+                }
+            } catch (e) {
+                if (e && e.message && e.message.indexOf('Unexpected end') !== -1) throw e;
+            }
             return {};
         }
 
         // 写入索引 Gist 的 room_index.json 多个字段（一次 GET + 一次 PATCH；Gist 请求很贵，能合并就合并）
         async function setRoomIndexConfigFields(obj) {
             const token = getGistToken();
-            if (!token) throw new Error('无Token');
+            if (!token || token.indexOf('YOUR_') === 0) throw new Error('未配置 Gist Token（请在系统设置/Token 页填写）');
             const url = await getIndexGistUrl();
             const cur = await getRoomIndexConfig();
             Object.assign(cur, obj || {});
@@ -28542,7 +28555,19 @@ ${maSection}
                 headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
                 body: JSON.stringify({ files: { 'room_index.json': { content: JSON.stringify(cur, null, 2) } } })
             });
-            if (!r.ok) throw new Error('写回失败(' + r.status + ')');
+            if (!r.ok) {
+                let detail = '';
+                try {
+                    const text = await r.text();
+                    detail = text ? (' | ' + text.slice(0, 200)) : '';
+                } catch (e) {}
+                let hint = '';
+                if (r.status === 401) hint = 'Token 无效、过期或被撤销';
+                else if (r.status === 403) hint = 'Token 无 gist 写权限';
+                else if (r.status === 404) hint = '索引 Gist 不存在';
+                else if (r.status === 422) hint = '请求格式错误/内容非法';
+                throw new Error(`写回失败 HTTP ${r.status}${hint ? '（' + hint + '）' : ''}${detail}`);
+            }
             return cur;
         }
         // 写入索引 Gist 的 room_index.json 某个字段（远程开关用；内部走多字段版）
