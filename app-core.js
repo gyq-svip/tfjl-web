@@ -28699,38 +28699,75 @@ ${maSection}
             return {};
         }
 
-        // 写入索引 Gist 的 room_index.json 多个字段（一次 GET + 一次 PATCH；Gist 请求很贵，能合并就合并）
-        async function setRoomIndexConfigFields(obj) {
+        // 写入索引 Gist 的 room_index.json 多个字段（串行队列 + 重试，防止多客户端/多模块并发覆盖）
+        let _roomIndexWriteQueue = Promise.resolve();
+        async function _doSetRoomIndexConfigFields(obj) {
             const token = getGistToken();
             if (!token || token.indexOf('YOUR_') === 0) throw new Error('未配置 Gist Token（请在系统设置/Token 页填写）');
             const url = await getIndexGistUrl();
-            const cur = await getRoomIndexConfig();
-            Object.assign(cur, obj || {});
-            const r = await fetch(url, {
-                method: 'PATCH',
-                headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
-                body: JSON.stringify({ files: { 'room_index.json': { content: JSON.stringify(cur, null, 2) } } })
-            });
-            if (!r.ok) {
-                let detail = '';
+
+            // 写前再 GET 一次最新内容（不用缓存），避免覆盖别人刚写的字段
+            let cur = {};
+            const readR = await fetch(url, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': 'token ' + token } });
+            if (readR.ok) {
                 try {
-                    const text = await r.text();
-                    detail = text ? (' | ' + text.slice(0, 200)) : '';
-                } catch (e) {}
-                let hint = '';
-                if (r.status === 401) hint = 'Token 无效、过期或被撤销';
-                else if (r.status === 403) hint = 'Token 无 gist 写权限';
-                else if (r.status === 404) hint = '索引 Gist 不存在';
-                else if (r.status === 422) hint = '请求格式错误/内容非法';
-                throw new Error(`写回失败 HTTP ${r.status}${hint ? '（' + hint + '）' : ''}${detail}`);
+                    const d = await readR.json();
+                    const c = d.files && d.files['room_index.json'] && d.files['room_index.json'].content;
+                    if (c && c.trim()) cur = JSON.parse(c);
+                } catch (e) {
+                    console.warn('[room_index] 写前读取解析失败，将基于空对象写入:', e);
+                }
+            } else if (readR.status !== 404) {
+                throw new Error(`写前读取失败 HTTP ${readR.status}，中止写入以防覆盖数据`);
             }
-            return cur;
+
+            Object.assign(cur, obj || {});
+            const body = JSON.stringify({ files: { 'room_index.json': { content: JSON.stringify(cur, null, 2) } } });
+
+            let lastErr = null;
+            for (let i = 0; i < 3; i++) {
+                try {
+                    const r = await fetch(url, {
+                        method: 'PATCH',
+                        headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
+                        body: body
+                    });
+                    if (r.ok) return cur;
+                    lastErr = r.status;
+                    let detail = '';
+                    try { const text = await r.text(); detail = text ? (' | ' + text.slice(0, 200)) : ''; } catch (e) {}
+                    let hint = '';
+                    if (r.status === 401) hint = 'Token 无效、过期或被撤销';
+                    else if (r.status === 403) hint = 'Token 无 gist 写权限';
+                    else if (r.status === 404) hint = '索引 Gist 不存在';
+                    else if (r.status === 422) hint = '请求格式错误/内容非法';
+                    if (r.status === 401 || r.status === 403 || r.status === 404) {
+                        throw new Error(`写回失败 HTTP ${r.status}${hint ? '（' + hint + '）' : ''}${detail}`);
+                    }
+                    await new Promise(res => setTimeout(res, 600 * (i + 1)));
+                } catch (e) {
+                    if (e && e.message && e.message.indexOf('写回失败') !== -1) throw e;
+                    lastErr = e && e.message ? e.message : e;
+                    await new Promise(res => setTimeout(res, 500));
+                }
+            }
+            throw new Error(`写回失败，重试 3 次仍未成功：${lastErr}`);
+        }
+        function setRoomIndexConfigFields(obj) {
+            _roomIndexWriteQueue = _roomIndexWriteQueue.catch(() => {}).then(() => _doSetRoomIndexConfigFields(obj));
+            return _roomIndexWriteQueue;
         }
         // 写入索引 Gist 的 room_index.json 某个字段（远程开关用；内部走多字段版）
         async function setRoomIndexConfigField(field, value) {
             const o = {}; o[field] = value;
             return setRoomIndexConfigFields(o);
         }
+        // 暴露给其它模块（app-features.js 等），避免各自独立写 room_index 导致互相覆盖
+        try {
+            window.getRoomIndexConfig = getRoomIndexConfig;
+            window.setRoomIndexConfigFields = setRoomIndexConfigFields;
+            window.setRoomIndexConfigField = setRoomIndexConfigField;
+        } catch (e) {}
 
         // 把 desc 里的 HTML 标签剥离为纯文本，供 title 悬浮说明使用（避免 <br> 等被当字面量显示）
         function _stripHtml(s) { return String(s || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/\n+/g, '\n').trim(); }
