@@ -14678,12 +14678,26 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (openHdr) { const sec = openHdr.closest('.collapsible-section'); if (sec) positionPoolPanel(sec); }
             positionPoolDock();
         });
-        // 停靠栏顶部锚到「出战选择/卡槽区」顶部之下，底部不够放时内部滚动（紫卡/蓝卡/绿卡不再被截断）
+        // 停靠栏位置：用户拖动后写入 localStorage，优先用记忆位置（避免被下面的自动重锚覆盖）
+        let poolDockUserPos = null;
+        try { const _p = localStorage.getItem('tdjl_pool_dock_pos'); if (_p) poolDockUserPos = JSON.parse(_p); } catch (e) {}
         function positionPoolDock() {
             try {
                 const dock = document.getElementById('poolTabBar');
+                if (!dock) return;
+                // 有记忆位置：直接应用，保持可拖动的自由摆放（不再强制锚到战斗区顶部）
+                if (poolDockUserPos && poolDockUserPos.top != null) {
+                    const top = Math.max(4, Math.min(window.innerHeight - 40, poolDockUserPos.top));
+                    const left = (poolDockUserPos.left != null) ? Math.max(0, Math.min(window.innerWidth - 40, poolDockUserPos.left)) : 8;
+                    dock.style.top = top + 'px';
+                    dock.style.left = left + 'px';
+                    dock.style.transform = 'none';
+                    dock.style.maxHeight = 'calc(100vh - ' + (top + 12) + 'px)';
+                    dock.style.overflowY = 'auto';
+                    return;
+                }
                 const bf = document.querySelector('.battle-field');
-                if (!dock || !bf) return;
+                if (!bf) return;
                 const top = Math.max(60, Math.round(bf.getBoundingClientRect().top));
                 dock.style.top = top + 'px';
                 dock.style.transform = 'none';
@@ -14692,6 +14706,47 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             } catch (e) {}
         }
         window.positionPoolDock = positionPoolDock;
+
+        // ===== 卡池停靠栏可拖动（手机端固定位置够不到，拖动到任意位置并记忆）=====
+        function initPoolDockDrag() {
+            try {
+                const dock = document.getElementById('poolTabBar');
+                const grip = dock && dock.querySelector('.pool-dock-grip');
+                if (!dock || !grip) return;
+                let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+                const onDown = function (e) {
+                    dragging = true;
+                    sx = e.clientX; sy = e.clientY;
+                    const r = dock.getBoundingClientRect();
+                    ox = r.left; oy = r.top;
+                    dock.style.transition = 'none';
+                    try { grip.setPointerCapture(e.pointerId); } catch (err) {}
+                    e.preventDefault();
+                };
+                const onMove = function (e) {
+                    if (!dragging) return;
+                    let nx = ox + (e.clientX - sx);
+                    let ny = oy + (e.clientY - sy);
+                    nx = Math.max(0, Math.min(window.innerWidth - dock.offsetWidth, nx));
+                    ny = Math.max(0, Math.min(window.innerHeight - 24, ny));
+                    dock.style.left = nx + 'px';
+                    dock.style.top = ny + 'px';
+                    dock.style.transform = 'none';
+                };
+                const onUp = function (e) {
+                    if (!dragging) return;
+                    dragging = false;
+                    try { grip.releasePointerCapture(e.pointerId); } catch (err) {}
+                    poolDockUserPos = { left: parseInt(dock.style.left, 10) || 8, top: parseInt(dock.style.top, 10) || 8 };
+                    try { localStorage.setItem('tdjl_pool_dock_pos', JSON.stringify(poolDockUserPos)); } catch (err) {}
+                };
+                grip.addEventListener('pointerdown', onDown);
+                grip.addEventListener('pointermove', onMove);
+                grip.addEventListener('pointerup', onUp);
+                grip.addEventListener('pointercancel', onUp);
+            } catch (e) {}
+        }
+        window.initPoolDockDrag = initPoolDockDrag;
 
         // 🔴 2026-09-18 滚动下限钳制【已整体移除】：事件钳制在真实环境（sticky 头部 + 滚动容器 + 惯性滚动）
         //    下必然出现「滚不动 / 反复跳」。改为结构性方案——styles.css 直接 display:none 掉 #fixedHeader
@@ -15355,6 +15410,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             // 布局稳定后把停靠栏/卡框锚到卡槽区（字体加载会改变高度，延迟两次校准）
             setTimeout(function () { if (typeof positionPoolDock === 'function') positionPoolDock(); }, 200);
             setTimeout(function () { if (typeof positionPoolDock === 'function') positionPoolDock(); }, 900);
+            // 初始化卡池停靠栏拖动（手机端固定位置够不到时可自由拖动并记忆）
+            setTimeout(function () { if (typeof initPoolDockDrag === 'function') initPoolDockDrag(); }, 300);
 
             // 恢复记事本折叠状态
             const notepadOpen = localStorage.getItem('tdjl_notepad_open');
