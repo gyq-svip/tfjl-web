@@ -10389,20 +10389,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
         }
 
-        // 创建等级徽章HTML（等级 / 魔化拆分，融合卡角标位置不同）
+        // 创建等级徽章HTML：左下角等级（金色盾牌），右下角魔化（官方恶魔图标）；融合卡与普通卡统一位置
         function createLevelBadgeHTML(cardId, cardType, handType = 'my', cardName = '') {
             const level = getCardLevel(cardId, cardType, handType);
             const skin = getCardSkin(cardId, cardName, handType);
             const hasMoHua = getCardMoHua(cardId, handType);
-            const hasCustomSkin = skin !== '默认';
-            let skinClass = '';
-            if (hasCustomSkin && hasMoHua) skinClass = 'has-skin has-mohua';
-            else if (hasCustomSkin) skinClass = 'has-skin';
-            else if (hasMoHua) skinClass = 'has-mohua';
-            const parts = (typeof getFusionParts === 'function') ? getFusionParts(cardName) : null;
-            const isFusion = !!(parts && parts.length >= 2);
-            const levelBadge = `<span class="card-level-badge card-level-number ${skinClass}${isFusion ? ' card-level-fusion' : ''}" data-card-id="${cardId}" data-card-type="${cardType}" data-hand-type="${handType}" data-card-name="${cardName}" data-skin="${skin}">${level}</span>`;
-            const mohuaIcon = hasMoHua ? `<span class="card-level-badge card-mohua-icon${isFusion ? ' card-mohua-fusion' : ''}" data-card-id="${cardId}" data-card-type="${cardType}" data-hand-type="${handType}" data-card-name="${cardName}" title="已魔化">🔮</span>` : '';
+            const levelBadge = `<span class="card-level-badge card-level-number" data-card-id="${cardId}" data-card-type="${cardType}" data-hand-type="${handType}" data-card-name="${cardName}" data-skin="${skin}">${level}</span>`;
+            // 使用官方恶魔/鬼面图标（👹），与参考站点红色魔化图标视觉一致
+            const mohuaIcon = hasMoHua ? `<span class="card-level-badge card-mohua-icon" data-card-id="${cardId}" data-card-type="${cardType}" data-hand-type="${handType}" data-card-name="${cardName}" title="已魔化">👹</span>` : '';
             return levelBadge + mohuaIcon;
         }
 
@@ -10495,7 +10489,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (canMoHua) {
                 const mohuaTitle = document.createElement('div');
                 mohuaTitle.style.cssText = 'color:#a855f7;font-size:0.75rem;padding:5px 10px;border-top:1px solid rgba(255,255,255,0.1);margin-top:5px;border-bottom:1px solid rgba(255,255,255,0.1);';
-                mohuaTitle.textContent = '🔮 魔化';
+                mohuaTitle.textContent = '👹 魔化';
                 dropdown.appendChild(mohuaTitle);
                 
                 const mohuaItem = document.createElement('div');
@@ -11111,7 +11105,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (canMoHua) {
                 const mohuaTitle = document.createElement('div');
                 mohuaTitle.style.cssText = 'color:#a855f7;font-size:0.75rem;padding:5px 10px;border-top:1px solid rgba(255,255,255,0.1);margin-top:5px;border-bottom:1px solid rgba(255,255,255,0.1);';
-                mohuaTitle.textContent = '🔮 魔化';
+                mohuaTitle.textContent = '👹 魔化';
                 dropdown.appendChild(mohuaTitle);
                 
                 const mohuaItem = document.createElement('div');

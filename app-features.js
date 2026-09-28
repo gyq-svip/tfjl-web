@@ -9569,8 +9569,8 @@
                     slot: prefix + i,
                     name: (nameEl && nameEl.dataset && nameEl.dataset.fullName) || (nameEl ? nameEl.textContent : ''),
                     display: nameEl ? nameEl.textContent : '',
-                    level: badgeTxt.replace('🔮', '').trim(),
-                    mohua: badgeTxt.indexOf('🔮') >= 0 || !!slot.querySelector('.card-mohua-icon'),
+                    level: badgeTxt.replace('👹', '').trim(),
+                    mohua: badgeTxt.indexOf('👹') >= 0 || !!slot.querySelector('.card-mohua-icon'),
                     skin: (badge && badge.dataset && badge.dataset.skin) || '',
                     prof: slot.dataset.profession || '',
                     eng: slot.dataset.type === 'engineering',
@@ -9597,8 +9597,8 @@
                     slot: 'h',
                     name: (nameEl && nameEl.dataset && nameEl.dataset.fullName) || (nameEl ? nameEl.textContent : ''),
                     display: nameEl ? nameEl.textContent : '',
-                    level: badgeTxt.replace('🔮', '').trim(),
-                    mohua: badgeTxt.indexOf('🔮') >= 0 || !!el.querySelector('.card-mohua-icon'),
+                    level: badgeTxt.replace('👹', '').trim(),
+                    mohua: badgeTxt.indexOf('👹') >= 0 || !!el.querySelector('.card-mohua-icon'),
                     skin: (badge && badge.dataset && badge.dataset.skin) || '',
                     prof: el.dataset.profession || '',
                     eng: el.dataset.engineering === 'true',
@@ -9703,7 +9703,7 @@
             }
             // 等级徽章：右上角（有皮肤=彩色渐变，与 UI has-skin 一致）
             if (card.level) {
-                const txt = String(card.level) + (card.mohua ? '🔮' : '');
+                const txt = String(card.level) + (card.mohua ? '👹' : '');
                 ctx.font = 'bold ' + Math.max(10, Math.round(14 * s)) + 'px "Microsoft YaHei", sans-serif';
                 const bw = Math.max(24, ctx.measureText(txt).width + 10 * s);
                 const bx = x + w - bw - Math.max(3, 4 * s), by = y + Math.max(3, 4 * s), bh = Math.max(15, Math.round(22 * s));
