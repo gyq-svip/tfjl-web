@@ -10528,9 +10528,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const currentMoHua = getCardMoHua(cardId, handType);
             const canMoHua = hasMoHuaData(cardName);
             const fusionParts = (typeof getFusionParts === 'function') ? getFusionParts(cardName) : null;
-            const isFusion = !!(fusionParts && fusionParts.length >= 2);
-            const subHero = isFusion ? fusionParts[1] : '';
-            const baseHero = isFusion ? fusionParts[0] : ((typeof getBaseHeroName === 'function') ? getBaseHeroName(cardName).heroName : cardName);
+            let isFusion = !!(fusionParts && fusionParts.length >= 2);
+            let subHero = isFusion ? fusionParts[1] : '';
+            let baseHero = isFusion ? fusionParts[0] : ((typeof getBaseHeroName === 'function') ? getBaseHeroName(cardName).heroName : cardName);
             const variants = (typeof getFusionVariantsForBase === 'function') ? getFusionVariantsForBase(baseHero) : [];
             const hasVariants = variants.length > 0;
 
@@ -10704,19 +10704,19 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     b.dataset.value = opt;
                     b.textContent = label;
                     b.style.cssText = 'padding:4px 8px;border-radius:7px;border:1px solid ' + (sel ? '#60a5fa' : 'rgba(255,255,255,0.2)') + ';background:' + (sel ? '#60a5fa' : 'transparent') + ';color:' + (sel ? '#1a1a2e' : '#fff') + ';cursor:pointer;font-size:0.76rem;font-weight:' + (sel ? '600' : '400') + ';';
-                    b.onclick = () => {
+                    b.onclick = async () => {
                         const pick = b.dataset.value;
                         // 直接改名即可：槽位用现有 upgradeCardToFusion；手牌直接改手牌数组 + 原地重绘
                         const slotEl = badge.closest('.battle-slot');
                         if (slotEl && typeof upgradeCardToFusion === 'function') {
-                            upgradeCardToFusion(slotEl, pick);
+                            await upgradeCardToFusion(slotEl, pick);
                         } else {
                             const handArr = (handType === 'my') ? myHandCards : teammateHandCards;
                             const hc = handArr && handArr.find(c => c.id === cardId);
                             if (hc) hc.name = pick;
                             const handCard = badge.closest('.selected-card.card-item');
                             if (handCard) { handCard.dataset.name = pick; }
-                            if (typeof reapplySingleHandCard === 'function' && handCard) { reapplySingleHandCard(handCard, cardId, handType); }
+                            if (typeof reapplySingleHandCard === 'function' && handCard) { await reapplySingleHandCard(handCard, cardId, handType); }
                             if (typeof autoSaveProject === 'function') autoSaveProject();
                         }
                         // 刷新弹窗状态，不关闭
@@ -10726,6 +10726,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         subHero = isFusion ? newParts[1] : '';
                         baseHero = isFusion ? newParts[0] : ((typeof getBaseHeroName === 'function') ? getBaseHeroName(cardName).heroName : cardName);
                         title.querySelector('span').textContent = '⚙️ ' + (cardName || cardId);
+                        // 刷新变体按钮选中态
+                        fvWrap.querySelectorAll('button').forEach(x => {
+                            const selected = x.dataset.value === cardName;
+                            x.style.borderColor = selected ? '#60a5fa' : 'rgba(255,255,255,0.2)';
+                            x.style.background = selected ? '#60a5fa' : 'transparent';
+                            x.style.color = selected ? '#1a1a2e' : '#fff';
+                            x.style.fontWeight = selected ? '600' : '400';
+                        });
                         renderFusionSubSection(box, cardName);
                         updateAllCardLevelBadges();
                         _reapplyCard();
