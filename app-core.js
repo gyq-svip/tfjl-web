@@ -7869,6 +7869,9 @@
         // 🔴 必须挂在 window 上：setFusionSkin/getFusionComponentSkin 等读写都用 window.fusionSkins，
         //    若这里用 `let` 声明会变成「块级变量 ≠ window.fusionSkins」两个对象，导致保存的永远是空对象、刷新后副卡皮丢失。
         window.fusionSkins = window.fusionSkins || {};
+        // 被融合卡（副卡）等级/魔化 存储（全局 localStorage，独立于项目）{ "副卡英雄名": 等级 / true }
+        window.fusionLevels = JSON.parse((function(){ try { return localStorage.getItem('tdjl_fusion_levels') || '{}'; } catch(e){ return '{}'; } })());
+        window.fusionMoHua = JSON.parse((function(){ try { return localStorage.getItem('tdjl_fusion_mohua') || '{}'; } catch(e){ return '{}'; } })());
         let defaultCardSkins = {}; // 全局默认皮肤（英雄级，卡池常用皮，跨项目保留）{ "47": "太平乐·火灵", ... }
         let cardMoHua = {}; // 每张卡的魔化开关 { "my_47": true, ... }
         // 🔁 当前项目「已保存」皮肤快照：setCardSkin 会即时落盘，故「放弃修改」需主动把卡牌/副卡皮肤回滚到切换前状态
@@ -8552,10 +8555,13 @@ function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
         overlay.remove();
     }
 
-    // 副卡魔化角标：主卡已魔化时，副卡右下角也叠一个小魔化图标（尺寸由 CSS .fused-mohua-icon 控制）
+    // 副卡魔化角标：仅在「主卡已魔化 且 副卡自身开启魔化」时显示（规则：主卡没魔化则副卡魔化无效）
+    const _handName = (card && card.getAttribute) ? (card.getAttribute('data-name') || (card.dataset && card.dataset.name) || '') : '';
+    const _handParts = (typeof getFusionParts === 'function') ? getFusionParts(_handName) : null;
+    const _subHero = (_handParts && _handParts.length >= 2) ? _handParts[1] : '';
+    const _subMhOn = !!card.querySelector('.card-mohua-icon') && !!fusedUrl && _subHero && (typeof getFusionComponentMoHua === 'function') && getFusionComponentMoHua(_subHero);
     let fm = card.querySelector('.fused-mohua-icon');
-    const mainMohua = !!card.querySelector('.card-mohua-icon');
-    if (mainMohua && fusedUrl) {
+    if (_subMhOn) {
         if (!fm) {
             fm = document.createElement('img');
             fm.className = 'fused-mohua-icon';
@@ -8565,6 +8571,21 @@ function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
         }
     } else if (fm && fm.parentNode) {
         fm.remove();
+    }
+
+    // 副卡等级角标（右下角小数字），与主卡等级角标(左上)区分
+    let subLv = card.querySelector('.fused-sub-level');
+    if (fusedUrl && _subHero) {
+        const lv = (typeof getFusionComponentLevel === 'function') ? getFusionComponentLevel(_subHero) : 1;
+        if (!subLv) {
+            subLv = document.createElement('div');
+            subLv.className = 'fused-sub-level';
+            subLv.style.cssText = 'position:absolute;right:1px;bottom:1px;background:rgba(0,0,0,0.7);color:#4ecdc4;border:1px solid #4ecdc4;border-radius:6px;font-size:0.6rem;line-height:1;padding:1px 4px;z-index:6;pointer-events:none;';
+            card.appendChild(subLv);
+        }
+        subLv.textContent = lv;
+    } else if (subLv && subLv.parentNode) {
+        subLv.remove();
     }
 }
 
@@ -8635,10 +8656,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         overlay.remove();
     }
 
-    // 副卡魔化角标：主卡已魔化时，副卡右下角也叠一个小魔化图标（尺寸由 CSS .fused-mohua-icon 控制）
-    let fm = slot.querySelector('.fused-mohua-icon');
+    // 副卡魔化角标：仅在「主卡已魔化 且 副卡自身开启魔化」时显示（规则：主卡没魔化则副卡魔化无效）
+    const _slotName = (slot.querySelector('.card-item') && (slot.querySelector('.card-item').getAttribute('data-name') || (slot.querySelector('.card-item').dataset && slot.querySelector('.card-item').dataset.name))) || (slot.getAttribute('data-name') || '') || '';
+    const _slotParts = (typeof getFusionParts === 'function') ? getFusionParts(_slotName) : null;
+    const _slotSub = (_slotParts && _slotParts.length >= 2) ? _slotParts[1] : '';
     const mainMohua = !!slot.querySelector('.card-mohua-icon');
-    if (mainMohua && fusedUrl) {
+    const _slotSubMhOn = mainMohua && !!fusedUrl && _slotSub && (typeof getFusionComponentMoHua === 'function') && getFusionComponentMoHua(_slotSub);
+    let fm = slot.querySelector('.fused-mohua-icon');
+    if (_slotSubMhOn) {
         if (!fm) {
             fm = document.createElement('img');
             fm.className = 'fused-mohua-icon';
@@ -8648,6 +8673,21 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         }
     } else if (fm && fm.parentNode) {
         fm.remove();
+    }
+
+    // 副卡等级角标（右下角小数字），与主卡等级角标(左上)区分
+    let subLv = slot.querySelector('.fused-sub-level');
+    if (fusedUrl && _slotSub) {
+        const lv = (typeof getFusionComponentLevel === 'function') ? getFusionComponentLevel(_slotSub) : 1;
+        if (!subLv) {
+            subLv = document.createElement('div');
+            subLv.className = 'fused-sub-level';
+            subLv.style.cssText = 'position:absolute;right:1px;bottom:1px;background:rgba(0,0,0,0.7);color:#4ecdc4;border:1px solid #4ecdc4;border-radius:6px;font-size:0.6rem;line-height:1;padding:1px 4px;z-index:6;pointer-events:none;';
+            slot.appendChild(subLv);
+        }
+        subLv.textContent = lv;
+    } else if (subLv && subLv.parentNode) {
+        subLv.remove();
     }
 
     if (mainUrl || fusedUrl) slot.classList.add('skin-bg');
@@ -10116,6 +10156,29 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (typeof persistFusionSkins === 'function') await persistFusionSkins();
             if (typeof autoSaveProject === 'function') autoSaveProject();
         }
+        // 被融合卡（副卡）等级：全局存储（与 fusionSkins 对称，但独立于项目）
+        function getFusionComponentLevel(heroName) {
+            return (window.fusionLevels && window.fusionLevels[heroName] !== undefined) ? Number(window.fusionLevels[heroName]) : 1;
+        }
+        function setFusionComponentLevel(heroName, level) {
+            if (!heroName) return;
+            if (typeof window.fusionLevels === 'undefined') window.fusionLevels = {};
+            window.fusionLevels[heroName] = Number(level) || 1;
+            try { localStorage.setItem('tdjl_fusion_levels', JSON.stringify(window.fusionLevels)); } catch (e) {}
+            if (typeof autoSaveProject === 'function') autoSaveProject();
+        }
+        // 被融合卡（副卡）魔化：仅当主卡已魔化时才允许开启；全局存储
+        function getFusionComponentMoHua(heroName) {
+            return !!(window.fusionMoHua && window.fusionMoHua[heroName] === true);
+        }
+        function setFusionComponentMoHua(heroName, enabled) {
+            if (!heroName) return;
+            if (typeof window.fusionMoHua === 'undefined') window.fusionMoHua = {};
+            if (enabled) window.fusionMoHua[heroName] = true;
+            else delete window.fusionMoHua[heroName];
+            try { localStorage.setItem('tdjl_fusion_mohua', JSON.stringify(window.fusionMoHua)); } catch (e) {}
+            if (typeof autoSaveProject === 'function') autoSaveProject();
+        }
         // 立即把副卡皮肤偏好落盘到当前项目记录（与 persistProjectSkins 对称）
         async function persistFusionSkins() {
             if (typeof window.fusionSkins === 'undefined') window.fusionSkins = {};
@@ -10432,146 +10495,189 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         }
 
         // 显示等级下拉选择器
+        // 🔴 2026-09-28：角标点击弹出的「一窗搞定」卡片设置面板
+        // 含：等级(进度条) / 皮肤 / 主卡魔化 / 融合副卡(皮肤+等级+魔化，副卡魔化需主卡先开) / 减伤值(同步减伤记录表)
         function showLevelDropdown(event, cardId, cardType, handType = 'my', cardName = '') {
             event.stopPropagation();
             event.preventDefault();
-            // 判断右键的卡属于「项目上阵卡」还是「卡池/收藏定义卡」：
-            // 手牌容器/战斗槽内 → 选皮肤=当前阵容(project)；卡池/收藏内 → 选皮肤=全局默认(default)
+            // 判断卡的归属：手牌/战斗槽内=项目范围(project)；卡池/收藏内=全局默认(default)
             const _scopeEl = (event.target && event.target.closest) ? event.target.closest('#myHandContainer, #teammateHandContainer, .battle-slot') : null;
             const isProjectScope = !!_scopeEl;
-
-            // 移除已存在的下拉框
-            document.querySelectorAll('.level-dropdown').forEach(el => el.remove());
-
             const badge = event.target;
+            // 关闭已有弹窗
+            document.querySelectorAll('.card-settings-popup-root').forEach(el => el.remove());
+
             const levels = getAvailableLevels(cardType);
             const currentLevel = getCardLevel(cardId, cardType, handType);
             const skins = getAvailableSkins(cardName);
             const currentSkin = getCardSkin(cardId, cardName, handType);
             const currentMoHua = getCardMoHua(cardId, handType);
             const canMoHua = hasMoHuaData(cardName);
+            const fusionParts = (typeof getFusionParts === 'function') ? getFusionParts(cardName) : null;
+            const isFusion = !!(fusionParts && fusionParts.length >= 2);
+            const subHero = isFusion ? fusionParts[1] : '';
+            const baseHero = (typeof getBaseHeroName === 'function') ? getBaseHeroName(cardName).heroName : cardName;
 
-            const dropdown = document.createElement('div');
-            dropdown.className = 'level-dropdown';
+            // 弹窗根（遮罩）
+            const root = document.createElement('div');
+            root.className = 'card-settings-popup-root';
+            root.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100000;display:flex;align-items:center;justify-content:center;';
+            root.onclick = (e) => { if (e.target === root) root.remove(); };
+            const box = document.createElement('div');
+            box.style.cssText = 'background:#1a1a2e;border:1px solid rgba(255,255,255,0.15);border-radius:14px;max-width:340px;width:92vw;max-height:88vh;overflow:auto;padding:16px;color:#fff;font-size:0.85rem;box-shadow:0 10px 40px rgba(0,0,0,0.6);';
+            root.appendChild(box);
 
-            // 等级选择标题
-            const levelTitle = document.createElement('div');
-            levelTitle.style.cssText = 'color:#4ecdc4;font-size:0.75rem;padding:5px 10px;border-bottom:1px solid rgba(255,255,255,0.1);';
-            levelTitle.textContent = '📊 等级';
-            dropdown.appendChild(levelTitle);
+            // 标题
+            const title = document.createElement('div');
+            title.style.cssText = 'font-size:1rem;font-weight:700;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;';
+            title.innerHTML = '<span>⚙️ ' + (cardName || cardId) + '</span><span style="cursor:pointer;opacity:0.6;padding:0 4px;" onclick="this.closest(\'.card-settings-popup-root\').remove()">✕</span>';
+            box.appendChild(title);
 
-            levels.forEach(level => {
-                const item = document.createElement('div');
-                item.className = 'level-dropdown-item' + (level === currentLevel ? ' selected' : '');
-                item.textContent = level;
-                item.setAttribute('data-group', 'level');
-                item.onclick = (e) => {
-                    e.stopPropagation();
-                    setCardLevel(cardId, level, cardType, handType);
-                    // 保持弹窗打开（可继续设置魔化/皮肤），仅更新选中高亮
-                    dropdown.querySelectorAll('[data-group="level"]').forEach(el => el.classList.remove('selected'));
-                    item.classList.add('selected');
-                    updateAllCardLevelBadges();
-                };
-                dropdown.appendChild(item);
-            });
-            
-            // 皮肤选择区域
+            // 等级（进度条滑块）
+            const lvWrap = document.createElement('div');
+            lvWrap.style.cssText = 'margin-bottom:12px;';
+            lvWrap.innerHTML = '<div style="color:#4ecdc4;margin-bottom:6px;">📊 等级：<b id="csLvVal">' + currentLevel + '</b></div>';
+            const slider = document.createElement('input');
+            slider.type = 'range'; slider.min = '0'; slider.max = String(Math.max(0, levels.length - 1)); slider.step = '1';
+            slider.value = String(Math.max(0, levels.indexOf(currentLevel)));
+            slider.style.cssText = 'width:100%;';
+            slider.oninput = () => { const el = document.getElementById('csLvVal'); if (el) el.textContent = levels[Number(slider.value)]; };
+            slider.onchange = () => { setCardLevel(cardId, levels[Number(slider.value)], cardType, handType); updateAllCardLevelBadges(); };
+            lvWrap.appendChild(slider);
+            box.appendChild(lvWrap);
+
+            // 皮肤
             const skinTitle = document.createElement('div');
-            skinTitle.style.cssText = 'color:#ff9800;font-size:0.75rem;padding:5px 10px;border-top:1px solid rgba(255,255,255,0.1);margin-top:5px;border-bottom:1px solid rgba(255,255,255,0.1);';
+            skinTitle.style.cssText = 'color:#ff9800;margin:8px 0 6px;';
             skinTitle.textContent = '🎨 皮肤';
-            dropdown.appendChild(skinTitle);
-            
+            box.appendChild(skinTitle);
+            const skinWrap = document.createElement('div');
+            skinWrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;';
             skins.forEach(skin => {
-                const item = document.createElement('div');
-                item.className = 'level-dropdown-item' + (skin === currentSkin ? ' selected' : '');
-                item.textContent = skin;
-                item.style.color = skin === currentSkin ? '#ff9800' : '#fff';
-                item.setAttribute('data-group', 'skin');
-                item.setAttribute('data-skin-name', skin);
-                item.onclick = (e) => {
-                    e.stopPropagation();
-                    if (isProjectScope) setCardSkin(cardId, skin, handType);
-                    else setDefaultCardSkin(cardId, skin);
-                    // 保持弹窗打开，仅更新选中高亮与颜色
-                    dropdown.querySelectorAll('[data-group="skin"]').forEach(el => {
-                        const sel = el.getAttribute('data-skin-name') === skin;
-                        el.classList.toggle('selected', sel);
-                        el.style.color = sel ? '#ff9800' : '#fff';
-                    });
+                const b = document.createElement('button');
+                const sel = skin === currentSkin;
+                b.textContent = skin;
+                b.style.cssText = 'padding:5px 10px;border-radius:8px;border:1px solid ' + (sel ? '#ff9800' : 'rgba(255,255,255,0.2)') + ';background:' + (sel ? 'rgba(255,152,0,0.2)' : 'transparent') + ';color:#fff;cursor:pointer;font-size:0.8rem;';
+                b.onclick = () => {
+                    if (isProjectScope) setCardSkin(cardId, skin, handType); else setDefaultCardSkin(cardId, skin);
+                    skinWrap.querySelectorAll('button').forEach(x => { x.style.borderColor = 'rgba(255,255,255,0.2)'; x.style.background = 'transparent'; });
+                    b.style.borderColor = '#ff9800'; b.style.background = 'rgba(255,152,0,0.2)';
                     updateAllCardLevelBadges();
                 };
-                dropdown.appendChild(item);
+                skinWrap.appendChild(b);
             });
-            
-            // 添加自定义皮肤选项
-            const addSkinItem = document.createElement('div');
-            addSkinItem.className = 'level-dropdown-item';
-            addSkinItem.style.cssText = 'color:#4caf50;font-style:italic;';
-            addSkinItem.textContent = '+ 添加皮肤...';
-            addSkinItem.onclick = (e) => {
-                e.stopPropagation();
-                dropdown.remove();
-                showAddSkinDialog(cardName, cardId, cardType, handType, badge, currentLevel);
-            };
-            dropdown.appendChild(addSkinItem);
-            
-            // 魔化开关区域（仅有魔化数据的卡才显示）
+            box.appendChild(skinWrap);
+            const addBtn = document.createElement('button');
+            addBtn.textContent = '+ 添加皮肤';
+            addBtn.style.cssText = 'margin-top:6px;padding:4px 10px;border-radius:8px;border:1px dashed rgba(76,175,80,0.6);background:transparent;color:#4caf50;cursor:pointer;font-size:0.78rem;';
+            addBtn.onclick = () => { root.remove(); if (typeof showAddSkinDialog === 'function') showAddSkinDialog(cardName, cardId, cardType, handType, badge, currentLevel); };
+            box.appendChild(addBtn);
+
+            // 魔化（主卡）
             if (canMoHua) {
-                const mohuaTitle = document.createElement('div');
-                mohuaTitle.style.cssText = 'color:#a855f7;font-size:0.75rem;padding:5px 10px;border-top:1px solid rgba(255,255,255,0.1);margin-top:5px;border-bottom:1px solid rgba(255,255,255,0.1);';
-                mohuaTitle.textContent = '👹 魔化';
-                dropdown.appendChild(mohuaTitle);
-                
-                const mohuaItem = document.createElement('div');
-                mohuaItem.className = 'level-dropdown-item' + (currentMoHua ? ' selected' : '');
-                mohuaItem.style.cssText = `cursor:pointer;padding:8px 15px;color:${currentMoHua ? '#a855f7' : '#fff'};font-size:0.85rem;transition:background 0.2s;`;
-                mohuaItem.textContent = currentMoHua ? '✅ 魔化已开启' : '魔化未开启';
-                mohuaItem.onmouseenter = () => mohuaItem.style.background = 'rgba(168,85,247,0.2)';
-                mohuaItem.onmouseleave = () => mohuaItem.style.background = 'transparent';
-                mohuaItem.onclick = (e) => {
-                    e.stopPropagation();
-                    const moHuaOn = !getCardMoHua(cardId, handType); // 实时读取当前状态，支持连续切换
-                    setCardMoHua(cardId, moHuaOn, handType);
-                    // 保持弹窗打开，仅更新文本/颜色/高亮
-                    mohuaItem.textContent = moHuaOn ? '✅ 魔化已开启' : '魔化未开启';
-                    mohuaItem.style.color = moHuaOn ? '#a855f7' : '#fff';
-                    mohuaItem.classList.toggle('selected', moHuaOn);
+                const mhTitle = document.createElement('div');
+                mhTitle.style.cssText = 'color:#a855f7;margin:12px 0 6px;';
+                mhTitle.textContent = '👹 魔化（主卡）';
+                box.appendChild(mhTitle);
+                const mhBtn = document.createElement('button');
+                const setMh = (on) => { mhBtn.textContent = on ? '✅ 魔化已开启' : '魔化未开启'; mhBtn.style.background = on ? 'rgba(168,85,247,0.25)' : 'transparent'; mhBtn.style.borderColor = on ? '#a855f7' : 'rgba(255,255,255,0.2)'; };
+                setMh(currentMoHua);
+                mhBtn.style.cssText = 'padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);color:#fff;cursor:pointer;font-size:0.82rem;';
+                mhBtn.onclick = () => {
+                    const on = !getCardMoHua(cardId, handType);
+                    setCardMoHua(cardId, on, handType);
+                    setMh(on);
+                    updateAllCardLevelBadges();
+                    // 主卡魔化变化 → 副卡魔化开关可用状态联动
+                    const subMh = box.querySelector('#csSubMh');
+                    if (subMh) { subMh.disabled = !on; subMh.style.opacity = on ? '1' : '0.4'; if (!on && typeof setFusionComponentMoHua === 'function') setFusionComponentMoHua(subHero, false); }
+                };
+                box.appendChild(mhBtn);
+            }
+
+            // 融合副卡设置
+            if (isFusion && subHero) {
+                const fTitle = document.createElement('div');
+                fTitle.style.cssText = 'color:#60a5fa;margin:14px 0 6px;border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;';
+                fTitle.textContent = '🔗 融合副卡：' + subHero;
+                box.appendChild(fTitle);
+
+                const subSkinTitle = document.createElement('div');
+                subSkinTitle.style.cssText = 'color:#ff9800;margin:6px 0 4px;font-size:0.78rem;';
+                subSkinTitle.textContent = '🎨 副卡皮肤';
+                box.appendChild(subSkinTitle);
+                const subSkinWrap = document.createElement('div');
+                subSkinWrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;';
+                const subSkins = getAvailableSkins(subHero);
+                const subCurSkin = (typeof getFusionComponentSkin === 'function') ? getFusionComponentSkin(subHero) : '默认';
+                subSkins.forEach(skin => {
+                    const b = document.createElement('button');
+                    const sel = skin === subCurSkin;
+                    b.textContent = skin;
+                    b.style.cssText = 'padding:4px 8px;border-radius:7px;border:1px solid ' + (sel ? '#ff9800' : 'rgba(255,255,255,0.2)') + ';background:' + (sel ? 'rgba(255,152,0,0.2)' : 'transparent') + ';color:#fff;cursor:pointer;font-size:0.76rem;';
+                    b.onclick = () => {
+                        if (typeof setFusionSkin === 'function') setFusionSkin(subHero, skin);
+                        subSkinWrap.querySelectorAll('button').forEach(x => { x.style.borderColor = 'rgba(255,255,255,0.2)'; x.style.background = 'transparent'; });
+                        b.style.borderColor = '#ff9800'; b.style.background = 'rgba(255,152,0,0.2)';
+                    };
+                    subSkinWrap.appendChild(b);
+                });
+                box.appendChild(subSkinWrap);
+
+                const subLvTitle = document.createElement('div');
+                subLvTitle.style.cssText = 'color:#4ecdc4;margin:8px 0 4px;font-size:0.78rem;';
+                subLvTitle.textContent = '📊 副卡等级';
+                box.appendChild(subLvTitle);
+                const subLvInput = document.createElement('input');
+                subLvInput.type = 'number'; subLvInput.min = '1'; subLvInput.max = '30';
+                subLvInput.value = String((typeof getFusionComponentLevel === 'function') ? getFusionComponentLevel(subHero) : 1);
+                subLvInput.style.cssText = 'width:60px;padding:4px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;';
+                subLvInput.onchange = () => { if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(subHero, subLvInput.value); updateAllCardLevelBadges(); };
+                box.appendChild(subLvInput);
+
+                const subMhTitle = document.createElement('div');
+                subMhTitle.style.cssText = 'color:#a855f7;margin:8px 0 4px;font-size:0.78rem;';
+                subMhTitle.textContent = '👹 副卡魔化（需主卡已魔化）';
+                box.appendChild(subMhTitle);
+                const subMhBtn = document.createElement('button');
+                subMhBtn.id = 'csSubMh';
+                const subMhOn = currentMoHua && (typeof getFusionComponentMoHua === 'function') && getFusionComponentMoHua(subHero);
+                const setSubMh = (on) => { subMhBtn.textContent = on ? '✅ 副卡魔化已开启' : '副卡魔化未开启'; subMhBtn.style.background = on ? 'rgba(168,85,247,0.25)' : 'transparent'; subMhBtn.style.borderColor = on ? '#a855f7' : 'rgba(255,255,255,0.2)'; };
+                setSubMh(subMhOn);
+                subMhBtn.disabled = !currentMoHua;
+                subMhBtn.style.cssText = 'padding:5px 12px;border-radius:8px;border:1px solid ' + (subMhOn ? '#a855f7' : 'rgba(255,255,255,0.2)') + ';color:#fff;cursor:pointer;font-size:0.8rem;' + (currentMoHua ? '' : 'opacity:0.4;');
+                subMhBtn.onclick = () => {
+                    if (!getCardMoHua(cardId, handType)) { if (typeof showToast === 'function') showToast('请先开启主卡魔化'); return; }
+                    const on = !(getFusionComponentMoHua(subHero));
+                    setFusionComponentMoHua(subHero, on);
+                    setSubMh(on);
                     updateAllCardLevelBadges();
                 };
-                dropdown.appendChild(mohuaItem);
+                box.appendChild(subMhBtn);
             }
-            
-            // 将下拉框添加到body，使用fixed定位
-            document.body.appendChild(dropdown);
-            
-            // 计算下拉框位置
-            const rect = badge.getBoundingClientRect();
-            dropdown.style.left = (rect.right - dropdown.offsetWidth) + 'px';
-            dropdown.style.top = (rect.bottom + 5) + 'px';
-            
-            // 如果下拉框超出屏幕底部，显示在上方
-            setTimeout(() => {
-                const dropdownRect = dropdown.getBoundingClientRect();
-                if (dropdownRect.bottom > window.innerHeight) {
-                    dropdown.style.top = (rect.top - dropdownRect.height - 5) + 'px';
-                }
-                // 如果超出屏幕右侧，向左偏移
-                if (dropdownRect.right > window.innerWidth) {
-                    dropdown.style.left = (window.innerWidth - dropdownRect.width - 10) + 'px';
-                }
-            }, 0);
-            
-            // 点击其他地方关闭下拉框
-            const handleClickOutside = (e) => {
-                if (!dropdown.contains(e.target) && !e.target.closest('.card-level-badge')) {
-                    dropdown.remove();
-                    document.removeEventListener('click', handleClickOutside);
-                }
-            };
-            setTimeout(() => {
-                document.addEventListener('click', handleClickOutside);
-            }, 10);
+
+            // 减伤值（与减伤记录当前表同步）
+            try {
+                const drTable = (window.drTables && (window.drTables[window.drActiveTable || '我的'])) || (window.drTables && window.drTables['我的']) || { 洗炼: {} };
+                const drVal = (drTable.洗炼 && baseHero && drTable.洗炼[baseHero] !== undefined) ? drTable.洗炼[baseHero] : '';
+                const drTitle = document.createElement('div');
+                drTitle.style.cssText = 'color:#ffd700;margin:14px 0 6px;border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;';
+                drTitle.textContent = '🛡️ 减伤值（' + (window.drActiveTable || '我的') + '）';
+                box.appendChild(drTitle);
+                const drInput = document.createElement('input');
+                drInput.type = 'number'; drInput.placeholder = '如 12'; drInput.value = drVal;
+                drInput.style.cssText = 'width:90px;padding:5px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;';
+                drInput.onchange = () => {
+                    const v = (drInput.value === '') ? undefined : Number(drInput.value);
+                    const t = (window.drTables && window.drTables[window.drActiveTable || '我的']) || (window.drTables && window.drTables['我的']);
+                    if (t) { t.洗炼 = t.洗炼 || {}; if (v === undefined) delete t.洗炼[baseHero]; else t.洗炼[baseHero] = v; }
+                    if (typeof saveDamageReductionData === 'function') saveDamageReductionData();
+                    if (typeof updateDamageReductionDisplay === 'function') updateDamageReductionDisplay();
+                };
+                box.appendChild(drInput);
+            } catch (e) {}
+
+            document.body.appendChild(root);
         }
 
         // 关闭等级下拉框
@@ -11072,6 +11178,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             hideSkinTooltip(); // 关闭tooltip
             document.querySelectorAll('.skin-dropdown').forEach(el => el.remove());
             document.querySelectorAll('.level-dropdown').forEach(el => el.remove());
+            document.querySelectorAll('.card-settings-popup-root').forEach(el => el.remove());
             
             const skins = getAvailableSkins(cardName);
             const currentSkin = getCardSkin(cardId, cardName, handType);
