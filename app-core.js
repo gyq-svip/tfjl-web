@@ -8905,7 +8905,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             });
         }
         async function cgmDeleteHeroCard(name) {
-            if (!confirm('确认删除英雄「' + name + '」？\n仅改本地 cards.json，需重新 git 推送才对线上生效。\n（该英雄已切的皮肤图片仍在 skins/' + name + '/ 不受影响）')) return;
+            if (!confirm('确认删除英雄「' + name + '」？\n将更新 cards.json 并自动推送到 GitHub / Gitee（刷新后所有端立即可见）。\n（该英雄已切的皮肤图片仍在 skins/' + name + '/ 不受影响）')) return;
             const status = document.getElementById('cgmHeroStatus');
             try {
                 let base = { cards: {} };
@@ -8918,7 +8918,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 window.cloudCards = base.cards;
                 if (typeof renderCloudCardsToPool === 'function') renderCloudCardsToPool();
                 cgmRefreshHeroList();
-                if (status) { status.style.color = '#4ade80'; status.textContent = '✓ 已删除「' + name + '」并写入 cards.json\n请 git add skins/cards.json 并提交推送'; }
+                if (status) { status.style.color = '#4ade80'; status.textContent = '✓ 已删除「' + name + '」并写入 cards.json\n正在自动推送到 GitHub / Gitee…'; }
+                // 🔴 2026-09-29 与「添加英雄」对齐：删除后自动推送（此前只写本地、让用户手动 git 推送，找不到入口）
+                try {
+                    const pushRes = await _cgmInvoke('git_push_skins');
+                    if (status) { status.style.color = '#4ade80'; status.textContent = '✓ 已删除并推送上线：\n' + (pushRes || '成功') + '\n刷新后所有端立即可见'; }
+                } catch (pe) {
+                    if (status) { status.style.color = '#ff9e80'; status.textContent = '⚠️ 本机已删除写入，但自动推送失败：' + (pe && pe.message || pe) + '\n可手动 cd d:\\tfjl-web && git add skins/cards.json && git commit -m "hero" && git push origin main'; }
+                }
             } catch (e) {
                 if (status) { status.style.color = '#ff9e80'; status.textContent = '✗ 删除失败：' + e.message; }
             }
