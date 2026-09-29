@@ -10402,8 +10402,13 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         }
         
         // 获取皮肤属性描述（含魔化）
-        function getSkinAttribute(cardName, skinName, includeMoHua = false) {
+        function getSkinAttribute(cardName, skinName, includeMoHua = false, level) {
             const mainCardName = getMainCardName(cardName);
+            // 🔴 2026-09-29 优先使用 CSV 转换的动态属性数据（按等级/皮肤/魔化），有则直接返回完整文本，不走旧静态 skin-attributes
+            const dynamicText = window.getHeroAttrText && window.getHeroAttrText(mainCardName, { level, skinName, hasMohua: includeMoHua });
+            if (dynamicText) {
+                return { name: skinName, desc: dynamicText, hasSkinAttr: true };
+            }
             const cloud = (typeof window !== 'undefined' && window.skinAttributesCloud) ? window.skinAttributesCloud : null;
             let defaultAttr = null;
             if (SKIN_ATTRIBUTES[mainCardName] && SKIN_ATTRIBUTES[mainCardName]["默认"]) {
@@ -10452,6 +10457,45 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             
             return { desc: descParts.join('\n\n') || '无特殊属性' };
         }
+
+        // 🔴 2026-09-29 从 CSV 数据按等级/皮肤/魔化组装动态属性文本；无数据返回 null，调用处回落旧静态描述
+        function getHeroAttrText(heroName, opts) {
+            const data = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[heroName];
+            if (!data) return null;
+            const level = Number(opts && opts.level) || 1;
+            const skinName = (opts && opts.skinName) || '默认';
+            const hasMohua = !!(opts && opts.hasMohua);
+            const maxStar = data.maxStar || 5;
+            const levels = Object.keys(data.talents || {}).map(Number).sort(function (a, b) { return a - b; });
+            let talent = null;
+            for (const lv of levels) { if (lv <= level) talent = data.talents[String(lv)]; }
+            const active = (talent && talent.activeSkill) || data.base.activeSkill || {};
+            const initial = (talent && talent.initialPassive) || data.base.initialPassive || {};
+            const fullStar = (talent && talent.fullStarPassive) || data.base.fullStarPassive || {};
+            const mohua = (talent && talent.mohuaPassive) || data.base.mohuaPassive || {};
+            const lines = [];
+            lines.push(`等级：${level}/${maxStar}`);
+            if (data.profession) lines.push(`职业：${data.profession}`);
+            if (data.cardType) lines.push(`类型：${data.cardType}`);
+            if (active && active.desc) {
+                let s = `【技能】` + (active.name ? active.name + '：' : '');
+                s += active.desc;
+                if (active.cd) s += '（CD ' + (active.cd / 1000).toFixed(1) + 's）';
+                lines.push(s);
+            }
+            if (initial && initial.desc) lines.push(`【初始被动】${initial.desc}`);
+            if (fullStar && fullStar.desc) lines.push(`【满星被动】${fullStar.desc}`);
+            if (hasMohua && mohua && mohua.desc) lines.push(`【魔化被动】${mohua.desc}`);
+            if (skinName && skinName !== '默认') {
+                const skin = data.skins[skinName];
+                if (skin) {
+                    if (skin.extraPassive) lines.push(`【皮肤额外被动】${skin.extraPassive}`);
+                    if (skin.hp) lines.push(`【皮肤加血】${skin.hp}`);
+                }
+            }
+            return lines.join('\n');
+        }
+        try { window.getHeroAttrText = getHeroAttrText; } catch (e) {}
 
         // ==================== 卡牌等级管理 ====================
         // 根据卡牌类型获取可选等级
@@ -10629,6 +10673,30 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             title.innerHTML = '<span>⚙️ ' + (cardName || cardId) + '</span><span style="cursor:pointer;opacity:0.6;padding:0 4px;" onclick="this.closest(\'.card-settings-popup-root\').remove()">✕</span>';
             box.appendChild(title);
 
+            // 🔴 2026-09-29 属性预览区：随等级/皮肤/魔化/副卡实时变化
+            const preview = document.createElement('div');
+            preview.id = 'csAttrPreview';
+            preview.style.cssText = 'background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:8px;margin-bottom:12px;white-space:pre-wrap;word-break:break-word;font-size:0.78rem;line-height:1.7;color:rgba(255,255,255,0.75);max-height:150px;overflow:auto;scrollbar-width:thin;';
+            box.appendChild(preview);
+            function _renderAttrPreview() {
+                try {
+                    const mainName = getMainCardName(cardName);
+                    const curLv = getCardLevel(cardId, cardType, handType);
+                    const curSkin = getCardSkin(cardId, cardName, handType);
+                    const curMh = getCardMoHua(cardId, handType);
+                    let txt = window.getHeroAttrText && window.getHeroAttrText(mainName, { level: curLv, skinName: curSkin, hasMohua: curMh });
+                    if (!txt) txt = '（暂无动态属性数据：' + mainName + '）';
+                    if (isFusion && subHero) {
+                        const subLv = (typeof getFusionComponentLevel === 'function') ? (getFusionComponentLevel(subHero) || 1) : 1;
+                        const subMh = !!(typeof getFusionComponentMoHua === 'function' && getFusionComponentMoHua(subHero));
+                        const subSkin = (typeof getFusionComponentSkin === 'function') ? (getFusionComponentSkin(subHero) || '默认') : '默认';
+                        const subTxt = window.getHeroAttrText && window.getHeroAttrText(subHero, { level: subLv, skinName: subSkin, hasMohua: subMh });
+                        if (subTxt) txt += '\n\n—— 副卡 ' + subHero + ' ——\n' + subTxt;
+                    }
+                    preview.textContent = txt;
+                } catch (e) {}
+            }
+
             // 等级（进度条滑块）
             const lvWrap = document.createElement('div');
             lvWrap.style.cssText = 'margin-bottom:12px;';
@@ -10638,7 +10706,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             slider.value = String(Math.max(0, levels.indexOf(currentLevel)));
             slider.style.cssText = 'width:100%;';
             slider.oninput = () => { const el = document.getElementById('csLvVal'); if (el) el.textContent = levels[Number(slider.value)]; };
-            slider.onchange = () => { setCardLevel(cardId, levels[Number(slider.value)], cardType, handType); updateAllCardLevelBadges(); };
+            slider.onchange = () => { setCardLevel(cardId, levels[Number(slider.value)], cardType, handType); updateAllCardLevelBadges(); _renderAttrPreview(); };
             lvWrap.appendChild(slider);
             box.appendChild(lvWrap);
 
@@ -10656,6 +10724,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (isProjectScope) await setCardSkin(cardId, skin, handType); else await setDefaultCardSkin(cardId, skin);
                     updateAllCardLevelBadges();
                     await _reapplyCard();
+                    _renderAttrPreview();
                 });
                 skinWrap.appendChild(b);
             });
@@ -10676,6 +10745,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     setMh(on);
                     updateAllCardLevelBadges();
                     await _reapplyCard();
+                    _renderAttrPreview();
                     // 主卡魔化变化 → 副卡魔化开关可用状态联动
                     const subMh = box.querySelector('#csSubMh');
                     if (subMh) { subMh.disabled = !on; subMh.style.opacity = on ? '1' : '0.4'; if (!on && typeof setFusionComponentMoHua === 'function') setFusionComponentMoHua(subHero, false); }
@@ -10725,6 +10795,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         if (typeof invalidateFusionHalfCache === 'function') await invalidateFusionHalfCache(_subHero);
                         setSkinThumbSelected(subSkinWrap, skin);
                         await _reapplyCard();
+                        _renderAttrPreview();
                     });
                     subSkinWrap.appendChild(b);
                 });
@@ -10746,7 +10817,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 subLvVal.textContent = String(subLevels[subLvIndex]);
                 subLvVal.style.cssText = 'min-width:28px;text-align:right;color:#4ecdc4;font-weight:600;';
                 subLvInput.oninput = () => { subLvVal.textContent = String(subLevels[Number(subLvInput.value)]); };
-                subLvInput.onchange = async () => { if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(_subHero, subLevels[Number(subLvInput.value)]); updateAllCardLevelBadges(); await _reapplyCard(); };
+                subLvInput.onchange = async () => { if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(_subHero, subLevels[Number(subLvInput.value)]); updateAllCardLevelBadges(); await _reapplyCard(); _renderAttrPreview(); };
                 subLvWrap.appendChild(subLvInput);
                 subLvWrap.appendChild(subLvVal);
                 sec.appendChild(subLvWrap);
@@ -10767,6 +10838,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     setSubMh(on);
                     updateAllCardLevelBadges();
                     await _reapplyCard();
+                    _renderAttrPreview();
                 };
                 sec.appendChild(subMhBtn);
 
@@ -10825,6 +10897,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         renderFusionSubSection(box, cardName);
                         updateAllCardLevelBadges();
                         await _reapplyCard();
+                        _renderAttrPreview();
                         // 同步刷新减伤值输入（因为 baseHero 可能已变；目标表按卡片归属解析）
                         const drInput = box.querySelector('#csDrInput');
                         if (drInput) {
@@ -10839,6 +10912,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
             // 初始化融合副卡设置
             renderFusionSubSection(box, cardName);
+            _renderAttrPreview();
 
             // 🔴 2026-09-29 修复：减伤值原写死 drActiveTable（默认「我的」）→ 在队友卡里改减伤全进了「我的」表。
             // 改为按卡片归属解析目标表：队友卡→「队友卡组」下拉当前选中的表；我的卡→「我的卡组」下拉；再回落 drActiveTable。
@@ -11281,10 +11355,13 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         // 显示皮肤tooltip
         function showSkinTooltip(event, cardId, cardName, handType = 'my') {
             clearTimeout(tooltipTimeout);
-            
+
             const skin = getCardSkin(cardId, cardName, handType);
             const hasMoHua = getCardMoHua(cardId, handType);
-            const skinAttr = getSkinAttribute(cardName, skin, hasMoHua);
+            // 🔴 2026-09-29 从等级角标上读取当前等级，传给动态属性生成器
+            const levelText = (event.target && event.target.textContent || '').trim();
+            const level = parseInt(levelText, 10) || 1;
+            const skinAttr = getSkinAttribute(cardName, skin, hasMoHua, level);
             const mainCardName = getMainCardName(cardName);
             const displayCardName = mainCardName !== cardName ? `${cardName} (${mainCardName})` : cardName;
             // 云端卡（cards.json）的卡牌描述：整合进统一 tooltip，避免去掉 native title 后描述丢失
