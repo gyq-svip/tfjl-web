@@ -3340,7 +3340,7 @@
     top: auto !important;
     left: auto !important;
     right: -2px !important;
-    bottom: 0 !important;
+    bottom: -2px !important;
     width: 28px;
     height: 28px;
     padding: 0 !important;
@@ -3360,7 +3360,7 @@
     height: 16px;
     left: auto;
     right: calc(60% + 1px);
-    bottom: calc(60% + 1px);
+    bottom: calc(60% - 3px);
     object-fit: contain;
     z-index: 6;
     pointer-events: none;
@@ -3429,7 +3429,7 @@
 .fused-sub-level {
     position: absolute !important;
     left: 0 !important;
-    bottom: 60% !important;
+    bottom: calc(60% - 3px) !important;
     width: 17px !important;
     height: 17px !important;
     min-width: 17px !important;

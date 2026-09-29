@@ -10785,10 +10785,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         renderFusionSubSection(box, cardName);
                         updateAllCardLevelBadges();
                         await _reapplyCard();
-                        // 同步刷新减伤值输入（因为 baseHero 可能已变）
+                        // 同步刷新减伤值输入（因为 baseHero 可能已变；目标表按卡片归属解析）
                         const drInput = box.querySelector('#csDrInput');
                         if (drInput) {
-                            const drTable = (window.drTables && (window.drTables[window.drActiveTable || '我的'])) || (window.drTables && window.drTables['我的']) || { 洗炼: {} };
+                            const drTable = (window.drTables && window.drTables[_csResolveDrTableName()]) || { 洗炼: {} };
                             drInput.value = (drTable.洗炼 && baseHero && drTable.洗炼[baseHero] !== undefined) ? drTable.洗炼[baseHero] : '';
                         }
                     };
@@ -10800,14 +10800,27 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             // 初始化融合副卡设置
             renderFusionSubSection(box, cardName);
 
-            // 减伤值（与减伤记录当前表同步）
+            // 🔴 2026-09-29 修复：减伤值原写死 drActiveTable（默认「我的」）→ 在队友卡里改减伤全进了「我的」表。
+            // 改为按卡片归属解析目标表：队友卡→「队友卡组」下拉当前选中的表；我的卡→「我的卡组」下拉；再回落 drActiveTable。
+            function _csResolveDrTableName() {
+                try {
+                    const sel = document.getElementById((handType === 'teammate') ? 'teammateDrTableSel' : 'myDrTableSel');
+                    const n = sel && sel.value;
+                    if (n && window.drTables && window.drTables[n]) return n;
+                } catch (e) {}
+                if (handType === 'teammate' && window._teammateDrTable && window.drTables && window.drTables[window._teammateDrTable]) return window._teammateDrTable;
+                if (handType !== 'teammate' && window._myDrTable && window.drTables && window.drTables[window._myDrTable]) return window._myDrTable;
+                return window.drActiveTable || '我的';
+            }
+            // 减伤值（写入当前侧选中的减伤表）
             try {
-                const drTable = (window.drTables && (window.drTables[window.drActiveTable || '我的'])) || (window.drTables && window.drTables['我的']) || { 洗炼: {} };
+                const _drTableName = _csResolveDrTableName();
+                const drTable = (window.drTables && window.drTables[_drTableName]) || { 洗炼: {} };
                 const drVal = (drTable.洗炼 && baseHero && drTable.洗炼[baseHero] !== undefined) ? drTable.洗炼[baseHero] : '';
                 const drTitle = document.createElement('div');
                 drTitle.id = 'csDrSection';
                 drTitle.style.cssText = 'color:#ffd700;margin:14px 0 6px;border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;';
-                drTitle.textContent = '🛡️ 减伤值（' + (window.drActiveTable || '我的') + '）';
+                drTitle.textContent = '🛡️ 减伤值（' + _drTableName + '）';
                 box.appendChild(drTitle);
                 const drInput = document.createElement('input');
                 drInput.id = 'csDrInput';
@@ -10815,7 +10828,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 drInput.style.cssText = 'width:90px;padding:5px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:#2a2a4a;color:#fff;';
                 drInput.onchange = () => {
                     const v = (drInput.value === '') ? undefined : Number(drInput.value);
-                    const t = (window.drTables && window.drTables[window.drActiveTable || '我的']) || (window.drTables && window.drTables['我的']);
+                    const _tn = _csResolveDrTableName();
+                    const t = (window.drTables && window.drTables[_tn]);
                     if (t) { t.洗炼 = t.洗炼 || {}; if (v === undefined) delete t.洗炼[baseHero]; else t.洗炼[baseHero] = v; }
                     if (typeof saveDamageReductionData === 'function') saveDamageReductionData();
                     if (typeof updateDamageReductionDisplay === 'function') updateDamageReductionDisplay();
