@@ -8661,7 +8661,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
     }
 
     // 副卡魔化角标：仅在「主卡已魔化 且 副卡自身开启魔化」时显示（规则：主卡没魔化则副卡魔化无效）
-    const _slotName = (slot.querySelector('.card-item') && (slot.querySelector('.card-item').getAttribute('data-name') || (slot.querySelector('.card-item').dataset && slot.querySelector('.card-item').dataset.name))) || (slot.getAttribute('data-name') || '') || '';
+    // 🔴 2026-09-29 修复：槽位 .card-item 无 data-name（只有手牌卡有）→ 旧逻辑在此恒取空，
+    //    副卡等级/魔化角标在「上阵卡槽」永不显示（手牌正常）。改为优先读 .card-name 的
+    //    dataset.fullName（applySkinBgToSlot 入口已写入完整融合名），兜底 slot data-name / 显示名。
+    const _slotNameEl = slot.querySelector('.card-name');
+    const _slotName = (slot.querySelector('.card-item') && (slot.querySelector('.card-item').getAttribute('data-name') || (slot.querySelector('.card-item').dataset && slot.querySelector('.card-item').dataset.name))) || (_slotNameEl && _slotNameEl.dataset.fullName) || (slot.getAttribute('data-name') || '') || (_slotNameEl ? (_slotNameEl.textContent || '') : '') || '';
     const _slotParts = (typeof getFusionParts === 'function') ? getFusionParts(_slotName) : null;
     const _slotSub = (_slotParts && _slotParts.length >= 2) ? _slotParts[1] : '';
     const _slotSubHidden = !!(window.fusionSkins && window.fusionSkins[_slotSub] === '');
@@ -11742,6 +11746,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             //    旧图始终显示到新图解码就绪，且并发调用全部收敛到同一元素，无互删竞态。
             const staleFused = slot.querySelector('.skin-layer-fused');
             if (staleFused) staleFused.remove();
+            // 非融合路径：清掉可能残留的副卡等级/魔化角标（换卡/关融合后不留脏节点）
+            const _staleSubLv = slot.querySelector('.fused-sub-level');
+            if (_staleSubLv) _staleSubLv.remove();
+            const _staleSubMh = slot.querySelector('.fused-mohua-icon');
+            if (_staleSubMh) _staleSubMh.remove();
             let img = slot.querySelector('.skin-layer');
             // 清理旧版竞态可能残留的重复皮肤层（多张叠在一起，白耗内存）
             {
