@@ -10629,8 +10629,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             skins.forEach(skin => {
                 const sel = skin === currentSkin;
                 const b = createSkinThumb(cardName, skin, sel, async () => {
+                    setSkinThumbSelected(skinWrap, skin);   // 🔴 2026-09-29 先亮选中态（瞬时反馈），再做后面的重刷新链
                     if (isProjectScope) await setCardSkin(cardId, skin, handType); else await setDefaultCardSkin(cardId, skin);
-                    setSkinThumbSelected(skinWrap, skin);
                     updateAllCardLevelBadges();
                     await _reapplyCard();
                 });
@@ -10942,7 +10942,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             });
 
             // 同步刷新卡池皮肤小图（全局预设：defaultCardSkins / heroSkinSelections）
-            if (typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(() => {});
+            // 🔴 2026-09-29 防抖：徽标重建便宜，但末尾的全卡池皮肤重铺很重（高性能模式 ~130 张 resolve+样式写）。
+            //    弹窗里连续点皮肤/等级/魔化会连环触发 → 排队堆积 → 越点越卡。改为 trailing 600ms 合并成一次。
+            if (typeof updateCardPoolSkins === 'function') {
+                clearTimeout(window.__ubPoolSkinsT);
+                window.__ubPoolSkinsT = setTimeout(function () { updateCardPoolSkins().catch(function () {}); }, 600);
+            }
         }
 
         // ==================== 性能模式（用户菜单开关）====================
