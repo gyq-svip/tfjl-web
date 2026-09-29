@@ -10481,6 +10481,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 let s = `【技能】` + (active.name ? active.name + '：' : '');
                 s += active.desc;
                 if (active.cd) s += '（CD ' + (active.cd / 1000).toFixed(1) + 's）';
+                // 🔴 2026-09-29 逐等级「技能强化」条目：把该等级对技能的数值改动附在技能行下方
+                if (talent && talent.skillEnhance && talent.skillEnhance.desc) {
+                    s += '\n　↳ ' + talent.skillEnhance.name + '：' + talent.skillEnhance.desc;
+                }
                 lines.push(s);
             }
             if (initial && initial.desc) lines.push(`【初始被动】${initial.desc}`);
