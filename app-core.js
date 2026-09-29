@@ -10517,7 +10517,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             event.preventDefault();
             // 判断卡的归属：手牌/战斗槽内=项目范围(project)；卡池/收藏内=全局默认(default)
             const _scopeEl = (event.target && event.target.closest) ? event.target.closest('#myHandContainer, #teammateHandContainer, .battle-slot') : null;
-            const isProjectScope = !!_scopeEl;
+            const isProjectScope = !!_scopeEl && !_scopeEl.classList.contains('ll-slot');   // 🔴 图库槽位=卡池/全局范围：皮肤走全局默认，等级/魔化本就是全局
             const badge = event.target;
             // 重新渲染当前卡（融合副卡魔化/等级/皮肤变更后需要重绘皮肤层）
             async function _reapplyCard() {
@@ -10531,6 +10531,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (slotEl) {
                         if (seen.has(slotEl)) continue;
                         seen.add(slotEl);
+                        if (slotEl.classList.contains('ll-slot')) {
+                            // 🔴 图库槽位：走图库自己的重铺（保留阵容个人皮肤覆盖 + 重建主卡角标）
+                            if (typeof window._llReapplySlot === 'function') { try { await window._llReapplySlot(slotEl); } catch (e) {} }
+                            continue;
+                        }
                         if (typeof applySkinBgToSlot === 'function') { try { await applySkinBgToSlot(slotEl, cardName); } catch (e) {} }
                         continue;
                     }

@@ -162,7 +162,9 @@
             + '<div id="llList" style="padding:0 14px 14px;"></div>';
         document.body.appendChild(ov);
         // 卡槽点击：🔴 2026-09-22 与主页一致：左键 = 循环切换融合卡；右键 = 循环切换主卡皮肤（均不弹菜单）
+        // 🔴 2026-09-29 点在等级/魔化角标上 = 打开主页同款设置弹窗（app-core 全局委托），不触发融合循环
         ov.addEventListener('click', function (e) {
+            if (e.target.closest('.card-level-badge')) return;
             const sl = e.target.closest('.ll-slot');
             if (sl) { window._llFuseCycle(sl); }
         });
@@ -378,6 +380,19 @@
             if (pc) el.insertAdjacentHTML('afterbegin', window.createLevelBadgeHTML(pc.id, pc.type, 'my', cur));
         } catch (e) {}
     }
+    // 🔴 2026-09-29 供主页设置弹窗（点图库角标弹出）回调：图库槽位按「阵容个人覆盖 + 卡池等级/魔化」整体重铺
+    //    —— 弹窗改等级/魔化（全局存储）后 _reapplyCard 走这里，主卡角标立即刷新；皮肤改的是全局默认，
+    //    若该槽有阵容个人皮肤覆盖则覆盖优先（与原逻辑一致）。
+    window._llReapplySlot = function (el) {
+        const hero = el.getAttribute('data-hero');
+        const tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid');
+        const L = _slot(tab, lid);
+        const force = (L.skin && L.skin[hero]) || undefined;
+        const fus = (L.fus && L.fus[hero]) || '';
+        const cur = fus || hero;
+        return Promise.resolve().then(function () { return window.applySkinBgToSlot(el, cur, cur, 'my', force, fus ? force : undefined); })
+            .catch(function () {}).then(function () { _fusBadge(el, fus); _lvBadge(el, hero, fus); });
+    };
     window._llFuseCycle = function (el) {
         const hero = el.getAttribute('data-hero'), tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid');
         const L = _slot(tab, lid);
