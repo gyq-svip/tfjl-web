@@ -1683,7 +1683,7 @@
                     </div>
                     <div class="admin-menu-item" data-key="wallBackup" onclick="wallAdminShowBackup()">
                         <span class="mi-emoji">💾</span>
-                        <div class="mi-text"><div class="mi-title">需求墙备份中心</div><div class="mi-sub">备份/还原/紧急救回</div></div>
+                        <div class="mi-text"><div class="mi-title">备份中心</div><div class="mi-sub">Gist全量备份/还原/每日自动</div></div>
                     </div>
                     <div class="admin-menu-item" data-key="wallGist" onclick="wallAdminShowGist()">
                         <span class="mi-emoji">🗂️</span>
@@ -2869,7 +2869,7 @@
         <div id="adminPageWallBackup" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:99990;overflow-y:auto;">
             <div style="max-width:680px;margin:40px auto;background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:12px;padding:20px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">💾 需求墙备份中心</h3>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">💾 备份中心</h3>
                     <button onclick="document.getElementById('adminPageWallBackup').style.display='none';var m=document.getElementById('adminMenuSection');if(m)m.style.display='block';" style="background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;">✕</button>
                 </div>
                 <div style="color:#4ade80;font-size:0.8rem;margin-bottom:8px;">✅ 本备份存独立私有Gist，含<b>消息+个人资料+脚本真实内容</b>（自包含：源文件被删也能还原）。还原可「合并」(保留新消息)或「覆盖」。</div>
@@ -2897,6 +2897,25 @@
                     </div>
                     <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;line-height:1.5;margin-bottom:10px;">平时会自动把最新消息镜像到备用Gist。只有当需求墙主数据彻底坏掉、打不开时，才点下面按钮从备用镜像一键把消息复制回来。⚠️ 不含脚本，救回后请再用上方「立即备份」对应的备份还原脚本。</div>
                     <button onclick="adminRestoreFromBackup()" style="background:linear-gradient(135deg,#ef4444,#b91c1c);color:#fff;border:none;padding:10px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">🆘 从备用镜像紧急救回消息</button>
+                </div>
+                <div style="margin-top:18px;border-top:1px solid rgba(255,255,255,0.12);padding-top:14px;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                        <span style="color:#60a5fa;font-size:1rem;">🗃️</span>
+                        <span style="color:#60a5fa;font-size:0.9rem;font-weight:500;">Gist 全量备份（本地压缩包 · 所有 Gist 文件）</span>
+                    </div>
+                    <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;line-height:1.5;margin-bottom:10px;">
+                        把账号下<b>所有 Gist 的每个文件</b>打包成 zip 存到本机（room_index / counter 统计 / 消息 / 诊断 / 登录 / 活动 / 分享 / 脚本…全覆盖）。<b>Gist 被误删</b>时可打开备份，把内容还原到<b>新的 Gist</b>。<b>每天首次打开 App 会自动在后台备份一次</b>（默认开启）。
+                    </div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+                        <button onclick="gistBackupRun(false)" style="background:linear-gradient(135deg,#60a5fa,#3b82f6);color:#fff;border:none;padding:10px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">🗃️ 立即备份到本地(zip)</button>
+                        <button onclick="document.getElementById('gistBackupFile').click()" style="background:linear-gradient(135deg,#a78bfa,#7c3aed);color:#fff;border:none;padding:10px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">📤 从本地备份还原</button>
+                        <input type="file" id="gistBackupFile" accept=".zip,application/zip" style="display:none;" onchange="gistBackupOnFile(this)">
+                        <button onclick="gistBackupOpenDir()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:10px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">📂 打开备份目录</button>
+                        <label style="display:flex;align-items:center;gap:6px;color:rgba(255,255,255,0.7);font-size:0.78rem;cursor:pointer;user-select:none;">
+                            <input type="checkbox" id="gistAutoBackupChk" onchange="gistBackupToggleAuto(this.checked)"> 每天首次打开自动备份
+                        </label>
+                    </div>
+                    <div id="gistBackupStatus" style="font-size:0.78rem;color:rgba(255,255,255,0.75);line-height:1.6;"></div>
                 </div>
             </div>
         </div>

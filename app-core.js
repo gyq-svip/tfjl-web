@@ -10515,8 +10515,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (initial && initial.desc) lines.push(`【初始被动】${initial.desc}`);
             if (fullStar && fullStar.desc) lines.push(`【满星被动】${fullStar.desc}`);
             if (hasMohua && mohua && mohua.desc) lines.push(`【魔化被动】${mohua.desc}`);
-            const awaken = data.base && data.base.mohuaAwaken ? data.base.mohuaAwaken : null;
-            if (hasMohua && awaken && awaken.desc) lines.push(`【魔化觉醒】${awaken.desc}`);
             if (skinName && skinName !== '默认') {
                 const skin = data.skins[skinName];
                 if (skin) {
@@ -10805,14 +10803,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 mhInfo.style.cssText = 'margin-top:6px;font-size:0.72rem;line-height:1.55;color:rgba(255,255,255,0.75);';
                 function _renderMhInfo(on) {
                     try {
-                        const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[mainName];
                         const mh = _getPassiveAtLevel(mainName, getCardLevel(cardId, cardType, handType), 'mohuaPassive');
-                        const aw = d && d.base && d.base.mohuaAwaken && d.base.mohuaAwaken.desc;
                         let html = '';
                         if (on) {
-                            if (mh && mh.desc) html += '<div><span style="color:#a855f7;font-weight:600;">魔化被动：</span>' + mh.desc + '</div>';
-                            if (aw) html += '<div><span style="color:#a855f7;font-weight:600;">魔化觉醒：</span>' + aw + '</div>';
-                            if (!html) html = '<span style="opacity:0.5">该英雄暂无魔化信息</span>';
+                            if (mh && mh.desc) html = '<div><span style="color:#a855f7;font-weight:600;">魔化被动：</span>' + mh.desc + '</div>';
+                            else html = '<span style="opacity:0.5">该英雄暂无魔化信息</span>';
                         }
                         mhInfo.innerHTML = html;
                     } catch (e) { mhInfo.innerHTML = ''; }
@@ -10949,15 +10944,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 subMhInfo.style.cssText = 'margin-top:5px;font-size:0.68rem;line-height:1.55;color:rgba(255,255,255,0.75);';
                 function _renderSubMhInfo(on) {
                     try {
-                        const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[_subHero];
                         const lv = (typeof getFusionComponentLevel === 'function') ? (getFusionComponentLevel(_subHero) || 1) : 1;
                         const mh = _getPassiveAtLevel(_subHero, lv, 'mohuaPassive');
-                        const aw = d && d.base && d.base.mohuaAwaken && d.base.mohuaAwaken.desc;
                         let html = '';
                         if (on) {
-                            if (mh && mh.desc) html += '<div><span style="color:#a855f7;font-weight:600;">魔化被动：</span>' + mh.desc + '</div>';
-                            if (aw) html += '<div><span style="color:#a855f7;font-weight:600;">魔化觉醒：</span>' + aw + '</div>';
-                            if (!html) html = '<span style="opacity:0.5">该英雄暂无魔化信息</span>';
+                            if (mh && mh.desc) html = '<div><span style="color:#a855f7;font-weight:600;">魔化被动：</span>' + mh.desc + '</div>';
+                            else html = '<span style="opacity:0.5">该英雄暂无魔化信息</span>';
                         }
                         subMhInfo.innerHTML = html;
                     } catch (e) { subMhInfo.innerHTML = ''; }
@@ -17774,6 +17766,10 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                 }
             }
             updateStatsBar();
+
+            // 🔴 2026-09-30 每天首次打开 App → 后台自动把「所有 Gist 文件」打 zip 备份到本机
+            //    默认开启；用 localStorage 日期标记保证每天只跑一次，20s 后延迟执行不拖慢首屏。
+            try { if (typeof window.gistBackupCheckAuto === 'function') window.gistBackupCheckAuto(); } catch (e) {}
         };
 
         // 确保「深海 / 王城低配版」默认项目已加载：本地缓存(IndexedDB) > 远程拉取并缓存 > 内置默认项目
@@ -21595,6 +21591,264 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         window.wallSelectOrphanGists = wallSelectOrphanGists;
         window.wallDeleteSelectedGists = wallDeleteSelectedGists;
         window.wallAdminShowGist = wallAdminShowGist;
+
+        // ==================== Gist 全量备份（本地 zip） ====================
+        // 把账号下所有 Gist 的每个文件打包成 zip 存到本机；Gist 被删可从备份还原到新 Gist。
+        // 每天首次打开 App 自动后台备份一次（默认开启）。
+        (function () {
+            const GB_AUTO_KEY = 'tfjl_gist_backup_auto';
+            const GB_LAST_DATE_KEY = 'tfjl_gist_backup_last_date';
+            const GB_DEFAULT_DIR = 'D:\\withfriends\\塔防精灵助手数据\\data\\gist_backups';
+
+            function _gbDefaultDir() {
+                try {
+                    const c = JSON.parse(localStorage.getItem('maDirsConfig') || '{}');
+                    const base = (c && c.softwareDataDir) ? c.softwareDataDir : 'D:\\withfriends\\塔防精灵助手数据';
+                    return String(base).replace(/[\\/]+$/, '') + '\\data\\gist_backups';
+                } catch (e) { return GB_DEFAULT_DIR; }
+            }
+            function _gbDir() {
+                let d = '';
+                try { d = localStorage.getItem('tfjl_gist_backup_dir') || ''; } catch (e) {}
+                return d || _gbDefaultDir();
+            }
+            function _gbStatus(html) {
+                const el = document.getElementById('gistBackupStatus');
+                if (el) el.innerHTML = html;
+                try {
+                    if (typeof showToast === 'function' && html && html.indexOf('<') < 0) showToast(html);
+                } catch (e) {}
+            }
+            function _gbHdrs(token) {
+                return { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'tfjl-gist-backup', ...(token ? { 'Authorization': 'token ' + token } : {}) };
+            }
+            function _gbU8(str) { return new TextEncoder().encode(str); }
+            function _gbB64(u8) {
+                let s = '';
+                const CH = 0x8000;
+                for (let i = 0; i < u8.length; i += CH) s += String.fromCharCode.apply(null, u8.subarray(i, i + CH));
+                return btoa(s);
+            }
+            const _gbCrcT = (function () {
+                const t = new Uint32Array(256);
+                for (let i = 0; i < 256; i++) { let c = i; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[i] = c >>> 0; }
+                return t;
+            })();
+            function _gbCrc32(buf) { let c = 0xFFFFFFFF; for (let i = 0; i < buf.length; i++) c = _gbCrcT[(c ^ buf[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+            function _gbDos(d) {
+                return {
+                    time: ((d.getHours() & 31) << 11) | ((d.getMinutes() & 63) << 5) | ((Math.floor(d.getSeconds() / 2)) & 31),
+                    date: (((d.getFullYear() - 1980) & 127) << 9) | (((d.getMonth() + 1) & 15) << 5) | (d.getDate() & 31)
+                };
+            }
+            // 生成 zip（store，无压缩）—— JSON 备份足够，且无需引入第三方库
+            function _gbZip(files) {
+                const dt = _gbDos(new Date());
+                const chunks = []; const central = []; let offset = 0;
+                files.forEach(function (f) {
+                    const nb = _gbU8(f.name); const data = _gbU8(f.content); const crc = _gbCrc32(data);
+                    const lfh = new Uint8Array(30 + nb.length); const lv = new DataView(lfh.buffer);
+                    lv.setUint32(0, 0x04034b50, true); lv.setUint16(4, 20, true); lv.setUint16(6, 0x0800, true);
+                    lv.setUint16(8, 0, true); lv.setUint16(10, dt.time, true); lv.setUint16(12, dt.date, true);
+                    lv.setUint32(14, crc, true); lv.setUint32(18, data.length, true); lv.setUint32(22, data.length, true);
+                    lv.setUint16(26, nb.length, true); lv.setUint16(28, 0, true);
+                    lfh.set(nb, 30);
+                    chunks.push(lfh, data);
+                    const ch = new Uint8Array(46 + nb.length); const cv = new DataView(ch.buffer);
+                    cv.setUint32(0, 0x02014b50, true); cv.setUint16(4, 20, true); cv.setUint16(6, 20, true);
+                    cv.setUint16(8, 0x0800, true); cv.setUint16(10, 0, true); cv.setUint16(12, dt.time, true); cv.setUint16(14, dt.date, true);
+                    cv.setUint32(16, crc, true); cv.setUint32(20, data.length, true); cv.setUint32(24, data.length, true);
+                    cv.setUint16(28, nb.length, true); cv.setUint16(30, 0, true); cv.setUint16(32, 0, true);
+                    cv.setUint16(34, 0, true); cv.setUint16(36, 0, true); cv.setUint32(38, 0, true); cv.setUint32(42, offset, true);
+                    ch.set(nb, 46);
+                    central.push(ch);
+                    offset += lfh.length + data.length;
+                });
+                let cs = 0; central.forEach(function (c) { cs += c.length; });
+                const eo = new Uint8Array(22); const ev = new DataView(eo.buffer);
+                ev.setUint32(0, 0x06054b50, true); ev.setUint16(4, 0, true); ev.setUint16(6, 0, true);
+                ev.setUint16(8, files.length, true); ev.setUint16(10, files.length, true);
+                ev.setUint32(12, cs, true); ev.setUint32(16, offset, true); ev.setUint16(20, 0, true);
+                const out = new Uint8Array(offset + cs + eo.length);
+                let p = 0;
+                chunks.forEach(function (c) { out.set(c, p); p += c.length; });
+                central.forEach(function (c) { out.set(c, p); p += c.length; });
+                out.set(eo, p);
+                return out;
+            }
+            // 解析 zip（仅 store）
+            function _gbUnzip(buf) {
+                const u8 = new Uint8Array(buf); const dv = new DataView(buf); const out = [];
+                let i = 0;
+                while (i + 30 <= u8.length) {
+                    const sig = dv.getUint32(i, true);
+                    if (sig === 0x04034b50) {
+                        const method = dv.getUint16(i + 8, true);
+                        const csize = dv.getUint32(i + 18, true);
+                        const nlen = dv.getUint16(i + 26, true);
+                        const elen = dv.getUint16(i + 28, true);
+                        let name = 'file';
+                        try { name = new TextDecoder().decode(u8.subarray(i + 30, i + 30 + nlen)); } catch (e) {}
+                        const start = i + 30 + nlen + elen;
+                        if (method !== 0) { out.push({ name: name, content: '' }); i = start + csize; continue; }
+                        let content = '';
+                        try { content = new TextDecoder().decode(u8.subarray(start, start + csize)); } catch (e) { content = ''; }
+                        out.push({ name: name, content: content });
+                        i = start + csize;
+                    } else if (sig === 0x02014b50 || sig === 0x06054b50) { break; } else { i++; }
+                }
+                return out;
+            }
+            async function _gbListGists(hdrs) {
+                const list = [];
+                for (let page = 1; page <= 10; page++) {
+                    const r = await fetch('https://api.github.com/gists?per_page=100&page=' + page, { headers: hdrs });
+                    if (!r.ok) break;
+                    const arr = await r.json();
+                    if (!Array.isArray(arr) || !arr.length) break;
+                    arr.forEach(function (g) { list.push(g); });
+                    if (arr.length < 100) break;
+                }
+                return list;
+            }
+            async function _gbSaveZip(u8, fileName, silent) {
+                const invokeFn = (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke) || (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke);
+                if (invokeFn) {
+                    const dir = _gbDir();
+                    try { await invokeFn('create_dir', { path: dir }); } catch (e) {}
+                    const filePath = dir.replace(/[\\/]+$/, '') + '\\' + fileName;
+                    await invokeFn('write_binary_file', { filePath: filePath, contentBase64: _gbB64(u8) });
+                    return { ok: true, path: filePath };
+                }
+                const blob = new Blob([u8], { type: 'application/zip' });
+                if (window.showSaveFilePicker && !silent) {
+                    try {
+                        const h = await window.showSaveFilePicker({ suggestedName: fileName, types: [{ description: 'ZIP 备份', accept: { 'application/zip': ['.zip'] } }] });
+                        const w = await h.createWritable(); await w.write(blob); await w.close();
+                        return { ok: true, path: fileName };
+                    } catch (e) { if (e && e.name === 'AbortError') return { ok: false, canceled: true }; }
+                }
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob); a.download = fileName;
+                document.body.appendChild(a); a.click();
+                setTimeout(function () { try { URL.revokeObjectURL(a.href); a.remove(); } catch (e) {} }, 2000);
+                return { ok: true, path: fileName };
+            }
+            window.gistBackupRun = async function (silent) {
+                try {
+                    const token = (typeof getGistToken === 'function') ? getGistToken() : '';
+                    if (!token) { _gbStatus('<span style="color:#ff6b6b;">❌ 未获取到 Gist Token，无法备份</span>'); return; }
+                    _gbStatus('⏳ 正在枚举 Gist…');
+                    const hdrs = _gbHdrs(token);
+                    const gists = await _gbListGists(hdrs);
+                    if (!gists.length) { _gbStatus('<span style="color:#ff6b6b;">❌ 未枚举到任何 Gist</span>'); return; }
+                    const manifest = { __tfjl_gist_backup__: 3, exportedAt: Date.now(), gists: [] };
+                    const files = [];
+                    let fileCount = 0;
+                    for (let i = 0; i < gists.length; i++) {
+                        const g = gists[i];
+                        const entry = { id: g.id, description: g.description || '', public: !!g.public, files: [] };
+                        const names = Object.keys(g.files || {});
+                        for (let j = 0; j < names.length; j++) {
+                            const fn = names[j];
+                            let content = null;
+                            try { content = await wallReadGistFile(g.id, fn, token); } catch (e) { content = null; }
+                            if (content === null || content === undefined) { entry.files.push({ name: fn, missing: true }); continue; }
+                            entry.files.push({ name: fn, size: content.length });
+                            files.push({ name: 'gists/' + g.id + '/' + fn, content: content });
+                            fileCount++;
+                        }
+                        manifest.gists.push(entry);
+                        if (i % 5 === 0) _gbStatus('⏳ 正在读取 Gist 内容… ' + (i + 1) + '/' + gists.length + '（已收 ' + fileCount + ' 个文件）');
+                    }
+                    files.push({ name: 'manifest.json', content: JSON.stringify(manifest, null, 2) });
+                    const d = new Date();
+                    const pad = function (n) { return String(n).padStart(2, '0'); };
+                    const ts = d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '_' + pad(d.getHours()) + pad(d.getMinutes());
+                    const fileName = 'gist_backup_' + ts + '.zip';
+                    _gbStatus('⏳ 正在打包 zip（' + fileCount + ' 个文件）…');
+                    const u8 = _gbZip(files);
+                    const r = await _gbSaveZip(u8, fileName, !!silent);
+                    if (r.ok) {
+                        const kb = Math.round(u8.length / 1024);
+                        _gbStatus('<span style="color:#4ade80;">✅ 备份完成：' + gists.length + ' 个 Gist / ' + fileCount + ' 个文件 / ' + kb + ' KB</span><br><span style="opacity:0.7;">保存位置：' + r.path + '</span>');
+                        try { localStorage.setItem('tfjl_gist_backup_last_ts', String(Date.now())); } catch (e) {}
+                    } else if (!r.canceled) {
+                        _gbStatus('<span style="color:#ff6b6b;">❌ 备份保存失败</span>');
+                    } else { _gbStatus('已取消'); }
+                } catch (e) {
+                    _gbStatus('<span style="color:#ff6b6b;">❌ 备份失败：' + (e && e.message ? e.message : e) + '</span>');
+                }
+            };
+            window.gistBackupOnFile = async function (input) {
+                try {
+                    const f = input.files && input.files[0];
+                    input.value = '';
+                    if (!f) return;
+                    _gbStatus('⏳ 正在读取备份…');
+                    const buf = await f.arrayBuffer();
+                    const files = _gbUnzip(buf);
+                    const mf = files.find(function (x) { return x.name === 'manifest.json'; });
+                    if (!mf) { _gbStatus('<span style="color:#ff6b6b;">❌ 不是有效的 Gist 备份包（缺少 manifest.json）</span>'); return; }
+                    let manifest = null;
+                    try { manifest = JSON.parse(mf.content); } catch (e) { manifest = null; }
+                    if (!manifest || manifest.__tfjl_gist_backup__ !== 3) { _gbStatus('<span style="color:#ff6b6b;">❌ 备份格式不识别</span>'); return; }
+                    const token = (typeof getGistToken === 'function') ? getGistToken() : '';
+                    if (!token) { _gbStatus('<span style="color:#ff6b6b;">❌ 未获取到 Gist Token</span>'); return; }
+                    if (!confirm('备份包含 ' + manifest.gists.length + ' 个 Gist。\n将写回：已存在的 Gist 覆盖同名文件；已删除的 Gist 会新建（id 会变）。\n确定继续？')) return;
+                    const hdrs = _gbHdrs(token);
+                    let restored = 0, created = 0, failed = 0;
+                    for (const entry of manifest.gists) {
+                        const payload = {};
+                        entry.files.forEach(function (x) {
+                            if (x.missing) return;
+                            const rec = files.find(function (y) { return y.name === 'gists/' + entry.id + '/' + x.name; });
+                            if (rec) payload[x.name] = { content: rec.content };
+                        });
+                        if (!Object.keys(payload).length) continue;
+                        let exists = false;
+                        try { const hr = await fetch('https://api.github.com/gists/' + entry.id, { headers: hdrs }); exists = hr.ok; } catch (e) { exists = false; }
+                        try {
+                            if (exists) {
+                                const pr = await fetch('https://api.github.com/gists/' + entry.id, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, hdrs), body: JSON.stringify({ files: payload }) });
+                                if (pr.ok) restored++; else failed++;
+                            } else {
+                                const cr = await fetch('https://api.github.com/gists', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, hdrs), body: JSON.stringify({ description: entry.description || ('还原自备份 ' + entry.id), public: !!entry.public, files: payload }) });
+                                if (cr.ok) { created++; try { const nd = await cr.json(); console.warn('[GistBackup] 原 Gist ' + entry.id + ' 已不存在，已新建为 ' + nd.id + '（若被引用需手动更新指针）'); } catch (e) {} } else failed++;
+                            }
+                        } catch (e) { failed++; }
+                        _gbStatus('⏳ 还原中… 覆盖 ' + restored + ' / 新建 ' + created + ' / 失败 ' + failed);
+                    }
+                    _gbStatus('<span style="color:#4ade80;">✅ 还原完成：覆盖 ' + restored + ' 个，新建 ' + created + ' 个，失败 ' + failed + ' 个</span><br><span style="opacity:0.7;">⚠️ 新建的 Gist id 会变化；若被引用（如 room_index 里的指针）请到对应位置手动更新。</span>');
+                } catch (e) {
+                    _gbStatus('<span style="color:#ff6b6b;">❌ 还原失败：' + (e && e.message ? e.message : e) + '</span>');
+                }
+            };
+            window.gistBackupToggleAuto = function (on) {
+                try { localStorage.setItem(GB_AUTO_KEY, on ? '1' : '0'); } catch (e) {}
+            };
+            window.gistBackupOpenDir = async function () {
+                const dir = _gbDir();
+                const invokeFn = (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke) || (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke);
+                if (invokeFn) {
+                    try { await invokeFn('create_dir', { path: dir }); await invokeFn('show_in_folder', { path: dir }); return; } catch (e) {}
+                }
+                _gbStatus('备份目录：' + dir);
+            };
+            window.gistBackupCheckAuto = function () {
+                try {
+                    let on = localStorage.getItem(GB_AUTO_KEY);
+                    if (on === null) on = '1'; // 默认开启
+                    const el = document.getElementById('gistAutoBackupChk');
+                    if (el) el.checked = on === '1';
+                    if (on !== '1') return;
+                    const today = (typeof getTodayString === 'function') ? getTodayString() : new Date().toISOString().slice(0, 10);
+                    if (localStorage.getItem(GB_LAST_DATE_KEY) === today) return;
+                    localStorage.setItem(GB_LAST_DATE_KEY, today);
+                    setTimeout(function () { try { window.gistBackupRun(true); } catch (e) {} }, 20000);
+                } catch (e) {}
+            };
+        })();
 
         // 仅管理员可见还原按钮：URL 带 ?admin=1 或 localStorage.tfjl_admin=1 时才显示
         function showAdminRestoreBtnIfAllowed() {
