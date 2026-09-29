@@ -4484,6 +4484,10 @@ if (true) {
                 const c = _readCloudJson('tfjl_skin_attrs');
                 if (c) { window.skinAttributesCloud = c; console.log('[SKIN] skin-attributes 从本地缓存恢复:', Object.keys(c).length, '条'); }
             }
+            if (!window.heroAttrsData || !Object.keys(window.heroAttrsData.heroes || {}).length) {
+                const c = _readCloudJson('tfjl_hero_attrs');
+                if (c && c.heroes) { window.heroAttrsData = c; console.log('[ATTR] hero-attrs-data 从本地缓存恢复:', Object.keys(c.heroes).length, '条'); }
+            }
         } catch (e) {}
     }
     _restoreCloudConfigs();   // 模块加载即恢复（先于任何渲染，消除"启动空窗"）
@@ -4563,6 +4567,21 @@ if (true) {
                     _restoreCloudConfigs();
                 }
             } catch (ae) { console.warn('[SKIN] load skin-attributes.json failed:', ae); _restoreCloudConfigs(); }
+
+            // 拉取英雄动态属性数据（CSV 转换，521KB 左右，按等级/皮肤/魔化生成悬浮属性）
+            try {
+                const hResp = await _fetchWithTimeout(REMOTE_SKIN_BASE + '/hero-attrs-data.json', 12000, { cache: 'no-cache' });
+                if (hResp.ok) {
+                    const hData = await hResp.json();
+                    if (hData && hData.heroes) {
+                        window.heroAttrsData = hData;
+                        _cacheCloudJson('tfjl_hero_attrs', window.heroAttrsData);
+                        console.log('[ATTR] hero-attrs-data.json loaded, heroes:', Object.keys(hData.heroes).length);
+                    }
+                } else {
+                    if (!window.heroAttrsData) _restoreCloudConfigs();
+                }
+            } catch (he) { console.warn('[ATTR] load hero-attrs-data.json failed:', he); _restoreCloudConfigs(); }
 
             // 拉取云端基础卡定义（cards.json，管理员维护新英雄）
             try {
