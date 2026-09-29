@@ -10506,18 +10506,47 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const isProjectScope = !!_scopeEl;
             const badge = event.target;
             // 重新渲染当前卡（融合副卡魔化/等级/皮肤变更后需要重绘皮肤层）
-            function _reapplyCard() {
+            async function _reapplyCard() {
                 // updateAllCardLevelBadges 会替换 badge 元素，原 badge 引用可能失效，重新按 cardId 查找
                 const curBadge = document.querySelector(`.card-level-badge[data-card-id="${cardId}"][data-hand-type="${handType}"]`);
                 const slotEl = curBadge ? curBadge.closest('.battle-slot') : null;
                 if (slotEl && typeof applySkinBgToSlot === 'function') {
-                    try { applySkinBgToSlot(slotEl, cardName); } catch (e) {}
+                    try { await applySkinBgToSlot(slotEl, cardName); } catch (e) {}
                 } else {
                     const handCard = curBadge ? curBadge.closest('.selected-card.card-item') : null;
                     if (handCard && typeof reapplySingleHandCard === 'function') {
-                        try { reapplySingleHandCard(handCard, cardId, handType); } catch (e) {}
+                        try { await reapplySingleHandCard(handCard, cardId, handType); } catch (e) {}
                     }
                 }
+            }
+            // 皮肤缩略图按钮（图片 + 文字标签）
+            function createSkinThumb(heroName, skin, selected, onClick) {
+                const b = document.createElement('button');
+                b.className = 'skin-thumb-btn';
+                b.dataset.skin = skin;
+                b.style.cssText = 'position:relative;width:56px;height:56px;border-radius:8px;border:2px solid ' + (selected ? '#ff9800' : 'rgba(255,255,255,0.2)') + ';background:#2a2a4a;overflow:hidden;cursor:pointer;padding:0;flex-shrink:0;transition:border-color .15s;';
+                const img = document.createElement('img');
+                img.style.cssText = 'width:100%;height:100%;object-fit:cover;opacity:0.45;';
+                img.alt = '';
+                b.appendChild(img);
+                const label = document.createElement('div');
+                label.textContent = skin;
+                label.style.cssText = 'position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.78);color:#fff;font-size:0.55rem;line-height:1.1;padding:2px 2px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+                b.appendChild(label);
+                b.onclick = onClick;
+                if (window.resolveHeroSkinUrl) {
+                    const skinForUrl = (skin === '默认') ? heroName : skin;
+                    window.resolveHeroSkinUrl(heroName, skinForUrl).then(url => {
+                        if (url) { img.src = url; img.style.opacity = '1'; }
+                    }).catch(() => {});
+                }
+                return b;
+            }
+            function setSkinThumbSelected(btnWrap, skin) {
+                btnWrap.querySelectorAll('.skin-thumb-btn').forEach(x => {
+                    const sel = x.dataset.skin === skin;
+                    x.style.borderColor = sel ? '#ff9800' : 'rgba(255,255,255,0.2)';
+                });
             }
             // 关闭已有弹窗
             document.querySelectorAll('.card-settings-popup-root').forEach(el => el.remove());
@@ -10571,17 +10600,13 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const skinWrap = document.createElement('div');
             skinWrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;';
             skins.forEach(skin => {
-                const b = document.createElement('button');
                 const sel = skin === currentSkin;
-                b.textContent = skin;
-                b.style.cssText = 'padding:5px 10px;border-radius:8px;border:1px solid ' + (sel ? '#ff9800' : 'rgba(255,255,255,0.2)') + ';background:' + (sel ? '#ff9800' : 'transparent') + ';color:' + (sel ? '#1a1a2e' : '#fff') + ';cursor:pointer;font-size:0.8rem;font-weight:' + (sel ? '600' : '400') + ';';
-                b.onclick = () => {
-                    if (isProjectScope) setCardSkin(cardId, skin, handType); else setDefaultCardSkin(cardId, skin);
-                    skinWrap.querySelectorAll('button').forEach(x => { x.style.borderColor = 'rgba(255,255,255,0.2)'; x.style.background = 'transparent'; x.style.color = '#fff'; x.style.fontWeight = '400'; });
-                    b.style.borderColor = '#ff9800'; b.style.background = '#ff9800'; b.style.color = '#1a1a2e'; b.style.fontWeight = '600';
+                const b = createSkinThumb(cardName, skin, sel, async () => {
+                    if (isProjectScope) await setCardSkin(cardId, skin, handType); else await setDefaultCardSkin(cardId, skin);
+                    setSkinThumbSelected(skinWrap, skin);
                     updateAllCardLevelBadges();
-                    _reapplyCard();
-                };
+                    await _reapplyCard();
+                });
                 skinWrap.appendChild(b);
             });
             box.appendChild(skinWrap);
@@ -10595,12 +10620,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const setMh = (on) => { mhBtn.textContent = on ? '✅ 魔化已开启' : '魔化未开启'; mhBtn.style.background = on ? '#a855f7' : 'transparent'; mhBtn.style.borderColor = on ? '#a855f7' : 'rgba(255,255,255,0.2)'; mhBtn.style.color = on ? '#fff' : '#fff'; };
                 setMh(currentMoHua);
                 mhBtn.style.cssText = 'padding:6px 14px;border-radius:8px;border:1px solid ' + (currentMoHua ? '#a855f7' : 'rgba(255,255,255,0.2)') + ';background:' + (currentMoHua ? '#a855f7' : 'transparent') + ';color:#fff;cursor:pointer;font-size:0.82rem;';
-                mhBtn.onclick = () => {
+                mhBtn.onclick = async () => {
                     const on = !getCardMoHua(cardId, handType);
                     setCardMoHua(cardId, on, handType);
                     setMh(on);
                     updateAllCardLevelBadges();
-                    _reapplyCard();
+                    await _reapplyCard();
                     // 主卡魔化变化 → 副卡魔化开关可用状态联动
                     const subMh = box.querySelector('#csSubMh');
                     if (subMh) { subMh.disabled = !on; subMh.style.opacity = on ? '1' : '0.4'; if (!on && typeof setFusionComponentMoHua === 'function') setFusionComponentMoHua(subHero, false); }
@@ -10644,16 +10669,13 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const subSkins = getAvailableSkins(_subHero);
                 const subCurSkin = (typeof getFusionComponentSkin === 'function') ? getFusionComponentSkin(_subHero) : '默认';
                 subSkins.forEach(skin => {
-                    const b = document.createElement('button');
                     const sel = skin === subCurSkin;
-                    b.textContent = skin;
-                    b.style.cssText = 'padding:4px 8px;border-radius:7px;border:1px solid ' + (sel ? '#ff9800' : 'rgba(255,255,255,0.2)') + ';background:' + (sel ? '#ff9800' : 'transparent') + ';color:' + (sel ? '#1a1a2e' : '#fff') + ';cursor:pointer;font-size:0.76rem;font-weight:' + (sel ? '600' : '400') + ';';
-                    b.onclick = () => {
-                        if (typeof setFusionSkin === 'function') setFusionSkin(_subHero, skin);
-                        subSkinWrap.querySelectorAll('button').forEach(x => { x.style.borderColor = 'rgba(255,255,255,0.2)'; x.style.background = 'transparent'; x.style.color = '#fff'; x.style.fontWeight = '400'; });
-                        b.style.borderColor = '#ff9800'; b.style.background = '#ff9800'; b.style.color = '#1a1a2e'; b.style.fontWeight = '600';
-                        _reapplyCard();
-                    };
+                    const b = createSkinThumb(_subHero, skin, sel, async () => {
+                        if (typeof setFusionSkin === 'function') await setFusionSkin(_subHero, skin);
+                        if (typeof invalidateFusionHalfCache === 'function') await invalidateFusionHalfCache(_subHero);
+                        setSkinThumbSelected(subSkinWrap, skin);
+                        await _reapplyCard();
+                    });
                     subSkinWrap.appendChild(b);
                 });
                 sec.appendChild(subSkinWrap);
@@ -10674,7 +10696,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 subLvVal.textContent = String(subLevels[subLvIndex]);
                 subLvVal.style.cssText = 'min-width:28px;text-align:right;color:#4ecdc4;font-weight:600;';
                 subLvInput.oninput = () => { subLvVal.textContent = String(subLevels[Number(subLvInput.value)]); };
-                subLvInput.onchange = () => { if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(_subHero, subLevels[Number(subLvInput.value)]); updateAllCardLevelBadges(); _reapplyCard(); };
+                subLvInput.onchange = async () => { if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(_subHero, subLevels[Number(subLvInput.value)]); updateAllCardLevelBadges(); await _reapplyCard(); };
                 subLvWrap.appendChild(subLvInput);
                 subLvWrap.appendChild(subLvVal);
                 sec.appendChild(subLvWrap);
@@ -10689,12 +10711,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const setSubMh = (on) => { subMhBtn.textContent = on ? '✅ 副卡魔化已开启' : '副卡魔化未开启'; subMhBtn.style.background = on ? '#a855f7' : 'transparent'; subMhBtn.style.borderColor = on ? '#a855f7' : 'rgba(255,255,255,0.2)'; subMhBtn.style.color = '#fff'; };
                 setSubMh(subMhOn);
                 subMhBtn.style.cssText = 'padding:5px 12px;border-radius:8px;border:1px solid ' + (subMhOn ? '#a855f7' : 'rgba(255,255,255,0.2)') + ';background:' + (subMhOn ? '#a855f7' : 'transparent') + ';color:#fff;cursor:pointer;font-size:0.8rem;';
-                subMhBtn.onclick = () => {
+                subMhBtn.onclick = async () => {
                     const on = !(getFusionComponentMoHua(_subHero));
                     setFusionComponentMoHua(_subHero, on);
                     setSubMh(on);
                     updateAllCardLevelBadges();
-                    _reapplyCard();
+                    await _reapplyCard();
                 };
                 sec.appendChild(subMhBtn);
 
@@ -10752,7 +10774,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         });
                         renderFusionSubSection(box, cardName);
                         updateAllCardLevelBadges();
-                        _reapplyCard();
+                        await _reapplyCard();
                         // 同步刷新减伤值输入（因为 baseHero 可能已变）
                         const drInput = box.querySelector('#csDrInput');
                         if (drInput) {
