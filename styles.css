@@ -3457,6 +3457,10 @@
 /* 淡色随主题：默认 rgba(255,255,255,0.32)，需要换主题色时改 CSS 变量 --introPanelColor 即可 */
 #introPanel { scrollbar-width: thin; }
 #introPanelBody b, #introPanelBody strong { color: rgba(255,255,255,0.45); font-weight: 700; }
+/* 最小化折叠态：收成小药丸，只留「📖 功能简介 −」标题行，点击展开 */
+#introPanel.min { width: auto !important; max-height: none !important; padding: 4px 10px 5px !important; }
+#introPanel.min #introPanelBody { display: none !important; }
+#introPanel.min > div { margin-bottom: 0 !important; }
 @media (max-width: 900px) {
     #introPanel { display: none !important; }
 }

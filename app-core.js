@@ -17193,12 +17193,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         // ==================== 功能简介板（出战区右侧） ====================
         // 内容 = 管理员公告里「分类=功能简介」的最新一条生效公告的正文；多条取 active_time 最新。
         // 淡色随主题：面板正文用 CSS 变量 --introPanelColor（默认 rgba(255,255,255,0.32)）。
-        // 可关闭：点 ✕ 按内容哈希记住；管理员更新内容后自动重新显示。
-        function _introPanelHash(text) {
-            let h = 0;
-            for (let i = 0; i < text.length; i++) { h = ((h << 5) - h + text.charCodeAt(i)) | 0; }
-            return String(h);
-        }
+        // 可最小化折叠：每次打开默认展开；折叠只是收起正文，不跨刷新记忆（2026-09-29 由"关闭"改为"最小化"）。
         function renderIntroPanel() {
             const panel = document.getElementById('introPanel');
             if (!panel) return;
@@ -17215,19 +17210,16 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             }
             const bodyEl = document.getElementById('introPanelBody');
             if (!latest || !latest.content || !bodyEl) { panel.style.display = 'none'; return; }
-            let dismissed = null;
-            try { dismissed = localStorage.getItem('tfjl_introPanel_dismissed'); } catch (e) {}
-            if (dismissed === _introPanelHash(latest.content)) { panel.style.display = 'none'; return; }
+            const changed = (bodyEl.textContent !== latest.content);
             bodyEl.textContent = latest.content;
             panel.style.display = 'flex';
+            if (changed) panel.classList.remove('min'); // 首载/公告更新 → 默认展开；每分钟兜底刷新且内容未变时不打扰折叠态
         }
-        function closeIntroPanel() {
+        function toggleIntroPanelMin() {
             const panel = document.getElementById('introPanel');
-            const bodyEl = document.getElementById('introPanelBody');
-            if (panel) panel.style.display = 'none';
-            try { localStorage.setItem('tfjl_introPanel_dismissed', _introPanelHash((bodyEl && bodyEl.textContent) || '')); } catch (e) {}
+            if (panel) panel.classList.toggle('min');
         }
-        try { window.renderIntroPanel = renderIntroPanel; window.closeIntroPanel = closeIntroPanel; } catch (e) {}
+        try { window.renderIntroPanel = renderIntroPanel; window.toggleIntroPanelMin = toggleIntroPanelMin; } catch (e) {}
 
         let activeTimeCheckInterval = null;
         function startActiveTimeCheck() {
