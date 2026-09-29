@@ -616,10 +616,31 @@ fn push_with_self_heal(repo: &str, push_args: &[&str]) -> Result<String, String>
             match run_git(repo, &["-c", "rebase.autoStash=true", "pull", "--rebase", "origin", "main"]) {
                 Ok(_) => {}
                 Err(e2) => {
-                    return Err(format!(
-                        "push 失败: {}\n自动 rebase 修复失败: {}\n（多为网络/代理问题，稍后重试即可）",
-                        e1, e2
-                    ));
+                    // 🔴 2026-09-29 二段自愈：rebase 撞到真冲突时不再直接报错，按权威规则自动解——
+                    //    版本文件(index.html/sw.js)取远端【ours】（CI 是版本号唯一权威源）；
+                    //    卡组数据(skins/*.json)取本地【theirs】（用户的添加/删除优先）。
+                    //    解完 git add -A + rebase --continue，然后照常重推。
+                    let rebase_dir = std::path::Path::new(repo).join(".git").join("rebase-merge");
+                    if rebase_dir.exists() {
+                        let _ = run_git(repo, &["checkout", "--ours", "--", "index.html", "sw.js"]);
+                        let _ = run_git(repo, &["checkout", "--theirs", "--", "skins/cards.json", "skins/skin-attributes.json", "skins/fusions.json"]);
+                        let _ = run_git(repo, &["add", "-A"]);
+                        match run_git(repo, &["-c", "core.editor=true", "rebase", "--continue"]) {
+                            Ok(_) => {}
+                            Err(e3) => {
+                                let _ = run_git(repo, &["rebase", "--abort"]);
+                                return Err(format!(
+                                    "push 失败: {}\n自动 rebase 冲突解决后仍失败: {}\n（已回退到 rebase 前状态，稍后重试即可）",
+                                    e1, e3
+                                ));
+                            }
+                        }
+                    } else {
+                        return Err(format!(
+                            "push 失败: {}\n自动 rebase 修复失败: {}\n（多为网络/代理问题，稍后重试即可）",
+                            e1, e2
+                        ));
+                    }
                 }
             }
             match run_git(repo, push_args) {
@@ -671,23 +692,18 @@ async fn git_push_skins() -> Result<String, String> {
     //    git add 暂存不到任何东西 → git commit 报 nothing-to-commit 退出码 1 → 整个推送被误报失败
     //    （pre-commit 钩子照跑并全部 PASS，用户看到「全部校验通过」却报失败，非常迷惑）。
     //    改为与 git_push_fusions 同款的【限路径】status，只看真正要提交的 skins/ + 版本文件。
-    let status = run_git(repo, &["status", "--porcelain", "--", "skins/", "index.html", "sw.js"])?;
+    // 🔴 2026-09-29 用户实测：app 与 CI 双端都 bump index.html/sw.js 的同一行版本号 → 每次推送必冲突
+    //    （rejected non-fast-forward → 自动 rebase 又撞 sw.js 版本行冲突 → 永远修不完）。
+    //    改为【app 只提交 skins/，版本号由 CI 部署时统一 +1】—— 双端不再碰同一条线，冲突源消灭。
+    let status = run_git(repo, &["status", "--porcelain", "--", "skins/"])?;
     if !status.trim().is_empty() {
-        // 2) bump 前端版本号（versionTag + CACHE_VERSION），便于用户刷新识别
-        match bump_skin_versions(repo) {
-            Ok(_) => log.push_str("✓ 已自增前端版本号。\n"),
-            Err(e) => log.push_str(&format!("• 版本号自增跳过（{}）\n", e)),
-        }
-        // 3) 暂存 skins/ 及前端版本文件
-        run_git(repo, &["add", "skins/", "index.html", "sw.js"])?;
-        // 4) 提交：暂存区为空（重复点击/竞态/杂文件干扰）时跳过提交不误报，
-        //    用 git diff --cached 探测而非匹配 commit 错误文案（不受 git 输出语言影响）
+        run_git(repo, &["add", "skins/"])?;
         let staged = run_git(repo, &["diff", "--cached", "--name-only"])?;
         if staged.trim().is_empty() {
             log.push_str("• 无新改动可提交（可能刚已提交过），直接推送。\n");
         } else {
-            run_git(repo, &["commit", "-m", "feat: 皮肤制作一键推送（自动 bump 版本）"])?;
-            log.push_str("✓ 已提交本地改动。\n");
+            run_git(repo, &["commit", "-m", "feat: 卡组管理一键推送 skins 改动"])?;
+            log.push_str("✓ 已提交本地改动（版本号由 CI 部署时统一自增）。\n");
         }
     } else {
         log.push_str("• 无本地改动，跳过提交。\n");
@@ -787,6 +803,7 @@ fn publish_skins(token: Option<String>) -> Result<String, String> {
 ///       改为通用解析 `s<数字>.<数字>.<数字>`，只自增末段补丁号。
 ///    ③ 注意：CI（deploy.yml）每次部署成功也会自动 +1 并 commit 回 main，这里只是**本地双保险**；
 ///       所以本函数失败不影响版本前进（推送成功后 CI 照样 +1）。
+#[allow(dead_code)] // 🔴 2026-09-29 起版本号统一由 CI 自增，本函数保留备用不再被调用
 fn bump_skin_versions(repo: &str) -> Result<(), String> {
     bump_sw_cache_version(&format!("{}\\sw.js", repo))
 }
