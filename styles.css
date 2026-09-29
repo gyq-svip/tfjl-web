@@ -3455,6 +3455,8 @@
 /* 融合卡不再特殊位置，与普通卡统一：左下等级、右下魔化 */
 /* ===================== 功能简介板（出战区右侧，内容=管理员公告·分类「功能简介」） ===================== */
 /* 淡色随主题：默认 rgba(255,255,255,0.32)，需要换主题色时改 CSS 变量 --introPanelColor 即可 */
+/* 阵容图库内的等级/魔化角标：纯显示（数据源=卡池，点角标不弹设置窗，避免在图库里误改项目皮肤） */
+.ll-slot .card-level-badge { pointer-events: none !important; }
 #introPanel { scrollbar-width: thin; }
 #introPanelBody b, #introPanelBody strong { color: rgba(255,255,255,0.45); font-weight: 700; }
 /* 最小化折叠态：收成小药丸，只留「📖 功能简介 −」标题行，点击展开 */

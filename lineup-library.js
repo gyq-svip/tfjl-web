@@ -7,7 +7,7 @@
 // ============================================================
 (function () {
     const LS_KEY = 'tfjl_lineup_local_v1';
-    const state = { tab: 'sail', q: '', page: 1, open: {}, menuFor: null };
+    const state = { tab: 'featured', q: '', page: 1, open: {}, menuFor: null };   // 🔴 2026-09-29 用户要求：默认打开「精选」tab
 
     function _load() { let o; try { o = JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch (e) { o = {}; } _migrateScripts(o); return o; }
     function _save(o) { try { localStorage.setItem(LS_KEY, JSON.stringify(o)); } catch (e) {} }
@@ -214,9 +214,9 @@
         const isSail = state.tab === 'sail';
         h.innerHTML =
             '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-            + '<button onclick="_llTab(\'sail\')" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (isSail ? 'rgba(78,205,196,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (isSail ? 'rgba(78,205,196,0.18)' : 'transparent') + ';color:' + (isSail ? '#4ecdc4' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">🚢 大航海(' + D.sailing.length + ')</button>'
-            + '<button onclick="_llTab(\'act\')" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (!isSail ? 'rgba(255,215,0,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (!isSail ? 'rgba(255,215,0,0.15)' : 'transparent') + ';color:' + (!isSail ? '#ffd700' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">🏆 活动阵容(' + D.activity.length + '天)</button>'
             + '<button onclick="_llTab(&quot;featured&quot;)" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (state.tab === 'featured' ? 'rgba(156,39,176,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (state.tab === 'featured' ? 'rgba(156,39,176,0.18)' : 'transparent') + ';color:' + (state.tab === 'featured' ? '#ce93d8' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">精选</button>' + (state.tab === 'featured' ? '<button onclick="_featLocalAddDlg()" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(78,205,196,0.6);background:rgba(78,205,196,0.18);color:#4ecdc4;cursor:pointer;font-size:0.8rem;font-weight:700;">添加本地阵容</button>' + (_isAdmin() ? '<button onclick="_featuredAddDlg()" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(240,147,43,0.6);background:rgba(240,147,43,0.18);color:#f0932b;cursor:pointer;font-size:0.8rem;font-weight:700;">添加精选</button>' : '') : '') + '<input id="llSearch" value="' + _esc(state.q) + '" oninput="_llSearch(this.value)" placeholder="🔍 多个英雄用空格/逗号分隔（同时含才显示）：如 电法 炎魔 悟空" style="flex:1;min-width:200px;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;">'
+            + '<button onclick="_llTab(\'sail\')" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (isSail ? 'rgba(78,205,196,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (isSail ? 'rgba(78,205,196,0.18)' : 'transparent') + ';color:' + (isSail ? '#4ecdc4' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">🚢 大航海(' + D.sailing.length + ')</button>'
+            + '<button onclick="_llTab(\'act\')" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (state.tab === 'act' ? 'rgba(255,215,0,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (state.tab === 'act' ? 'rgba(255,215,0,0.15)' : 'transparent') + ';color:' + (state.tab === 'act' ? '#ffd700' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">🏆 活动阵容(' + D.activity.length + '天)</button>'
             + '</div>'
             + '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-top:4px;">左卡组右笔记 · <b style="color:#ce93d8;">左键=轮流切融合卡（含副卡皮肤，末尾关闭）</b> · <b style="color:rgba(255,255,255,0.7);">右键=主卡皮肤（融合后也可切）</b> · <b style="color:#ff8a80;">🛡️减伤=鼠标悬浮查看每张卡的减伤明细（0% 减伤的卡自动隐藏）</b> · 活动 📜=脚本 ·（个人设置只存本机）· 拖标题栏移动窗口，右下角拉伸大小</div>';
         _ensureAdmin();
@@ -330,6 +330,7 @@
     function _applySlots(root) {
         if (!window.applySkinBgToSlot) return;
         const slots = root.querySelectorAll('.ll-slot[data-hero]');
+        const poolMap = (window.createLevelBadgeHTML && window.collectPoolCards) ? _poolTypeMap() : {};   // 每轮渲染只查一次卡池
         let i = 0;
         (function step() {
             if (i >= slots.length) return;
@@ -344,7 +345,7 @@
             const fus = (L.fus && L.fus[hero]) || '';
             const cur = fus || hero;
             Promise.resolve().then(function () { return window.applySkinBgToSlot(el, cur, cur, 'my', force, fus ? force : undefined); })
-                .catch(function () {}).then(function () { _fusBadge(el, fus); step(); });
+                .catch(function () {}).then(function () { _fusBadge(el, fus); _lvBadge(el, hero, fus, poolMap); step(); });
         })();
     }
     // 🔴 2026-09-22 快捷操作（与主页融合一致，用户要求）：
@@ -359,6 +360,23 @@
         b.style.cssText = 'position:absolute;left:1px;top:1px;pointer-events:none;';
         b.innerHTML = '<span style="background:rgba(156,39,176,0.85);color:#fff;font-size:0.56rem;padding:0 3px;border-radius:3px;">' + _esc(label) + '</span>';
         el.appendChild(b);
+    }
+    // 🔴 2026-09-29 主卡等级/魔化角标：与卡池同步 —— collectPoolCards 按英雄名反查卡池 id/type，
+    //    createLevelBadgeHTML 读的就是卡池那套等级/魔化存储（my_<池id>），改卡池=全局生效，图库只做显示。
+    //    副卡等级/魔化不用这里管：applySkinBgToSlot 的融合分支会按全局 fusionLevels/fusionMoHua 自动挂副卡角标（同为卡池数据源）。
+    function _poolTypeMap() {
+        const m = {};
+        try { (window.collectPoolCards() || []).forEach(function (p) { if (p && p._ds && p._ds.name) m[p._ds.name] = { id: p._ds.id, type: p._ds.type || 'gold' }; }); } catch (e) {}
+        return m;
+    }
+    function _lvBadge(el, hero, fus, poolMap) {
+        if (!window.createLevelBadgeHTML) return;
+        el.querySelectorAll('.card-level-badge').forEach(function (b) { b.remove(); });   // 只清主卡角标（等级+魔化图标）；副卡角标归主页融合管线管
+        try {
+            const cur = fus || hero;
+            const pc = (poolMap || _poolTypeMap())[cur];
+            if (pc) el.insertAdjacentHTML('afterbegin', window.createLevelBadgeHTML(pc.id, pc.type, 'my', cur));
+        } catch (e) {}
     }
     window._llFuseCycle = function (el) {
         const hero = el.getAttribute('data-hero'), tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid');
@@ -395,7 +413,7 @@
         if (next.sub) { try { window.fusionSkins = window.fusionSkins || {}; window.fusionSkins[next.sub] = next.skin; } catch (e2) {} }
         const skin = (L.skin && L.skin[hero]) || undefined;
         const shown = next.v || hero;
-        Promise.resolve().then(function () { return window.applySkinBgToSlot(el, shown, shown, 'my', skin, next.v ? skin : undefined); }).catch(function () {}).then(function () { _fusBadge(el, next.v); _refreshDrSums(document.getElementById('llList')); });
+        Promise.resolve().then(function () { return window.applySkinBgToSlot(el, shown, shown, 'my', skin, next.v ? skin : undefined); }).catch(function () {}).then(function () { _fusBadge(el, next.v); _lvBadge(el, hero, next.v); _refreshDrSums(document.getElementById('llList')); });
         try { if (typeof showToast === 'function') showToast(next.v ? (next.v + (next.skin ? ' · 副卡皮:' + next.skin : ' · 副卡默认皮')) : '已关闭融合（' + hero + '）', 'info'); } catch (e2) {}
     };
     //   右键 = 循环【主卡】皮肤（🔴 2026-09-22 修复：融合后也一直可切，与左键融合循环互不影响；列表=主页卡池 getHeroSkins）
@@ -416,7 +434,7 @@
         const shown = fus || hero;
         // 🔴 融合态必须传第6参 forceMainSkin（融合分支只认它，第5参被忽略）——修复"显示切了但皮肤没换"
         Promise.resolve().then(function () { return window.applySkinBgToSlot(el, shown, shown, 'my', next || undefined, fus ? (next || undefined) : undefined); })
-            .catch(function () {}).then(function () { _refreshDrSums(document.getElementById('llList')); });
+            .catch(function () {}).then(function () { _lvBadge(el, hero, fus); _refreshDrSums(document.getElementById('llList')); });
         try { if (typeof showToast === 'function') showToast(hero + ' 主卡皮肤 → ' + (next || '默认'), 'info'); } catch (e2) {}
     };
     // ---------- 活动脚本（🔴 2026-09-22 用户要求：活动可以用脚本去打，每天一个脚本，可上传到脚本分享供大家使用） ----------
