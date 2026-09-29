@@ -10375,6 +10375,22 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     try { await applySkinBgToSlot(slot, getSlotCardName(slot)); } catch (e) {}
                 });
             } catch (e) { console.warn('[SKIN] setDefaultCardSkin refresh error:', e); }
+            // 🔴 2026-09-29 卡池卡片本身也即时刷新：基础卡只刷这一张（替代 updateAllCardLevelBadges 里拖累全场的全卡池重铺）；
+            //    融合卡含主副双图，走一次全量（低频可接受）
+            try {
+                let needFull = false;
+                document.querySelectorAll('.collapsible-section .card-item[data-id="' + cardId + '"]').forEach(el => {
+                    const name = el.dataset.name || '';
+                    if (!name) return;
+                    if (el.dataset.fusion === 'true') { needFull = true; return; }
+                    if (window.resolveHeroSkinUrl) {
+                        window.resolveHeroSkinUrl(name, skin).then(url => {
+                            if (url) { el.classList.add('skin-bg'); el.style.backgroundImage = 'url("' + url + '")'; }
+                        }).catch(() => {});
+                    }
+                });
+                if (needFull && typeof updateCardPoolSkins === 'function') updateCardPoolSkins().catch(() => {});
+            } catch (e) {}
             if (typeof persistProjectSkins === 'function') persistProjectSkins();
         }
         
@@ -10941,13 +10957,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 card.insertAdjacentHTML('afterbegin', createLevelBadgeHTML(cardId, actualType, 'teammate', cardName));
             });
 
-            // 同步刷新卡池皮肤小图（全局预设：defaultCardSkins / heroSkinSelections）
-            // 🔴 2026-09-29 防抖：徽标重建便宜，但末尾的全卡池皮肤重铺很重（高性能模式 ~130 张 resolve+样式写）。
-            //    弹窗里连续点皮肤/等级/魔化会连环触发 → 排队堆积 → 越点越卡。改为 trailing 600ms 合并成一次。
-            if (typeof updateCardPoolSkins === 'function') {
-                clearTimeout(window.__ubPoolSkinsT);
-                window.__ubPoolSkinsT = setTimeout(function () { updateCardPoolSkins().catch(function () {}); }, 600);
-            }
+            // 🔴 2026-09-29 移除「全卡池皮肤重铺」（高性能模式 ~130 张 resolve+样式写，弹窗里点一次卡 5 秒的元凶）。
+            //    皮肤变更的卡池刷新已由 setDefaultCardSkin 精准刷单张；等级/魔化变更根本不影响卡池皮肤。
         }
 
         // ==================== 性能模式（用户菜单开关）====================
