@@ -2904,12 +2904,13 @@
                         <span style="color:#60a5fa;font-size:0.9rem;font-weight:500;">Gist 全量备份（本地压缩包 · 所有 Gist 文件）</span>
                     </div>
                     <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;line-height:1.5;margin-bottom:10px;">
-                        把账号下<b>所有 Gist 的每个文件</b>打包成 zip 存到本机（room_index / counter 统计 / 消息 / 诊断 / 登录 / 活动 / 分享 / 脚本…全覆盖）。<b>Gist 被误删</b>时可打开备份，把内容还原到<b>新的 Gist</b>。<b>每天首次打开 App 会自动在后台备份一次</b>（默认开启）。
+                        把账号下<b>所有 Gist 的每个文件</b>打包成 zip 存到本机（room_index / counter 统计 / 消息 / 诊断 / 登录 / 活动 / 分享 / 脚本…全覆盖）。<b>Gist 被误删</b>时可打开备份，把内容还原到<b>新的 Gist</b>。<b>每天首次打开 App 会自动在后台备份一次</b>（默认开启）。<br>⚡ <b>增量备份</b>：只拉取「有变动」的 Gist（按 updated_at 比对），没变就整次跳过；<b>每 7 天自动做一次全量</b>，保证被删的 Gist 一定落在某份全量包里。读取用 5 并发 + 异步，不卡界面。
                     </div>
                     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
                         <button onclick="gistBackupRun(false)" style="background:linear-gradient(135deg,#60a5fa,#3b82f6);color:#fff;border:none;padding:10px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">🗃️ 立即备份到本地(zip)</button>
                         <button onclick="document.getElementById('gistBackupFile').click()" style="background:linear-gradient(135deg,#a78bfa,#7c3aed);color:#fff;border:none;padding:10px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">📤 从本地备份还原</button>
                         <input type="file" id="gistBackupFile" accept=".zip,application/zip" style="display:none;" onchange="gistBackupOnFile(this)">
+                        <button onclick="gistBackupCheckMissing()" style="background:rgba(255,152,0,0.15);border:1px solid rgba(255,152,0,0.4);color:#ff9800;padding:10px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">🔎 检测缺失(只读)</button>
                         <button onclick="gistBackupOpenDir()" style="background:rgba(255,255,255,0.1);color:#fff;border:none;padding:10px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">📂 打开备份目录</button>
                         <label style="display:flex;align-items:center;gap:6px;color:rgba(255,255,255,0.7);font-size:0.78rem;cursor:pointer;user-select:none;">
                             <input type="checkbox" id="gistAutoBackupChk" onchange="gistBackupToggleAuto(this.checked)"> 每天首次打开自动备份
