@@ -8574,16 +8574,19 @@ function applyFusionSkinToHandCard(card, mainUrl, fusedUrl, fusedIsBadge) {
         fm.remove();
     }
 
-    // 副卡等级角标（副卡左下角小数字），与主卡等级角标(主卡左下)区分
+    // 副卡等级角标：与主线同款（品质盾牌背景 + 空心白字），定位在副卡图内左下
+    const _subType = (function () {
+        const el = document.querySelector('.collapsible-section .card-item[data-name="' + (_subHero || '').replace(/"/g, '\\"') + '"]');
+        return el ? (el.dataset.type || 'gold') : 'gold';
+    })();
     let subLv = card.querySelector('.fused-sub-level');
     if (_subHero && !_subHidden) {
         const lv = (typeof getFusionComponentLevel === 'function') ? getFusionComponentLevel(_subHero) : 1;
         if (!subLv) {
             subLv = document.createElement('div');
-            subLv.className = 'fused-sub-level';
-            subLv.style.cssText = 'position:absolute;left:1px;bottom:calc(60% + 1px);background:rgba(0,0,0,0.7);color:#4ecdc4;border:1px solid #4ecdc4;border-radius:6px;font-size:0.6rem;line-height:1;padding:1px 4px;z-index:6;pointer-events:none;';
             card.appendChild(subLv);
         }
+        subLv.className = 'fused-sub-level card-level-q-' + _subType;
         subLv.textContent = lv;
     } else if (subLv && subLv.parentNode) {
         subLv.remove();
@@ -8676,16 +8679,19 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         fm.remove();
     }
 
-    // 副卡等级角标（副卡左下角小数字），与主卡等级角标(主卡左下)区分
+    // 副卡等级角标：与主线同款（品质盾牌背景 + 空心白字），定位在副卡图内左下
+    const _slotSubType = (function () {
+        const el = document.querySelector('.collapsible-section .card-item[data-name="' + (_slotSub || '').replace(/"/g, '\\"') + '"]');
+        return el ? (el.dataset.type || 'gold') : 'gold';
+    })();
     let subLv = slot.querySelector('.fused-sub-level');
     if (_slotSub && !_slotSubHidden) {
         const lv = (typeof getFusionComponentLevel === 'function') ? getFusionComponentLevel(_slotSub) : 1;
         if (!subLv) {
             subLv = document.createElement('div');
-            subLv.className = 'fused-sub-level';
-            subLv.style.cssText = 'position:absolute;left:1px;bottom:calc(60% + 1px);background:rgba(0,0,0,0.7);color:#4ecdc4;border:1px solid #4ecdc4;border-radius:6px;font-size:0.6rem;line-height:1;padding:1px 4px;z-index:6;pointer-events:none;';
             slot.appendChild(subLv);
         }
+        subLv.className = 'fused-sub-level card-level-q-' + _slotSubType;
         subLv.textContent = lv;
     } else if (subLv && subLv.parentNode) {
         subLv.remove();
