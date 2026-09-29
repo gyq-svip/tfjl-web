@@ -10704,13 +10704,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             box.appendChild(title);
 
             // 等级选择 + 当前等级属性（简洁文本）
-            const lvWrap = document.createElement('div');
-            lvWrap.style.cssText = 'margin-bottom:12px;';
-            const lvInfo = document.createElement('div');
-            lvInfo.id = 'csLvInfo';
-            lvInfo.style.cssText = 'margin-top:6px;font-size:0.72rem;line-height:1.65;color:rgba(255,255,255,0.8);background:rgba(0,0,0,0.18);border-radius:6px;padding:6px 8px;';
-            const lvBtns = document.createElement('div');
-            lvBtns.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;';
             function _getPassiveAtLevel(heroName, level, field) {
                 try {
                     const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[heroName];
@@ -10726,38 +10719,35 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     return cur;
                 } catch (e) { return null; }
             }
-            function _setLvBtnSelected(selLv) {
-                lvBtns.querySelectorAll('button').forEach(b => {
-                    const sel = Number(b.dataset.lv) === selLv;
-                    b.style.borderColor = sel ? '#4ecdc4' : 'rgba(255,255,255,0.2)';
-                    b.style.background = sel ? '#4ecdc4' : 'transparent';
-                    b.style.color = sel ? '#1a1a2e' : '#fff';
-                });
-            }
+            const lvWrap = document.createElement('div');
+            lvWrap.style.cssText = 'margin-bottom:12px;';
+            const lvInfo = document.createElement('div');
+            lvInfo.id = 'csLvInfo';
+            lvInfo.style.cssText = 'margin-top:6px;font-size:0.72rem;line-height:1.65;color:rgba(255,255,255,0.8);background:rgba(0,0,0,0.18);border-radius:6px;padding:6px 8px;';
+            lvWrap.innerHTML = '<div style="color:#4ecdc4;margin-bottom:6px;">📊 等级：<b id="csLvVal">' + currentLevel + '</b></div>';
+            const slider = document.createElement('input');
+            slider.type = 'range'; slider.min = '0'; slider.max = String(Math.max(0, levels.length - 1)); slider.step = '1';
+            slider.value = String(Math.max(0, levels.indexOf(currentLevel)));
+            slider.style.cssText = 'width:100%;';
             function _renderLevelInfo(curLv) {
                 const initial = _getPassiveAtLevel(mainName, curLv, 'initialPassive');
                 const fullStar = _getPassiveAtLevel(mainName, curLv, 'fullStarPassive');
-                let html = '<div style="color:#4ecdc4;font-weight:600;margin-bottom:4px;">📊 等级：' + curLv + '</div>';
+                let html = '<div style="color:#4ecdc4;font-weight:600;margin-bottom:4px;">等级：' + curLv + '</div>';
                 if (initial && initial.desc) html += '<div>【初始被动】' + initial.desc + '</div>';
                 if (fullStar && fullStar.desc) html += '<div>【满星被动】' + fullStar.desc + '</div>';
                 if (!initial?.desc && !fullStar?.desc) html += '<span style="opacity:0.5">暂无等级属性</span>';
                 lvInfo.innerHTML = html;
-                _setLvBtnSelected(curLv);
             }
-            levels.forEach(lv => {
-                const b = document.createElement('button');
-                b.textContent = String(lv);
-                b.dataset.lv = String(lv);
-                b.style.cssText = 'padding:4px 9px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:#fff;cursor:pointer;font-size:0.74rem;';
-                b.onclick = async () => {
-                    setCardLevel(cardId, lv, cardType, handType);
-                    updateAllCardLevelBadges();
-                    _renderLevelInfo(lv);
-                    await _reapplyCard();
-                };
-                lvBtns.appendChild(b);
-            });
-            lvWrap.appendChild(lvBtns);
+            slider.oninput = () => {
+                const el = document.getElementById('csLvVal'); if (el) el.textContent = levels[Number(slider.value)];
+                _renderLevelInfo(levels[Number(slider.value)]);
+            };
+            slider.onchange = () => {
+                const newLv = levels[Number(slider.value)];
+                setCardLevel(cardId, newLv, cardType, handType); updateAllCardLevelBadges();
+                _renderLevelInfo(newLv);
+            };
+            lvWrap.appendChild(slider);
             lvWrap.appendChild(lvInfo);
             box.appendChild(lvWrap);
             _renderLevelInfo(currentLevel);
@@ -10903,19 +10893,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 subLvTitle.textContent = '📊 副卡等级';
                 sec.appendChild(subLvTitle);
                 const subLvWrap = document.createElement('div');
+                subLvWrap.innerHTML = '<div style="color:#4ecdc4;margin-bottom:5px;">等级：<b id="csSubLvVal">' + ((typeof getFusionComponentLevel === 'function') ? (getFusionComponentLevel(_subHero) || 1) : 1) + '</b></div>';
+                const subLvInput = document.createElement('input');
+                subLvInput.type = 'range'; subLvInput.min = '0'; subLvInput.max = String(Math.max(0, subLevels.length - 1)); subLvInput.step = '1';
+                const subLvIndex = Math.max(0, subLevels.indexOf((typeof getFusionComponentLevel === 'function') ? getFusionComponentLevel(_subHero) : 1));
+                subLvInput.value = String(subLvIndex);
+                subLvInput.style.cssText = 'width:100%;accent-color:#4ecdc4;';
                 const subLvInfo = document.createElement('div');
                 subLvInfo.id = 'csSubLvInfo';
                 subLvInfo.style.cssText = 'margin-top:5px;font-size:0.68rem;line-height:1.55;color:rgba(255,255,255,0.8);background:rgba(0,0,0,0.18);border-radius:6px;padding:5px 7px;';
-                const subLvBtns = document.createElement('div');
-                subLvBtns.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;';
-                function _setSubLvBtnSelected(selLv) {
-                    subLvBtns.querySelectorAll('button').forEach(b => {
-                        const sel = Number(b.dataset.lv) === selLv;
-                        b.style.borderColor = sel ? '#4ecdc4' : 'rgba(255,255,255,0.2)';
-                        b.style.background = sel ? '#4ecdc4' : 'transparent';
-                        b.style.color = sel ? '#1a1a2e' : '#fff';
-                    });
-                }
                 function _renderSubLevelInfo(curLv) {
                     const initial = _getPassiveAtLevel(_subHero, curLv, 'initialPassive');
                     const fullStar = _getPassiveAtLevel(_subHero, curLv, 'fullStarPassive');
@@ -10924,23 +10910,19 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (fullStar && fullStar.desc) html += '<div>【满星被动】' + fullStar.desc + '</div>';
                     if (!initial?.desc && !fullStar?.desc) html += '<span style="opacity:0.5">暂无等级属性</span>';
                     subLvInfo.innerHTML = html;
-                    _setSubLvBtnSelected(curLv);
                 }
-                const subLvIndex = Math.max(0, subLevels.indexOf((typeof getFusionComponentLevel === 'function') ? getFusionComponentLevel(_subHero) : 1));
-                subLevels.forEach(lv => {
-                    const b = document.createElement('button');
-                    b.textContent = String(lv);
-                    b.dataset.lv = String(lv);
-                    b.style.cssText = 'padding:3px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:#fff;cursor:pointer;font-size:0.7rem;';
-                    b.onclick = async () => {
-                        if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(_subHero, lv);
-                        updateAllCardLevelBadges();
-                        _renderSubLevelInfo(lv);
-                        await _reapplyCard();
-                    };
-                    subLvBtns.appendChild(b);
-                });
-                subLvWrap.appendChild(subLvBtns);
+                subLvInput.oninput = () => {
+                    const el = document.getElementById('csSubLvVal'); if (el) el.textContent = subLevels[Number(subLvInput.value)];
+                    _renderSubLevelInfo(subLevels[Number(subLvInput.value)]);
+                };
+                subLvInput.onchange = async () => {
+                    const newLv = subLevels[Number(subLvInput.value)];
+                    if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(_subHero, newLv);
+                    updateAllCardLevelBadges();
+                    _renderSubLevelInfo(newLv);
+                    await _reapplyCard();
+                };
+                subLvWrap.appendChild(subLvInput);
                 subLvWrap.appendChild(subLvInfo);
                 sec.appendChild(subLvWrap);
                 _renderSubLevelInfo(subLevels[subLvIndex]);
