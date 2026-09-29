@@ -797,7 +797,13 @@ fn bump_sw_cache_version(path: &str) -> Result<(), String> {
     let marker = "const CACHE_VERSION";
     let pos = content.find(marker).ok_or("未找到 CACHE_VERSION")?;
     // 只在标记后一小段里找版本号，避免误改文件里其它 sX.Y.Z（如注释里的示例）
-    let window_end = (pos + 200).min(content.len());
+    // 🔴 2026-09-29 修闪退真凶：固定 +200 字节窗口会切进 UTF-8 中文注释的字符中间
+    //    （"end byte index 7782 is not a char boundary; it is inside '治'"）→ 切片 panic。
+    //    window_end 向后对齐到字符边界再切。
+    let mut window_end = (pos + 200).min(content.len());
+    while window_end < content.len() && !content.is_char_boundary(window_end) {
+        window_end += 1;
+    }
     let after = &content[pos..window_end];
     let (vs, ve, ver) = find_semver(after).ok_or("未找到版本号（形如 s1.1.76）")?;
     let new_ver = inc_semver_patch(&ver)?;
