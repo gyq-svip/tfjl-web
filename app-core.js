@@ -8133,6 +8133,10 @@
         window.uploadScriptToGist = uploadScriptToGist;   // 图库活动阵容的「📜脚本」上传（描述含"脚本分享"→ 自动进脚本墙）
         window.getDamageReductionBreakdown = getDamageReductionBreakdown;   // 图库组头减伤悬浮明细（主页同款计算）
         window.formatDrTooltip = formatDrTooltip;
+        // 🔴 2026-09-29 图库活动阵容主卡等级/魔化角标（与卡池同步）：createLevelBadgeHTML 读同一套等级/魔化存储，
+        //    collectPoolCards 按英雄名反查卡池 id/type —— 图库显示值=卡池设置值，改卡池即全局生效。
+        window.createLevelBadgeHTML = createLevelBadgeHTML;
+        window.collectPoolCards = collectPoolCards;
         // 基础英雄 → 以其为主卡(part[0])的融合卡列表
         function getFusionVariantsForBase(baseHero) {
             if (!baseHero) return [];
