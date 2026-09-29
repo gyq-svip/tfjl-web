@@ -340,13 +340,12 @@
             const hero = el.getAttribute('data-hero');
             const tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid');
             const L = _slot(tab, lid);
-            const force = (L.skin && L.skin[hero]) || undefined;
-            // 🔴 2026-09-22 融合卡渲染与主页一致：槽位卡名直接用融合卡名（applySkinBgToSlot 内部走对角切割渲染）。
-            //    第6参 forceMainSkin：融合卡的主卡皮肤（融合分支只读项目级存储，外部必须显式传）。
-            //    🔴 减伤不再画在卡上（用户要求：右下角被名字挡住）——组头 🛡️ 悬浮明细统一在 _refreshDrSums 计算。
+            // 🔴 2026-09-29 皮肤与卡池完全同步：不再用阵容本地皮肤覆盖（L.skin 旧数据废弃不渲染），
+            //    第3参传卡池 id → applySkinBgToSlot 内部 getCardSkin(池id) 解析「卡池默认皮」，改卡池即生效。
             const fus = (L.fus && L.fus[hero]) || '';
             const cur = fus || hero;
-            Promise.resolve().then(function () { return window.applySkinBgToSlot(el, cur, cur, 'my', force, fus ? force : undefined); })
+            const pc = poolMap[cur];
+            Promise.resolve().then(function () { return window.applySkinBgToSlot(el, cur, pc ? pc.id : undefined, 'my'); })
                 .catch(function () {}).then(function () { _fusBadge(el, fus); _lvBadge(el, hero, fus, poolMap); step(); });
         })();
     }
@@ -387,10 +386,10 @@
         const hero = el.getAttribute('data-hero');
         const tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid');
         const L = _slot(tab, lid);
-        const force = (L.skin && L.skin[hero]) || undefined;
         const fus = (L.fus && L.fus[hero]) || '';
         const cur = fus || hero;
-        return Promise.resolve().then(function () { return window.applySkinBgToSlot(el, cur, cur, 'my', force, fus ? force : undefined); })
+        const pc = _poolTypeMap()[cur];
+        return Promise.resolve().then(function () { return window.applySkinBgToSlot(el, cur, pc ? pc.id : undefined, 'my'); })
             .catch(function () {}).then(function () { _fusBadge(el, fus); _lvBadge(el, hero, fus); });
     };
     // 🔴 2026-09-29 图库设置弹窗入口：与主页同款 showLevelDropdown（图库=全局/卡池作用域）+ 图库专属「融合切换」区
@@ -465,9 +464,10 @@
         const next = steps[(idx + 1) % steps.length];
         window._llSet(tab, lid, 'fus', hero, next.v);
         if (next.sub) { try { window.fusionSkins = window.fusionSkins || {}; window.fusionSkins[next.sub] = next.skin; } catch (e2) {} }
-        const skin = (L.skin && L.skin[hero]) || undefined;
         const shown = next.v || hero;
-        return Promise.resolve().then(function () { return window.applySkinBgToSlot(el, shown, shown, 'my', skin, next.v ? skin : undefined); }).catch(function () {}).then(function () { _fusBadge(el, next.v); _lvBadge(el, hero, next.v); _refreshDrSums(document.getElementById('llList')); });
+        const pm = _poolTypeMap();
+        const pc2 = pm[shown];
+        return Promise.resolve().then(function () { return window.applySkinBgToSlot(el, shown, pc2 ? pc2.id : undefined, 'my'); }).catch(function () {}).then(function () { _fusBadge(el, next.v); _lvBadge(el, hero, next.v, pm); _refreshDrSums(document.getElementById('llList')); });
         try { if (typeof showToast === 'function') showToast(next.v ? (next.v + (next.skin ? ' · 副卡皮:' + next.skin : ' · 副卡默认皮')) : '已关闭融合（' + hero + '）', 'info'); } catch (e2) {}
     };
     //   右键 = 循环【主卡】皮肤（🔴 2026-09-22 修复：融合后也一直可切，与左键融合循环互不影响；列表=主页卡池 getHeroSkins）
