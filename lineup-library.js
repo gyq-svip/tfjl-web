@@ -161,16 +161,16 @@
             + '<div id="llHead" style="padding:10px 14px 6px;"></div>'
             + '<div id="llList" style="padding:0 14px 14px;"></div>';
         document.body.appendChild(ov);
-        // 卡槽点击：🔴 2026-09-22 与主页一致：左键 = 循环切换融合卡；右键 = 循环切换主卡皮肤（均不弹菜单）
-        // 🔴 2026-09-29 点在等级/魔化角标上 = 打开主页同款设置弹窗（app-core 全局委托），不触发融合循环
+        // 卡槽点击：🔴 2026-09-29 用户要求：去掉左键融合循环/右键皮肤循环（与设置弹窗冲突且连环重渲染卡顿），
+        //   左键/右键统一 = 打开主页同款设置弹窗（皮肤/等级/魔化/副卡 + 图库专属融合切换区）
         ov.addEventListener('click', function (e) {
-            if (e.target.closest('.card-level-badge')) return;
+            if (e.target.closest('.card-level-badge')) return;   // 角标有自己的全局委托，避免双开
             const sl = e.target.closest('.ll-slot');
-            if (sl) { window._llFuseCycle(sl); }
+            if (sl) { _llOpenSettings(sl, e); }
         });
         ov.addEventListener('contextmenu', function (e) {
             const sl = e.target.closest('.ll-slot');
-            if (sl) { e.preventDefault(); window._llSkinCycle(sl); }
+            if (sl) { e.preventDefault(); _llOpenSettings(sl, e); }
         });
         // 拖动（标题栏按住移动窗口；窗口用 left/top 定位后 resize 仍可用）
         const win = ov, bar = ov.querySelector('#llDrag');
@@ -220,7 +220,7 @@
             + '<button onclick="_llTab(\'sail\')" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (isSail ? 'rgba(78,205,196,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (isSail ? 'rgba(78,205,196,0.18)' : 'transparent') + ';color:' + (isSail ? '#4ecdc4' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">🚢 大航海(' + D.sailing.length + ')</button>'
             + '<button onclick="_llTab(\'act\')" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (state.tab === 'act' ? 'rgba(255,215,0,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (state.tab === 'act' ? 'rgba(255,215,0,0.15)' : 'transparent') + ';color:' + (state.tab === 'act' ? '#ffd700' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">🏆 活动阵容(' + D.activity.length + '天)</button>'
             + '</div>'
-            + '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-top:4px;">左卡组右笔记 · <b style="color:#ce93d8;">左键=轮流切融合卡（含副卡皮肤，末尾关闭）</b> · <b style="color:rgba(255,255,255,0.7);">右键=主卡皮肤（融合后也可切）</b> · <b style="color:#ff8a80;">🛡️减伤=鼠标悬浮查看每张卡的减伤明细（0% 减伤的卡自动隐藏）</b> · 活动 📜=脚本 ·（个人设置只存本机）· 拖标题栏移动窗口，右下角拉伸大小</div>';
+            + '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-top:4px;">左卡组右笔记 · <b style="color:#ce93d8;">左键/右键=打开设置弹窗（皮肤/等级/魔化/副卡/融合切换，改完全局生效）</b> · <b style="color:#ff8a80;">🛡️减伤=鼠标悬浮查看每张卡的减伤明细（0% 减伤的卡自动隐藏）</b> · 活动 📜=脚本 ·（个人设置只存本机）· 拖标题栏移动窗口，右下角拉伸大小</div>';
         _ensureAdmin();
     }
     // 🔴 2026-09-23 多关键词搜索：空格/逗号/顿号分隔，必须【同时包含】（AND）——搜"电法 炎魔 悟空"才精准
@@ -288,7 +288,7 @@
         //    内联把 min/max 全部钉死 + overflow:hidden，保证槽位永远等于格子尺寸。
         const box = 'width:' + s + 'px;height:' + s + 'px;min-width:' + s + 'px;max-width:' + s + 'px;min-height:' + s + 'px;max-height:' + s + 'px;padding:0;border-radius:6px;cursor:pointer;position:relative;overflow:hidden;';
         // 🔴 2026-09-22 卡下方名字标签移除（皮肤图上已有名字）；卡放大 44→54px（用户反馈太小、融合卡看不清）
-        return '<div class="battle-slot filled ll-slot" data-slot="ll-' + tab + '-' + id + '-' + which + idx + '" data-hero="' + _esc(hero) + '" data-tab="' + tab + '" data-lid="' + _esc(id) + '" data-w="' + which + '" title="' + _esc(hero) + '（右键：切换皮肤 / 左键：融合）" style="' + box + '">'
+        return '<div class="battle-slot filled ll-slot" data-slot="ll-' + tab + '-' + id + '-' + which + idx + '" data-hero="' + _esc(hero) + '" data-tab="' + tab + '" data-lid="' + _esc(id) + '" data-w="' + which + '" title="' + _esc(hero) + '（点击：设置皮肤/等级/魔化/融合副卡）" style="' + box + '">'
             + '<span class="card-item"><span class="card-name">' + _esc(hero) + '</span></span>'
             + '</div>';
     }
@@ -393,6 +393,45 @@
         return Promise.resolve().then(function () { return window.applySkinBgToSlot(el, cur, cur, 'my', force, fus ? force : undefined); })
             .catch(function () {}).then(function () { _fusBadge(el, fus); _lvBadge(el, hero, fus); });
     };
+    // 🔴 2026-09-29 图库设置弹窗入口：与主页同款 showLevelDropdown（图库=全局/卡池作用域）+ 图库专属「融合切换」区
+    //    （替代原左键循环）。切换完成自动重开弹窗，反映新的当前卡（等级/魔化/皮肤区全部按新卡刷新）。
+    window._llOpenSettings = function (sl, e) {
+        const hero = sl.getAttribute('data-hero');
+        const tab = sl.getAttribute('data-tab'), lid = sl.getAttribute('data-lid');
+        const L = _slot(tab, lid);
+        const fus = (L.fus && L.fus[hero]) || '';
+        const cur = fus || hero;
+        const pc = _poolTypeMap()[cur];
+        if (!pc) { try { if (typeof showToast === 'function') showToast(cur + ' 不在卡池，无法设置', 'info'); } catch (e2) {} return; }
+        if (!window.showLevelDropdown) return;
+        window.showLevelDropdown(e, pc.id, pc.type, 'my', cur);
+        try {
+            const base = fus ? hero : cur;
+            const variants = window.getFusionVariantsForBase ? window.getFusionVariantsForBase(_norm(base)) : [];
+            if (variants.length) {
+                const root = document.querySelector('.card-settings-popup-root');
+                const box = root ? root.firstElementChild : null;
+                if (box) {
+                    const sec = document.createElement('div');
+                    sec.style.cssText = 'margin-top:12px;border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;';
+                    const t = document.createElement('div');
+                    t.style.cssText = 'color:#60a5fa;margin-bottom:6px;';
+                    t.textContent = '🔗 融合切换（本阵容）';
+                    const btn = document.createElement('button');
+                    btn.textContent = '🔄 循环切换融合（当前：' + (fus || '关闭') + '）';
+                    btn.style.cssText = 'width:100%;padding:7px;border-radius:8px;border:1px solid rgba(96,165,250,0.5);background:rgba(96,165,250,0.12);color:#60a5fa;cursor:pointer;font-size:0.82rem;';
+                    btn.onclick = function () {
+                        const p = window._llFuseCycle(sl);
+                        root.remove();
+                        Promise.resolve(p).then(function () { _llOpenSettings(sl, e); }).catch(function () {});
+                    };
+                    sec.appendChild(t);
+                    sec.appendChild(btn);
+                    box.appendChild(sec);
+                }
+            }
+        } catch (e2) {}
+    };
     window._llFuseCycle = function (el) {
         const hero = el.getAttribute('data-hero'), tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid');
         const L = _slot(tab, lid);
@@ -428,7 +467,7 @@
         if (next.sub) { try { window.fusionSkins = window.fusionSkins || {}; window.fusionSkins[next.sub] = next.skin; } catch (e2) {} }
         const skin = (L.skin && L.skin[hero]) || undefined;
         const shown = next.v || hero;
-        Promise.resolve().then(function () { return window.applySkinBgToSlot(el, shown, shown, 'my', skin, next.v ? skin : undefined); }).catch(function () {}).then(function () { _fusBadge(el, next.v); _lvBadge(el, hero, next.v); _refreshDrSums(document.getElementById('llList')); });
+        return Promise.resolve().then(function () { return window.applySkinBgToSlot(el, shown, shown, 'my', skin, next.v ? skin : undefined); }).catch(function () {}).then(function () { _fusBadge(el, next.v); _lvBadge(el, hero, next.v); _refreshDrSums(document.getElementById('llList')); });
         try { if (typeof showToast === 'function') showToast(next.v ? (next.v + (next.skin ? ' · 副卡皮:' + next.skin : ' · 副卡默认皮')) : '已关闭融合（' + hero + '）', 'info'); } catch (e2) {}
     };
     //   右键 = 循环【主卡】皮肤（🔴 2026-09-22 修复：融合后也一直可切，与左键融合循环互不影响；列表=主页卡池 getHeroSkins）
