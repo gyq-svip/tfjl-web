@@ -16703,6 +16703,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             const now = new Date();
             const activeItems = newsItems.filter(item => {
                 if (item.category === 'welcome') return false; // 🔴 欢迎词不属于公告：只在欢迎弹窗展示，不进跑马灯
+                if (item.category === '功能简介') return false; // 🔴 功能简介：只在出战区简介板展示，不进跑马灯
                 if (item.active_time && new Date(item.active_time) > now) return false;
                 if (item.expire_time && new Date(item.expire_time) <= now) return false;
                 return true;
@@ -17162,7 +17163,47 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                     marqueeEl.style.textShadow = `0 0 10px ${newColor}, 0 0 20px ${newColor}`;
                 }, 3000);
             }
+            renderIntroPanel(); // 功能简介板：公告加载/刷新后同步渲染
         }
+
+        // ==================== 功能简介板（出战区右侧） ====================
+        // 内容 = 管理员公告里「分类=功能简介」的最新一条生效公告的正文；多条取 active_time 最新。
+        // 淡色随主题：面板正文用 CSS 变量 --introPanelColor（默认 rgba(255,255,255,0.32)）。
+        // 可关闭：点 ✕ 按内容哈希记住；管理员更新内容后自动重新显示。
+        function _introPanelHash(text) {
+            let h = 0;
+            for (let i = 0; i < text.length; i++) { h = ((h << 5) - h + text.charCodeAt(i)) | 0; }
+            return String(h);
+        }
+        function renderIntroPanel() {
+            const panel = document.getElementById('introPanel');
+            if (!panel) return;
+            const now = new Date();
+            const items = (newsItems || []).filter(it => it && it.category === '功能简介'
+                && !(it.active_time && new Date(it.active_time) > now)
+                && !(it.expire_time && new Date(it.expire_time) <= now));
+            let latest = null;
+            for (const it of items) {
+                if (!latest) { latest = it; continue; }
+                const ta = it.active_time ? new Date(it.active_time).getTime() : 0;
+                const tb = latest.active_time ? new Date(latest.active_time).getTime() : 0;
+                if (ta >= tb) latest = it;
+            }
+            const bodyEl = document.getElementById('introPanelBody');
+            if (!latest || !latest.content || !bodyEl) { panel.style.display = 'none'; return; }
+            let dismissed = null;
+            try { dismissed = localStorage.getItem('tfjl_introPanel_dismissed'); } catch (e) {}
+            if (dismissed === _introPanelHash(latest.content)) { panel.style.display = 'none'; return; }
+            bodyEl.textContent = latest.content;
+            panel.style.display = 'flex';
+        }
+        function closeIntroPanel() {
+            const panel = document.getElementById('introPanel');
+            const bodyEl = document.getElementById('introPanelBody');
+            if (panel) panel.style.display = 'none';
+            try { localStorage.setItem('tfjl_introPanel_dismissed', _introPanelHash((bodyEl && bodyEl.textContent) || '')); } catch (e) {}
+        }
+        try { window.renderIntroPanel = renderIntroPanel; window.closeIntroPanel = closeIntroPanel; } catch (e) {}
 
         let activeTimeCheckInterval = null;
         function startActiveTimeCheck() {
@@ -17182,6 +17223,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                         restartMarquee(); // 文本可能变化，按需重置动画（保持速度恒定）
                     }
                 }
+                renderIntroPanel(); // 每分钟兜底：生效/到期时间切换后简介板跟随更新
             }, 60000);
         }
         

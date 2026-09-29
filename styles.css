@@ -364,6 +364,7 @@
             gap: 24px;
             margin: 2px auto;
             width: 100%;
+            position: relative;
             max-width: 920px;
             padding: 0 10px;
             box-sizing: border-box;
@@ -3311,9 +3312,9 @@
 .selected-card.card-item .card-level-badge.card-level-number,
 .selected-card.card-item.skin-bg .card-level-badge.card-level-number {
     top: auto !important;
-    left: 2px !important;
+    left: 0 !important;
     right: auto !important;
-    bottom: 2px !important;
+    bottom: 0 !important;
     width: 22px;
     height: 22px;
     min-width: 22px;
@@ -3338,10 +3339,10 @@
 .selected-card.card-item.skin-bg .card-level-badge.card-mohua-icon {
     top: auto !important;
     left: auto !important;
-    right: 0 !important;
+    right: -2px !important;
     bottom: 0 !important;
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
     padding: 0 !important;
     display: block !important;
     background: transparent !important;
@@ -3452,3 +3453,10 @@
     text-shadow: 0 1px 2px rgba(0,0,0,0.9) !important;
 }
 /* 融合卡不再特殊位置，与普通卡统一：左下等级、右下魔化 */
+/* ===================== 功能简介板（出战区右侧，内容=管理员公告·分类「功能简介」） ===================== */
+/* 淡色随主题：默认 rgba(255,255,255,0.32)，需要换主题色时改 CSS 变量 --introPanelColor 即可 */
+#introPanel { scrollbar-width: thin; }
+#introPanelBody b, #introPanelBody strong { color: rgba(255,255,255,0.45); font-weight: 700; }
+@media (max-width: 900px) {
+    #introPanel { display: none !important; }
+}
