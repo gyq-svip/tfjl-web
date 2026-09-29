@@ -11293,10 +11293,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             createSkinTooltip();
             
             let baseDesc = skinAttr.desc;
-            if (cloudDesc && baseDesc && baseDesc !== '无特殊属性' && !baseDesc.includes(cloudDesc)) {
-                baseDesc = cloudDesc + '\n\n' + baseDesc;
-            } else if (cloudDesc) {
-                baseDesc = cloudDesc;
+            if (cloudDesc && baseDesc && baseDesc !== '无特殊属性') {
+                // 🔴 2026-09-29 去重：皮肤属性里的段落若已包含在云端卡描述(cards.json)中，不再整段重复显示
+                //    （添加英雄时 desc 写入 cards.json，skin-attributes「默认」里同文，旧逻辑两段都拼 → 属性重复）
+                const segs = baseDesc.split('\n\n').filter(function (seg) {
+                    if (!seg) return false;
+                    return !cloudDesc.includes(seg.trim());
+                });
+                baseDesc = segs.join('\n\n');
+                if (!baseDesc.includes(cloudDesc)) baseDesc = cloudDesc + (baseDesc ? '\n\n' + baseDesc : '');
             }
             const formattedDesc = baseDesc.replace(/\n/g, '<br>');
             
