@@ -283,6 +283,20 @@
     // forceSkin = 本阵容个人皮肤；徽标（Lv/魔/减伤）在渲染后叠加
     function _slotHtml(which, idx, hero, tab, id, sz) {
         const s = sz || 50;
+        // 🔴 2026-09-29 备份/项目导入的卡可能已是「融合名」（A·B 形态）：图库此前把它当普通单卡渲染，
+        //    getFusionVariantsForBase(融合名) 查不到变体 → 融合选项"消失"、看起来像写死。
+        //    这里统一拆回主卡 + 初始化本阵容融合状态（保留导入时的融合形态），之后切融合/设置弹窗全部正常。
+        try {
+            hero = _norm(hero);
+            const parts = (window.getFusionParts ? window.getFusionParts(hero) : null);
+            if (parts && parts.length >= 2) {
+                const base = parts[0];
+                const L = _slot(tab, id);
+                L.fus = L.fus || {};
+                if (!L.fus[base]) L.fus[base] = hero;   // 保留导入时的融合形态；用户后续可自由切换
+                hero = base;
+            }
+        } catch (e) {}
         // 🔴 2026-09-22 全局 .battle-slot 写死 min/max-width:72px、min-height:72px（styles.css:545），
         //    min-width 会压过内联 width → 图库小格子里实际渲染 72px → 相邻卡槽互相重叠（用户实测）。
         //    内联把 min/max 全部钉死 + overflow:hidden，保证槽位永远等于格子尺寸。
