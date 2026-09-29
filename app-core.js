@@ -10515,6 +10515,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (initial && initial.desc) lines.push(`【初始被动】${initial.desc}`);
             if (fullStar && fullStar.desc) lines.push(`【满星被动】${fullStar.desc}`);
             if (hasMohua && mohua && mohua.desc) lines.push(`【魔化被动】${mohua.desc}`);
+            const awaken = data.base && data.base.mohuaAwaken ? data.base.mohuaAwaken : null;
+            if (hasMohua && awaken && awaken.desc) lines.push(`【魔化觉醒】${awaken.desc}`);
             if (skinName && skinName !== '默认') {
                 const skin = data.skins[skinName];
                 if (skin) {
@@ -10803,8 +10805,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 mhInfo.style.cssText = 'margin-top:6px;font-size:0.72rem;line-height:1.55;color:rgba(255,255,255,0.75);';
                 function _renderMhInfo(on) {
                     try {
+                        const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[mainName];
                         const mh = _getPassiveAtLevel(mainName, getCardLevel(cardId, cardType, handType), 'mohuaPassive');
-                        mhInfo.innerHTML = on && mh && mh.desc ? ('<span style="color:#a855f7;font-weight:600;">魔化被动：</span>' + mh.desc) : '';
+                        const aw = d && d.base && d.base.mohuaAwaken && d.base.mohuaAwaken.desc;
+                        let html = '';
+                        if (on) {
+                            if (mh && mh.desc) html += '<div><span style="color:#a855f7;font-weight:600;">魔化被动：</span>' + mh.desc + '</div>';
+                            if (aw) html += '<div><span style="color:#a855f7;font-weight:600;">魔化觉醒：</span>' + aw + '</div>';
+                            if (!html) html = '<span style="opacity:0.5">该英雄暂无魔化信息</span>';
+                        }
+                        mhInfo.innerHTML = html;
                     } catch (e) { mhInfo.innerHTML = ''; }
                 }
                 const setMh = (on) => { mhBtn.textContent = on ? '✅ 魔化已开启' : '魔化未开启'; mhBtn.style.background = on ? '#a855f7' : 'transparent'; mhBtn.style.borderColor = on ? '#a855f7' : 'rgba(255,255,255,0.2)'; mhBtn.style.color = on ? '#fff' : '#fff'; _renderMhInfo(on); };
@@ -10939,9 +10949,17 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 subMhInfo.style.cssText = 'margin-top:5px;font-size:0.68rem;line-height:1.55;color:rgba(255,255,255,0.75);';
                 function _renderSubMhInfo(on) {
                     try {
+                        const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[_subHero];
                         const lv = (typeof getFusionComponentLevel === 'function') ? (getFusionComponentLevel(_subHero) || 1) : 1;
                         const mh = _getPassiveAtLevel(_subHero, lv, 'mohuaPassive');
-                        subMhInfo.innerHTML = on && mh && mh.desc ? ('<span style="color:#a855f7;font-weight:600;">魔化被动：</span>' + mh.desc) : '';
+                        const aw = d && d.base && d.base.mohuaAwaken && d.base.mohuaAwaken.desc;
+                        let html = '';
+                        if (on) {
+                            if (mh && mh.desc) html += '<div><span style="color:#a855f7;font-weight:600;">魔化被动：</span>' + mh.desc + '</div>';
+                            if (aw) html += '<div><span style="color:#a855f7;font-weight:600;">魔化觉醒：</span>' + aw + '</div>';
+                            if (!html) html = '<span style="opacity:0.5">该英雄暂无魔化信息</span>';
+                        }
+                        subMhInfo.innerHTML = html;
                     } catch (e) { subMhInfo.innerHTML = ''; }
                 }
                 const setSubMh = (on) => { subMhBtn.textContent = on ? '✅ 副卡魔化已开启' : '副卡魔化未开启'; subMhBtn.style.background = on ? '#a855f7' : 'transparent'; subMhBtn.style.borderColor = on ? '#a855f7' : 'rgba(255,255,255,0.2)'; subMhBtn.style.color = '#fff'; _renderSubMhInfo(on); };
