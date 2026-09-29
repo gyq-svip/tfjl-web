@@ -1172,6 +1172,14 @@
             </div>
 
             <div class="battle-field">
+                <!-- 功能简介板：内容=管理员公告·分类「功能简介」最新生效一条；淡色随主题（CSS变量 --introPanelColor），可关闭（内容更新后自动再显示） -->
+                <div id="introPanel" style="display:none;position:absolute;top:4px;right:6px;width:252px;max-height:82%;overflow:auto;flex-direction:column;background:rgba(0,0,0,0.28);border:1px solid rgba(255,255,255,0.09);border-radius:10px;padding:7px 10px 8px;z-index:5;box-sizing:border-box;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;flex-shrink:0;">
+                        <span style="font-size:0.66rem;letter-spacing:1.5px;color:rgba(255,255,255,0.30);">📖 功能简介</span>
+                        <span onclick="closeIntroPanel()" title="关闭（公告内容更新后会再次显示）" style="cursor:pointer;color:rgba(255,255,255,0.30);font-size:0.78rem;padding:0 4px;line-height:1;user-select:none;">✕</span>
+                    </div>
+                    <div id="introPanelBody" style="color:var(--introPanelColor,rgba(255,255,255,0.32));font-size:0.72rem;line-height:1.75;white-space:pre-wrap;word-break:break-word;"></div>
+                </div>
                 <div class="battle-column user-column">
                     <h4>👤 我的卡组（7格）<span id="myDamageReduction" style="color:#4ecdc4;font-size:0.85rem;margin-left:8px;">洗炼总减伤:0</span>
                         <select id="myDrTableSel" onchange="switchDrTable('my', this.value)" title="切换减伤表" style="margin-left:8px;font-size:0.72rem;background:rgba(0,0,0,0.35);border:1px solid rgba(78,205,196,0.4);color:#4ecdc4;padding:2px 6px;border-radius:6px;cursor:pointer;"></select>
@@ -2308,6 +2316,7 @@
                                 <option value="更新">更新</option>
                                 <option value="通知">通知</option>
                                 <option value="其他">其他</option>
+                                <option value="功能简介">功能简介（出战区简介板）</option>
                             </select>
                         </div>
                         <div>
