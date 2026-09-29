@@ -423,8 +423,11 @@ fn read_directory(dir_path: String) -> Result<Vec<FileInfo>, String> {
 
 /// 读取文本文件（多编码自动检测 + 逐层回退，一劳永逸）
 /// 命令名 `read_text_file_auto`，避免与 tauri_plugin_fs 的 read_text_file 冲突
+/// 🔴 2026-09-29 改 async：同步命令在主线程事件循环（extern "system"）内执行，一旦 panic
+///    就是「panic in a function that cannot unwind」→ 直接 abort 闪退（用户添加英雄闪退实锤）。
+///    async 命令跑在可展开的运行时线程：panic 被正常捕获 → 全局钩子记录真实位置 → 前端拿到错误，不闪退。
 #[tauri::command]
-fn read_text_file_auto(file_path: String) -> Result<String, String> {
+async fn read_text_file_auto(file_path: String) -> Result<String, String> {
     let bytes = fs::read(&file_path).map_err(|e| e.to_string())?;
 
     if bytes.is_empty() {
@@ -543,7 +546,7 @@ fn detect_file_encoding(file_path: String) -> Result<String, String> {
 
 /// 写入文本文件（自动创建父目录）
 #[tauri::command]
-fn write_text_file(file_path: String, content: String) -> Result<(), String> {
+async fn write_text_file(file_path: String, content: String) -> Result<(), String> {
     let path = Path::new(&file_path);
     if let Some(parent) = path.parent() {
         if !parent.as_os_str().is_empty() && !parent.exists() {
@@ -555,7 +558,7 @@ fn write_text_file(file_path: String, content: String) -> Result<(), String> {
 
 /// 追加文本到文件末尾（自动创建父目录）；用于诊断日志落盘，避免每次重写全量内容
 #[tauri::command]
-fn append_text_file(file_path: String, content: String) -> Result<(), String> {
+async fn append_text_file(file_path: String, content: String) -> Result<(), String> {
     use std::io::Write as _;
     let path = Path::new(&file_path);
     if let Some(parent) = path.parent() {
@@ -631,7 +634,7 @@ fn push_with_self_heal(repo: &str, push_args: &[&str]) -> Result<String, String>
 /// 仅桌面端「卡组管理」调用，免去手动命令行。
 /// 仓库级 .git/config 已为 github.com 配置代理；gitee 直连（清空代理）。
 #[tauri::command]
-fn git_push_fusions() -> Result<String, String> {
+async fn git_push_fusions() -> Result<String, String> {
     let repo = "d:\\tfjl-web";
     let mut log = String::new();
     // 1. 有本地改动时提交（fusions.json + 自动切皮产物 registry.json 与 skins/融合XX/ 一起带上，
@@ -660,7 +663,7 @@ fn git_push_fusions() -> Result<String, String> {
 /// 皮肤制作工具「一键推送」：自动 bump 前端版本号 + 提交 skins/ 改动 + 推双远端
 /// 复用 run_git（origin 走仓库默认代理；gitee 直连清空代理）
 #[tauri::command]
-fn git_push_skins() -> Result<String, String> {
+async fn git_push_skins() -> Result<String, String> {
     let repo = "d:\\tfjl-web";
     let mut log = String::new();
     // 1) 🔴 2026-09-01 修复误报「推送失败」：此前用【全仓库】status 判断有无改动，
