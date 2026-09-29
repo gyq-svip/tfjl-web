@@ -12305,7 +12305,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 if (profKey === 'engineering') card.dataset.engineering = 'true';
                 card.setAttribute('draggable', 'false');
                 card.style.cursor = 'pointer';
-                card.innerHTML = '<span class="card-name">' + name + '</span>';
+                // 🔴 2026-09-29 修复：融合卡进卡池漏生成等级/魔化角标（云端基础卡 renderCloudCardsToPool 有生成，融合卡漏了）
+                //    → 卡池融合卡永久无等级无魔化。与其他卡统一：渲染时直接带上角标。
+                card.innerHTML = createLevelBadgeHTML('fusion_' + name, quality, 'my', name) + '<span class="card-name">' + name + '</span>';
                 grid.appendChild(card);
             });
             // 重新绑定拖拽/长按（与基础卡一致）

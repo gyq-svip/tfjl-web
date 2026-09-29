@@ -1331,8 +1331,6 @@
         .collapsible-section .card-item {
             padding-top: 30px;
             padding-bottom: 8px;
-            min-height: 94px;        /* 与上阵卡槽同高（94px），预览效果 */
-            box-sizing: border-box;
         }
         .collapsible-section .card-item.skin-bg {
             background-size: cover !important;
