@@ -10703,71 +10703,64 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             title.innerHTML = '<span>⚙️ ' + (cardName || cardId) + '</span><span style="cursor:pointer;opacity:0.6;padding:0 4px;" onclick="this.closest(\'.card-settings-popup-root\').remove()">✕</span>';
             box.appendChild(title);
 
-            // 🔴 2026-09-29 属性预览区：随等级/皮肤/魔化/副卡实时变化
-            const preview = document.createElement('div');
-            preview.id = 'csAttrPreview';
-            preview.style.cssText = 'background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:8px;margin-bottom:12px;white-space:pre-wrap;word-break:break-word;font-size:0.78rem;line-height:1.7;color:rgba(255,255,255,0.75);max-height:150px;overflow:auto;scrollbar-width:thin;';
-            box.appendChild(preview);
-            function _renderAttrPreview() {
-                try {
-                    const mainName = getMainCardName(cardName);
-                    const curLv = getCardLevel(cardId, cardType, handType);
-                    const curSkin = getCardSkin(cardId, cardName, handType);
-                    const curMh = getCardMoHua(cardId, handType);
-                    let txt = window.getHeroAttrText && window.getHeroAttrText(mainName, { level: curLv, skinName: curSkin, hasMohua: curMh });
-                    if (!txt) txt = '（暂无动态属性数据：' + mainName + '）';
-                    if (isFusion && subHero) {
-                        const subLv = (typeof getFusionComponentLevel === 'function') ? (getFusionComponentLevel(subHero) || 1) : 1;
-                        const subMh = !!(typeof getFusionComponentMoHua === 'function' && getFusionComponentMoHua(subHero));
-                        const subSkin = (typeof getFusionComponentSkin === 'function') ? (getFusionComponentSkin(subHero) || '默认') : '默认';
-                        const subTxt = window.getHeroAttrText && window.getHeroAttrText(subHero, { level: subLv, skinName: subSkin, hasMohua: subMh });
-                        if (subTxt) txt += '\n\n—— 副卡 ' + subHero + ' ——\n' + subTxt;
-                    }
-                    preview.textContent = txt;
-                } catch (e) {}
-            }
-
-            // 等级（进度条滑块）+ 等级变化明细
+            // 等级选择 + 当前等级属性（简洁文本）
             const lvWrap = document.createElement('div');
             lvWrap.style.cssText = 'margin-bottom:12px;';
-            lvWrap.innerHTML = '<div style="color:#4ecdc4;margin-bottom:6px;">📊 等级：<b id="csLvVal">' + currentLevel + '</b></div>';
-            const slider = document.createElement('input');
-            slider.type = 'range'; slider.min = '0'; slider.max = String(Math.max(0, levels.length - 1)); slider.step = '1';
-            slider.value = String(Math.max(0, levels.indexOf(currentLevel)));
-            slider.style.cssText = 'width:100%;';
-            const lvChanges = document.createElement('div');
-            lvChanges.id = 'csLvChanges';
-            lvChanges.style.cssText = 'margin-top:6px;font-size:0.66rem;line-height:1.5;color:rgba(255,255,255,0.7);max-height:90px;overflow:auto;background:rgba(0,0,0,0.18);border-radius:6px;padding:5px 6px;';
-            function _renderLvChanges(curLv) {
+            const lvInfo = document.createElement('div');
+            lvInfo.id = 'csLvInfo';
+            lvInfo.style.cssText = 'margin-top:6px;font-size:0.72rem;line-height:1.65;color:rgba(255,255,255,0.8);background:rgba(0,0,0,0.18);border-radius:6px;padding:6px 8px;';
+            const lvBtns = document.createElement('div');
+            lvBtns.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;';
+            function _getPassiveAtLevel(heroName, level, field) {
                 try {
-                    const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[mainName];
-                    if (!d || !d.talents || Object.keys(d.talents).length === 0) { lvChanges.innerHTML = '<span style="opacity:0.5">暂无等级变化</span>'; return; }
-                    const tLevels = Object.keys(d.talents).map(Number).sort((a, b) => a - b);
-                    const parts = [];
+                    const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[heroName];
+                    if (!d) return null;
+                    const talents = d.talents || {};
+                    const tLevels = Object.keys(talents).map(Number).sort((a, b) => a - b);
+                    let cur = d.base && d.base[field] ? d.base[field] : null;
                     for (const lv of tLevels) {
-                        const t = d.talents[String(lv)];
-                        if (!t || !t.changeDesc || !t.changeDesc.desc) continue;
-                        const active = lv <= curLv;
-                        const color = active ? '#4ecdc4' : 'rgba(255,255,255,0.45)';
-                        const marker = active ? '●' : '○';
-                        parts.push('<div style="margin-bottom:3px;"><span style="color:' + color + ';font-weight:600;">' + marker + ' Lv' + lv + '</span> ' + (t.changeDesc.name ? t.changeDesc.name + '：' : '') + t.changeDesc.desc + '</div>');
+                        if (lv > level) break;
+                        const t = talents[String(lv)];
+                        if (t && t[field] && t[field].desc) cur = t[field];
                     }
-                    lvChanges.innerHTML = parts.length ? parts.join('') : '<span style="opacity:0.5">暂无明显等级变化</span>';
-                } catch (e) { lvChanges.innerHTML = '<span style="opacity:0.5">等级变化加载失败</span>'; }
+                    return cur;
+                } catch (e) { return null; }
             }
-            slider.oninput = () => {
-                const el = document.getElementById('csLvVal'); if (el) el.textContent = levels[Number(slider.value)];
-                _renderLvChanges(levels[Number(slider.value)]);
-            };
-            slider.onchange = () => {
-                const newLv = levels[Number(slider.value)];
-                setCardLevel(cardId, newLv, cardType, handType); updateAllCardLevelBadges();
-                _renderLvChanges(newLv); _renderAttrPreview();
-            };
-            lvWrap.appendChild(slider);
-            lvWrap.appendChild(lvChanges);
+            function _setLvBtnSelected(selLv) {
+                lvBtns.querySelectorAll('button').forEach(b => {
+                    const sel = Number(b.dataset.lv) === selLv;
+                    b.style.borderColor = sel ? '#4ecdc4' : 'rgba(255,255,255,0.2)';
+                    b.style.background = sel ? '#4ecdc4' : 'transparent';
+                    b.style.color = sel ? '#1a1a2e' : '#fff';
+                });
+            }
+            function _renderLevelInfo(curLv) {
+                const initial = _getPassiveAtLevel(mainName, curLv, 'initialPassive');
+                const fullStar = _getPassiveAtLevel(mainName, curLv, 'fullStarPassive');
+                let html = '<div style="color:#4ecdc4;font-weight:600;margin-bottom:4px;">📊 等级：' + curLv + '</div>';
+                if (initial && initial.desc) html += '<div>【初始被动】' + initial.desc + '</div>';
+                if (fullStar && fullStar.desc) html += '<div>【满星被动】' + fullStar.desc + '</div>';
+                if (!initial?.desc && !fullStar?.desc) html += '<span style="opacity:0.5">暂无等级属性</span>';
+                lvInfo.innerHTML = html;
+                _setLvBtnSelected(curLv);
+            }
+            levels.forEach(lv => {
+                const b = document.createElement('button');
+                b.textContent = String(lv);
+                b.dataset.lv = String(lv);
+                b.style.cssText = 'padding:4px 9px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:#fff;cursor:pointer;font-size:0.74rem;';
+                b.onclick = async () => {
+                    setCardLevel(cardId, lv, cardType, handType);
+                    updateAllCardLevelBadges();
+                    _renderLevelInfo(lv);
+                    await _reapplyCard();
+                };
+                lvBtns.appendChild(b);
+            });
+            lvWrap.appendChild(lvBtns);
+            lvWrap.appendChild(lvInfo);
             box.appendChild(lvWrap);
-            _renderLvChanges(currentLevel);
+            _renderLevelInfo(currentLevel);
 
             // 皮肤
             const skinTitle = document.createElement('div');
@@ -10784,16 +10777,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     updateAllCardLevelBadges();
                     await _reapplyCard();
                     _renderSkinAttrPanel(skin);
-                    _renderAttrPreview();
+                    
                 });
                 skinWrap.appendChild(b);
             });
             box.appendChild(skinWrap);
 
-            // 已选皮肤属性展示
+            // 已选皮肤属性展示（只显示额外被动，精简为一行）
             const skinAttrPanel = document.createElement('div');
             skinAttrPanel.id = 'csSkinAttr';
-            skinAttrPanel.style.cssText = 'margin-top:8px;font-size:0.74rem;line-height:1.6;color:rgba(255,255,255,0.75);background:rgba(255,152,0,0.08);border:1px solid rgba(255,152,0,0.25);border-radius:6px;padding:6px 8px;';
+            skinAttrPanel.style.cssText = 'margin-top:8px;font-size:0.72rem;line-height:1.55;color:rgba(255,255,255,0.75);background:rgba(255,152,0,0.08);border:1px solid rgba(255,152,0,0.25);border-radius:6px;padding:6px 8px;';
             function _renderSkinAttrPanel(selSkin) {
                 try {
                     const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[mainName];
@@ -10802,10 +10795,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         return;
                     }
                     const s = d.skins[selSkin];
-                    const out = [];
-                    if (s.extraPassive) out.push('<div><span style="color:#ff9800;font-weight:600;">额外被动：</span>' + s.extraPassive + '</div>');
-                    if (s.hp) out.push('<div><span style="color:#ff9800;font-weight:600;">血量加成：</span>' + s.hp + '</div>');
-                    skinAttrPanel.innerHTML = out.length ? out.join('') : '<span style="opacity:0.5">该皮肤暂无额外属性</span>';
+                    skinAttrPanel.innerHTML = s.extraPassive ? ('<span style="color:#ff9800;font-weight:600;">皮肤属性：</span>' + s.extraPassive) : '<span style="opacity:0.5">该皮肤无额外属性</span>';
                 } catch (e) { skinAttrPanel.innerHTML = ''; }
             }
             skinWrap.after(skinAttrPanel);
@@ -10818,7 +10808,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 mhTitle.textContent = '👹 魔化（主卡）';
                 box.appendChild(mhTitle);
                 const mhBtn = document.createElement('button');
-                const setMh = (on) => { mhBtn.textContent = on ? '✅ 魔化已开启' : '魔化未开启'; mhBtn.style.background = on ? '#a855f7' : 'transparent'; mhBtn.style.borderColor = on ? '#a855f7' : 'rgba(255,255,255,0.2)'; mhBtn.style.color = on ? '#fff' : '#fff'; };
+                const mhInfo = document.createElement('div');
+                mhInfo.id = 'csMhInfo';
+                mhInfo.style.cssText = 'margin-top:6px;font-size:0.72rem;line-height:1.55;color:rgba(255,255,255,0.75);';
+                function _renderMhInfo(on) {
+                    try {
+                        const mh = _getPassiveAtLevel(mainName, getCardLevel(cardId, cardType, handType), 'mohuaPassive');
+                        mhInfo.innerHTML = on && mh && mh.desc ? ('<span style="color:#a855f7;font-weight:600;">魔化被动：</span>' + mh.desc) : '';
+                    } catch (e) { mhInfo.innerHTML = ''; }
+                }
+                const setMh = (on) => { mhBtn.textContent = on ? '✅ 魔化已开启' : '魔化未开启'; mhBtn.style.background = on ? '#a855f7' : 'transparent'; mhBtn.style.borderColor = on ? '#a855f7' : 'rgba(255,255,255,0.2)'; mhBtn.style.color = on ? '#fff' : '#fff'; _renderMhInfo(on); };
                 setMh(currentMoHua);
                 mhBtn.style.cssText = 'padding:6px 14px;border-radius:8px;border:1px solid ' + (currentMoHua ? '#a855f7' : 'rgba(255,255,255,0.2)') + ';background:' + (currentMoHua ? '#a855f7' : 'transparent') + ';color:#fff;cursor:pointer;font-size:0.82rem;';
                 mhBtn.onclick = async () => {
@@ -10827,12 +10826,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     setMh(on);
                     updateAllCardLevelBadges();
                     await _reapplyCard();
-                    _renderAttrPreview();
                     // 主卡魔化变化 → 副卡魔化开关可用状态联动
                     const subMh = box.querySelector('#csSubMh');
                     if (subMh) { subMh.disabled = !on; subMh.style.opacity = on ? '1' : '0.4'; if (!on && typeof setFusionComponentMoHua === 'function') setFusionComponentMoHua(subHero, false); }
                 };
                 box.appendChild(mhBtn);
+                box.appendChild(mhInfo);
             }
 
             // 融合副卡设置（渲染函数，初始化与切换变体后复用）
@@ -10878,24 +10877,22 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         setSkinThumbSelected(subSkinWrap, skin);
                         _renderSubSkinAttrPanel(skin);
                         await _reapplyCard();
-                        _renderAttrPreview();
+                        
                     });
                     subSkinWrap.appendChild(b);
                 });
                 sec.appendChild(subSkinWrap);
 
-                // 副卡已选皮肤属性
+                // 副卡已选皮肤属性（只显示额外被动，精简为一行）
                 const subSkinAttrPanel = document.createElement('div');
                 subSkinAttrPanel.id = 'csSubSkinAttr';
-                subSkinAttrPanel.style.cssText = 'margin-top:6px;font-size:0.7rem;line-height:1.55;color:rgba(255,255,255,0.75);background:rgba(255,152,0,0.08);border:1px solid rgba(255,152,0,0.2);border-radius:6px;padding:5px 7px;';
+                subSkinAttrPanel.style.cssText = 'margin-top:6px;font-size:0.68rem;line-height:1.55;color:rgba(255,255,255,0.75);background:rgba(255,152,0,0.08);border:1px solid rgba(255,152,0,0.2);border-radius:6px;padding:5px 7px;';
                 function _renderSubSkinAttrPanel(selSkin) {
                     try {
                         const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[_subHero];
                         if (!d || !d.skins || !d.skins[selSkin]) { subSkinAttrPanel.innerHTML = '<span style="opacity:0.5">暂无皮肤属性</span>'; return; }
-                        const s = d.skins[selSkin]; const out = [];
-                        if (s.extraPassive) out.push('<div><span style="color:#ff9800;font-weight:600;">额外被动：</span>' + s.extraPassive + '</div>');
-                        if (s.hp) out.push('<div><span style="color:#ff9800;font-weight:600;">血量加成：</span>' + s.hp + '</div>');
-                        subSkinAttrPanel.innerHTML = out.length ? out.join('') : '<span style="opacity:0.5">暂无额外属性</span>';
+                        const s = d.skins[selSkin];
+                        subSkinAttrPanel.innerHTML = s.extraPassive ? ('<span style="color:#ff9800;font-weight:600;">皮肤属性：</span>' + s.extraPassive) : '<span style="opacity:0.5">该皮肤无额外属性</span>';
                     } catch (e) { subSkinAttrPanel.innerHTML = ''; }
                 }
                 subSkinWrap.after(subSkinAttrPanel);
@@ -10906,43 +10903,47 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 subLvTitle.textContent = '📊 副卡等级';
                 sec.appendChild(subLvTitle);
                 const subLvWrap = document.createElement('div');
-                subLvWrap.style.cssText = 'display:flex;align-items:center;gap:8px;';
-                const subLvInput = document.createElement('input');
-                subLvInput.type = 'range'; subLvInput.min = '0'; subLvInput.max = String(Math.max(0, subLevels.length - 1)); subLvInput.step = '1';
-                const subLvIndex = Math.max(0, subLevels.indexOf((typeof getFusionComponentLevel === 'function') ? getFusionComponentLevel(_subHero) : 1));
-                subLvInput.value = String(subLvIndex);
-                subLvInput.style.cssText = 'flex:1;accent-color:#4ecdc4;';
-                const subLvVal = document.createElement('span');
-                subLvVal.id = 'csSubLvVal';
-                subLvVal.textContent = String(subLevels[subLvIndex]);
-                subLvVal.style.cssText = 'min-width:28px;text-align:right;color:#4ecdc4;font-weight:600;';
-                const subLvChanges = document.createElement('div');
-                subLvChanges.id = 'csSubLvChanges';
-                subLvChanges.style.cssText = 'margin-top:5px;font-size:0.62rem;line-height:1.45;color:rgba(255,255,255,0.7);max-height:70px;overflow:auto;background:rgba(0,0,0,0.18);border-radius:6px;padding:4px 5px;';
-                function _renderSubLvChanges(curLv) {
-                    try {
-                        const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[_subHero];
-                        if (!d || !d.talents || Object.keys(d.talents).length === 0) { subLvChanges.innerHTML = '<span style="opacity:0.5">暂无等级变化</span>'; return; }
-                        const tLevels = Object.keys(d.talents).map(Number).sort((a, b) => a - b);
-                        const parts = [];
-                        for (const lv of tLevels) {
-                            const t = d.talents[String(lv)];
-                            if (!t || !t.changeDesc || !t.changeDesc.desc) continue;
-                            const active = lv <= curLv;
-                            const color = active ? '#4ecdc4' : 'rgba(255,255,255,0.45)';
-                            const marker = active ? '●' : '○';
-                            parts.push('<div style="margin-bottom:2px;"><span style="color:' + color + ';font-weight:600;">' + marker + ' Lv' + lv + '</span> ' + (t.changeDesc.name ? t.changeDesc.name + '：' : '') + t.changeDesc.desc + '</div>');
-                        }
-                        subLvChanges.innerHTML = parts.length ? parts.join('') : '<span style="opacity:0.5">暂无明显等级变化</span>';
-                    } catch (e) { subLvChanges.innerHTML = '<span style="opacity:0.5">等级变化加载失败</span>'; }
+                const subLvInfo = document.createElement('div');
+                subLvInfo.id = 'csSubLvInfo';
+                subLvInfo.style.cssText = 'margin-top:5px;font-size:0.68rem;line-height:1.55;color:rgba(255,255,255,0.8);background:rgba(0,0,0,0.18);border-radius:6px;padding:5px 7px;';
+                const subLvBtns = document.createElement('div');
+                subLvBtns.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;';
+                function _setSubLvBtnSelected(selLv) {
+                    subLvBtns.querySelectorAll('button').forEach(b => {
+                        const sel = Number(b.dataset.lv) === selLv;
+                        b.style.borderColor = sel ? '#4ecdc4' : 'rgba(255,255,255,0.2)';
+                        b.style.background = sel ? '#4ecdc4' : 'transparent';
+                        b.style.color = sel ? '#1a1a2e' : '#fff';
+                    });
                 }
-                subLvInput.oninput = () => { subLvVal.textContent = String(subLevels[Number(subLvInput.value)]); _renderSubLvChanges(subLevels[Number(subLvInput.value)]); };
-                subLvInput.onchange = async () => { const newLv = subLevels[Number(subLvInput.value)]; if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(_subHero, newLv); updateAllCardLevelBadges(); _renderSubLvChanges(newLv); await _reapplyCard(); _renderAttrPreview(); };
-                subLvWrap.appendChild(subLvInput);
-                subLvWrap.appendChild(subLvVal);
-                subLvWrap.appendChild(subLvChanges);
+                function _renderSubLevelInfo(curLv) {
+                    const initial = _getPassiveAtLevel(_subHero, curLv, 'initialPassive');
+                    const fullStar = _getPassiveAtLevel(_subHero, curLv, 'fullStarPassive');
+                    let html = '<div style="color:#4ecdc4;font-weight:600;margin-bottom:3px;">等级：' + curLv + '</div>';
+                    if (initial && initial.desc) html += '<div>【初始被动】' + initial.desc + '</div>';
+                    if (fullStar && fullStar.desc) html += '<div>【满星被动】' + fullStar.desc + '</div>';
+                    if (!initial?.desc && !fullStar?.desc) html += '<span style="opacity:0.5">暂无等级属性</span>';
+                    subLvInfo.innerHTML = html;
+                    _setSubLvBtnSelected(curLv);
+                }
+                const subLvIndex = Math.max(0, subLevels.indexOf((typeof getFusionComponentLevel === 'function') ? getFusionComponentLevel(_subHero) : 1));
+                subLevels.forEach(lv => {
+                    const b = document.createElement('button');
+                    b.textContent = String(lv);
+                    b.dataset.lv = String(lv);
+                    b.style.cssText = 'padding:3px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:#fff;cursor:pointer;font-size:0.7rem;';
+                    b.onclick = async () => {
+                        if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(_subHero, lv);
+                        updateAllCardLevelBadges();
+                        _renderSubLevelInfo(lv);
+                        await _reapplyCard();
+                    };
+                    subLvBtns.appendChild(b);
+                });
+                subLvWrap.appendChild(subLvBtns);
+                subLvWrap.appendChild(subLvInfo);
                 sec.appendChild(subLvWrap);
-                _renderSubLvChanges(subLevels[subLvIndex]);
+                _renderSubLevelInfo(subLevels[subLvIndex]);
 
                 const subMhTitle = document.createElement('div');
                 subMhTitle.style.cssText = 'color:#a855f7;margin:8px 0 4px;font-size:0.78rem;';
@@ -10951,7 +10952,17 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const subMhBtn = document.createElement('button');
                 subMhBtn.id = 'csSubMh';
                 const subMhOn = (typeof getFusionComponentMoHua === 'function') && getFusionComponentMoHua(_subHero);
-                const setSubMh = (on) => { subMhBtn.textContent = on ? '✅ 副卡魔化已开启' : '副卡魔化未开启'; subMhBtn.style.background = on ? '#a855f7' : 'transparent'; subMhBtn.style.borderColor = on ? '#a855f7' : 'rgba(255,255,255,0.2)'; subMhBtn.style.color = '#fff'; };
+                const subMhInfo = document.createElement('div');
+                subMhInfo.id = 'csSubMhInfo';
+                subMhInfo.style.cssText = 'margin-top:5px;font-size:0.68rem;line-height:1.55;color:rgba(255,255,255,0.75);';
+                function _renderSubMhInfo(on) {
+                    try {
+                        const lv = (typeof getFusionComponentLevel === 'function') ? (getFusionComponentLevel(_subHero) || 1) : 1;
+                        const mh = _getPassiveAtLevel(_subHero, lv, 'mohuaPassive');
+                        subMhInfo.innerHTML = on && mh && mh.desc ? ('<span style="color:#a855f7;font-weight:600;">魔化被动：</span>' + mh.desc) : '';
+                    } catch (e) { subMhInfo.innerHTML = ''; }
+                }
+                const setSubMh = (on) => { subMhBtn.textContent = on ? '✅ 副卡魔化已开启' : '副卡魔化未开启'; subMhBtn.style.background = on ? '#a855f7' : 'transparent'; subMhBtn.style.borderColor = on ? '#a855f7' : 'rgba(255,255,255,0.2)'; subMhBtn.style.color = '#fff'; _renderSubMhInfo(on); };
                 setSubMh(subMhOn);
                 subMhBtn.style.cssText = 'padding:5px 12px;border-radius:8px;border:1px solid ' + (subMhOn ? '#a855f7' : 'rgba(255,255,255,0.2)') + ';background:' + (subMhOn ? '#a855f7' : 'transparent') + ';color:#fff;cursor:pointer;font-size:0.8rem;';
                 subMhBtn.onclick = async () => {
@@ -10960,9 +10971,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     setSubMh(on);
                     updateAllCardLevelBadges();
                     await _reapplyCard();
-                    _renderAttrPreview();
                 };
                 sec.appendChild(subMhBtn);
+                sec.appendChild(subMhInfo);
 
                 const anchor = container.querySelector('#csDrSection');
                 if (anchor && anchor.parentNode === container) container.insertBefore(sec, anchor);
@@ -11019,7 +11030,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         renderFusionSubSection(box, cardName);
                         updateAllCardLevelBadges();
                         await _reapplyCard();
-                        _renderAttrPreview();
+                        
                         // 同步刷新减伤值输入（因为 baseHero 可能已变；目标表按卡片归属解析）
                         const drInput = box.querySelector('#csDrInput');
                         if (drInput) {
@@ -11034,7 +11045,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
             // 初始化融合副卡设置
             renderFusionSubSection(box, cardName);
-            _renderAttrPreview();
+            
 
             // 🔴 2026-09-29 修复：减伤值原写死 drActiveTable（默认「我的」）→ 在队友卡里改减伤全进了「我的」表。
             // 改为按卡片归属解析目标表：队友卡→「队友卡组」下拉当前选中的表；我的卡→「我的卡组」下拉；再回落 drActiveTable。
