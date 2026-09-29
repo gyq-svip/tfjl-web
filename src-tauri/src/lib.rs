@@ -3173,6 +3173,32 @@ async fn pick_umi_ocr_exe(app: tauri::AppHandle) -> Result<Option<String>, Strin
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // 🔴 2026-09-29 全局 panic 钩子：任何 Rust panic（表现为闪退/异常码 0xc0000409）都先把
+    //    panic 消息+触发位置+线程名落盘到 tfjl_diag\panic-<时间戳>.log，再走默认 abort。
+    //    没有它，闪退后 Windows 事件日志只有一个偏移量，完全无法定位。
+    std::panic::set_hook(Box::new(|info| {
+        let msg = info
+            .payload()
+            .downcast_ref::<&str>()
+            .map(|s| s.to_string())
+            .or_else(|| info.payload().downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "未知 panic payload".to_string());
+        let text = format!(
+            "[PANIC] {}\nlocation: {:?}\nthread: {:?}\ntime: {:?}\n",
+            msg,
+            info.location(),
+            std::thread::current().name(),
+            std::time::SystemTime::now()
+        );
+        let dir = std::path::PathBuf::from(r"D:\withfriends\塔防精灵助手数据\tfjl_diag");
+        let _ = std::fs::create_dir_all(&dir);
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        let _ = std::fs::write(dir.join(format!("panic-{}.log", ts)), text);
+    }));
+
     // 更新下载走直连，忽略本机残留代理设置（避免 127.0.0.1:7897 失效端口导致下载失败）
     clear_proxy_env();
 
