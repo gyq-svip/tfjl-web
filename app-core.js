@@ -10458,33 +10458,58 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             return { desc: descParts.join('\n\n') || '无特殊属性' };
         }
 
-        // 🔴 2026-09-29 从 CSV 数据按等级/皮肤/魔化组装动态属性文本；无数据返回 null，调用处回落旧静态描述
+        // 🔴 2026-09-29 从 CSV/HTML 数据按等级/皮肤/魔化组装动态属性文本；无数据返回 null，调用处回落旧静态描述
         function getHeroAttrText(heroName, opts) {
             const data = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[heroName];
             if (!data) return null;
             const level = Number(opts && opts.level) || 1;
             const skinName = (opts && opts.skinName) || '默认';
             const hasMohua = !!(opts && opts.hasMohua);
-            const maxStar = data.maxStar || 5;
-            const levels = Object.keys(data.talents || {}).map(Number).sort(function (a, b) { return a - b; });
-            let talent = null;
-            for (const lv of levels) { if (lv <= level) talent = data.talents[String(lv)]; }
-            const active = (talent && talent.activeSkill) || data.base.activeSkill || {};
-            const initial = (talent && talent.initialPassive) || data.base.initialPassive || {};
-            const fullStar = (talent && talent.fullStarPassive) || data.base.fullStarPassive || {};
-            const mohua = (talent && talent.mohuaPassive) || data.base.mohuaPassive || {};
+            const talents = data.talents || {};
+            const levels = Object.keys(talents).map(Number).sort(function (a, b) { return a - b; });
+            const maxLevel = levels.length ? Math.max.apply(null, levels) : (data.maxStar || 5);
+
+            // 取某个字段在当前等级下的「最新有效值」：逐级扫描，后面的非空值覆盖前面的
+            function latest(field, base) {
+                let cur = base;
+                for (const lv of levels) {
+                    if (lv > level) break;
+                    const t = talents[String(lv)];
+                    if (t && t[field] && t[field].desc) cur = t[field];
+                }
+                return cur || {};
+            }
+
+            // 从 HTML 解析的技能版本表里取当前等级下最高<=level的版本
+            function pickSkillVersion(list) {
+                if (!Array.isArray(list) || !list.length) return null;
+                let pick = null;
+                for (const v of list) {
+                    if (v.level <= level && (!pick || v.level > pick.level)) pick = v;
+                }
+                return pick;
+            }
+
+            const initial = latest('initialPassive', data.base.initialPassive);
+            const fullStar = latest('fullStarPassive', data.base.fullStarPassive);
+            const mohua = latest('mohuaPassive', data.base.mohuaPassive);
+
+            // 主动技能：优先按魔化/普通版本表；没有版本表则回落 base
+            let active = null;
+            if (data.skillVersions) {
+                if (hasMohua) active = pickSkillVersion(data.skillVersions.mohua) || pickSkillVersion(data.skillVersions.normal);
+                if (!active) active = pickSkillVersion(data.skillVersions.normal);
+            }
+            if (!active) active = data.base.activeSkill || {};
+
             const lines = [];
-            lines.push(`等级：${level}/${maxStar}`);
+            lines.push(`等级：${level}/${maxLevel}`);
             if (data.profession) lines.push(`职业：${data.profession}`);
             if (data.cardType) lines.push(`类型：${data.cardType}`);
             if (active && active.desc) {
                 let s = `【技能】` + (active.name ? active.name + '：' : '');
                 s += active.desc;
                 if (active.cd) s += '（CD ' + (active.cd / 1000).toFixed(1) + 's）';
-                // 🔴 2026-09-29 逐等级「技能强化」条目：把该等级对技能的数值改动附在技能行下方
-                if (talent && talent.skillEnhance && talent.skillEnhance.desc) {
-                    s += '\n　↳ ' + talent.skillEnhance.name + '：' + talent.skillEnhance.desc;
-                }
                 lines.push(s);
             }
             if (initial && initial.desc) lines.push(`【初始被动】${initial.desc}`);
@@ -10661,6 +10686,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             let baseHero = isFusion ? fusionParts[0] : ((typeof getBaseHeroName === 'function') ? getBaseHeroName(cardName).heroName : cardName);
             const variants = (typeof getFusionVariantsForBase === 'function') ? getFusionVariantsForBase(baseHero) : [];
             const hasVariants = variants.length > 0;
+            const mainName = getMainCardName(cardName);
 
             // 弹窗根（遮罩）
             const root = document.createElement('div');
@@ -10668,7 +10694,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             root.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100000;display:flex;align-items:center;justify-content:center;';
             root.onclick = (e) => { if (e.target === root) root.remove(); };
             const box = document.createElement('div');
-            box.style.cssText = 'background:#1a1a2e;border:1px solid rgba(255,255,255,0.15);border-radius:14px;max-width:340px;width:92vw;max-height:88vh;overflow:auto;padding:16px;color:#fff;font-size:0.85rem;box-shadow:0 10px 40px rgba(0,0,0,0.6);';
+            box.style.cssText = 'background:#1a1a2e;border:1px solid rgba(255,255,255,0.15);border-radius:14px;max-width:560px;width:92vw;max-height:88vh;overflow:auto;padding:16px;color:#fff;font-size:0.85rem;box-shadow:0 10px 40px rgba(0,0,0,0.6);';
             root.appendChild(box);
 
             // 标题
@@ -10701,7 +10727,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 } catch (e) {}
             }
 
-            // 等级（进度条滑块）
+            // 等级（进度条滑块）+ 等级变化明细
             const lvWrap = document.createElement('div');
             lvWrap.style.cssText = 'margin-bottom:12px;';
             lvWrap.innerHTML = '<div style="color:#4ecdc4;margin-bottom:6px;">📊 等级：<b id="csLvVal">' + currentLevel + '</b></div>';
@@ -10709,10 +10735,69 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             slider.type = 'range'; slider.min = '0'; slider.max = String(Math.max(0, levels.length - 1)); slider.step = '1';
             slider.value = String(Math.max(0, levels.indexOf(currentLevel)));
             slider.style.cssText = 'width:100%;';
-            slider.oninput = () => { const el = document.getElementById('csLvVal'); if (el) el.textContent = levels[Number(slider.value)]; };
-            slider.onchange = () => { setCardLevel(cardId, levels[Number(slider.value)], cardType, handType); updateAllCardLevelBadges(); _renderAttrPreview(); };
+            const lvChanges = document.createElement('div');
+            lvChanges.id = 'csLvChanges';
+            lvChanges.style.cssText = 'margin-top:8px;font-size:0.68rem;line-height:1.45;color:rgba(255,255,255,0.8);max-height:220px;overflow:auto;background:rgba(0,0,0,0.25);border-radius:8px;padding:6px;border:1px solid rgba(255,255,255,0.08);';
+            function _effectiveMap(talents, base, field) {
+                let cur = base && base[field] ? base[field] : null;
+                const map = {};
+                const tLevels = Object.keys(talents).map(Number).sort((a, b) => a - b);
+                for (const lv of tLevels) {
+                    const t = talents[String(lv)];
+                    if (t && t[field] && t[field].desc) cur = t[field];
+                    map[lv] = cur;
+                }
+                return map;
+            }
+            function _renderLvChanges(curLv) {
+                try {
+                    const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[mainName];
+                    if (!d || !d.talents || Object.keys(d.talents).length === 0) { lvChanges.innerHTML = '<span style="opacity:0.5">暂无天赋树数据</span>'; return; }
+                    const tLevels = Object.keys(d.talents).map(Number).sort((a, b) => a - b);
+                    const initials = _effectiveMap(d.talents, d.base, 'initialPassive');
+                    const fullStars = _effectiveMap(d.talents, d.base, 'fullStarPassive');
+                    const mohuas = _effectiveMap(d.talents, d.base, 'mohuaPassive');
+                    let html = '<table style="width:100%;border-collapse:collapse;"><thead><tr style="color:#4ecdc4;">';
+                    html += '<th style="text-align:left;padding:3px 2px;width:28px;">Lv</th>';
+                    html += '<th style="text-align:left;padding:3px 2px;min-width:60px;">天赋</th>';
+                    html += '<th style="text-align:left;padding:3px 2px;min-width:90px;">初始被动</th>';
+                    html += '<th style="text-align:left;padding:3px 2px;min-width:90px;">满星被动</th>';
+                    html += '<th style="text-align:left;padding:3px 2px;min-width:80px;">魔化被动</th>';
+                    html += '</tr></thead><tbody>';
+                    for (const lv of tLevels) {
+                        const t = d.talents[String(lv)];
+                        const active = lv <= curLv;
+                        const rowColor = active ? 'rgba(78,205,196,0.10)' : 'transparent';
+                        const txtColor = active ? '#fff' : 'rgba(255,255,255,0.55)';
+                        const talent = t && t.changeDesc && t.changeDesc.desc ? (t.changeDesc.name ? '<b>' + t.changeDesc.name.replace('强化', '') + '</b><br/>' + t.changeDesc.desc : t.changeDesc.desc) : '—';
+                        const ip = (initials[lv] && initials[lv].desc) || '—';
+                        const fp = (fullStars[lv] && fullStars[lv].desc) || '—';
+                        const mp = (mohuas[lv] && mohuas[lv].desc) || '—';
+                        html += '<tr style="background:' + rowColor + ';color:' + txtColor + ';">';
+                        html += '<td style="padding:3px 2px;vertical-align:top;font-weight:600;">' + (active ? '●' : '○') + ' ' + lv + '</td>';
+                        html += '<td style="padding:3px 2px;vertical-align:top;">' + talent + '</td>';
+                        html += '<td style="padding:3px 2px;vertical-align:top;word-break:break-word;">' + ip + '</td>';
+                        html += '<td style="padding:3px 2px;vertical-align:top;word-break:break-word;">' + fp + '</td>';
+                        html += '<td style="padding:3px 2px;vertical-align:top;word-break:break-word;">' + mp + '</td>';
+                        html += '</tr>';
+                    }
+                    html += '</tbody></table>';
+                    lvChanges.innerHTML = html;
+                } catch (e) { lvChanges.innerHTML = '<span style="opacity:0.5">天赋树加载失败</span>'; }
+            }
+            slider.oninput = () => {
+                const el = document.getElementById('csLvVal'); if (el) el.textContent = levels[Number(slider.value)];
+                _renderLvChanges(levels[Number(slider.value)]);
+            };
+            slider.onchange = () => {
+                const newLv = levels[Number(slider.value)];
+                setCardLevel(cardId, newLv, cardType, handType); updateAllCardLevelBadges();
+                _renderLvChanges(newLv); _renderAttrPreview();
+            };
             lvWrap.appendChild(slider);
+            lvWrap.appendChild(lvChanges);
             box.appendChild(lvWrap);
+            _renderLvChanges(currentLevel);
 
             // 皮肤
             const skinTitle = document.createElement('div');
@@ -10728,11 +10813,34 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (isProjectScope) await setCardSkin(cardId, skin, handType); else await setDefaultCardSkin(cardId, skin);
                     updateAllCardLevelBadges();
                     await _reapplyCard();
+                    _renderSkinAttrPanel(skin);
                     _renderAttrPreview();
                 });
                 skinWrap.appendChild(b);
             });
             box.appendChild(skinWrap);
+
+            // 已选皮肤属性展示
+            const skinAttrPanel = document.createElement('div');
+            skinAttrPanel.id = 'csSkinAttr';
+            skinAttrPanel.style.cssText = 'margin-top:8px;font-size:0.74rem;line-height:1.6;color:rgba(255,255,255,0.75);background:rgba(255,152,0,0.08);border:1px solid rgba(255,152,0,0.25);border-radius:6px;padding:6px 8px;';
+            function _renderSkinAttrPanel(selSkin) {
+                try {
+                    const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[mainName];
+                    if (!d || !d.skins || !d.skins[selSkin]) {
+                        skinAttrPanel.innerHTML = selSkin === '默认' ? '<span style="opacity:0.5">默认皮肤无额外属性</span>' : '<span style="opacity:0.5">该皮肤暂无额外属性</span>';
+                        return;
+                    }
+                    const s = d.skins[selSkin];
+                    const out = [];
+                    if (s.extraPassive) out.push('<div><span style="color:#ff9800;font-weight:600;">额外被动：</span>' + s.extraPassive + '</div>');
+                    if (s.hp) out.push('<div><span style="color:#ff9800;font-weight:600;">血量加成：</span>' + s.hp + '</div>');
+                    skinAttrPanel.innerHTML = out.length ? out.join('') : '<span style="opacity:0.5">该皮肤暂无额外属性</span>';
+                } catch (e) { skinAttrPanel.innerHTML = ''; }
+            }
+            skinWrap.after(skinAttrPanel);
+            _renderSkinAttrPanel(currentSkin);
+
             // 魔化（主卡）
             if (canMoHua) {
                 const mhTitle = document.createElement('div');
@@ -10798,12 +10906,30 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         if (typeof setFusionSkin === 'function') await setFusionSkin(_subHero, skin);
                         if (typeof invalidateFusionHalfCache === 'function') await invalidateFusionHalfCache(_subHero);
                         setSkinThumbSelected(subSkinWrap, skin);
+                        _renderSubSkinAttrPanel(skin);
                         await _reapplyCard();
                         _renderAttrPreview();
                     });
                     subSkinWrap.appendChild(b);
                 });
                 sec.appendChild(subSkinWrap);
+
+                // 副卡已选皮肤属性
+                const subSkinAttrPanel = document.createElement('div');
+                subSkinAttrPanel.id = 'csSubSkinAttr';
+                subSkinAttrPanel.style.cssText = 'margin-top:6px;font-size:0.7rem;line-height:1.55;color:rgba(255,255,255,0.75);background:rgba(255,152,0,0.08);border:1px solid rgba(255,152,0,0.2);border-radius:6px;padding:5px 7px;';
+                function _renderSubSkinAttrPanel(selSkin) {
+                    try {
+                        const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[_subHero];
+                        if (!d || !d.skins || !d.skins[selSkin]) { subSkinAttrPanel.innerHTML = '<span style="opacity:0.5">暂无皮肤属性</span>'; return; }
+                        const s = d.skins[selSkin]; const out = [];
+                        if (s.extraPassive) out.push('<div><span style="color:#ff9800;font-weight:600;">额外被动：</span>' + s.extraPassive + '</div>');
+                        if (s.hp) out.push('<div><span style="color:#ff9800;font-weight:600;">血量加成：</span>' + s.hp + '</div>');
+                        subSkinAttrPanel.innerHTML = out.length ? out.join('') : '<span style="opacity:0.5">暂无额外属性</span>';
+                    } catch (e) { subSkinAttrPanel.innerHTML = ''; }
+                }
+                subSkinWrap.after(subSkinAttrPanel);
+                _renderSubSkinAttrPanel(subCurSkin);
 
                 const subLvTitle = document.createElement('div');
                 subLvTitle.style.cssText = 'color:#4ecdc4;margin:8px 0 4px;font-size:0.78rem;';
@@ -10820,11 +10946,63 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 subLvVal.id = 'csSubLvVal';
                 subLvVal.textContent = String(subLevels[subLvIndex]);
                 subLvVal.style.cssText = 'min-width:28px;text-align:right;color:#4ecdc4;font-weight:600;';
-                subLvInput.oninput = () => { subLvVal.textContent = String(subLevels[Number(subLvInput.value)]); };
-                subLvInput.onchange = async () => { if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(_subHero, subLevels[Number(subLvInput.value)]); updateAllCardLevelBadges(); await _reapplyCard(); _renderAttrPreview(); };
+                const subLvChanges = document.createElement('div');
+                subLvChanges.id = 'csSubLvChanges';
+                subLvChanges.style.cssText = 'margin-top:6px;font-size:0.64rem;line-height:1.4;color:rgba(255,255,255,0.8);max-height:160px;overflow:auto;background:rgba(0,0,0,0.22);border-radius:6px;padding:5px;border:1px solid rgba(255,255,255,0.06);';
+                function _subEffectiveMap(talents, base, field) {
+                    let cur = base && base[field] ? base[field] : null;
+                    const map = {};
+                    const tLevels = Object.keys(talents).map(Number).sort((a, b) => a - b);
+                    for (const lv of tLevels) {
+                        const t = talents[String(lv)];
+                        if (t && t[field] && t[field].desc) cur = t[field];
+                        map[lv] = cur;
+                    }
+                    return map;
+                }
+                function _renderSubLvChanges(curLv) {
+                    try {
+                        const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[_subHero];
+                        if (!d || !d.talents || Object.keys(d.talents).length === 0) { subLvChanges.innerHTML = '<span style="opacity:0.5">暂无天赋树数据</span>'; return; }
+                        const tLevels = Object.keys(d.talents).map(Number).sort((a, b) => a - b);
+                        const initials = _subEffectiveMap(d.talents, d.base, 'initialPassive');
+                        const fullStars = _subEffectiveMap(d.talents, d.base, 'fullStarPassive');
+                        const mohuas = _subEffectiveMap(d.talents, d.base, 'mohuaPassive');
+                        let html = '<table style="width:100%;border-collapse:collapse;"><thead><tr style="color:#4ecdc4;">';
+                        html += '<th style="text-align:left;padding:2px;width:22px;">Lv</th>';
+                        html += '<th style="text-align:left;padding:2px;min-width:50px;">天赋</th>';
+                        html += '<th style="text-align:left;padding:2px;min-width:70px;">初始被动</th>';
+                        html += '<th style="text-align:left;padding:2px;min-width:70px;">满星被动</th>';
+                        html += '<th style="text-align:left;padding:2px;min-width:60px;">魔化被动</th>';
+                        html += '</tr></thead><tbody>';
+                        for (const lv of tLevels) {
+                            const t = d.talents[String(lv)];
+                            const active = lv <= curLv;
+                            const rowColor = active ? 'rgba(78,205,196,0.08)' : 'transparent';
+                            const txtColor = active ? '#fff' : 'rgba(255,255,255,0.55)';
+                            const talent = t && t.changeDesc && t.changeDesc.desc ? (t.changeDesc.name ? '<b>' + t.changeDesc.name.replace('强化', '') + '</b><br/>' + t.changeDesc.desc : t.changeDesc.desc) : '—';
+                            const ip = (initials[lv] && initials[lv].desc) || '—';
+                            const fp = (fullStars[lv] && fullStars[lv].desc) || '—';
+                            const mp = (mohuas[lv] && mohuas[lv].desc) || '—';
+                            html += '<tr style="background:' + rowColor + ';color:' + txtColor + ';">';
+                            html += '<td style="padding:2px;vertical-align:top;font-weight:600;">' + (active ? '●' : '○') + ' ' + lv + '</td>';
+                            html += '<td style="padding:2px;vertical-align:top;">' + talent + '</td>';
+                            html += '<td style="padding:2px;vertical-align:top;word-break:break-word;">' + ip + '</td>';
+                            html += '<td style="padding:2px;vertical-align:top;word-break:break-word;">' + fp + '</td>';
+                            html += '<td style="padding:2px;vertical-align:top;word-break:break-word;">' + mp + '</td>';
+                            html += '</tr>';
+                        }
+                        html += '</tbody></table>';
+                        subLvChanges.innerHTML = html;
+                    } catch (e) { subLvChanges.innerHTML = '<span style="opacity:0.5">天赋树加载失败</span>'; }
+                }
+                subLvInput.oninput = () => { subLvVal.textContent = String(subLevels[Number(subLvInput.value)]); _renderSubLvChanges(subLevels[Number(subLvInput.value)]); };
+                subLvInput.onchange = async () => { const newLv = subLevels[Number(subLvInput.value)]; if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(_subHero, newLv); updateAllCardLevelBadges(); _renderSubLvChanges(newLv); await _reapplyCard(); _renderAttrPreview(); };
                 subLvWrap.appendChild(subLvInput);
                 subLvWrap.appendChild(subLvVal);
+                subLvWrap.appendChild(subLvChanges);
                 sec.appendChild(subLvWrap);
+                _renderSubLvChanges(subLevels[subLvIndex]);
 
                 const subMhTitle = document.createElement('div');
                 subMhTitle.style.cssText = 'color:#a855f7;margin:8px 0 4px;font-size:0.78rem;';
