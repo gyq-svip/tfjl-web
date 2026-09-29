@@ -10517,15 +10517,23 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const badge = event.target;
             // 重新渲染当前卡（融合副卡魔化/等级/皮肤变更后需要重绘皮肤层）
             async function _reapplyCard() {
-                // updateAllCardLevelBadges 会替换 badge 元素，原 badge 引用可能失效，重新按 cardId 查找
-                const curBadge = document.querySelector(`.card-level-badge[data-card-id="${cardId}"][data-hand-type="${handType}"]`);
-                const slotEl = curBadge ? curBadge.closest('.battle-slot') : null;
-                if (slotEl && typeof applySkinBgToSlot === 'function') {
-                    try { await applySkinBgToSlot(slotEl, cardName); } catch (e) {}
-                } else {
-                    const handCard = curBadge ? curBadge.closest('.selected-card.card-item') : null;
-                    if (handCard && typeof reapplySingleHandCard === 'function') {
-                        try { await reapplySingleHandCard(handCard, cardId, handType); } catch (e) {}
+                // 🔴 2026-09-29 修复：同一张卡可能同时存在于「卡组槽位 + 手牌」，querySelector 只取第一个
+                //    匹配角标 → 只重渲染其中一处，另一处的副卡魔化/皮肤残留旧态（表现为"改了不渲染"）。
+                //    改为遍历全部匹配角标，槽位与手牌各自重渲染（Set 去重防重复刷同一容器）。
+                const badges = document.querySelectorAll(`.card-level-badge[data-card-id="${cardId}"][data-hand-type="${handType}"]`);
+                const seen = new Set();
+                for (const b of badges) {
+                    const slotEl = b.closest('.battle-slot');
+                    if (slotEl) {
+                        if (seen.has(slotEl)) continue;
+                        seen.add(slotEl);
+                        if (typeof applySkinBgToSlot === 'function') { try { await applySkinBgToSlot(slotEl, cardName); } catch (e) {} }
+                        continue;
+                    }
+                    const handCard = b.closest('.selected-card.card-item');
+                    if (handCard && !seen.has(handCard)) {
+                        seen.add(handCard);
+                        if (typeof reapplySingleHandCard === 'function') { try { await reapplySingleHandCard(handCard, cardId, handType); } catch (e) {} }
                     }
                 }
             }
