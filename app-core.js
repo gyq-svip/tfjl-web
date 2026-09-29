@@ -10737,53 +10737,23 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             slider.style.cssText = 'width:100%;';
             const lvChanges = document.createElement('div');
             lvChanges.id = 'csLvChanges';
-            lvChanges.style.cssText = 'margin-top:8px;font-size:0.68rem;line-height:1.45;color:rgba(255,255,255,0.8);max-height:220px;overflow:auto;background:rgba(0,0,0,0.25);border-radius:8px;padding:6px;border:1px solid rgba(255,255,255,0.08);';
-            function _effectiveMap(talents, base, field) {
-                let cur = base && base[field] ? base[field] : null;
-                const map = {};
-                const tLevels = Object.keys(talents).map(Number).sort((a, b) => a - b);
-                for (const lv of tLevels) {
-                    const t = talents[String(lv)];
-                    if (t && t[field] && t[field].desc) cur = t[field];
-                    map[lv] = cur;
-                }
-                return map;
-            }
+            lvChanges.style.cssText = 'margin-top:6px;font-size:0.66rem;line-height:1.5;color:rgba(255,255,255,0.7);max-height:90px;overflow:auto;background:rgba(0,0,0,0.18);border-radius:6px;padding:5px 6px;';
             function _renderLvChanges(curLv) {
                 try {
                     const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[mainName];
-                    if (!d || !d.talents || Object.keys(d.talents).length === 0) { lvChanges.innerHTML = '<span style="opacity:0.5">暂无天赋树数据</span>'; return; }
+                    if (!d || !d.talents || Object.keys(d.talents).length === 0) { lvChanges.innerHTML = '<span style="opacity:0.5">暂无等级变化</span>'; return; }
                     const tLevels = Object.keys(d.talents).map(Number).sort((a, b) => a - b);
-                    const initials = _effectiveMap(d.talents, d.base, 'initialPassive');
-                    const fullStars = _effectiveMap(d.talents, d.base, 'fullStarPassive');
-                    const mohuas = _effectiveMap(d.talents, d.base, 'mohuaPassive');
-                    let html = '<table style="width:100%;border-collapse:collapse;"><thead><tr style="color:#4ecdc4;">';
-                    html += '<th style="text-align:left;padding:3px 2px;width:28px;">Lv</th>';
-                    html += '<th style="text-align:left;padding:3px 2px;min-width:60px;">天赋</th>';
-                    html += '<th style="text-align:left;padding:3px 2px;min-width:90px;">初始被动</th>';
-                    html += '<th style="text-align:left;padding:3px 2px;min-width:90px;">满星被动</th>';
-                    html += '<th style="text-align:left;padding:3px 2px;min-width:80px;">魔化被动</th>';
-                    html += '</tr></thead><tbody>';
+                    const parts = [];
                     for (const lv of tLevels) {
                         const t = d.talents[String(lv)];
+                        if (!t || !t.changeDesc || !t.changeDesc.desc) continue;
                         const active = lv <= curLv;
-                        const rowColor = active ? 'rgba(78,205,196,0.10)' : 'transparent';
-                        const txtColor = active ? '#fff' : 'rgba(255,255,255,0.55)';
-                        const talent = t && t.changeDesc && t.changeDesc.desc ? (t.changeDesc.name ? '<b>' + t.changeDesc.name.replace('强化', '') + '</b><br/>' + t.changeDesc.desc : t.changeDesc.desc) : '—';
-                        const ip = (initials[lv] && initials[lv].desc) || '—';
-                        const fp = (fullStars[lv] && fullStars[lv].desc) || '—';
-                        const mp = (mohuas[lv] && mohuas[lv].desc) || '—';
-                        html += '<tr style="background:' + rowColor + ';color:' + txtColor + ';">';
-                        html += '<td style="padding:3px 2px;vertical-align:top;font-weight:600;">' + (active ? '●' : '○') + ' ' + lv + '</td>';
-                        html += '<td style="padding:3px 2px;vertical-align:top;">' + talent + '</td>';
-                        html += '<td style="padding:3px 2px;vertical-align:top;word-break:break-word;">' + ip + '</td>';
-                        html += '<td style="padding:3px 2px;vertical-align:top;word-break:break-word;">' + fp + '</td>';
-                        html += '<td style="padding:3px 2px;vertical-align:top;word-break:break-word;">' + mp + '</td>';
-                        html += '</tr>';
+                        const color = active ? '#4ecdc4' : 'rgba(255,255,255,0.45)';
+                        const marker = active ? '●' : '○';
+                        parts.push('<div style="margin-bottom:3px;"><span style="color:' + color + ';font-weight:600;">' + marker + ' Lv' + lv + '</span> ' + (t.changeDesc.name ? t.changeDesc.name + '：' : '') + t.changeDesc.desc + '</div>');
                     }
-                    html += '</tbody></table>';
-                    lvChanges.innerHTML = html;
-                } catch (e) { lvChanges.innerHTML = '<span style="opacity:0.5">天赋树加载失败</span>'; }
+                    lvChanges.innerHTML = parts.length ? parts.join('') : '<span style="opacity:0.5">暂无明显等级变化</span>';
+                } catch (e) { lvChanges.innerHTML = '<span style="opacity:0.5">等级变化加载失败</span>'; }
             }
             slider.oninput = () => {
                 const el = document.getElementById('csLvVal'); if (el) el.textContent = levels[Number(slider.value)];
@@ -10948,53 +10918,23 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 subLvVal.style.cssText = 'min-width:28px;text-align:right;color:#4ecdc4;font-weight:600;';
                 const subLvChanges = document.createElement('div');
                 subLvChanges.id = 'csSubLvChanges';
-                subLvChanges.style.cssText = 'margin-top:6px;font-size:0.64rem;line-height:1.4;color:rgba(255,255,255,0.8);max-height:160px;overflow:auto;background:rgba(0,0,0,0.22);border-radius:6px;padding:5px;border:1px solid rgba(255,255,255,0.06);';
-                function _subEffectiveMap(talents, base, field) {
-                    let cur = base && base[field] ? base[field] : null;
-                    const map = {};
-                    const tLevels = Object.keys(talents).map(Number).sort((a, b) => a - b);
-                    for (const lv of tLevels) {
-                        const t = talents[String(lv)];
-                        if (t && t[field] && t[field].desc) cur = t[field];
-                        map[lv] = cur;
-                    }
-                    return map;
-                }
+                subLvChanges.style.cssText = 'margin-top:5px;font-size:0.62rem;line-height:1.45;color:rgba(255,255,255,0.7);max-height:70px;overflow:auto;background:rgba(0,0,0,0.18);border-radius:6px;padding:4px 5px;';
                 function _renderSubLvChanges(curLv) {
                     try {
                         const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[_subHero];
-                        if (!d || !d.talents || Object.keys(d.talents).length === 0) { subLvChanges.innerHTML = '<span style="opacity:0.5">暂无天赋树数据</span>'; return; }
+                        if (!d || !d.talents || Object.keys(d.talents).length === 0) { subLvChanges.innerHTML = '<span style="opacity:0.5">暂无等级变化</span>'; return; }
                         const tLevels = Object.keys(d.talents).map(Number).sort((a, b) => a - b);
-                        const initials = _subEffectiveMap(d.talents, d.base, 'initialPassive');
-                        const fullStars = _subEffectiveMap(d.talents, d.base, 'fullStarPassive');
-                        const mohuas = _subEffectiveMap(d.talents, d.base, 'mohuaPassive');
-                        let html = '<table style="width:100%;border-collapse:collapse;"><thead><tr style="color:#4ecdc4;">';
-                        html += '<th style="text-align:left;padding:2px;width:22px;">Lv</th>';
-                        html += '<th style="text-align:left;padding:2px;min-width:50px;">天赋</th>';
-                        html += '<th style="text-align:left;padding:2px;min-width:70px;">初始被动</th>';
-                        html += '<th style="text-align:left;padding:2px;min-width:70px;">满星被动</th>';
-                        html += '<th style="text-align:left;padding:2px;min-width:60px;">魔化被动</th>';
-                        html += '</tr></thead><tbody>';
+                        const parts = [];
                         for (const lv of tLevels) {
                             const t = d.talents[String(lv)];
+                            if (!t || !t.changeDesc || !t.changeDesc.desc) continue;
                             const active = lv <= curLv;
-                            const rowColor = active ? 'rgba(78,205,196,0.08)' : 'transparent';
-                            const txtColor = active ? '#fff' : 'rgba(255,255,255,0.55)';
-                            const talent = t && t.changeDesc && t.changeDesc.desc ? (t.changeDesc.name ? '<b>' + t.changeDesc.name.replace('强化', '') + '</b><br/>' + t.changeDesc.desc : t.changeDesc.desc) : '—';
-                            const ip = (initials[lv] && initials[lv].desc) || '—';
-                            const fp = (fullStars[lv] && fullStars[lv].desc) || '—';
-                            const mp = (mohuas[lv] && mohuas[lv].desc) || '—';
-                            html += '<tr style="background:' + rowColor + ';color:' + txtColor + ';">';
-                            html += '<td style="padding:2px;vertical-align:top;font-weight:600;">' + (active ? '●' : '○') + ' ' + lv + '</td>';
-                            html += '<td style="padding:2px;vertical-align:top;">' + talent + '</td>';
-                            html += '<td style="padding:2px;vertical-align:top;word-break:break-word;">' + ip + '</td>';
-                            html += '<td style="padding:2px;vertical-align:top;word-break:break-word;">' + fp + '</td>';
-                            html += '<td style="padding:2px;vertical-align:top;word-break:break-word;">' + mp + '</td>';
-                            html += '</tr>';
+                            const color = active ? '#4ecdc4' : 'rgba(255,255,255,0.45)';
+                            const marker = active ? '●' : '○';
+                            parts.push('<div style="margin-bottom:2px;"><span style="color:' + color + ';font-weight:600;">' + marker + ' Lv' + lv + '</span> ' + (t.changeDesc.name ? t.changeDesc.name + '：' : '') + t.changeDesc.desc + '</div>');
                         }
-                        html += '</tbody></table>';
-                        subLvChanges.innerHTML = html;
-                    } catch (e) { subLvChanges.innerHTML = '<span style="opacity:0.5">天赋树加载失败</span>'; }
+                        subLvChanges.innerHTML = parts.length ? parts.join('') : '<span style="opacity:0.5">暂无明显等级变化</span>';
+                    } catch (e) { subLvChanges.innerHTML = '<span style="opacity:0.5">等级变化加载失败</span>'; }
                 }
                 subLvInput.oninput = () => { subLvVal.textContent = String(subLevels[Number(subLvInput.value)]); _renderSubLvChanges(subLevels[Number(subLvInput.value)]); };
                 subLvInput.onchange = async () => { const newLv = subLevels[Number(subLvInput.value)]; if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(_subHero, newLv); updateAllCardLevelBadges(); _renderSubLvChanges(newLv); await _reapplyCard(); _renderAttrPreview(); };
