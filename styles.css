@@ -1329,8 +1329,8 @@
         /* 卡名改到底部显示，避免融合副卡小图（左上角）挡住卡名，尤其融合卡名 */
         /* 用 padding-top 顶下去，最稳（inline-flex+单文本节点的 flex item 在个别 WebView 偶有怪行为） */
         .collapsible-section .card-item {
-            padding-top: 26px;
-            padding-bottom: 4px;
+            padding-top: 30px;
+            padding-bottom: 8px;
         }
         .collapsible-section .card-item.skin-bg {
             background-size: cover !important;
@@ -3359,7 +3359,7 @@
     width: 16px;
     height: 16px;
     left: auto;
-    right: calc(60% + 1px);
+    right: calc(60% - 1px);
     bottom: calc(60% - 3px);
     object-fit: contain;
     z-index: 6;

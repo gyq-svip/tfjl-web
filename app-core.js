@@ -10854,7 +10854,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const cardName = card.dataset.name || card.textContent.trim();
                 if (!cardId || !cardType) return;
                 
-                card.querySelector('.card-level-badge')?.remove();
+                card.querySelectorAll('.card-level-badge').forEach(el => el.remove());
                 card.insertAdjacentHTML('afterbegin', createLevelBadgeHTML(cardId, cardType, 'my', cardName));
             });
             
@@ -10867,7 +10867,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const actualType = cardType || findCardTypeById(cardId);
                 if (!actualType) return;
 
-                card.querySelector('.card-level-badge')?.remove();
+                card.querySelectorAll('.card-level-badge').forEach(el => el.remove());
                 card.insertAdjacentHTML('afterbegin', createLevelBadgeHTML(cardId, actualType, 'my', cardName));
             });
 
@@ -10880,7 +10880,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const actualType = cardType || findCardTypeById(cardId);
                 if (!actualType) return;
 
-                card.querySelector('.card-level-badge')?.remove();
+                card.querySelectorAll('.card-level-badge').forEach(el => el.remove());
                 card.insertAdjacentHTML('afterbegin', createLevelBadgeHTML(cardId, actualType, 'teammate', cardName));
             });
             
@@ -10890,7 +10890,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const cardName = card.dataset.name || card.textContent.trim();
                 if (!cardId || !cardType) return;
                 
-                card.querySelector('.card-level-badge')?.remove();
+                card.querySelectorAll('.card-level-badge').forEach(el => el.remove());
                 card.insertAdjacentHTML('afterbegin', createLevelBadgeHTML(cardId, cardType, 'my', cardName));
             });
             
@@ -10905,7 +10905,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const handCard = myHandCards.find(c => c.id === cardId);
                 const cardName = handCard?.name || '';
                 
-                card.querySelector('.card-level-badge')?.remove();
+                card.querySelectorAll('.card-level-badge').forEach(el => el.remove());
                 card.insertAdjacentHTML('afterbegin', createLevelBadgeHTML(cardId, actualType, 'my', cardName));
             });
 
@@ -10920,7 +10920,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const handCard = teammateHandCards.find(c => c.id === cardId);
                 const cardName = handCard?.name || '';
                 
-                card.querySelector('.card-level-badge')?.remove();
+                card.querySelectorAll('.card-level-badge').forEach(el => el.remove());
                 card.insertAdjacentHTML('afterbegin', createLevelBadgeHTML(cardId, actualType, 'teammate', cardName));
             });
 
