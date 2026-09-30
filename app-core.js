@@ -17767,9 +17767,8 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             }
             updateStatsBar();
 
-            // 🔴 2026-09-30 每天首次打开 App → 后台自动把「所有 Gist 文件」打 zip 备份到本机
-            //    默认开启；用 localStorage 日期标记保证每天只跑一次，20s 后延迟执行不拖慢首屏。
-            try { if (typeof window.gistBackupCheckAuto === 'function') window.gistBackupCheckAuto(); } catch (e) {}
+            // 🔴 2026-09-30 自动备份已关闭：备份功能仅限管理员登录后在「备份中心」手动触发，
+            //    不再随 App 启动自动执行，避免非管理员用户在本机静默备份。
         };
 
         // 确保「深海 / 王城低配版」默认项目已加载：本地缓存(IndexedDB) > 远程拉取并缓存 > 内置默认项目
