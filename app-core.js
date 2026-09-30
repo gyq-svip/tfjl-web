@@ -33662,12 +33662,26 @@ ${maSection}
             </div>`;
         }
 
-        function adminLoadStats() {
+        async function adminLoadStats() {
             const content = document.getElementById('adminStatsContent');
 
             if (!counterData) {
                 content.innerHTML = '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:30px;">暂无统计数据，请稍后再试</div>';
                 return;
+            }
+
+            // 🔴 2026-09-30 修复：打开统计页先重新拉取线上 Gist，确保看到的是"真正同步后"的数据，
+            // 而不是停留在内存里可能被其他设备写过之后的旧值。
+            try {
+                const fresh = await fetchCounterFromGist();
+                if (fresh) {
+                    counterData = fresh;
+                    saveCounterToCache(counterData);
+                } else if (!counterData) {
+                    counterData = loadCounterFromCache();
+                }
+            } catch (e) {
+                console.warn('[统计页] 拉取最新统计失败，使用本地缓存:', e);
             }
 
             const today = getTodayString();
@@ -33707,6 +33721,10 @@ ${maSection}
             }
 
             content.innerHTML = `
+                <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;">
+                    <button id="adminVerifyStatsBtn" style="padding:6px 14px;border-radius:8px;border:1px solid #4ecdc4;background:rgba(78,205,196,0.15);color:#4ecdc4;cursor:pointer;font-size:0.82rem;">🔍 统计同步核验</button>
+                    <span id="adminVerifyStatsResult" style="font-size:0.78rem;color:rgba(255,255,255,0.6);"></span>
+                </div>
                 <div class="admin-section">
                     ${pendingCount > 0 ? `<div style="color:#ff9800;margin-bottom:10px;">⚠️ 有 ${pendingCount} 条数据等待同步</div>` : ''}
                     <h3 style="color:#4ecdc4;">📈 总计数据</h3>
@@ -33737,6 +33755,51 @@ ${maSection}
                 </div>
                 <div style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;margin-top:10px;">最后更新：${_relTime(counterData.last_updated || '') || '未知'}</div>
             `;
+
+            // 绑定「统计同步核验」按钮
+            const verifyBtn = document.getElementById('adminVerifyStatsBtn');
+            if (verifyBtn) verifyBtn.onclick = () => adminVerifyStatsSync();
+        }
+
+        // 🔴 2026-09-30 统计同步核验：实时对比「线上 Gist / 本机内存(counterData) / 本机缓存(localStorage)」三份，
+        // 列出关键字段差异，让管理员一眼看出统计数据是否真的同步到线上 Gist。
+        async function adminVerifyStatsSync() {
+            const btn = document.getElementById('adminVerifyStatsBtn');
+            const out = document.getElementById('adminVerifyStatsResult');
+            try {
+                if (btn) { btn.disabled = true; btn.textContent = '核验中…'; }
+                if (out) out.textContent = '正在拉取线上 Gist…';
+                const remote = await fetchCounterFromGist();
+                const mem = counterData;
+                const cache = loadCounterFromCache();
+                if (!remote) { if (out) out.innerHTML = '<span style="color:#ff5252;">⚠️ 拉取线上 Gist 失败（网络/限流/Token 无效），无法核验</span>'; return; }
+                const alive = (c) => { if (!c || !c.online_users) return 0; const now = Date.now(); const t = _olEffWindow(c.online_timeout) || 1800000; let n = 0; for (const id in c.online_users) if (_olAlive(c.online_users[id], t, now)) n++; return n; };
+                const row = (label, a, b, c) => {
+                    const same = (a === b) && (b === c);
+                    const col = same ? '#4ade80' : '#ff5252';
+                    return `<tr style="color:${col};"><td style="padding:2px 6px;">${label}</td><td style="padding:2px 6px;">${a}</td><td style="padding:2px 6px;">${b}</td><td style="padding:2px 6px;">${c}</td></tr>`;
+                };
+                const t = getTodayString();
+                const rd = remote.daily_stats && remote.daily_stats[t] ? remote.daily_stats[t] : {};
+                const md = mem && mem.daily_stats && mem.daily_stats[t] ? mem.daily_stats[t] : {};
+                const cd = cache && cache.daily_stats && cache.daily_stats[t] ? cache.daily_stats[t] : {};
+                let html = '<table style="width:100%;border-collapse:collapse;font-size:0.78rem;margin-top:8px;background:rgba(0,0,0,0.25);border-radius:6px;overflow:hidden;">';
+                html += '<thead><tr style="color:#4ecdc4;"><th style="padding:3px 6px;text-align:left;">字段</th><th style="padding:3px 6px;text-align:left;">线上Gist</th><th style="padding:3px 6px;text-align:left;">本机内存</th><th style="padding:3px 6px;text-align:left;">本机缓存</th></tr></thead><tbody>';
+                html += row('累计访问', remote.total_visits, mem && mem.total_visits, cache && cache.total_visits);
+                html += row('累计用户', (remote.total_users || remote.unique_users && remote.unique_users.length), (mem && (mem.total_users || mem.unique_users && mem.unique_users.length)), (cache && (cache.total_users || cache.unique_users && cache.unique_users.length)));
+                html += row('累计下载', remote.total_downloads, mem && mem.total_downloads, cache && cache.total_downloads);
+                html += row('今日在线(活)', alive(remote), alive(mem), alive(cache));
+                html += row('今日活跃', (remote.active_today || (remote.active_today_users && remote.active_today_users.length)), (mem && (mem.active_today || (mem.active_today_users && mem.active_today_users.length))), (cache && (cache.active_today || (cache.active_today_users && cache.active_today_users.length))));
+                html += row('今日访问(' + t + ')', rd.visits || 0, md.visits || 0, cd.visits || 0);
+                html += row('今日新增', rd.new_users || 0, md.new_users || 0, cd.new_users || 0);
+                html += '</tbody></table>';
+                html += '<div style="font-size:0.72rem;color:rgba(255,255,255,0.5);margin-top:6px;">绿色=三份一致；红色=存在差异（多半是本机缓存/内存未写回线上，或被其他设备覆盖）。最后线上更新：' + (_relTime(remote.last_updated || '') || '未知') + '</div>';
+                if (out) out.innerHTML = html;
+            } catch (e) {
+                if (out) out.innerHTML = '<span style="color:#ff5252;">核验出错：' + (e && e.message || e) + '</span>';
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = '🔍 统计同步核验'; }
+            }
         }
 
         // 加载脚本下载统计
