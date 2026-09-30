@@ -867,7 +867,16 @@ let _adminVerified=false, _adminLastTok='', _featItems=[], _featData=null, _feat
         }
         if(pubItems.length){
             const groups={}; pubProjs.forEach(function(o){ const cat=o.item.category || (o.pj&&o.pj.category) || '其他'; (groups[cat]=groups[cat]||[]).push(o); });
+            // 🔴 2026-09-30 分类排序：固定「隐藏」第一（默认折叠）、「深海」第二（默认展开），其余保持数据原顺序
+            const _catFirst=['隐藏','深海'];
             _featCats=Object.keys(groups);
+            _featCats.sort(function(a,b){
+                const ia=_catFirst.indexOf(a), ib=_catFirst.indexOf(b);
+                if(ia>=0 && ib>=0) return ia-ib;
+                if(ia>=0) return -1;
+                if(ib>=0) return 1;
+                return 0;
+            });
             const _badCard=function(idx){ return '<div style="border:1px solid rgba(255,107,107,0.4);border-radius:10px;padding:8px;margin-bottom:10px;background:rgba(255,107,107,0.1);color:#ff6b6b;font-size:0.78rem;">该精选数据异常，无法渲染。<button onclick="_featuredRemove('+idx+',\'pub\')" style="margin-left:8px;padding:2px 8px;border-radius:6px;border:1px solid rgba(255,107,107,0.5);background:rgba(255,107,107,0.15);color:#ff6b6b;cursor:pointer;">删除</button></div>'; };
             _featCats.forEach(function(cat,ci){
                 if(_featCollapsed[cat]===undefined) _featCollapsed[cat]=(cat!=='深海');
