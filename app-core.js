@@ -10611,6 +10611,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         function showLevelDropdown(event, cardId, cardType, handType = 'my', cardName = '') {
             event.stopPropagation();
             event.preventDefault();
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('打开卡牌设置弹窗');
             // 判断卡的归属：手牌/战斗槽内=项目范围(project)；卡池/收藏内=全局默认(default)
             const _scopeEl = (event.target && event.target.closest) ? event.target.closest('#myHandContainer, #teammateHandContainer, .battle-slot') : null;
             const isProjectScope = !!_scopeEl && !_scopeEl.classList.contains('ll-slot');   // 🔴 图库槽位=卡池/全局范围：皮肤走全局默认，等级/魔化本就是全局
@@ -10746,6 +10747,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const newLv = levels[Number(slider.value)];
                 setCardLevel(cardId, newLv, cardType, handType); updateAllCardLevelBadges();
                 _renderLevelInfo(newLv);
+                if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('卡牌设置-调整等级');
             };
             lvWrap.appendChild(slider);
             lvWrap.appendChild(lvInfo);
@@ -10767,7 +10769,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     updateAllCardLevelBadges();
                     await _reapplyCard();
                     _renderSkinAttrPanel(skin);
-                    
+                    if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('卡牌设置-切换皮肤');
                 });
                 skinWrap.appendChild(b);
             });
@@ -10821,6 +10823,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     setMh(on);
                     updateAllCardLevelBadges();
                     await _reapplyCard();
+                    if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('卡牌设置-主卡魔化开关');
                     // 主卡魔化变化 → 副卡魔化开关可用状态联动
                     const subMh = box.querySelector('#csSubMh');
                     if (subMh) { subMh.disabled = !on; subMh.style.opacity = on ? '1' : '0.4'; if (!on && typeof setFusionComponentMoHua === 'function') setFusionComponentMoHua(subHero, false); }
@@ -10872,7 +10875,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         setSkinThumbSelected(subSkinWrap, skin);
                         _renderSubSkinAttrPanel(skin);
                         await _reapplyCard();
-                        
+                        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('卡牌设置-切换副卡皮肤');
                     });
                     subSkinWrap.appendChild(b);
                 });
@@ -10926,6 +10929,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     updateAllCardLevelBadges();
                     _renderSubLevelInfo(newLv);
                     await _reapplyCard();
+                    if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('卡牌设置-调整副卡等级');
                 };
                 subLvWrap.appendChild(subLvInput);
                 subLvWrap.appendChild(subLvInfo);
@@ -10963,6 +10967,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     setSubMh(on);
                     updateAllCardLevelBadges();
                     await _reapplyCard();
+                    if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('卡牌设置-副卡魔化开关');
                 };
                 sec.appendChild(subMhBtn);
                 sec.appendChild(subMhInfo);
@@ -11022,7 +11027,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         renderFusionSubSection(box, cardName);
                         updateAllCardLevelBadges();
                         await _reapplyCard();
-                        
+                        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('卡牌设置-选择融合副卡');
+
                         // 同步刷新减伤值输入（因为 baseHero 可能已变；目标表按卡片归属解析）
                         const drInput = box.querySelector('#csDrInput');
                         if (drInput) {
@@ -11072,6 +11078,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (t) { t.洗炼 = t.洗炼 || {}; if (v === undefined) delete t.洗炼[baseHero]; else t.洗炼[baseHero] = v; }
                     if (typeof saveDamageReductionData === 'function') saveDamageReductionData();
                     if (typeof updateDamageReductionDisplay === 'function') updateDamageReductionDisplay();
+                    if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('卡牌设置-设置减伤值');
                 };
                 box.appendChild(drInput);
             } catch (e) {}
@@ -21761,6 +21768,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 return out;
             }
             window.gistBackupRun = async function (silent) {
+                if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('备份中心-立即备份');
                 const t0 = Date.now();
                 try {
                     const token = (typeof getGistToken === 'function') ? getGistToken() : '';
@@ -21839,6 +21847,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             };
             // 🔎 只读检测：关键 Gist 是否被删（不写任何数据，安全）
             window.gistBackupCheckMissing = async function () {
+                if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('备份中心-检测缺失');
                 try {
                     const token = (typeof getGistToken === 'function') ? getGistToken() : '';
                     const hdrs = _gbHdrs(token);
@@ -21865,6 +21874,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 }
             };
             window.gistBackupOnFile = async function (input) {
+                if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('备份中心-从备份还原');
                 try {
                     const f = input.files && input.files[0];
                     input.value = '';
@@ -21909,6 +21919,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 }
             };
             window.gistBackupToggleAuto = function (on) {
+                if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('备份中心-切换自动备份');
                 try { localStorage.setItem(GB_AUTO_KEY, on ? '1' : '0'); } catch (e) {}
             };
             window.gistBackupOpenDir = async function () {
@@ -33766,6 +33777,7 @@ ${maSection}
         async function adminVerifyStatsSync() {
             const btn = document.getElementById('adminVerifyStatsBtn');
             const out = document.getElementById('adminVerifyStatsResult');
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('统计同步核验');
             try {
                 if (btn) { btn.disabled = true; btn.textContent = '核验中…'; }
                 if (out) out.textContent = '正在拉取线上 Gist…';
