@@ -2137,6 +2137,7 @@ if (true) {
     }
 
     async function restoreFromBackup(fileName) {
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('APP数据还原');
         if (!softwareDataDir) return;
         const filePath = softwareDataDir.replace(/[\\/]+$/, '') + '\\' + fileName;
         const raw = await readTextFile(filePath);
