@@ -216,7 +216,7 @@
         const isSail = state.tab === 'sail';
         h.innerHTML =
             '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-            + '<button onclick="_llTab(&quot;featured&quot;)" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (state.tab === 'featured' ? 'rgba(156,39,176,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (state.tab === 'featured' ? 'rgba(156,39,176,0.18)' : 'transparent') + ';color:' + (state.tab === 'featured' ? '#ce93d8' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">精选</button>' + (state.tab === 'featured' ? '<button onclick="_featLocalAddDlg()" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(78,205,196,0.6);background:rgba(78,205,196,0.18);color:#4ecdc4;cursor:pointer;font-size:0.8rem;font-weight:700;">添加本地阵容</button>' + (_isAdmin() ? '<button onclick="_featuredAddDlg()" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(240,147,43,0.6);background:rgba(240,147,43,0.18);color:#f0932b;cursor:pointer;font-size:0.8rem;font-weight:700;">添加精选</button>' : '') : '') + '<input id="llSearch" value="' + _esc(state.q) + '" oninput="_llSearch(this.value)" placeholder="🔍 多个英雄用空格/逗号分隔（同时含才显示）：如 电法 炎魔 悟空" style="flex:1;min-width:200px;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.85rem;">'
+            + '<button onclick="_llTab(&quot;featured&quot;)" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (state.tab === 'featured' ? 'rgba(156,39,176,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (state.tab === 'featured' ? 'rgba(156,39,176,0.18)' : 'transparent') + ';color:' + (state.tab === 'featured' ? '#ce93d8' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">精选</button>' + (state.tab === 'featured' ? '<button onclick="_featLocalAddDlg()" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(78,205,196,0.6);background:rgba(78,205,196,0.18);color:#4ecdc4;cursor:pointer;font-size:0.8rem;font-weight:700;">添加本地阵容</button>' + (_isAdmin() ? '<button onclick="_featuredAddDlg()" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(240,147,43,0.6);background:rgba(240,147,43,0.18);color:#f0932b;cursor:pointer;font-size:0.8rem;font-weight:700;">添加精选</button>' : '') : '') + (isSail || state.tab === 'act' ? '<input id="llSearch" value="' + _esc(state.q) + '" oninput="_llSearch(this.value)" placeholder="🔍 空格分隔多个英雄" title="多个英雄用空格/逗号分隔（同时含才显示）：如 电法 炎魔 悟空" style="flex:0 0 170px;width:170px;min-width:0;padding:6px 9px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.8rem;">' : '')
             + '<button onclick="_llTab(\'sail\')" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (isSail ? 'rgba(78,205,196,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (isSail ? 'rgba(78,205,196,0.18)' : 'transparent') + ';color:' + (isSail ? '#4ecdc4' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">🚢 大航海(' + D.sailing.length + ')</button>'
             + '<button onclick="_llTab(\'act\')" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (state.tab === 'act' ? 'rgba(255,215,0,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (state.tab === 'act' ? 'rgba(255,215,0,0.15)' : 'transparent') + ';color:' + (state.tab === 'act' ? '#ffd700' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">🏆 活动阵容(' + D.activity.length + '天)</button>'
             + '</div>'
@@ -403,8 +403,10 @@
         const fus = (L.fus && L.fus[hero]) || '';
         const cur = fus || hero;
         const pc = _poolTypeMap()[cur];
+        // 🔴 2026-10-07 角标（等级/融合）先同步刷新做到瞬时反馈，皮肤底图异步铺不阻塞
+        _fusBadge(el, fus); _lvBadge(el, hero, fus);
         return Promise.resolve().then(function () { return window.applySkinBgToSlot(el, cur, pc ? pc.id : undefined, 'my'); })
-            .catch(function () {}).then(function () { _fusBadge(el, fus); _lvBadge(el, hero, fus); });
+            .catch(function () {});
     };
     // 🔴 2026-09-29 图库设置弹窗入口：与主页同款 showLevelDropdown（图库=全局/卡池作用域）+ 图库专属「融合切换」区
     //    （替代原左键循环）。切换完成自动重开弹窗，反映新的当前卡（等级/魔化/皮肤区全部按新卡刷新）。
@@ -425,21 +427,46 @@
                 const root = document.querySelector('.card-settings-popup-root');
                 const box = root ? root.firstElementChild : null;
                 if (box) {
+                    // 🔴 2026-10-07 与主页完全一致：用「🔗 融合变体（选副卡）」按钮组（不融合 + 各融合变体），
+                    //    取代原「🔄 循环切换融合」按钮——图库此前交互与主页不一致，且只能循环、不能像主页那样直接选副卡。
                     const sec = document.createElement('div');
-                    sec.style.cssText = 'margin-top:12px;border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;';
+                    sec.style.cssText = 'margin:14px 0 6px;border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;';
                     const t = document.createElement('div');
                     t.style.cssText = 'color:#60a5fa;margin-bottom:6px;';
-                    t.textContent = '🔗 融合切换（本阵容）';
-                    const btn = document.createElement('button');
-                    btn.textContent = '🔄 循环切换融合（当前：' + (fus || '关闭') + '）';
-                    btn.style.cssText = 'width:100%;padding:7px;border-radius:8px;border:1px solid rgba(96,165,250,0.5);background:rgba(96,165,250,0.12);color:#60a5fa;cursor:pointer;font-size:0.82rem;';
-                    btn.onclick = function () {
-                        const p = window._llFuseCycle(sl);
-                        root.remove();
-                        Promise.resolve(p).then(function () { _llOpenSettings(sl, e); }).catch(function () {});
-                    };
+                    t.textContent = '🔗 融合变体（选副卡）';
+                    const row = document.createElement('div');
+                    row.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;';
+                    const opts = [hero].concat(variants);
+                    opts.forEach(function (opt) {
+                        const parts = (window.getFusionParts ? window.getFusionParts(opt) : null) || [];
+                        const label = (opt === hero) ? '不融合' : ((parts.length >= 2) ? parts[1] : opt);
+                        const selected = (opt === cur);
+                        const b = document.createElement('button');
+                        b.textContent = label;
+                        b.style.cssText = 'padding:4px 8px;border-radius:7px;border:1px solid ' + (selected ? '#60a5fa' : 'rgba(255,255,255,0.2)') + ';background:' + (selected ? '#60a5fa' : 'transparent') + ';color:' + (selected ? '#1a1a2e' : '#fff') + ';cursor:pointer;font-size:0.76rem;font-weight:' + (selected ? '600' : '400') + ';';
+                        b.onclick = function () {
+                            _llTrack('阵容图库选融合');
+                            const pick = opt;
+                            const newFus = (pick === hero) ? '' : pick;
+                            const shown = newFus || hero;
+                            const pparts = (window.getFusionParts ? window.getFusionParts(pick) : null) || [];
+                            const sub = (newFus && pparts.length >= 2) ? pparts[1] : '';
+                            window._llSet(tab, lid, 'fus', hero, newFus);
+                            if (sub) { try { window.fusionSkins = window.fusionSkins || {}; window.fusionSkins[sub] = ''; } catch (e2) {} }
+                            const pm = _poolTypeMap();
+                            const pc2 = pm[shown];
+                            root.remove();
+                            Promise.resolve()
+                                .then(function () { return window.applySkinBgToSlot(sl, shown, pc2 ? pc2.id : undefined, 'my'); })
+                                .catch(function () {})
+                                .then(function () { _fusBadge(sl, newFus); _lvBadge(sl, hero, newFus, pm); _refreshDrSums(document.getElementById('llList')); })
+                                .then(function () { _llOpenSettings(sl, e); })
+                                .catch(function () {});
+                        };
+                        row.appendChild(b);
+                    });
                     sec.appendChild(t);
-                    sec.appendChild(btn);
+                    sec.appendChild(row);
                     box.appendChild(sec);
                 }
             }
