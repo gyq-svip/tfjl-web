@@ -10765,10 +10765,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const sel = skin === currentSkin;
                 const b = createSkinThumb(cardName, skin, sel, async () => {
                     setSkinThumbSelected(skinWrap, skin);   // 🔴 2026-09-29 先亮选中态（瞬时反馈），再做后面的重刷新链
+                    // 🔴 2026-10-07 皮肤属性是本地数据，先渲染让弹窗立刻有反应；重铺卡槽/刷新角标放后台（避免换肤要等图片加载）
+                    _renderSkinAttrPanel(skin);
                     if (isProjectScope) await setCardSkin(cardId, skin, handType); else await setDefaultCardSkin(cardId, skin);
                     updateAllCardLevelBadges();
                     await _reapplyCard();
-                    _renderSkinAttrPanel(skin);
                     if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('卡牌设置-切换皮肤');
                 });
                 skinWrap.appendChild(b);
@@ -29023,7 +29024,7 @@ ${maSection}
                         // ============ 全量上报文件（🔴 2026-09-10 改为表格 + 搜索 + 点用户跳转）============
                         const sortedFiles = fileMetas.slice().sort((a, b) => b.last - a.last);
                         html += '<div style="margin-bottom:16px;">';
-                        html += '<div style="color:#ffd700;margin-bottom:6px;font-weight:700;">📋 全量上报文件 <span style="color:#94a3b8;font-size:0.7rem;font-weight:400;">（按最后上报时间倒序 · 点用户名跳到该用户详情）</span></div>';
+                        html += '<div style="color:#ffd700;margin-bottom:6px;font-weight:700;">📋 全量上报文件 <span style="color:#94a3b8;font-size:0.7rem;font-weight:400;">（按最后上报时间倒序 · 点用户名就地展开/收起该用户详情）</span></div>';
                         html += '<input id="diagFileSearch" type="text" placeholder="🔍 搜索用户 / 昵称 / ID / 版本 / 平台…" oninput="diagFilterFiles(this.value)" style="width:100%;box-sizing:border-box;margin-bottom:6px;padding:6px 10px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.78rem;outline:none;">';
                         html += '<div style="overflow-x:auto;"><table id="diagFileTable" style="border-collapse:collapse;width:100%;font-size:0.74rem;">';
                         html += '<tr style="font-size:0.68rem;color:#94a3b8;background:rgba(255,215,0,0.08);">'
@@ -29052,7 +29053,7 @@ ${maSection}
                             const _kw = (m.who + ' ' + m.anonId + ' ' + (m.ver || '') + ' ' + (m.plat || '') + ' ' + ((m.payload && m.payload.appExeVersion) || '') + ' ' + m.fn).toLowerCase().replace(/"/g, '');
                             html += '<tr class="diagFileRow" data-kw="' + _kw + '" style="border-top:1px dashed rgba(255,255,255,0.08);">'
                                 + '<td style="padding:3px 6px;color:#64748b;">' + (i + 1) + '</td>'
-                                + '<td style="padding:3px 6px;cursor:pointer;" onclick="diagJumpToUser(\'' + _aid + '\')" title="点击跳到该用户详情">' + _colorWho(m.who) + ' <span style="color:#60a5fa;font-size:0.68rem;">▶</span></td>'
+                                + '<td style="padding:3px 6px;cursor:pointer;" onclick="diagToggleInlineUser(\'' + _aid + '\',' + i + ')" title="点击就地展开/收起该用户详情">' + _colorWho(m.who) + ' <span style="color:#60a5fa;font-size:0.68rem;">▶</span></td>'
                                 + '<td style="padding:3px 6px;">' + _hb + ' ' + _wk + '</td>'
                                 + '<td style="padding:3px 6px;color:#60a5fa;">' + _fv + '</td>'
                                 + '<td style="padding:3px 6px;color:#a78bfa;">' + _ev + '</td>'
@@ -29066,6 +29067,8 @@ ${maSection}
                             if (m.err) {
                                 html += '<tr class="diagFileRow" data-kw="' + _kw + '"><td></td><td colspan="10" style="padding:2px 6px;color:#f87171;font-size:0.7rem;">err: ' + String(m.err).replace(/</g, '&lt;') + '</td></tr>';
                             }
+                            // 🔴 2026-10-07 内联详情行：点用户名就地展开/收起该用户详情（不再跳到「按用户 TOP」）
+                            html += '<tr class="diagInlineRow" id="inlineDetailRow_' + i + '" data-open="0" style="display:none;"><td colspan="11" style="padding:0;"><div id="inlineDetailHost_' + i + '" style="background:rgba(0,0,0,0.25);border-left:2px solid #60a5fa;padding:6px 10px;margin:4px 0 8px 12px;font-size:0.75rem;"></div></td></tr>';
                         });
                         html += '</table></div></div>';
                         // ==================== 📈 API 消耗分析与趋势预判（2026-08-30 新增） =====================
@@ -33940,6 +33943,34 @@ ${maSection}
                 const tr = rows[i];
                 const hit = !q || ((tr.getAttribute('data-kw') || '').indexOf(q) >= 0);
                 tr.style.display = hit ? '' : 'none';
+            }
+            // 🔴 2026-10-07 内联详情行不参与搜索过滤，但要跟随父用户行显隐 + 保留手动展开态
+            const inline = document.querySelectorAll('#diagFileTable tr.diagInlineRow');
+            for (let i = 0; i < inline.length; i++) {
+                const tr = inline[i];
+                let prev = tr.previousElementSibling;
+                while (prev && !prev.classList.contains('diagFileRow')) prev = prev.previousElementSibling;
+                const parentVisible = prev ? prev.style.display !== 'none' : false;
+                tr.style.display = (parentVisible && tr.getAttribute('data-open') === '1') ? '' : 'none';
+            }
+        };
+        // 🔴 2026-10-07 从「全量上报文件」点用户名 → 就在该行下方就地展开/收起详情（不再跳到顶部）
+        window.diagToggleInlineUser = function (aid, idx) {
+            const row = document.getElementById('inlineDetailRow_' + idx);
+            const host = document.getElementById('inlineDetailHost_' + idx);
+            if (!row || !host) return;
+            const isOpen = row.getAttribute('data-open') === '1';
+            if (!isOpen) {
+                if (!host.firstChild) {
+                    const src = document.getElementById('uDetailBox_' + aid);
+                    if (src) { src.style.display = 'block'; host.appendChild(src); }
+                    else { host.innerHTML = '<span style="color:#94a3b8;">该用户暂无详情（可能是旧数据无 anonId）</span>'; }
+                }
+                row.setAttribute('data-open', '1');
+                row.style.display = '';
+            } else {
+                row.setAttribute('data-open', '0');
+                row.style.display = 'none';
             }
         };
         // 从「全量上报」点用户名 → 跳到「按用户 TOP」里该用户的详情（自动展开各级折叠）
