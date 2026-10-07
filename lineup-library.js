@@ -416,6 +416,63 @@
         return Promise.resolve().then(function () { return window.applySkinBgToSlot(el, cur, pc ? pc.id : undefined, 'my'); })
             .catch(function () {});
     };
+    // 🔴 2026-10-07 图库融合变体发现（修复「第1天有融合、第4天同主卡却无融合选项」）：
+    //   主页 getAllFusionNames() 只枚举 window.cloudFusions 的键，管理员没录入的融合（如 电法炎魔）
+    //   → getFusionVariantsForBase('电法') 返回 []，弹窗里就没有「融合变体」可点。
+    //   但 getFusionParts('电法炎魔') 能拆出 ['电法','炎魔']，所以这里额外扫描「所有阵容数据里出现过的
+    //   卡名」，把能拆成融合的建成 主卡 → [融合名] 索引，补齐云端表缺失的融合。
+    function _llFusionIndex() {
+        const map = {};
+        const add = function (name) {
+            const nm = (typeof name === 'string') ? name.trim() : '';
+            if (!nm) return;
+            try {
+                const parts = (window.getFusionParts ? window.getFusionParts(nm) : null);
+                if (parts && parts.length >= 2) {
+                    const base = _norm(parts[0]);
+                    (map[base] = map[base] || []);
+                    if (map[base].indexOf(nm) < 0) map[base].push(nm);
+                }
+            } catch (e) {}
+        };
+        try { if (window.getAllFusionNames) (window.getAllFusionNames() || []).forEach(add); } catch (e) {}
+        try {
+            const D = _data();
+            (D.sailing || []).forEach(function (s) { (s.heroes || []).forEach(add); });
+            (D.activity || []).forEach(function (a) { ['A', 'B'].forEach(function (ab) { ((a && a[ab]) || []).forEach(add); }); });
+        } catch (e) {}
+        try {
+            [((_featData && _featData.projs) || []), ((_featLocal && _featLocal.projs) || [])].forEach(function (arr) {
+                (arr || []).forEach(function (o) {
+                    if (!o || !o.pj) return;
+                    ['myHandCards', 'teammateHandCards'].forEach(function (k) {
+                        ((o.pj && o.pj[k]) || []).forEach(function (c) { add(c && c.name); });
+                    });
+                });
+            });
+        } catch (e) {}
+        // 已存储的各阵容融合设置值（L.fus[主卡]=融合名）——覆盖「第1天手动融合过、第4天同主卡」的 discover 场景
+        try {
+            const o = _load();
+            Object.keys(o || {}).forEach(function (tab) {
+                const slots = o[tab] || {};
+                Object.keys(slots).forEach(function (id) {
+                    const fus = slots[id] && slots[id].fus;
+                    if (fus && typeof fus === 'object') Object.keys(fus).forEach(function (k) { add(fus[k]); });
+                });
+            });
+        } catch (e) {}
+        return map;
+    }
+    // 主卡 → 可选融合名（云端表 + 图库数据里出现过的融合，取并集）
+    function _llFusionVariantsFor(base) {
+        const out = [];
+        const push = function (n) { if (n && out.indexOf(n) < 0) out.push(n); };
+        const b = _norm(base);
+        try { if (window.getFusionVariantsForBase) (window.getFusionVariantsForBase(b) || []).forEach(push); } catch (e) {}
+        try { ((_llFusionIndex() || {})[b] || []).forEach(push); } catch (e) {}
+        return out;
+    }
     // 🔴 2026-09-29 图库设置弹窗入口：与主页同款 showLevelDropdown（图库=全局/卡池作用域）+ 图库专属「融合切换」区
     //    （替代原左键循环）。切换完成自动重开弹窗，反映新的当前卡（等级/魔化/皮肤区全部按新卡刷新）。
     window._llOpenSettings = function (sl, e) {
@@ -430,7 +487,7 @@
         window.showLevelDropdown(e, pc.id, pc.type, 'my', cur);
         try {
             const base = fus ? hero : cur;
-            const variants = window.getFusionVariantsForBase ? window.getFusionVariantsForBase(_norm(base)) : [];
+            const variants = _llFusionVariantsFor(base);
             if (variants.length) {
                 const root = document.querySelector('.card-settings-popup-root');
                 const box = root ? root.firstElementChild : null;
