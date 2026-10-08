@@ -9584,6 +9584,7 @@
                     level: badgeTxt.replace('👹', '').trim(),
                     mohua: badgeTxt.indexOf('👹') >= 0 || !!slot.querySelector('.card-mohua-icon'),
                     skin: (badge && badge.dataset && badge.dataset.skin) || '',
+                    q: (badge && badge.dataset && badge.dataset.cardType) || '',   // 品质(gold/purple/blue/green)，等级方块上色
                     prof: slot.dataset.profession || '',
                     eng: slot.dataset.type === 'engineering',
                     fusedLevel: fusedLevel,
@@ -9625,6 +9626,7 @@
                     level: badgeTxt.replace('👹', '').trim(),
                     mohua: badgeTxt.indexOf('👹') >= 0 || !!el.querySelector('.card-mohua-icon'),
                     skin: (badge && badge.dataset && badge.dataset.skin) || '',
+                    q: (badge && badge.dataset && badge.dataset.cardType) || '',   // 品质(gold/purple/blue/green)
                     prof: el.dataset.profession || '',
                     eng: el.dataset.engineering === 'true',
                     fusedLevel: fusedLevel,
@@ -9654,30 +9656,38 @@
             ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
         }
 
-        // 🔴 2026-10-08 等级+魔化角标（主卡/副卡共用同一套：彩色渐变底 + 魔化紫框 + 同字号）。
-        //    用户要求副卡角标与主页/主卡「完全一致、同样大小」，故抽成共用函数，主副卡都走这里。
-        //    (x,y) = 角标左上角。hasImg 决定用渐变底(有皮肤)还是纯黑底(无皮肤)。
-        function _lineupDrawLvBadge(ctx, x, y, level, mohua, hasImg, s) {
+        // 🔴 2026-10-08 等级/魔化角标：完全复刻主页（createLevelBadgeHTML + styles.css 3308+）：
+        //    等级=左下角品质色方块(.card-level-number 22px)，魔化=右下角官方恶魔图标(.card-mohua-icon 28px)。
+        //    旧的「右上角 等级+👹 合并角标」已废弃（用户要求与主页完全一致）。
+        const LINEUP_Q_COLORS = { gold: '#FFD700', purple: '#A855F7', blue: '#3B82F6', green: '#22C55E' };
+        let _mohuaIconImg = null;
+        // 预加载官方魔化图标（与主页同源 PNG）；同源不污染 canvas
+        function _preloadMohuaIcon() {
+            return new Promise(function (res) {
+                if (_mohuaIconImg && _mohuaIconImg.complete && _mohuaIconImg.naturalWidth) return res(_mohuaIconImg);
+                const img = new Image();
+                img.onload = function () { _mohuaIconImg = img; res(img); };
+                img.onerror = function () { res(null); };
+                img.src = 'skins/icons/mohua-icon.png';
+            });
+        }
+        // 左下角等级方块（品质色底 + 深色粗数字，复刻 .card-level-number）
+        function _lineupDrawLvSquare(ctx, x, y, size, level, q) {
             if (level === '' || level === null || level === undefined) return;
-            const txt = String(level) + (mohua ? '👹' : '');
-            ctx.font = 'bold ' + Math.max(10, Math.round(14 * s)) + 'px "Microsoft YaHei", sans-serif';
-            const bw = Math.max(24, ctx.measureText(txt).width + 10 * s);
-            const bh = Math.max(15, Math.round(22 * s));
-            _lineupRoundRect(ctx, x, y, bw, bh, Math.max(4, 6 * s));
-            if (hasImg) {
-                const bg = ctx.createLinearGradient(x, y, x + bw, y + bh);
-                bg.addColorStop(0, '#ff6b6b'); bg.addColorStop(0.5, '#feca57'); bg.addColorStop(1, '#48dbfb');
-                ctx.fillStyle = bg;
-            } else {
-                ctx.fillStyle = 'rgba(0,0,0,0.7)';
-            }
+            const col = LINEUP_Q_COLORS[q] || LINEUP_Q_COLORS.gold;
+            _lineupRoundRect(ctx, x, y, size, size, Math.max(2, Math.round(size * 0.18)));
+            ctx.fillStyle = col;
             ctx.fill();
-            ctx.strokeStyle = mohua ? 'rgba(168,85,247,0.9)' : 'rgba(255,255,255,0.25)';
-            ctx.lineWidth = mohua ? 2 : 1;
-            ctx.stroke();
-            ctx.fillStyle = hasImg ? '#fff' : '#ffd700';
+            ctx.fillStyle = '#1a1a2e';
+            ctx.font = '900 ' + Math.max(8, Math.round(size * 0.55)) + 'px "Microsoft YaHei", sans-serif';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(txt, x + bw / 2, y + bh / 2 + 1);
+            ctx.fillText(String(level), x + size / 2, y + size / 2 + size * 0.04);
+        }
+        // 右下角魔化图标（官方红恶魔 PNG，复刻 .card-mohua-icon）
+        function _lineupDrawMohuaIcon(ctx, x, y, size) {
+            const img = _mohuaIconImg;
+            if (!img || !img.complete || !img.naturalWidth) return;
+            try { ctx.drawImage(img, x, y, size, size); } catch (e) {}
         }
 
         // 画一个槽位卡片（字号随卡宽缩放，紧凑版默认 94×110）。card 为 null 时画空槽。
@@ -9734,9 +9744,11 @@
                 ctx.lineWidth = Math.max(1.5, 3 * s);
                 fusedPath();
                 ctx.stroke();
-                // 🔴 2026-10-08 融合副卡等级+魔化角标：与主卡「完全同一套」共用函数（同字号/渐变底/魔化紫框），
-                //    画在副卡方块左下角（右下是斜切，角标放左下不压切角）。
-                _lineupDrawLvBadge(ctx, x + fo, y + fo + fh - Math.max(15, Math.round(22 * s)) - Math.max(1, 2 * s), card.fusedLevel, card.fusedMohua, true, s);
+                // 🔴 2026-10-08 融合副卡角标：与主页一致（左下等级方块 + 右下魔化图标），画在副卡方块内。
+                const _ls = Math.max(11, Math.round(20 * s));   // 副卡方块小，等级方块略缩但保持可读
+                const _ms = Math.max(13, Math.round(24 * s));
+                _lineupDrawLvSquare(ctx, x + fo + Math.max(1, 2 * s), y + fo + fh - _ls - Math.max(1, 2 * s), _ls, card.fusedLevel, card.q);
+                if (card.fusedMohua) _lineupDrawMohuaIcon(ctx, x + fo + fw - _ms - Math.max(1, 2 * s), y + fo + fh - _ms - Math.max(1, 2 * s), _ms);
             }
             ctx.restore();
             // 卡名：底部贴边（有皮肤=半透明黑条；无皮肤=居中大字）
@@ -9757,11 +9769,13 @@
                 ctx.fillText(card.display || card.name, x + w / 2, y + h / 2 - Math.max(4, Math.round(8 * s)));
                 ctx.shadowBlur = 0;
             }
-            // 等级徽章：右上角（与副卡共用 _lineupDrawLvBadge，同一套样式/字号）
-            if (card.level) {
-                const _bw = Math.max(24, (function () { ctx.font = 'bold ' + Math.max(10, Math.round(14 * s)) + 'px "Microsoft YaHei", sans-serif'; return ctx.measureText(String(card.level) + (card.mohua ? '👹' : '')).width + 10 * s; })());
-                _lineupDrawLvBadge(ctx, x + w - _bw - Math.max(3, 4 * s), y + Math.max(3, 4 * s), card.level, card.mohua, hasImg, s);
-            }
+            // 🔴 2026-10-08 等级/魔化角标：与主页一致 —— 左下角品质色等级方块 + 右下角官方魔化图标。
+            //    （旧的「右上角 等级+👹 合并角标」已废弃）
+            const _mls = Math.max(13, Math.round(22 * s));
+            const _mms = Math.max(15, Math.round(28 * s));
+            const _m = Math.max(1, Math.round(2 * s));
+            _lineupDrawLvSquare(ctx, x + _m, y + h - _mls - _m, _mls, card.level, card.q);
+            if (card.mohua) _lineupDrawMohuaIcon(ctx, x + w - _mms - _m, y + h - _mms - _m, _mms);
             // 工程格 🔧 标记
             if (card.eng) {
                 ctx.font = Math.round(16 * s) + 'px "Microsoft YaHei", sans-serif';
@@ -9816,6 +9830,8 @@
                 catName = (typeof currentProjectCategory !== 'undefined' && currentProjectCategory) ? String(currentProjectCategory) : '';
                 myDr = drTxt('myDamageReduction'); tmDr = drTxt('teammateDamageReduction');
             }
+            // 🔴 2026-10-08 预加载官方魔化图标（右下角角标用），失败不阻塞分享
+            try { await _preloadMohuaIcon(); } catch (e) {}
             filled = my.concat(tm, myHand, tmHand).filter(Boolean).length;
             if (!filled) return { canvas: null, filled: 0 };
 
