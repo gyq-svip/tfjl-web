@@ -9565,15 +9565,29 @@
                 const nameEl = slot.querySelector('.card-name');
                 const badge = slot.querySelector('.card-level-badge');
                 const badgeTxt = badge ? (badge.textContent || '') : '';
+                const _full = (nameEl && nameEl.dataset && nameEl.dataset.fullName) || (nameEl ? nameEl.textContent : '');
+                // 🔴 2026-10-08 融合副卡等级/魔化：副卡数据按「副卡名」全局存（window.fusionLevels/fusionMoHua），
+                //    分享图之前只画了主卡角标，副卡只有图没有等级/魔化 → 这里补采，画到副卡角上。
+                let fusedLevel = '', fusedMohua = false;
+                try {
+                    const parts = (typeof window.getFusionParts === 'function') ? window.getFusionParts(_full) : null;
+                    if (parts && parts.length >= 2) {
+                        const sub = parts[1];
+                        fusedLevel = (window.fusionLevels && window.fusionLevels[sub] !== undefined) ? String(window.fusionLevels[sub]) : '1';
+                        fusedMohua = !!(window.fusionMoHua && window.fusionMoHua[sub] === true);
+                    }
+                } catch (e) {}
                 out.push({
                     slot: prefix + i,
-                    name: (nameEl && nameEl.dataset && nameEl.dataset.fullName) || (nameEl ? nameEl.textContent : ''),
+                    name: _full,
                     display: nameEl ? nameEl.textContent : '',
                     level: badgeTxt.replace('👹', '').trim(),
                     mohua: badgeTxt.indexOf('👹') >= 0 || !!slot.querySelector('.card-mohua-icon'),
                     skin: (badge && badge.dataset && badge.dataset.skin) || '',
                     prof: slot.dataset.profession || '',
                     eng: slot.dataset.type === 'engineering',
+                    fusedLevel: fusedLevel,
+                    fusedMohua: fusedMohua,
                     mainImg: slot.querySelector('.skin-layer'),
                     fusedImg: slot.querySelector('.skin-layer-fused')
                 });
@@ -9593,15 +9607,28 @@
                 const nameEl = el.querySelector('.card-name');
                 const badge = el.querySelector('.card-level-badge');
                 const badgeTxt = badge ? (badge.textContent || '') : '';
+                const _full = (nameEl && nameEl.dataset && nameEl.dataset.fullName) || (nameEl ? nameEl.textContent : '');
+                // 🔴 2026-10-08 融合副卡等级/魔化（同 _lineupCollect）
+                let fusedLevel = '', fusedMohua = false;
+                try {
+                    const parts = (typeof window.getFusionParts === 'function') ? window.getFusionParts(_full) : null;
+                    if (parts && parts.length >= 2) {
+                        const sub = parts[1];
+                        fusedLevel = (window.fusionLevels && window.fusionLevels[sub] !== undefined) ? String(window.fusionLevels[sub]) : '1';
+                        fusedMohua = !!(window.fusionMoHua && window.fusionMoHua[sub] === true);
+                    }
+                } catch (e) {}
                 out.push({
                     slot: 'h',
-                    name: (nameEl && nameEl.dataset && nameEl.dataset.fullName) || (nameEl ? nameEl.textContent : ''),
+                    name: _full,
                     display: nameEl ? nameEl.textContent : '',
                     level: badgeTxt.replace('👹', '').trim(),
                     mohua: badgeTxt.indexOf('👹') >= 0 || !!el.querySelector('.card-mohua-icon'),
                     skin: (badge && badge.dataset && badge.dataset.skin) || '',
                     prof: el.dataset.profession || '',
                     eng: el.dataset.engineering === 'true',
+                    fusedLevel: fusedLevel,
+                    fusedMohua: fusedMohua,
                     mainImg: el.querySelector('.hand-skin-layer') || el.querySelector('.skin-layer'),
                     fusedImg: el.querySelector('.hand-skin-fused') || el.querySelector('.skin-layer-fused')
                 });
@@ -9681,6 +9708,26 @@
                 ctx.lineWidth = Math.max(1.5, 3 * s);
                 fusedPath();
                 ctx.stroke();
+                // 🔴 2026-10-08 融合副卡等级+魔化角标（画在副卡方块左下角，避开右下斜切），
+                //    副卡等级/魔化按副卡名全局存（window.fusionLevels / window.fusionMoHua）。
+                if (card.fusedLevel) {
+                    const _t = String(card.fusedLevel) + (card.fusedMohua ? '👹' : '');
+                    const _fs = Math.max(7, Math.round(11 * s));
+                    ctx.font = 'bold ' + _fs + 'px "Microsoft YaHei", sans-serif';
+                    const _bw = Math.max(15, ctx.measureText(_t).width + 6 * s);
+                    const _bh = Math.max(11, Math.round(15 * s));
+                    const _bx = x + fo + Math.max(1, 2 * s);
+                    const _by = y + fo + fh - _bh - Math.max(1, 2 * s);
+                    _lineupRoundRect(ctx, _bx, _by, _bw, _bh, Math.max(3, 4 * s));
+                    ctx.fillStyle = card.fusedMohua ? 'rgba(168,85,247,0.92)' : 'rgba(0,0,0,0.72)';
+                    ctx.fill();
+                    ctx.strokeStyle = card.fusedMohua ? 'rgba(255,255,255,0.85)' : 'rgba(255,215,0,0.7)';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                    ctx.fillStyle = '#fff';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText(_t, _bx + _bw / 2, _by + _bh / 2 + 1);
+                }
             }
             ctx.restore();
             // 卡名：底部贴边（有皮肤=半透明黑条；无皮肤=居中大字）
