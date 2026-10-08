@@ -9654,6 +9654,32 @@
             ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
         }
 
+        // 🔴 2026-10-08 等级+魔化角标（主卡/副卡共用同一套：彩色渐变底 + 魔化紫框 + 同字号）。
+        //    用户要求副卡角标与主页/主卡「完全一致、同样大小」，故抽成共用函数，主副卡都走这里。
+        //    (x,y) = 角标左上角。hasImg 决定用渐变底(有皮肤)还是纯黑底(无皮肤)。
+        function _lineupDrawLvBadge(ctx, x, y, level, mohua, hasImg, s) {
+            if (level === '' || level === null || level === undefined) return;
+            const txt = String(level) + (mohua ? '👹' : '');
+            ctx.font = 'bold ' + Math.max(10, Math.round(14 * s)) + 'px "Microsoft YaHei", sans-serif';
+            const bw = Math.max(24, ctx.measureText(txt).width + 10 * s);
+            const bh = Math.max(15, Math.round(22 * s));
+            _lineupRoundRect(ctx, x, y, bw, bh, Math.max(4, 6 * s));
+            if (hasImg) {
+                const bg = ctx.createLinearGradient(x, y, x + bw, y + bh);
+                bg.addColorStop(0, '#ff6b6b'); bg.addColorStop(0.5, '#feca57'); bg.addColorStop(1, '#48dbfb');
+                ctx.fillStyle = bg;
+            } else {
+                ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            }
+            ctx.fill();
+            ctx.strokeStyle = mohua ? 'rgba(168,85,247,0.9)' : 'rgba(255,255,255,0.25)';
+            ctx.lineWidth = mohua ? 2 : 1;
+            ctx.stroke();
+            ctx.fillStyle = hasImg ? '#fff' : '#ffd700';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(txt, x + bw / 2, y + bh / 2 + 1);
+        }
+
         // 画一个槽位卡片（字号随卡宽缩放，紧凑版默认 94×110）。card 为 null 时画空槽。
         function _lineupDrawSlot(ctx, x, y, w, h, card) {
             const s = w / 120;                       // 相对标准卡(120宽)的缩放系数
@@ -9708,26 +9734,9 @@
                 ctx.lineWidth = Math.max(1.5, 3 * s);
                 fusedPath();
                 ctx.stroke();
-                // 🔴 2026-10-08 融合副卡等级+魔化角标（画在副卡方块左下角，避开右下斜切），
-                //    副卡等级/魔化按副卡名全局存（window.fusionLevels / window.fusionMoHua）。
-                if (card.fusedLevel) {
-                    const _t = String(card.fusedLevel) + (card.fusedMohua ? '👹' : '');
-                    const _fs = Math.max(7, Math.round(11 * s));
-                    ctx.font = 'bold ' + _fs + 'px "Microsoft YaHei", sans-serif';
-                    const _bw = Math.max(15, ctx.measureText(_t).width + 6 * s);
-                    const _bh = Math.max(11, Math.round(15 * s));
-                    const _bx = x + fo + Math.max(1, 2 * s);
-                    const _by = y + fo + fh - _bh - Math.max(1, 2 * s);
-                    _lineupRoundRect(ctx, _bx, _by, _bw, _bh, Math.max(3, 4 * s));
-                    ctx.fillStyle = card.fusedMohua ? 'rgba(168,85,247,0.92)' : 'rgba(0,0,0,0.72)';
-                    ctx.fill();
-                    ctx.strokeStyle = card.fusedMohua ? 'rgba(255,255,255,0.85)' : 'rgba(255,215,0,0.7)';
-                    ctx.lineWidth = 1;
-                    ctx.stroke();
-                    ctx.fillStyle = '#fff';
-                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                    ctx.fillText(_t, _bx + _bw / 2, _by + _bh / 2 + 1);
-                }
+                // 🔴 2026-10-08 融合副卡等级+魔化角标：与主卡「完全同一套」共用函数（同字号/渐变底/魔化紫框），
+                //    画在副卡方块左下角（右下是斜切，角标放左下不压切角）。
+                _lineupDrawLvBadge(ctx, x + fo, y + fo + fh - Math.max(15, Math.round(22 * s)) - Math.max(1, 2 * s), card.fusedLevel, card.fusedMohua, true, s);
             }
             ctx.restore();
             // 卡名：底部贴边（有皮肤=半透明黑条；无皮肤=居中大字）
@@ -9748,27 +9757,10 @@
                 ctx.fillText(card.display || card.name, x + w / 2, y + h / 2 - Math.max(4, Math.round(8 * s)));
                 ctx.shadowBlur = 0;
             }
-            // 等级徽章：右上角（有皮肤=彩色渐变，与 UI has-skin 一致）
+            // 等级徽章：右上角（与副卡共用 _lineupDrawLvBadge，同一套样式/字号）
             if (card.level) {
-                const txt = String(card.level) + (card.mohua ? '👹' : '');
-                ctx.font = 'bold ' + Math.max(10, Math.round(14 * s)) + 'px "Microsoft YaHei", sans-serif';
-                const bw = Math.max(24, ctx.measureText(txt).width + 10 * s);
-                const bx = x + w - bw - Math.max(3, 4 * s), by = y + Math.max(3, 4 * s), bh = Math.max(15, Math.round(22 * s));
-                _lineupRoundRect(ctx, bx, by, bw, bh, Math.max(4, 6 * s));
-                if (hasImg) {
-                    const bg = ctx.createLinearGradient(bx, by, bx + bw, by + bh);
-                    bg.addColorStop(0, '#ff6b6b'); bg.addColorStop(0.5, '#feca57'); bg.addColorStop(1, '#48dbfb');
-                    ctx.fillStyle = bg;
-                } else {
-                    ctx.fillStyle = 'rgba(0,0,0,0.7)';
-                }
-                ctx.fill();
-                ctx.strokeStyle = card.mohua ? 'rgba(168,85,247,0.9)' : 'rgba(255,255,255,0.25)';
-                ctx.lineWidth = card.mohua ? 2 : 1;
-                ctx.stroke();
-                ctx.fillStyle = hasImg ? '#fff' : '#ffd700';
-                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.fillText(txt, bx + bw / 2, by + bh / 2 + 1);
+                const _bw = Math.max(24, (function () { ctx.font = 'bold ' + Math.max(10, Math.round(14 * s)) + 'px "Microsoft YaHei", sans-serif'; return ctx.measureText(String(card.level) + (card.mohua ? '👹' : '')).width + 10 * s; })());
+                _lineupDrawLvBadge(ctx, x + w - _bw - Math.max(3, 4 * s), y + Math.max(3, 4 * s), card.level, card.mohua, hasImg, s);
             }
             // 工程格 🔧 标记
             if (card.eng) {
