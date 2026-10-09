@@ -278,7 +278,7 @@ window.EQUIP_IMG = {
         div.id = 'scriptSimRoot';
         div.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);z-index:99998;display:flex;align-items:center;justify-content:center;font-family:inherit;';
         div.innerHTML =
-            '<div id="scriptSimPanel" style="position:relative;width:97vw;height:94vh;background:linear-gradient(180deg,#1a1a2e,#16213e);border:1px solid rgba(78,205,196,0.4);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,0.6);display:flex;flex-direction:column;overflow:hidden;">'
+            '<div id="scriptSimPanel" style="position:relative;width:min(97vw,1150px);height:94vh;background:linear-gradient(180deg,#1a1a2e,#16213e);border:1px solid rgba(78,205,196,0.4);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,0.6);display:flex;flex-direction:column;overflow:hidden;">'
             // 标题栏
             + '<div style="flex:0 0 auto;padding:8px 16px;background:rgba(0,0,0,0.35);border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between;">'
             + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
@@ -295,10 +295,10 @@ window.EQUIP_IMG = {
             + '</div>'
             // 主体
             + '<div style="flex:1 1 auto;display:flex;overflow:hidden;padding:10px;gap:10px;">'
-            // 左：脚本①歌词（定高紧凑，与卡槽区同高对齐）
-            + '<div style="flex:0 0 205px;display:flex;flex-direction:column;gap:6px;align-self:center;">'
+            // 左：脚本①歌词（顶到卡槽区顶部，紧凑不撑宽）
+            + '<div style="flex:0 0 185px;display:flex;flex-direction:column;gap:6px;align-self:flex-start;margin-top:36px;">'
             + '<div style="color:#4ecdc4;font-size:0.8rem;font-weight:700;">脚本① · 歌词</div>'
-            + '<div id="simMainLyric" style="height:500px;max-height:56vh;background:rgba(0,0,0,0.35);border-radius:8px;border:1px solid rgba(78,205,196,0.15);padding:8px;overflow:auto;font-size:0.72rem;line-height:1.6;color:rgba(255,255,255,0.7);"></div>'
+            + '<div id="simMainLyric" style="height:480px;max-height:56vh;background:rgba(0,0,0,0.35);border-radius:8px;border:1px solid rgba(78,205,196,0.15);padding:8px;overflow:auto;font-size:0.72rem;line-height:1.6;color:rgba(255,255,255,0.7);"></div>'
             + '</div>'
             // 中：双卡组
             + '<div style="flex:1 1 auto;display:flex;flex-direction:column;gap:8px;align-items:center;overflow:auto;">'
@@ -310,9 +310,9 @@ window.EQUIP_IMG = {
             + '<div id="simEquipmentArea" style="padding:8px 16px;border-radius:10px;border:1px solid rgba(255,215,0,0.3);background:rgba(255,215,0,0.08);display:flex;align-items:center;gap:16px;flex-wrap:wrap;color:#ffd700;font-size:0.85rem;font-weight:700;">装备区</div>'
             + '</div>'
             // 右：脚本②歌词
-            + '<div style="flex:0 0 205px;display:flex;flex-direction:column;gap:6px;align-self:center;">'
+            + '<div style="flex:0 0 185px;display:flex;flex-direction:column;gap:6px;align-self:flex-start;margin-top:36px;">'
             + '<div style="color:#ff6b6b;font-size:0.8rem;font-weight:700;">脚本② · 歌词</div>'
-            + '<div id="simSubLyric" style="height:500px;max-height:56vh;background:rgba(0,0,0,0.35);border-radius:8px;border:1px solid rgba(255,107,107,0.15);padding:8px;overflow:auto;font-size:0.72rem;line-height:1.6;color:rgba(255,255,255,0.7);"></div>'
+            + '<div id="simSubLyric" style="height:480px;max-height:56vh;background:rgba(0,0,0,0.35);border-radius:8px;border:1px solid rgba(255,107,107,0.15);padding:8px;overflow:auto;font-size:0.72rem;line-height:1.6;color:rgba(255,255,255,0.7);"></div>'
             + '</div>'
             + '</div>'
             // 底部控制器
