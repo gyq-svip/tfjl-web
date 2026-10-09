@@ -211,7 +211,7 @@ window.EQUIP_IMG = {
         if (state.waveIndex < 0) state.waveIndex = 0;
     }
 
-    function createSideState() { return { slots: {}, equipment: null, sameRowPairs: [], vehicle: { main: '', sub: '' }, hand: [] }; }
+    function createSideState() { return { slots: {}, equipment: null, sameRowPairs: [], vehicle: { main: '', sub: '' }, hand: [], placedBases: null }; }
 
     function removeCard(s, hero) {
         const base = getMainCardName(hero);
@@ -254,9 +254,11 @@ window.EQUIP_IMG = {
                 else if (a.type === 'sameRowCancel') s.sameRowPairs = [];
             });
         });
+        // 手牌 = 上阵 10 张全部显示；已上场的置灰（与主页一致）
         const placed = new Set();
         for (let i = 0; i <= 6; i++) if (s.slots[i]) placed.add(s.slots[i].base);
-        s.hand = script.header.lineup.filter(function (n) { return !placed.has(n); });
+        s.placedBases = placed;
+        s.hand = script.header.lineup.slice();
         return s;
     }
 
@@ -345,8 +347,8 @@ window.EQUIP_IMG = {
             + '<div class="battle-slots" id="' + slotContainerId + '">' + heroSlots + '</div>'
             + '</div>'
             + '<div class="chariot-box" id="simChariot-' + side + '" title="点击设置战车" style="margin-top:4px;font-size:0.7rem;color:#ffd700;cursor:pointer;padding:2px 8px;border-radius:6px;border:1px dashed rgba(255,215,0,0.35);">🚗 战车：未设置</div>'
-            + '<div style="width:100%;color:rgba(255,255,255,0.6);font-size:0.68rem;text-align:center;margin-top:2px;">我的手牌</div>'
-            + '<div class="selected-cards-container ' + (side === SIDE_MY ? 'my-hand' : 'teammate-hand') + '" id="' + handId + '" style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;min-height:30px;max-width:230px;"></div>'
+            + '<div style="width:100%;color:rgba(255,255,255,0.6);font-size:0.68rem;text-align:center;margin-top:2px;">上阵手牌（灰=已上场）</div>'
+            + '<div class="sim-hand-container" id="' + handId + '" style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;align-items:flex-start;min-height:58px;max-width:222px;"></div>'
             + '</div>';
     }
 
@@ -471,7 +473,7 @@ window.EQUIP_IMG = {
         const curLevel = ov.level || '';
         const curSkin = ov.skin || '';
         const curMohua = ov.mohua || '';
-        const curFusion = ov.fusion || '';
+        const curFusion = ov.fusion || (ovKey !== base ? ovKey : '');
         const scriptSkin = (sc && sc.header.skins[base]) || '默认';
         const scriptMohua = sc && sc.header.mohua.indexOf(base) >= 0 ? 'on' : 'off';
 
@@ -499,6 +501,16 @@ window.EQUIP_IMG = {
         // 融合
         let variants = [];
         try { if (typeof window.getFusionVariantsForBase === 'function') variants = window.getFusionVariantsForBase(base) || []; } catch (e) {}
+        // 兜底：用全量融合表按主卡名过滤（与主页融合切换同源）
+        if (!variants.length && typeof window.getAllFusionNames === 'function') {
+            try {
+                (window.getAllFusionNames() || []).forEach(function (n) {
+                    const parts = window.getFusionParts ? window.getFusionParts(n) : null;
+                    if (parts && parts.length >= 2 && parts[0] === base) variants.push(n);
+                });
+            } catch (e) {}
+        }
+        if (curFusion && variants.indexOf(curFusion) < 0) variants.push(curFusion);
         let fuOpts = '<option value="">不融合（本体）</option>';
         variants.forEach(function (v) { const n = typeof v === 'string' ? v : v.name; if (n) fuOpts += '<option value="' + esc(n) + '"' + (curFusion === n ? ' selected' : '') + '>' + esc(n) + '</option>'; });
         const fuSel = popupRow(p, '融合', variants.length ? '<select id="simPopFu" style="' + selStyle + '">' + fuOpts + '</select>' : '<span style="color:rgba(255,255,255,0.4);">无可用融合</span>');
@@ -632,7 +644,7 @@ window.EQUIP_IMG = {
             if (card) fillSlot(slot, card, side);
         }
         const handContainer = state.root.querySelector('#sim-hand-' + side);
-        if (handContainer) renderHand(handContainer, sideState.hand, side);
+        if (handContainer) renderHand(handContainer, sideState.hand, side, sideState.placedBases || new Set());
         const chariot = state.root.querySelector('#simChariot-' + side);
         if (chariot) {
             const conf = state.chariot[side];
@@ -694,9 +706,13 @@ window.EQUIP_IMG = {
     let _sideStateRefs = { my: null, teammate: null };
     function currentSideStateRef(side) { return _sideStateRefs[side]; }
 
-    function renderHand(container, handList, side) {
+    function renderHand(container, handList, side, placedBases) {
         container.innerHTML = '';
         const sc = side === SIDE_MY ? state.mainScript : state.subScript;
+        if (!handList.length) {
+            container.innerHTML = '<span style="color:rgba(255,255,255,0.35);font-size:0.7rem;">未导入脚本</span>';
+            return;
+        }
         handList.forEach(function (name) {
             const info = getCardInfo(name);
             const ov = (state.overrides[side] && state.overrides[side][name]) || null;
@@ -708,9 +724,12 @@ window.EQUIP_IMG = {
             const card = { hero: heroName, base: name, ovKey: name, level: level, skin: skin, isMohua: isMohua, isFusion: heroName !== name, id: info.id || name, type: info.type || 'gold', profession: info.profession || '' };
             const display = getFusionDisplayName(heroName);
             const div = document.createElement('div');
-            div.className = 'selected-card card-item';
+            const isPlaced = !!(placedBases && placedBases.has(name));
+            div.className = 'selected-card card-item' + (isPlaced ? ' placed' : '');
             div.dataset.id = card.id; div.dataset.name = heroName; div.dataset.ovKey = name; div.dataset.type = card.type; div.dataset.profession = card.profession; div.dataset.handType = side;
-            div.style.cssText = 'width:66px;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;background-color:rgba(28,28,48,0.92);background-size:cover;background-position:center;overflow:hidden;border:1px solid rgba(255,255,255,0.15);';
+            div.style.cssText = 'width:62px;min-height:58px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;background-color:rgba(28,28,48,0.92);background-size:cover;background-position:center;overflow:hidden;'
+                + (isPlaced ? 'border:1px dashed rgba(78,205,196,0.6);opacity:0.42;filter:grayscale(1);' : 'border:1px solid rgba(255,255,255,0.15);');
+            if (isPlaced) div.title = '已上场';
             div.innerHTML = simBadgeHTML(card, side) + '<span class="card-name" data-full-name="' + esc(heroName) + '" style="text-align:center;text-shadow:0 1px 3px rgba(0,0,0,0.9);">' + esc(display) + '</span>';
             div.addEventListener('click', function (ev) { ev.stopPropagation(); openCardSettings(div, ev); });
             container.appendChild(div);
