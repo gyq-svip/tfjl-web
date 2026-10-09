@@ -297,10 +297,10 @@ window.EQUIP_IMG = {
             + '</div>'
             // 主体
             + '<div style="flex:1 1 auto;display:flex;overflow:hidden;padding:10px;gap:10px;">'
-            // 左：脚本①歌词（顶到卡槽区顶部，紧凑不撑宽）
+            // 左：脚本①歌词（只显示 上一条/当前/下一条，小框跟随波数）
             + '<div style="flex:0 0 185px;display:flex;flex-direction:column;gap:6px;align-self:flex-start;margin-top:36px;">'
             + '<div style="color:#4ecdc4;font-size:0.8rem;font-weight:700;">脚本① · 歌词</div>'
-            + '<div id="simMainLyric" style="height:480px;max-height:56vh;background:rgba(0,0,0,0.35);border-radius:8px;border:1px solid rgba(78,205,196,0.15);padding:8px;overflow:auto;font-size:0.72rem;line-height:1.6;color:rgba(255,255,255,0.7);"></div>'
+            + '<div id="simMainLyric" style="min-height:80px;background:rgba(0,0,0,0.35);border-radius:8px;border:1px solid rgba(78,205,196,0.15);padding:6px 8px;overflow:hidden;font-size:0.72rem;line-height:1.6;color:rgba(255,255,255,0.7);"></div>'
             + '</div>'
             // 中：双卡组
             + '<div style="flex:1 1 auto;display:flex;flex-direction:column;gap:8px;align-items:center;overflow:auto;">'
@@ -314,7 +314,7 @@ window.EQUIP_IMG = {
             // 右：脚本②歌词
             + '<div style="flex:0 0 185px;display:flex;flex-direction:column;gap:6px;align-self:flex-start;margin-top:36px;">'
             + '<div style="color:#ff6b6b;font-size:0.8rem;font-weight:700;">脚本② · 歌词</div>'
-            + '<div id="simSubLyric" style="height:480px;max-height:56vh;background:rgba(0,0,0,0.35);border-radius:8px;border:1px solid rgba(255,107,107,0.15);padding:8px;overflow:auto;font-size:0.72rem;line-height:1.6;color:rgba(255,255,255,0.7);"></div>'
+            + '<div id="simSubLyric" style="min-height:80px;background:rgba(0,0,0,0.35);border-radius:8px;border:1px solid rgba(255,107,107,0.15);padding:6px 8px;overflow:hidden;font-size:0.72rem;line-height:1.6;color:rgba(255,255,255,0.7);"></div>'
             + '</div>'
             + '</div>'
             // 底部控制器
@@ -340,7 +340,8 @@ window.EQUIP_IMG = {
         heroOrder.forEach(function (n) {
             heroSlots += '<div class="battle-slot empty" data-slot="sim-' + side + '-' + n + '">空</div>';
         });
-        return '<div class="battle-column" style="display:flex;flex-direction:column;align-items:center;gap:4px;">'
+        // 布局照主页：卡槽在上，手牌 5列×2行 网格紧贴卡槽正下方
+        return '<div class="battle-column" style="display:flex;flex-direction:column;align-items:center;gap:4px;width:345px;">'
             + '<h4 style="margin:0;color:#fff;font-size:0.85rem;">' + title + ' <span id="' + drId + '" style="color:#4ecdc4;font-size:0.78rem;margin-left:6px;">减伤:0</span></h4>'
             + '<div class="battle-slots-container" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px;border-radius:10px;background:rgba(0,0,0,0.22);border:1px solid rgba(255,255,255,0.08);">'
             + '<div class="battle-slot engineering-slot empty" data-slot="sim-' + side + '-0" data-type="engineering" style="margin:0;"><span class="slot-label">🔧</span><span class="slot-empty">空</span></div>'
@@ -348,7 +349,7 @@ window.EQUIP_IMG = {
             + '</div>'
             + '<div class="chariot-box" id="simChariot-' + side + '" title="点击设置战车" style="margin-top:4px;font-size:0.7rem;color:#ffd700;cursor:pointer;padding:2px 8px;border-radius:6px;border:1px dashed rgba(255,215,0,0.35);">🚗 战车：未设置</div>'
             + '<div style="width:100%;color:rgba(255,255,255,0.6);font-size:0.68rem;text-align:center;margin-top:2px;">上阵手牌（灰=已上场）</div>'
-            + '<div class="sim-hand-container" id="' + handId + '" style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;align-items:flex-start;min-height:58px;max-width:222px;"></div>'
+            + '<div class="sim-hand-container" id="' + handId + '" style="display:grid;grid-template-columns:repeat(5,62px);grid-auto-rows:46px;gap:3px;justify-content:center;min-height:46px;"></div>'
             + '</div>';
     }
 
@@ -461,70 +462,38 @@ window.EQUIP_IMG = {
         return row.querySelector('select, button');
     }
 
+    // 点卡设置 = 主页同款 showLevelDropdown（等级/魔化/皮肤/融合切换一套通用）
     function openCardSettings(el, ev) {
+        const cardId = el.dataset.cardId;
+        const cardName = el.dataset.name;
         const side = el.dataset.handType || SIDE_MY;
-        const ovKey = el.dataset.ovKey || el.dataset.name;
-        const shownName = el.dataset.name;
-        if (!ovKey || !shownName) return;
-        const sc = side === SIDE_MY ? state.mainScript : state.subScript;
-        const base = getMainCardName(ovKey);
-        const ov = state.overrides[side][ovKey] || {};
-        // 当前生效值（override 优先，否则跟随脚本头）
-        const curLevel = ov.level || '';
-        const curSkin = ov.skin || '';
-        const curMohua = ov.mohua || '';
-        const curFusion = ov.fusion || (ovKey !== base ? ovKey : '');
-        const scriptSkin = (sc && sc.header.skins[base]) || '默认';
-        const scriptMohua = sc && sc.header.mohua.indexOf(base) >= 0 ? 'on' : 'off';
+        if (!cardId || !cardName) return;
+        if (typeof window.showLevelDropdown !== 'function') { alert('主页设置组件未加载，请刷新页面重试'); return; }
+        const info = getCardInfo(cardName);
+        try { window.showLevelDropdown(ev, cardId, info.type || 'gold', side, cardName); } catch (e) {}
+        watchPopupClose(side, el.dataset.ovKey || cardName, cardId, cardName, info.type || 'gold');
+    }
 
-        const p = buildSimPopup('⚙ ' + shownName + '（' + (side === SIDE_MY ? '脚本①' : '脚本②') + '）', ev);
-        const selStyle = 'flex:1;padding:4px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.4);color:#fff;font-size:0.75rem;';
-
-        // 等级
-        let lvOpts = '<option value="">跟随脚本（满）</option><option value="满"' + (curLevel === '满' ? ' selected' : '') + '>满级</option>';
-        for (let i = getMaxLevel('gold'); i >= 1; i--) lvOpts += '<option value="' + i + '级"' + (curLevel === i + '级' ? ' selected' : '') + '>' + i + '级</option>';
-        const lvSel = popupRow(p, '等级', '<select id="simPopLv" style="' + selStyle + '">' + lvOpts + '</select>');
-        // 魔化
-        const mhSel = popupRow(p, '魔化', '<select id="simPopMh" style="' + selStyle + '">'
-            + '<option value="">跟随脚本（' + (scriptMohua === 'on' ? '已魔化' : '未魔化') + '）</option>'
-            + '<option value="on"' + (curMohua === 'on' ? ' selected' : '') + '>魔化</option>'
-            + '<option value="off"' + (curMohua === 'off' ? ' selected' : '') + '>不魔化</option></select>');
-        // 皮肤
-        let skins = ['默认'];
-        try {
-            const list = (typeof window.getHeroSkins === 'function') ? window.getHeroSkins(base) : ((window.skinRegistry || {})[base] || []);
-            (list || []).forEach(function (s) { const n = typeof s === 'string' ? s : s.name; if (n && skins.indexOf(n) < 0) skins.push(n); });
-        } catch (e) {}
-        let skOpts = '<option value="">跟随脚本（' + esc(scriptSkin) + '）</option>';
-        skins.forEach(function (n) { skOpts += '<option value="' + esc(n) + '"' + (curSkin === n ? ' selected' : '') + '>' + esc(n) + '</option>'; });
-        const skSel = popupRow(p, '皮肤', '<select id="simPopSk" style="' + selStyle + '">' + skOpts + '</select>');
-        // 融合
-        let variants = [];
-        try { if (typeof window.getFusionVariantsForBase === 'function') variants = window.getFusionVariantsForBase(base) || []; } catch (e) {}
-        // 兜底：用全量融合表按主卡名过滤（与主页融合切换同源）
-        if (!variants.length && typeof window.getAllFusionNames === 'function') {
+    // 主页弹窗关闭后，把改动的 等级/魔化/皮肤 捕获进 override（跨波保留）；融合形态渲染时实时读主页全局 fusionSkins
+    function watchPopupClose(side, ovKey, cardId, cardName, type) {
+        const iv = setInterval(function () {
+            if (document.querySelector('.card-settings-popup-root')) return;
+            clearInterval(iv);
             try {
-                (window.getAllFusionNames() || []).forEach(function (n) {
-                    const parts = window.getFusionParts ? window.getFusionParts(n) : null;
-                    if (parts && parts.length >= 2 && parts[0] === base) variants.push(n);
-                });
+                const ov = state.overrides[side][ovKey] || {};
+                if (window.getCardLevel) { const lv = window.getCardLevel(cardId, type, side); if (lv) ov.level = levelToScript(lv, type); }
+                if (window.getCardMoHua) ov.mohua = window.getCardMoHua(cardId, side) ? 'on' : 'off';
+                if (window.getCardSkin) { const sk = window.getCardSkin(cardId, cardName, side); if (sk) ov.skin = sk; }
+                state.overrides[side][ovKey] = ov;
             } catch (e) {}
-        }
-        if (curFusion && variants.indexOf(curFusion) < 0) variants.push(curFusion);
-        let fuOpts = '<option value="">不融合（本体）</option>';
-        variants.forEach(function (v) { const n = typeof v === 'string' ? v : v.name; if (n) fuOpts += '<option value="' + esc(n) + '"' + (curFusion === n ? ' selected' : '') + '>' + esc(n) + '</option>'; });
-        const fuSel = popupRow(p, '融合', variants.length ? '<select id="simPopFu" style="' + selStyle + '">' + fuOpts + '</select>' : '<span style="color:rgba(255,255,255,0.4);">无可用融合</span>');
+            render();
+        }, 250);
+    }
 
-        function apply() {
-            const o = {};
-            if (lvSel && lvSel.value) o.level = lvSel.value;
-            if (mhSel && mhSel.value) o.mohua = mhSel.value;
-            if (skSel && skSel.value) o.skin = skSel.value;
-            if (fuSel && fuSel.tagName === 'SELECT' && fuSel.value) o.fusion = fuSel.value;
-            if (Object.keys(o).length) state.overrides[side][ovKey] = o; else delete state.overrides[side][ovKey];
-            render();  // 只重绘模拟器，弹窗保持打开，改动即时生效
-        }
-        [lvSel, mhSel, skSel, fuSel].forEach(function (sel) { if (sel && sel.tagName === 'SELECT') sel.addEventListener('change', apply); });
+    function levelToScript(lv, type) {
+        const max = getMaxLevel(type);
+        if (lv === max) return '满';
+        return lv + '级';
     }
 
     function openChariotSettings(side, ev) {
@@ -558,7 +527,7 @@ window.EQUIP_IMG = {
         state.timer = setInterval(function () {
             if (state.waveIndex >= state.timeline.length - 1) { pause(); return; }
             changeWave(1);
-        }, Math.max(250, state.speed * 1000));
+        }, Math.max(100, state.speed * 1000));
     }
 
     function pause() {
@@ -569,7 +538,10 @@ window.EQUIP_IMG = {
     }
 
     function adjustSpeed(delta) {
-        state.speed = Math.max(0.5, Math.min(5.0, state.speed + delta));
+        // >1s 时每档 0.5s；≤1s 时每档 0.1s（最快 0.1s/波）
+        const step = state.speed > 1 ? 0.5 : 0.1;
+        const d = delta > 0 ? step : -step;
+        state.speed = Math.round(Math.max(0.1, Math.min(5.0, state.speed + d)) * 10) / 10;
         const label = state.root.querySelector('#simSpeedLabel');
         if (label) label.textContent = state.speed.toFixed(1) + 's/波';
         if (state.playing) { pause(); togglePlay(); }
@@ -727,7 +699,8 @@ window.EQUIP_IMG = {
             const isPlaced = !!(placedBases && placedBases.has(name));
             div.className = 'selected-card card-item' + (isPlaced ? ' placed' : '');
             div.dataset.id = card.id; div.dataset.name = heroName; div.dataset.ovKey = name; div.dataset.type = card.type; div.dataset.profession = card.profession; div.dataset.handType = side;
-            div.style.cssText = 'width:62px;min-height:58px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;background-color:rgba(28,28,48,0.92);background-size:cover;background-position:center;overflow:hidden;'
+            if (card.isFusion) div.dataset.fusion = 'true'; else div.removeAttribute('data-fusion');
+            div.style.cssText = 'width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;background-color:rgba(28,28,48,0.92);background-size:cover;background-position:center;overflow:hidden;font-size:0.62rem;padding:2px 1px;'
                 + (isPlaced ? 'border:1px dashed rgba(78,205,196,0.6);opacity:0.42;filter:grayscale(1);' : 'border:1px solid rgba(255,255,255,0.15);');
             if (isPlaced) div.title = '已上场';
             div.innerHTML = simBadgeHTML(card, side) + '<span class="card-name" data-full-name="' + esc(heroName) + '" style="text-align:center;text-shadow:0 1px 3px rgba(0,0,0,0.9);">' + esc(display) + '</span>';
@@ -771,23 +744,24 @@ window.EQUIP_IMG = {
     function renderLyric(panel, script, W, side) {
         if (!panel) return;
         if (!script) { panel.innerHTML = '<span style="color:rgba(255,255,255,0.4);">未导入脚本</span>'; return; }
-        let html = '';
-        let currentElId = '';
-        script.waves.forEach(function (w, idx) {
-            const isCurrent = (w.wave <= W) && (idx === script.waves.length - 1 || script.waves[idx + 1].wave > W);
-            const cls = isCurrent ? 'sim-lyric-line sim-lyric-current' : 'sim-lyric-line';
-            const id = 'simLyric_' + side + '_' + idx;
-            if (isCurrent) currentElId = id;
-            html += '<div id="' + id + '" class="' + cls + '" style="padding:2px 6px;border-radius:5px;margin:2px 0;'
-                + (isCurrent ? 'background:rgba(78,205,196,0.18);color:#4ecdc4;font-weight:700;' : 'color:rgba(255,255,255,0.65);')
-                + '">波' + w.wave + '：' + esc(w.raw.length > 80 ? w.raw.substring(w.raw.indexOf(',') + 1) : w.raw) + '</div>';
-        });
-        if (!script.waves.length) html = '<span style="color:rgba(255,255,255,0.4);">暂无波束</span>';
-        panel.innerHTML = html;
-        if (currentElId) {
-            const el = panel.querySelector('#' + currentElId);
-            if (el) panel.scrollTop = el.offsetTop - panel.clientHeight / 2 + el.clientHeight / 2;
+        if (!script.waves.length) { panel.innerHTML = '<span style="color:rgba(255,255,255,0.4);">暂无波束</span>'; return; }
+        // 只显示 上一条 / 当前 / 下一条，跟着波数走（框小不占地方）
+        let curIdx = -1;
+        for (let i = 0; i < script.waves.length; i++) {
+            const w = script.waves[i];
+            const next = script.waves[i + 1];
+            if (w.wave <= W && (!next || next.wave > W)) { curIdx = i; break; }
         }
+        let html = '';
+        for (let k = curIdx - 1; k <= curIdx + 1; k++) {
+            if (k < 0 || k >= script.waves.length) { html += '<div style="min-height:16px;"></div>'; continue; }
+            const w = script.waves[k];
+            const isCur = k === curIdx;
+            html += '<div style="padding:2px 6px;border-radius:5px;margin:2px 0;'
+                + (isCur ? 'background:rgba(78,205,196,0.18);color:#4ecdc4;font-weight:700;' : 'color:rgba(255,255,255,0.55);')
+                + '">波' + w.wave + '：' + esc(w.raw.substring(w.raw.indexOf(',') + 1)) + '</div>';
+        }
+        panel.innerHTML = html;
     }
 
     function renderDamageReduction(myState, tmState) {
