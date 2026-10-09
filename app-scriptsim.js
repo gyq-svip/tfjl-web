@@ -3,32 +3,30 @@
 
     // ============================================================
     // app-scriptsim.js — 脚本推演模拟器（阵容图库「模拟器」弹窗）
-    // 2026-10-09
+    // 2026-10-09 重写：单波轴（主副独立更新）、完全复刻主页布局/角标、手牌图、装备图、歌词脚本
     // ============================================================
 
-    // ===== 常量 =====
     const SIDE_MY = 'my';
     const SIDE_TEAMMATE = 'teammate';
-    const SLOT_COUNT = 7; // 6 英雄槽 + 1 工程槽
-    const EQUIPMENT_LIST = {
-        '强袭': { color: '#ff6b6b', starSkinHero: '幻精灵' },
-        '龙心': { color: '#4ecdc4', starSkinHero: '幻精灵' },
-        '圣剑': { color: '#ffd700', starSkinHero: '幻精灵' },
-        '烟斗': { color: '#a78bfa', starSkinHero: '幻精灵' }
+    const EQUIP_DEF = {
+        '强袭': { img4: 'assets/equipment/qiangxi-4.png', img5: 'assets/equipment/qiangxi-5.png', starHero: '幻精灵' },
+        '龙心': { img4: 'assets/equipment/longxin-4.png', img5: 'assets/equipment/longxin-5.png', starHero: '幻精灵' },
+        '圣剑': { img4: 'assets/equipment/shengjian-4.png', img5: 'assets/equipment/shengjian-5.png', starHero: '幻精灵' },
+        '烟斗': { img4: 'assets/equipment/yandou-4.png', img5: 'assets/equipment/yandou-5.png', starHero: '幻精灵' }
     };
 
-    // ===== 状态 =====
     const state = {
         mainScript: null,
         subScript: null,
-        waveIndex: 0,
+        timeline: [1],     // 连续整数波号 1..maxWave
+        waveIndex: 0,      // timeline 下标
         playing: false,
-        speed: 1.0,          // 秒/波
+        speed: 1.0,
         timer: null,
-        root: null
+        root: null,
+        overrides: { my: {}, teammate: {} } // identity -> { level, mohua, skin }
     };
 
-    // ===== 卡池缓存 =====
     let poolMapCache = null;
     function getPoolMap() {
         if (poolMapCache) return poolMapCache;
@@ -39,8 +37,7 @@
                     if (c && c.value) poolMapCache[c.value] = c._ds || { id: c.value, name: c.value, type: 'gold', profession: '', engineering: 'false' };
                 });
             }
-        } catch (e) { console.warn('[模拟器] 卡池扫描失败', e); }
-        // 兜底：常见卡，避免卡池未渲染时查不到职业
+        } catch (e) {}
         const fallbacks = [
             { id: '1', name: '雷神', type: 'gold', profession: 'mage', engineering: 'false' },
             { id: '2', name: '电法', type: 'gold', profession: 'mage', engineering: 'false' },
@@ -73,9 +70,7 @@
             { id: '29', name: '胖虎', type: 'gold', profession: 'warrior', engineering: 'false' },
             { id: '30', name: '冰法', type: 'gold', profession: 'mage', engineering: 'false' }
         ];
-        fallbacks.forEach(function (c) {
-            if (!poolMapCache[c.name]) poolMapCache[c.name] = c;
-        });
+        fallbacks.forEach(function (c) { if (!poolMapCache[c.name]) poolMapCache[c.name] = c; });
         return poolMapCache;
     }
 
@@ -98,54 +93,39 @@
     }
 
     function getMaxLevel(cardType) {
-        const map = {
-            'gold': 24, 'purple': 24, 'blue': 25, 'green': 24, 'engineering-card': 24
-        };
+        const map = { 'gold': 24, 'purple': 24, 'blue': 25, 'green': 24, 'engineering-card': 24 };
         return map[cardType] || 24;
     }
 
-    // ===== 脚本解析 =====
+    // ===== 解析 =====
     function parseScript(text) {
         const lines = text.replace(/\r/g, '').split('\n');
-        const script = {
-            header: { lineup: [], skins: {}, mohua: [], mainVehicle: '', subVehicle: '' },
-            waves: [],
-            rawLines: lines
-        };
+        const script = { header: { lineup: [], skins: {}, mohua: [], mainVehicle: '', subVehicle: '' }, waves: [], rawLines: lines };
         let headerDone = false;
         lines.forEach(function (line) {
             const trim = line.trim();
             if (!trim) { headerDone = true; return; }
             if (!headerDone) {
-                if (trim.indexOf('上阵：') === 0) {
-                    script.header.lineup = splitCsv(trim.replace('上阵：', ''));
-                } else if (trim.indexOf('皮肤：') === 0) {
-                    splitCsv(trim.replace('皮肤：', '')).forEach(function (s) {
-                        const m = s.match(/^(.+?)(\d+)$/);
-                        if (m) script.header.skins[m[1]] = String(parseInt(m[2], 10));
-                    });
-                } else if (trim.indexOf('魔化：') === 0) {
-                    script.header.mohua = splitCsv(trim.replace('魔化：', ''));
-                } else if (trim.indexOf('主战车：') === 0) {
-                    script.header.mainVehicle = trim.replace('主战车：', '').trim();
-                } else if (trim.indexOf('副战车：') === 0) {
-                    script.header.subVehicle = trim.replace('副战车：', '').trim();
-                }
+                if (trim.indexOf('上阵：') === 0) script.header.lineup = splitCsv(trim.replace('上阵：', ''));
+                else if (trim.indexOf('皮肤：') === 0) splitCsv(trim.replace('皮肤：', '')).forEach(function (s) {
+                    const m = s.match(/^(.+?)(\d+)$/); if (m) script.header.skins[m[1]] = String(parseInt(m[2], 10));
+                });
+                else if (trim.indexOf('魔化：') === 0) script.header.mohua = splitCsv(trim.replace('魔化：', ''));
+                else if (trim.indexOf('主战车：') === 0) script.header.mainVehicle = trim.replace('主战车：', '').trim();
+                else if (trim.indexOf('副战车：') === 0) script.header.subVehicle = trim.replace('副战车：', '').trim();
                 return;
             }
-            const waveMatch = trim.match(/^(\d+)[,，]/);
-            if (waveMatch) {
-                const wave = parseInt(waveMatch[1], 10);
-                const rest = trim.substring(waveMatch[0].length);
+            const wm = trim.match(/^(\d+)[,，]/);
+            if (wm) {
+                const wave = parseInt(wm[1], 10);
+                const rest = trim.substring(wm[0].length);
                 script.waves.push({ wave: wave, raw: trim, actions: parseWaveActions(rest, script.header.lineup) });
             }
         });
         return script;
     }
 
-    function splitCsv(s) {
-        return s.split(/[,，]/).map(function (x) { return x.trim(); }).filter(Boolean);
-    }
+    function splitCsv(s) { return s.split(/[,，]/).map(function (x) { return x.trim(); }).filter(Boolean); }
 
     function parseWaveActions(raw, lineup) {
         const parts = raw.split(/[,，]/).map(function (x) { return x.trim(); }).filter(Boolean);
@@ -154,36 +134,25 @@
         parts.forEach(function (part) {
             if (part === '强制顺序上卡') { forceSeq = true; return; }
             if (part === '同排取消') { actions.push({ type: 'sameRowCancel' }); return; }
-            // 同排：支持「火灵蛇女同排」「蛇女火灵同排」无分隔写法，也支持「火灵与蛇女同排」
             const sr = part.match(/^(.+?)[和与、](.+?)同排$/);
             if (sr) { actions.push({ type: 'sameRow', heroes: [sr[1].trim(), sr[2].trim()] }); return; }
             if (part.endsWith('同排')) {
-                const core = part.replace(/同排$/, '');
-                const pair = parseSameRowPair(core, lineup);
+                const pair = parseSameRowPair(part.replace(/同排$/, ''), lineup);
                 if (pair) { actions.push({ type: 'sameRow', heroes: pair }); return; }
             }
             const eq = part.match(/^换(强袭|龙心|圣剑|烟斗)$/);
             if (eq) { actions.push({ type: 'equip', name: eq[1] }); return; }
             const down = part.match(/^下(.+)$/);
-            if (down && !part.includes('上')) {
-                actions.push({ type: 'remove', hero: cleanHeroName(down[1]) });
-                return;
-            }
+            if (down && !part.includes('上')) { actions.push({ type: 'remove', hero: cleanHeroName(down[1]) }); return; }
             const up = part.match(/^上(.+?)(满|1级|2级|)$/);
-            if (up) {
-                actions.push({ type: 'place', hero: cleanHeroName(up[1]), level: up[2] || '满', forceSeq: forceSeq });
-                return;
-            }
+            if (up) { actions.push({ type: 'place', hero: cleanHeroName(up[1]), level: up[2] || '满', forceSeq: forceSeq }); return; }
             actions.push({ type: 'note', text: part });
         });
         return actions;
     }
 
-    function cleanHeroName(s) {
-        return s.replace(/^(?:上|下)/, '').replace(/(?:满|1级|2级)$/, '').trim();
-    }
+    function cleanHeroName(s) { return s.replace(/^(?:上|下)/, '').replace(/(?:满|1级|2级)$/, '').trim(); }
 
-    // 解析无分隔符同排：如「火灵蛇女同排」→ 从上阵列表里找出连续拼接的2个英雄
     function parseSameRowPair(core, lineup) {
         if (!Array.isArray(lineup) || lineup.length < 2) return null;
         for (let i = 0; i < lineup.length; i++) {
@@ -192,101 +161,75 @@
             const rest = core.substring(a.length);
             for (let j = 0; j < lineup.length; j++) {
                 if (i === j) continue;
-                const b = lineup[j];
-                if (rest === b) return [a, b];
+                if (rest === lineup[j]) return [a, lineup[j]];
             }
         }
         return null;
     }
 
-    // ===== 模拟状态 =====
-    function createSideState() {
-        return {
-            slots: {},
-            equipment: null,
-            sameRowPairs: [],
-            vehicle: { main: '', sub: '' },
-            hand: []
-        };
+    // ===== 时间轴 / 模拟 =====
+    function computeMaxWave() {
+        let m = 1;
+        [state.mainScript, state.subScript].forEach(function (sc) {
+            if (sc) sc.waves.forEach(function (w) { if (w.wave > m) m = w.wave; });
+        });
+        return m;
     }
 
-    function cloneSideState(src) {
-        const out = createSideState();
-        out.equipment = src.equipment;
-        out.sameRowPairs = src.sameRowPairs.slice();
-        out.vehicle = Object.assign({}, src.vehicle);
-        for (let i = 1; i <= SLOT_COUNT; i++) out.slots[i] = src.slots[i] ? Object.assign({}, src.slots[i]) : null;
-        out.hand = src.hand.slice();
-        return out;
+    function rebuildTimeline() {
+        const max = computeMaxWave();
+        state.timeline = [];
+        for (let w = 1; w <= max; w++) state.timeline.push(w);
+        if (state.waveIndex >= state.timeline.length) state.waveIndex = state.timeline.length - 1;
+        if (state.waveIndex < 0) state.waveIndex = 0;
     }
 
-    function applyWave(sideState, script, waveIdx) {
-        // 从初始状态重放到当前波
-        const s = createSideState();
-        s.vehicle.main = script.header.mainVehicle;
-        s.vehicle.sub = script.header.subVehicle;
-        for (let i = 0; i <= waveIdx; i++) {
-            const w = script.waves[i];
-            if (!w) continue;
-            const removals = [];
-            const others = [];
-            w.actions.forEach(function (a) { (a.type === 'remove' ? removals : others).push(a); });
-            removals.forEach(function (a) { removeCard(s, a.hero); });
-            others.forEach(function (a) {
-                if (a.type === 'place') placeCard(s, a, script);
-                else if (a.type === 'equip') s.equipment = a.name;
-                else if (a.type === 'sameRow') s.sameRowPairs.push(a.heroes.slice());
-                else if (a.type === 'sameRowCancel') s.sameRowPairs = [];
-            });
-        }
-        const placed = new Set();
-        for (let i = 1; i <= SLOT_COUNT; i++) if (s.slots[i]) placed.add(s.slots[i].base);
-        s.hand = script.header.lineup.filter(function (n) { return !placed.has(n); });
-        return s;
-    }
+    function createSideState() { return { slots: {}, equipment: null, sameRowPairs: [], vehicle: { main: '', sub: '' }, hand: [] }; }
 
     function removeCard(s, hero) {
         const base = window.getMainCardName ? window.getMainCardName(hero) : hero;
-        for (let i = 1; i <= SLOT_COUNT; i++) {
-            if (s.slots[i] && s.slots[i].base === base) { s.slots[i] = null; return; }
-        }
+        for (let i = 1; i <= 7; i++) if (s.slots[i] && s.slots[i].base === base) { s.slots[i] = null; return; }
     }
 
-    function placeCard(s, action, script) {
+    function placeCard(s, action, script, side) {
         const hero = action.hero;
         const base = window.getMainCardName ? window.getMainCardName(hero) : hero;
         const info = getCardInfo(hero);
         const eng = isEngineering(hero);
-        const level = action.level;
-        const skin = script.header.skins[base] || '默认';
-        const isMohua = script.header.mohua.indexOf(base) >= 0;
-        const card = {
-            hero: hero,
-            base: base,
-            level: level,
-            skin: skin,
-            isMohua: isMohua,
-            isFusion: hero !== base,
-            id: info.id || base,
-            type: info.type || 'gold',
-            profession: info.profession || ''
-        };
-        // 已存在则更新等级/形态
-        for (let i = 1; i <= SLOT_COUNT; i++) {
-            if (s.slots[i] && s.slots[i].base === base) {
-                s.slots[i].level = level;
-                s.slots[i].hero = hero;
-                s.slots[i].isFusion = hero !== base;
-                return;
-            }
+        let level = action.level;
+        let skin = script.header.skins[base] || '默认';
+        let isMohua = script.header.mohua.indexOf(base) >= 0;
+        const ov = (state.overrides[side] && state.overrides[side][hero]) || null;
+        if (ov) { if (ov.level) level = ov.level; if (ov.skin) skin = ov.skin; if (ov.mohua !== undefined) isMohua = ov.mohua; }
+        const card = { hero: hero, base: base, level: level, skin: skin, isMohua: isMohua, isFusion: hero !== base, id: info.id || base, type: info.type || 'gold', profession: info.profession || '' };
+        for (let i = 1; i <= 7; i++) if (s.slots[i] && s.slots[i].base === base) {
+            s.slots[i].level = level; s.slots[i].hero = hero; s.slots[i].isFusion = hero !== base; s.slots[i].skin = skin; s.slots[i].isMohua = isMohua; return;
         }
-        if (eng) {
-            if (!s.slots[7]) { s.slots[7] = card; return; }
-        } else {
-            for (let i = 1; i <= 6; i++) {
-                if (!s.slots[i]) { s.slots[i] = card; return; }
-            }
-        }
+        if (eng) { if (!s.slots[7]) { s.slots[7] = card; return; } }
+        else { for (let i = 1; i <= 6; i++) if (!s.slots[i]) { s.slots[i] = card; return; } }
+    }
+
+    function applyWaveUpToWave(script, W, side) {
+        const s = createSideState();
+        if (!script) return s;
+        s.vehicle.main = script.header.mainVehicle;
+        s.vehicle.sub = script.header.subVehicle;
+        script.waves.forEach(function (w) {
+            if (w.wave > W) return;
+            const removals = [], others = [];
+            w.actions.forEach(function (a) { (a.type === 'remove' ? removals : others).push(a); });
+            removals.forEach(function (a) { removeCard(s, a.hero); });
+            others.forEach(function (a) {
+                if (a.type === 'place') placeCard(s, a, script, side);
+                else if (a.type === 'equip') s.equipment = a.name;
+                else if (a.type === 'sameRow') s.sameRowPairs.push(a.heroes.slice());
+                else if (a.type === 'sameRowCancel') s.sameRowPairs = [];
+            });
+        });
+        const placed = new Set();
+        for (let i = 1; i <= 7; i++) if (s.slots[i]) placed.add(s.slots[i].base);
+        s.hand = script.header.lineup.filter(function (n) { return !placed.has(n); });
+        return s;
     }
 
     // ===== UI =====
@@ -294,150 +237,123 @@
         if (state.root) { state.root.style.display = 'flex'; return; }
         state.root = createModal();
         document.body.appendChild(state.root);
-        bindEvents();
+        bindStaticEvents();
+        bindDynamic();
+        rebuildTimeline();
         render();
     }
 
-    function closeSimulator() {
-        pause();
-        if (state.root) { state.root.style.display = 'none'; }
-    }
+    function closeSimulator() { pause(); if (state.root) state.root.style.display = 'none'; }
 
     function createModal() {
         const div = document.createElement('div');
         div.id = 'scriptSimRoot';
-        div.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.82);z-index:99999;display:flex;align-items:center;justify-content:center;font-family:inherit;';
+        div.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);z-index:99998;display:flex;align-items:center;justify-content:center;font-family:inherit;';
         div.innerHTML =
-            '<div id="scriptSimPanel" style="position:relative;width:96vw;height:92vh;background:linear-gradient(180deg,#1a1a2e,#16213e);border:1px solid rgba(78,205,196,0.4);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,0.6);display:flex;flex-direction:column;overflow:hidden;">'
+            '<div id="scriptSimPanel" style="position:relative;width:97vw;height:94vh;background:linear-gradient(180deg,#1a1a2e,#16213e);border:1px solid rgba(78,205,196,0.4);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,0.6);display:flex;flex-direction:column;overflow:hidden;">'
             // 标题栏
-            + '<div style="flex:0 0 auto;padding:10px 16px;background:rgba(0,0,0,0.35);border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between;">'
+            + '<div style="flex:0 0 auto;padding:8px 16px;background:rgba(0,0,0,0.35);border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between;">'
             + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
             + '<span style="color:#4ecdc4;font-weight:700;font-size:1rem;">🎮 脚本推演模拟器</span>'
             + '<label style="padding:4px 10px;border-radius:6px;border:1px solid rgba(78,205,196,0.4);background:rgba(78,205,196,0.12);color:#4ecdc4;cursor:pointer;font-size:0.75rem;">📂 导入主卡<input type="file" id="simImportMain" accept=".txt" style="display:none;"></label>'
             + '<label style="padding:4px 10px;border-radius:6px;border:1px solid rgba(255,107,107,0.4);background:rgba(255,107,107,0.12);color:#ff6b6b;cursor:pointer;font-size:0.75rem;">📂 导入副卡<input type="file" id="simImportSub" accept=".txt" style="display:none;"></label>'
             + '<button id="simRefresh" style="padding:4px 10px;border-radius:6px;border:1px solid rgba(255,215,0,0.4);background:rgba(255,215,0,0.12);color:#ffd700;cursor:pointer;font-size:0.75rem;">🔄 刷新</button>'
+            + '<span style="color:rgba(255,255,255,0.5);font-size:0.7rem;">（点卡可设等级/魔化/皮肤，整局保留）</span>'
             + '</div>'
             + '<div style="display:flex;align-items:center;gap:10px;">'
-            + '<span id="simWaveDisplay" style="color:#fff;font-weight:700;font-size:1.1rem;">波数 —</span>'
+            + '<span id="simWaveDisplay" style="color:#ffd700;font-weight:700;font-size:1.1rem;">第 1 波</span>'
             + '<button id="simClose" style="padding:4px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.75rem;">✕ 关闭</button>'
             + '</div>'
             + '</div>'
             // 主体
             + '<div style="flex:1 1 auto;display:flex;overflow:hidden;padding:10px;gap:10px;">'
-            // 左侧：主卡脚本内容
-            + '<div style="flex:0 0 210px;display:flex;flex-direction:column;gap:6px;">'
-            + '<div style="color:#4ecdc4;font-size:0.8rem;font-weight:700;">当前波束 · 主卡脚本</div>'
-            + '<div id="simMainScriptPanel" style="flex:1;background:rgba(0,0,0,0.35);border-radius:8px;border:1px solid rgba(78,205,196,0.15);padding:8px;overflow:auto;font-size:0.72rem;line-height:1.5;color:rgba(255,255,255,0.85);white-space:pre-wrap;word-break:break-word;"></div>'
+            // 左：主卡歌词
+            + '<div style="flex:0 0 240px;display:flex;flex-direction:column;gap:6px;">'
+            + '<div style="color:#4ecdc4;font-size:0.8rem;font-weight:700;">主卡脚本 · 歌词</div>'
+            + '<div id="simMainLyric" style="flex:1;background:rgba(0,0,0,0.35);border-radius:8px;border:1px solid rgba(78,205,196,0.15);padding:8px;overflow:auto;font-size:0.72rem;line-height:1.7;color:rgba(255,255,255,0.7);"></div>'
             + '</div>'
-            // 中间：双卡组 + 波数/装备
-            + '<div style="flex:1 1 auto;display:flex;flex-direction:column;gap:10px;align-items:center;">'
-            + '<div id="simWaveBanner" style="color:#ffd700;font-size:1.3rem;font-weight:700;text-shadow:0 0 8px rgba(255,215,0,0.4);">—</div>'
-            + '<div style="flex:1 1 auto;display:flex;gap:20px;align-items:center;justify-content:center;width:100%;">'
-            + renderDeckHTML(SIDE_MY, '👤 主卡脚本（我的卡组）')
-            + renderDeckHTML(SIDE_TEAMMATE, '👥 副卡脚本（队友卡组）')
+            // 中：双卡组
+            + '<div style="flex:1 1 auto;display:flex;flex-direction:column;gap:8px;align-items:center;overflow:auto;">'
+            + '<div id="simWaveBanner" style="color:#ffd700;font-size:1.4rem;font-weight:700;text-shadow:0 0 8px rgba(255,215,0,0.4);">第 1 波</div>'
+            + '<div style="display:flex;gap:24px;align-items:flex-start;justify-content:center;flex-wrap:wrap;">'
+            + renderDeckColumn(SIDE_MY, '👤 主卡脚本（我的卡组）', 'simMyDr', 'simMyBattleSlots', 'simMyHandContainer')
+            + renderDeckColumn(SIDE_TEAMMATE, '👥 副卡脚本（队友卡组）', 'simTeammateDr', 'simTeammateBattleSlots', 'simTeammateHandContainer')
             + '</div>'
-            + '<div id="simEquipmentArea" style="padding:8px 16px;border-radius:10px;border:1px solid rgba(255,215,0,0.3);background:rgba(255,215,0,0.08);display:flex;align-items:center;gap:16px;color:#ffd700;font-size:0.85rem;font-weight:700;">装备区</div>'
+            + '<div id="simEquipmentArea" style="padding:10px 18px;border-radius:10px;border:1px solid rgba(255,215,0,0.3);background:rgba(255,215,0,0.08);display:flex;align-items:center;gap:16px;flex-wrap:wrap;color:#ffd700;font-size:0.85rem;font-weight:700;">装备区</div>'
             + '</div>'
-            // 右侧：副卡脚本内容
-            + '<div style="flex:0 0 210px;display:flex;flex-direction:column;gap:6px;">'
-            + '<div style="color:#ff6b6b;font-size:0.8rem;font-weight:700;">当前波束 · 副卡脚本</div>'
-            + '<div id="simSubScriptPanel" style="flex:1;background:rgba(0,0,0,0.35);border-radius:8px;border:1px solid rgba(255,107,107,0.15);padding:8px;overflow:auto;font-size:0.72rem;line-height:1.5;color:rgba(255,255,255,0.85);white-space:pre-wrap;word-break:break-word;"></div>'
+            // 右：副卡歌词
+            + '<div style="flex:0 0 240px;display:flex;flex-direction:column;gap:6px;">'
+            + '<div style="color:#ff6b6b;font-size:0.8rem;font-weight:700;">副卡脚本 · 歌词</div>'
+            + '<div id="simSubLyric" style="flex:1;background:rgba(0,0,0,0.35);border-radius:8px;border:1px solid rgba(255,107,107,0.15);padding:8px;overflow:auto;font-size:0.72rem;line-height:1.7;color:rgba(255,255,255,0.7);"></div>'
             + '</div>'
             + '</div>'
             // 底部控制器
-            + '<div style="flex:0 0 auto;padding:10px 16px;background:rgba(0,0,0,0.35);border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap;">'
+            + '<div style="flex:0 0 auto;padding:10px 16px;background:rgba(0,0,0,0.35);border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;">'
             + '<span id="simSpeedLabel" style="color:rgba(255,255,255,0.7);font-size:0.75rem;">1.0s/波</span>'
-            + '<button id="simSlower" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.75rem;">减速 -0.5s</button>'
-            + '<button id="simFaster" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.75rem;">加速 +0.5s</button>'
-            + '<button id="simPrev" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.75rem;">⏮ 上一波</button>'
+            + '<button id="simSlower" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.75rem;">减速</button>'
+            + '<button id="simFaster" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.75rem;">加速</button>'
+            + '<button id="simPrev" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.75rem;">⏮</button>'
             + '<button id="simPlay" style="padding:5px 12px;border-radius:6px;border:1px solid rgba(78,205,196,0.5);background:rgba(78,205,196,0.18);color:#4ecdc4;cursor:pointer;font-size:0.75rem;font-weight:700;">▶ 自动</button>'
-            + '<button id="simNext" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.75rem;">下一波 ⏭</button>'
-            + '<input type="range" id="simWaveSlider" min="0" max="0" value="0" style="width:160px;">'
+            + '<button id="simNext" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.75rem;">⏭</button>'
+            + '<button id="simSkipEvent" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(255,215,0,0.4);background:rgba(255,215,0,0.12);color:#ffd700;cursor:pointer;font-size:0.75rem;">⏩下一变化</button>'
+            + '<input type="range" id="simWaveSlider" min="0" max="0" value="0" style="width:180px;">'
             + '</div>'
             + '</div>';
         return div;
     }
 
-    function renderDeckHTML(side, title) {
-        let slotsHtml = '';
-        // 工程槽在顶部（slot 7）
-        slotsHtml += '<div class="battle-slot engineering-slot empty" data-slot="sim-' + side + '-7" data-hand-type="' + side + '" data-type="engineering" style="width:72px;height:72px;position:relative;"><span class="slot-label">🔧</span><span class="slot-empty">空</span></div>';
-        // 3 行，每行 2 槽：1-2 底行，3-4 中行，5-6 顶行
-        const rows = [[1, 2], [3, 4], [5, 6]];
-        rows.forEach(function (pair) {
-            slotsHtml += '<div style="display:flex;gap:8px;">';
-            pair.forEach(function (n) {
-                slotsHtml += '<div class="battle-slot empty" data-slot="sim-' + side + '-' + n + '" data-hand-type="' + side + '" style="width:72px;height:72px;position:relative;"><span class="slot-empty">空</span></div>';
-            });
-            slotsHtml += '</div>';
-        });
-        const drId = side === SIDE_MY ? 'simMyDr' : 'simTeammateDr';
-        return '<div style="display:flex;flex-direction:column;align-items:center;gap:6px;">'
-            + '<div style="color:#fff;font-size:0.82rem;font-weight:700;">' + title + '</div>'
-            + '<div style="color:#4ecdc4;font-size:0.72rem;">总减伤:<span id="' + drId + '">0</span></div>'
-            + '<div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px;border-radius:10px;background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.08);">'
-            + slotsHtml
-            + '</div>'
-            + '<div style="width:100%;color:rgba(255,255,255,0.6);font-size:0.7rem;text-align:center;">我的手牌</div>'
-            + '<div id="sim-hand-' + side + '" style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;min-height:28px;"></div>'
+    function renderDeckColumn(side, title, drId, slotContainerId, handId) {
+        return '<div class="battle-column" style="display:flex;flex-direction:column;align-items:center;gap:4px;">'
+            + '<h4 style="margin:0;color:#fff;font-size:0.85rem;">' + title + ' <span id="' + drId + '" style="color:#4ecdc4;font-size:0.78rem;margin-left:6px;">洗炼:0</span></h4>'
+            + '<div class="battle-slots-container" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px;border-radius:10px;background:rgba(0,0,0,0.22);border:1px solid rgba(255,255,255,0.08);">'
+            + '<div class="battle-slot engineering-slot empty" data-slot="sim-' + side + '-0" data-type="engineering" style="margin:0;"><span class="slot-label">🔧</span><span class="slot-empty">空</span></div>'
+            + '<div class="battle-slots" id="' + slotContainerId + '" style="display:flex;flex-direction:column;gap:6px;">'
+            + '<div class="battle-slots" style="display:flex;gap:6px;"><div class="battle-slot empty" data-slot="sim-' + side + '-1">空</div><div class="battle-slot empty" data-slot="sim-' + side + '-2">空</div></div>'
+            + '<div class="battle-slots" style="display:flex;gap:6px;"><div class="battle-slot empty" data-slot="sim-' + side + '-3">空</div><div class="battle-slot empty" data-slot="sim-' + side + '-4">空</div></div>'
+            + '<div class="battle-slots" style="display:flex;gap:6px;"><div class="battle-slot empty" data-slot="sim-' + side + '-5">空</div><div class="battle-slot empty" data-slot="sim-' + side + '-6">空</div></div>'
+            + '</div></div>'
+            + '<div style="width:100%;color:rgba(255,255,255,0.6);font-size:0.68rem;text-align:center;margin-top:2px;">我的手牌</div>'
+            + '<div class="hand-container" id="' + handId + '" style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;min-height:30px;max-width:230px;"></div>'
             + '</div>';
     }
 
-    function bindEvents() {
+    function bindStaticEvents() {
         const r = state.root;
         if (!r) return;
         r.addEventListener('click', function (e) {
-            if (e.target === r || e.target.id === 'simClose') { closeSimulator(); return; }
-            if (e.target.id === 'simPrev') { changeWave(-1); return; }
-            if (e.target.id === 'simNext') { changeWave(1); return; }
-            if (e.target.id === 'simPlay') { togglePlay(); return; }
-            if (e.target.id === 'simSlower') { adjustSpeed(-0.5); return; }
-            if (e.target.id === 'simFaster') { adjustSpeed(0.5); return; }
-            if (e.target.id === 'simRefresh') { render(); return; }
+            const t = e.target;
+            if (t === r || t.id === 'simClose') { closeSimulator(); return; }
+            switch (t.id) {
+                case 'simPrev': changeWave(-1); return;
+                case 'simNext': changeWave(1); return;
+                case 'simSkipEvent': skipToNextEvent(); return;
+                case 'simPlay': togglePlay(); return;
+                case 'simSlower': adjustSpeed(-0.5); return;
+                case 'simFaster': adjustSpeed(0.5); return;
+                case 'simRefresh': render(); return;
+            }
         });
         r.addEventListener('wheel', function (e) {
-            // 左右脚本面板内滚动不切换波束
-            const panel = e.target.closest('#simMainScriptPanel, #simSubScriptPanel');
+            const panel = e.target.closest('#simMainLyric, #simSubLyric');
             if (panel) return;
             e.preventDefault();
             changeWave(e.deltaY > 0 ? 1 : -1);
         }, { passive: false });
+    }
+
+    function bindDynamic() {
+        const r = state.root;
         const slider = r.querySelector('#simWaveSlider');
-        if (slider) {
-            slider.addEventListener('input', function () {
-                state.waveIndex = parseInt(this.value, 10);
-                render();
-            });
-        }
-        // 导入
+        if (slider) slider.addEventListener('input', function () { state.waveIndex = parseInt(this.value, 10); render(); });
         const mainIn = r.querySelector('#simImportMain');
         const subIn = r.querySelector('#simImportSub');
         if (mainIn) mainIn.addEventListener('change', function (e) { importScript(e.target, 'main'); });
         if (subIn) subIn.addEventListener('change', function (e) { importScript(e.target, 'sub'); });
-        // 槽位点击：打开主页同款设置弹窗
+        // 槽位点击 = 主页同款设置弹窗
         r.querySelectorAll('.battle-slot').forEach(function (slot) {
             slot.addEventListener('click', function (ev) {
                 if (!slot.classList.contains('filled')) return;
-                const cardId = slot.dataset.cardId;
-                const cardName = slot.dataset.name;
-                const handType = slot.dataset.handType;
-                if (!cardId || !cardName) return;
-                const info = getCardInfo(cardName);
-                if (typeof window.showLevelDropdown === 'function') {
-                    try { window.showLevelDropdown(ev, cardId, info.type || 'gold', handType, cardName); } catch (e) {}
-                }
-            });
-            slot.addEventListener('contextmenu', function (ev) {
-                ev.preventDefault();
-                if (!slot.classList.contains('filled')) return;
-                const cardId = slot.dataset.cardId;
-                const cardName = slot.dataset.name;
-                const handType = slot.dataset.handType;
-                if (!cardId || !cardName) return;
-                const info = getCardInfo(cardName);
-                if (typeof window.showLevelDropdown === 'function') {
-                    try { window.showLevelDropdown(ev, cardId, info.type || 'gold', handType, cardName); } catch (e) {}
-                }
+                openSlotSettings(slot, ev);
             });
         });
     }
@@ -447,9 +363,9 @@
         if (!file) return;
         const reader = new FileReader();
         reader.onload = function (e) {
-            const text = e.target.result;
-            const script = parseScript(text);
-            if (which === 'main') state.mainScript = script; else state.subScript = script;
+            const sc = parseScript(e.target.result);
+            if (which === 'main') state.mainScript = sc; else state.subScript = sc;
+            rebuildTimeline();
             state.waveIndex = 0;
             pause();
             render();
@@ -459,16 +375,52 @@
         input.value = '';
     }
 
+    function openSlotSettings(slot, ev) {
+        const cardId = slot.dataset.cardId;
+        const cardName = slot.dataset.name;
+        const handType = slot.dataset.handType || SIDE_MY;
+        if (!cardId || !cardName) return;
+        const info = getCardInfo(cardName);
+        const identity = cardName;
+        if (typeof window.showLevelDropdown === 'function') {
+            try { window.showLevelDropdown(ev, cardId, info.type || 'gold', handType, cardName); } catch (e) {}
+        }
+        watchPopupClose(handType, identity, cardId, info.type || 'gold', handType);
+    }
+
+    // 弹窗关闭后，把手动改的等级/魔化/皮肤写回 override，使其跨波保留
+    function watchPopupClose(side, identity, cardId, type, handType) {
+        const iv = setInterval(function () {
+            if (!document.querySelector('.card-settings-popup-root')) {
+                clearInterval(iv);
+                try {
+                    const ov = state.overrides[side][identity] || {};
+                    if (window.getCardLevel) { const lv = window.getCardLevel(cardId, type, handType); if (lv) ov.level = levelToScript(lv, type); }
+                    if (window.getCardMoHua) ov.mohua = !!window.getCardMoHua(cardId, handType);
+                    if (window.getCardSkin) { const sk = window.getCardSkin(cardId, identity, handType); if (sk) ov.skin = sk; }
+                    state.overrides[side][identity] = ov;
+                } catch (e) {}
+                render();
+            }
+        }, 250);
+    }
+
+    function levelToScript(lv, type) {
+        const max = getMaxLevel(type);
+        if (lv === max) return '满';
+        return lv + '级';
+    }
+
     function togglePlay() {
         if (state.playing) { pause(); return; }
-        if (!maxWaveIndex()) return;
+        if (state.timeline.length <= 1) return;
         state.playing = true;
         const btn = state.root.querySelector('#simPlay');
         if (btn) { btn.textContent = '⏸ 暂停'; btn.style.color = '#ff5252'; btn.style.borderColor = 'rgba(255,82,82,0.5)'; btn.style.background = 'rgba(255,82,82,0.15)'; }
         state.timer = setInterval(function () {
-            if (state.waveIndex >= maxWaveIndex()) { pause(); return; }
+            if (state.waveIndex >= state.timeline.length - 1) { pause(); return; }
             changeWave(1);
-        }, Math.max(200, state.speed * 1000));
+        }, Math.max(250, state.speed * 1000));
     }
 
     function pause() {
@@ -485,24 +437,10 @@
         if (state.playing) { pause(); togglePlay(); }
     }
 
-    function maxWaveIndex() {
-        const m = state.mainScript ? state.mainScript.waves.length - 1 : -1;
-        const s = state.subScript ? state.subScript.waves.length - 1 : -1;
-        return Math.max(m, s);
-    }
-
-    function currentWaveNumber() {
-        const arr = [];
-        if (state.mainScript && state.mainScript.waves[state.waveIndex]) arr.push(state.mainScript.waves[state.waveIndex].wave);
-        if (state.subScript && state.subScript.waves[state.waveIndex]) arr.push(state.subScript.waves[state.waveIndex].wave);
-        return arr.length ? arr.join(' / ') : '—';
-    }
-
     function changeWave(delta) {
-        const max = maxWaveIndex();
-        if (max < 0) return;
+        if (state.timeline.length <= 1) return;
         let next = state.waveIndex + delta;
-        next = Math.max(0, Math.min(max, next));
+        next = Math.max(0, Math.min(state.timeline.length - 1, next));
         if (next === state.waveIndex) return;
         state.waveIndex = next;
         const slider = state.root.querySelector('#simWaveSlider');
@@ -510,89 +448,91 @@
         render();
     }
 
+    function skipToNextEvent() {
+        const max = state.timeline.length - 1;
+        for (let i = state.waveIndex + 1; i <= max; i++) {
+            const W = state.timeline[i];
+            const hasMain = state.mainScript && state.mainScript.waves.some(function (w) { return w.wave === W; });
+            const hasSub = state.subScript && state.subScript.waves.some(function (w) { return w.wave === W; });
+            if (hasMain || hasSub) { state.waveIndex = i; break; }
+        }
+        const slider = state.root.querySelector('#simWaveSlider');
+        if (slider) slider.value = state.waveIndex;
+        render();
+    }
+
     // ===== 渲染 =====
     function render() {
         if (!state.root) return;
-        const max = maxWaveIndex();
-        const slider = state.root.querySelector('#simWaveSlider');
-        if (slider) { slider.max = Math.max(0, max); slider.value = state.waveIndex; }
-
+        const W = state.timeline[state.waveIndex] || 1;
         const banner = state.root.querySelector('#simWaveBanner');
         const waveDisplay = state.root.querySelector('#simWaveDisplay');
-        const waveStr = currentWaveNumber();
-        const maxIdx = maxWaveIndex();
-        const progress = (maxIdx >= 0 ? (state.waveIndex + 1) + '/' + (maxIdx + 1) : '');
-        if (banner) banner.textContent = '第 ' + waveStr + ' 波';
-        if (waveDisplay) waveDisplay.textContent = '波数 ' + waveStr + ' · ' + progress;
+        if (banner) banner.textContent = '第 ' + W + ' 波';
+        if (waveDisplay) waveDisplay.textContent = '第 ' + W + ' 波 · ' + (state.waveIndex + 1) + '/' + state.timeline.length;
 
-        const myState = state.mainScript ? applyWave(createSideState(), state.mainScript, state.waveIndex) : createSideState();
-        const tmState = state.subScript ? applyWave(createSideState(), state.subScript, state.waveIndex) : createSideState();
+        const slider = state.root.querySelector('#simWaveSlider');
+        if (slider) { slider.max = state.timeline.length - 1; slider.value = state.waveIndex; }
 
+        const myState = applyWaveUpToWave(state.mainScript, W, SIDE_MY);
+        const tmState = applyWaveUpToWave(state.subScript, W, SIDE_TEAMMATE);
+        _sideStateRefs.my = myState;
+        _sideStateRefs.teammate = tmState;
         renderSide(SIDE_MY, myState);
         renderSide(SIDE_TEAMMATE, tmState);
         renderEquipment(myState, tmState);
-        renderScriptPanels();
-        renderDamageReduction(myState, tmState);
+        renderLyric(state.root.querySelector('#simMainLyric'), state.mainScript, W, 'main');
+        renderLyric(state.root.querySelector('#simSubLyric'), state.subScript, W, 'sub');
     }
 
     function renderSide(side, sideState) {
-        for (let i = 1; i <= SLOT_COUNT; i++) {
+        for (let i = 0; i <= 7; i++) {
             const slot = state.root.querySelector('[data-slot="sim-' + side + '-' + i + '"]');
-            const card = sideState.slots[i];
+            if (!slot) continue;
             clearSlot(slot);
-            if (card) fillSlot(slot, card, side, sideState);
+            const card = sideState.slots[i];
+            if (card) fillSlot(slot, card, side);
         }
-        // 手牌
-        const handContainer = state.root.querySelector('#sim-hand-' + side);
-        if (handContainer) {
-            handContainer.innerHTML = sideState.hand.map(function (h) {
-                const info = getCardInfo(h);
-                return '<div style="padding:2px 6px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:rgba(255,255,255,0.8);font-size:0.65rem;white-space:nowrap;">' + esc(h) + '</div>';
-            }).join('');
-        }
+        const handContainer = state.root.querySelector('#sim-' + side + 'HandContainer');
+        if (handContainer) renderHand(handContainer, sideState.hand, side);
     }
 
     function clearSlot(slot) {
-        if (!slot) return;
-        slot.className = 'battle-slot empty' + (slot.dataset.type === 'engineering' ? ' engineering-slot' : '');
-        slot.innerHTML = slot.dataset.type === 'engineering' ? '<span class="slot-label">🔧</span><span class="slot-empty">空</span>' : '<span class="slot-empty">空</span>';
+        slot.className = 'battle-slot' + (slot.dataset.type === 'engineering' ? ' engineering-slot' : '') + ' empty';
+        slot.innerHTML = slot.dataset.type === 'engineering' ? '<span class="slot-label">🔧</span><span class="slot-empty">空</span>' : '空';
         slot.removeAttribute('data-card-id');
         slot.removeAttribute('data-name');
+        slot.removeAttribute('data-hand-type');
         slot.style.border = '';
+        slot.style.boxShadow = '';
     }
 
-    function fillSlot(slot, card, side, sideState) {
-        if (!slot) return;
-        slot.className = 'battle-slot filled' + (slot.dataset.type === 'engineering' ? ' engineering-slot' : '');
+    function simBadgeHTML(card, side) {
+        const lv = card.level === '满' ? getMaxLevel(card.type) : (parseInt(card.level, 10) || 1);
+        const levelBadge = '<span class="card-level-badge card-level-number card-level-q-' + (card.type || 'gold') + '" data-card-id="' + card.id + '" data-card-type="' + card.type + '" data-hand-type="' + side + '" data-card-name="' + esc(card.hero) + '" data-skin="' + esc(card.skin) + '">' + lv + '</span>';
+        const mohuaIcon = card.isMohua ? '<img class="card-level-badge card-mohua-icon" data-card-id="' + card.id + '" data-card-type="' + card.type + '" data-hand-type="' + side + '" data-card-name="' + esc(card.hero) + '" src="skins/icons/mohua-icon.png" alt="" title="已魔化">' : '';
+        return levelBadge + mohuaIcon;
+    }
+
+    function fillSlot(slot, card, side) {
+        slot.className = 'battle-slot' + (slot.dataset.type === 'engineering' ? ' engineering-slot' : '') + ' filled';
         slot.dataset.cardId = card.id;
         slot.dataset.name = card.hero;
+        slot.dataset.handType = side;
+        if (card.isFusion) slot.setAttribute('data-fusion', 'true'); else slot.removeAttribute('data-fusion');
         const display = window.getFusionDisplayName ? window.getFusionDisplayName(card.hero) : card.hero;
-        slot.innerHTML = '<span class="card-name" data-full-name="' + esc(card.hero) + '" style="position:absolute;bottom:2px;left:0;right:0;text-align:center;color:#fff;font-size:0.62rem;text-shadow:0 1px 2px rgba(0,0,0,0.8);pointer-events:none;z-index:3;">' + esc(display) + '</span>';
-        addBadges(slot, card);
-        markSameRow(slot, card, sideState);
+        slot.innerHTML = '<span class="card-item" data-profession="' + (card.profession || '') + '">'
+            + simBadgeHTML(card, side)
+            + '<span class="card-name" data-full-name="' + esc(card.hero) + '">' + esc(display) + '</span></span>';
+        markSameRow(slot, card, side);
         if (typeof window.applySkinBgToSlot === 'function') {
             try { window.applySkinBgToSlot(slot, card.hero, card.id, side, card.skin, card.skin); } catch (e) {}
         }
     }
 
-    function addBadges(slot, card) {
-        const lv = card.level === '满' ? getMaxLevel(card.type) : (parseInt(card.level, 10) || 1);
-        const lvBadge = document.createElement('div');
-        lvBadge.style.cssText = 'position:absolute;bottom:2px;left:2px;background:linear-gradient(135deg,#ffd700,#ff8c00);color:#1a1a2e;border-radius:4px;padding:1px 3px;font-size:0.55rem;font-weight:700;line-height:1;z-index:4;pointer-events:none;';
-        lvBadge.textContent = lv;
-        slot.appendChild(lvBadge);
-        if (card.isMohua) {
-            const mh = document.createElement('div');
-            mh.style.cssText = 'position:absolute;bottom:2px;right:2px;width:14px;height:14px;background:#ff1744;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;font-weight:700;z-index:4;pointer-events:none;box-shadow:0 0 4px #ff1744;';
-            mh.textContent = '魔';
-            slot.appendChild(mh);
-        }
-    }
-
-    function markSameRow(slot, card, sideState) {
-        // 判断该卡是否在某对同排里
+    function markSameRow(slot, card, side) {
         let row = -1;
-        sideState.sameRowPairs.forEach(function (pair, idx) {
+        const pairs = (currentSideStateRef(side) && currentSideStateRef(side).sameRowPairs) || [];
+        pairs.forEach(function (pair, idx) {
             if (pair.indexOf(card.base) >= 0 || pair.indexOf(card.hero) >= 0) row = idx;
         });
         if (row >= 0) {
@@ -602,12 +542,38 @@
         }
     }
 
+    // 当前 side 的最新渲染状态（供 markSameRow 用，render 时暂存）
+    let _sideStateRefs = { my: null, teammate: null };
+    function currentSideStateRef(side) { return _sideStateRefs[side]; }
+
+    function renderHand(container, handList, side) {
+        container.innerHTML = '';
+        handList.forEach(function (name) {
+            const info = getCardInfo(name);
+            const ov = (state.overrides[side] && state.overrides[side][name]) || null;
+            const skin = (ov && ov.skin) || (state.mainScript && state.mainScript.header.skins[name]) || '默认';
+            const isMohua = ov ? ov.mohua : (state.mainScript && state.mainScript.header.mohua.indexOf(name) >= 0);
+            const card = { hero: name, id: info.id || name, type: info.type || 'gold', profession: info.profession || '', skin: skin, isMohua: isMohua };
+            const display = window.getFusionDisplayName ? window.getFusionDisplayName(name) : name;
+            const div = document.createElement('div');
+            div.className = 'selected-card card-item';
+            div.dataset.id = card.id; div.dataset.name = name; div.dataset.type = card.type; div.dataset.profession = card.profession; div.dataset.handType = side;
+            div.innerHTML = simBadgeHTML(card, side) + '<span class="card-name">' + esc(display) + '</span>';
+            container.appendChild(div);
+            if (typeof window.resolveHeroSkinUrl === 'function') {
+                window.resolveHeroSkinUrl(name, skin).then(function (url) {
+                    if (url) { div.classList.add('skin-bg'); div.style.backgroundImage = 'url("' + url + '")'; div.style.backgroundSize = 'contain'; div.style.backgroundPosition = 'center'; div.style.backgroundRepeat = 'no-repeat'; }
+                }).catch(function () {});
+            }
+        });
+    }
+
     function renderEquipment(mainState, subState) {
         const area = state.root.querySelector('#simEquipmentArea');
         if (!area) return;
         const parts = [];
-        if (mainState.equipment) parts.push('主卡:' + formatEquip(mainState.equipment, state.mainScript));
-        if (subState.equipment) parts.push('副卡:' + formatEquip(subState.equipment, state.subScript));
+        if (mainState.equipment) parts.push('<span style="color:#4ecdc4;">主卡:' + equipImg(mainState.equipment, state.mainScript) + '</span>');
+        if (subState.equipment) parts.push('<span style="color:#ff6b6b;">副卡:' + equipImg(subState.equipment, state.subScript) + '</span>');
         const myDr = calcSideDr(mainState);
         const tmDr = calcSideDr(subState);
         const total = (parseFloat(myDr) || 0) + (parseFloat(tmDr) || 0);
@@ -616,50 +582,50 @@
         area.innerHTML = drHtml + '　当前装备：' + parts.join('　');
     }
 
-    function formatEquip(name, script) {
-        const def = EQUIPMENT_LIST[name] || { color: '#ccc', starSkinHero: '幻精灵' };
-        const skinHero = def.starSkinHero;
+    function equipImg(name, script) {
+        const def = EQUIP_DEF[name];
+        if (!def) return esc(name);
+        const skinHero = def.starHero;
         const hasSkin = script && script.header.skins[skinHero] && script.header.skins[skinHero] !== '默认';
-        const star = hasSkin ? '★5' : '★4';
-        return '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;background:' + def.color + '22;border:1px solid ' + def.color + ';"><span style="color:' + def.color + ';">' + name + '</span><span style="color:#ffd700;font-size:0.7rem;">' + star + '</span></span>';
+        const star = hasSkin ? 5 : 4;
+        const img = hasSkin ? def.img5 : def.img4;
+        return '<img src="' + img + '" alt="' + esc(name) + '" title="' + esc(name) + ' ' + star + '星" style="height:30px;vertical-align:middle;border-radius:4px;box-shadow:0 0 6px rgba(0,0,0,0.5);">';
     }
 
-    function renderScriptPanels() {
-        const mainPanel = state.root.querySelector('#simMainScriptPanel');
-        const subPanel = state.root.querySelector('#simSubScriptPanel');
-        if (mainPanel) mainPanel.innerHTML = formatWaveContent(state.mainScript, state.waveIndex, '#4ecdc4');
-        if (subPanel) subPanel.innerHTML = formatWaveContent(state.subScript, state.waveIndex, '#ff6b6b');
-    }
-
-    function formatWaveContent(script, idx, color) {
-        if (!script) return '<span style="color:rgba(255,255,255,0.4);">未导入脚本</span>';
-        const w = script.waves[idx];
-        if (!w) return '<span style="color:rgba(255,255,255,0.4);">该脚本无第 ' + (idx + 1) + ' 条波束</span>';
-        let html = '<div style="color:' + color + ';font-weight:700;margin-bottom:4px;">波 ' + w.wave + '</div>';
-        w.actions.forEach(function (a) {
-            if (a.type === 'place') html += '<div>⬆ <b>上</b> ' + esc(a.hero) + ' ' + esc(a.level) + (a.forceSeq ? ' <span style="color:#ffd700;">[顺序]</span>' : '') + '</div>';
-            else if (a.type === 'remove') html += '<div>⬇ <b>下</b> ' + esc(a.hero) + '</div>';
-            else if (a.type === 'equip') html += '<div>🛡 <b>换</b> ' + esc(a.name) + '</div>';
-            else if (a.type === 'sameRow') html += '<div>🔗 <b>同排</b> ' + esc(a.heroes.join(' + ')) + '</div>';
-            else if (a.type === 'sameRowCancel') html += '<div>❌ <b>取消同排</b></div>';
-            else html += '<div style="color:rgba(255,255,255,0.55);">· ' + esc(a.text) + '</div>';
+    function renderLyric(panel, script, W, side) {
+        if (!panel) return;
+        if (!script) { panel.innerHTML = '<span style="color:rgba(255,255,255,0.4);">未导入脚本</span>'; return; }
+        let html = '';
+        let currentElId = '';
+        script.waves.forEach(function (w, idx) {
+            const isCurrent = (w.wave <= W) && (idx === script.waves.length - 1 || script.waves[idx + 1].wave > W);
+            const cls = isCurrent ? 'sim-lyric-line sim-lyric-current' : 'sim-lyric-line';
+            const id = 'simLyric_' + side + '_' + idx;
+            if (isCurrent) currentElId = id;
+            html += '<div id="' + id + '" class="' + cls + '" style="padding:2px 6px;border-radius:5px;margin:2px 0;'
+                + (isCurrent ? 'background:rgba(78,205,196,0.18);color:#4ecdc4;font-weight:700;' : 'color:rgba(255,255,255,0.65);')
+                + '">波' + w.wave + '：' + esc(w.raw.length > 80 ? w.raw.substring(w.raw.indexOf(',') + 1) : w.raw) + '</div>';
         });
-        return html;
+        if (!script.waves.length) html = '<span style="color:rgba(255,255,255,0.4);">暂无波束</span>';
+        panel.innerHTML = html;
+        if (currentElId) {
+            const el = panel.querySelector('#' + currentElId);
+            if (el) panel.scrollTop = el.offsetTop - panel.clientHeight / 2 + el.clientHeight / 2;
+        }
     }
 
-    function renderDamageReduction(mainState, subState) {
+    function renderDamageReduction(myState, tmState) {
+        _sideStateRefs.my = myState;
+        _sideStateRefs.teammate = tmState;
         const myEl = state.root.querySelector('#simMyDr');
         const tmEl = state.root.querySelector('#simTeammateDr');
-        if (myEl) myEl.textContent = calcSideDr(mainState);
-        if (tmEl) tmEl.textContent = calcSideDr(subState);
-        // 14 卡合计
-        const total = parseFloat(myEl ? myEl.textContent : 0) + parseFloat(tmEl ? tmEl.textContent : 0);
-        // 已在各自标题下方显示；这里不加额外 UI，避免拥挤
+        if (myEl) myEl.textContent = '洗炼:' + calcSideDr(myState);
+        if (tmEl) tmEl.textContent = '洗炼:' + calcSideDr(tmState);
     }
 
     function calcSideDr(sideState) {
         const cards = [];
-        for (let i = 1; i <= SLOT_COUNT; i++) {
+        for (let i = 1; i <= 7; i++) {
             const c = sideState.slots[i];
             if (c) cards.push({ name: c.hero, id: c.id, type: c.type, profession: c.profession });
         }
@@ -670,7 +636,6 @@
                 return bd && typeof bd.total === 'number' ? bd.total.toFixed(1) : '0';
             }
         } catch (e) {}
-        // 兜底：直接读 drTables['我的'].洗炼
         let sum = 0;
         const table = (window.drTables && window.drTables['我的'] && window.drTables['我的']['洗炼']) || {};
         cards.forEach(function (c) {
@@ -680,10 +645,7 @@
         return sum.toFixed(1);
     }
 
-    function esc(s) {
-        return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
+    function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
-    // 暴露
     window.openScriptSimulator = openScriptSimulator;
 })();
