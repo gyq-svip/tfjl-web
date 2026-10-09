@@ -226,6 +226,8 @@
             + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
             + (state.tab === 'featured' ? '<button onclick="_featLocalAddDlg()" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(78,205,196,0.6);background:rgba(78,205,196,0.18);color:#4ecdc4;cursor:pointer;font-size:0.8rem;font-weight:700;">添加本地阵容</button>' + (_isAdmin() ? '<button onclick="_featuredAddDlg()" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(240,147,43,0.6);background:rgba(240,147,43,0.18);color:#f0932b;cursor:pointer;font-size:0.8rem;font-weight:700;">添加精选</button>' : '') : '')
             + (isSail || state.tab === 'act' ? '<input id="llSearch" value="' + _esc(state.q) + '" oninput="_llSearch(this.value)" placeholder="🔍 空格分隔多个英雄" title="多个英雄用空格/逗号分隔（同时含才显示）：如 电法 炎魔 悟空" style="flex:0 0 170px;width:170px;min-width:0;padding:6px 9px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.8rem;">' : '')
+            // 🔴 2026-10-09 阵容图库新增「模拟器」入口：脚本推演（导入主副卡脚本，按波束显示卡槽变化）
+            + '<button onclick="_llOpenScriptSim()" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(255,107,107,0.6);background:rgba(255,107,107,0.18);color:#ff6b6b;cursor:pointer;font-size:0.8rem;font-weight:700;">🎮 模拟器</button>'
             + '</div>'
             + '</div>'
             + '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-top:4px;">左卡组右笔记 · <b style="color:#ce93d8;">左键/右键=打开设置弹窗（皮肤/等级/魔化/副卡/融合切换，改完全局生效）</b> · <b style="color:#ff8a80;">🛡️减伤=鼠标悬浮查看每张卡的减伤明细（0% 减伤的卡自动隐藏）</b> · 活动 📜=脚本 ·（个人设置只存本机）· 拖标题栏移动窗口，右下角拉伸大小</div>';
@@ -473,6 +475,21 @@
         try { ((_llFusionIndex() || {})[b] || []).forEach(push); } catch (e) {}
         return out;
     }
+    // 🔴 2026-10-09 打开「模拟器」弹窗（脚本推演）：懒加载 app-scriptsim.js，避免影响首屏。
+    window._llOpenScriptSim = function () {
+        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('打开模拟器');
+        if (typeof window.loadModule === 'function') {
+            window.loadModule('scriptsim').then(function () {
+                if (typeof window.openScriptSimulator === 'function') window.openScriptSimulator();
+                else alert('模拟器模块加载失败，请刷新重试');
+            }).catch(function (e) {
+                console.warn('[模拟器] 加载失败', e);
+                alert('模拟器加载失败：' + (e && e.message || e));
+            });
+        } else {
+            alert('模块加载器未就绪，请刷新后重试');
+        }
+    };
     // 🔴 2026-09-29 图库设置弹窗入口：与主页同款 showLevelDropdown（图库=全局/卡池作用域）+ 图库专属「融合切换」区
     //    （替代原左键循环）。切换完成自动重开弹窗，反映新的当前卡（等级/魔化/皮肤区全部按新卡刷新）。
     window._llOpenSettings = function (sl, e) {

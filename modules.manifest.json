@@ -12,6 +12,7 @@
   "lazy": {
     "skinmaker": { "src": "app-skinmaker.js", "v": "1", "preload": false },
     "recognize": { "src": "recognize.js", "v": "11", "preload": true },
-    "deepsea": { "src": "app-deepsea.js", "v": "1", "preload": true }
+    "deepsea": { "src": "app-deepsea.js", "v": "1", "preload": true },
+    "scriptsim": { "src": "app-scriptsim.js", "v": "1", "preload": false }
   }
 }
