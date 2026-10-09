@@ -700,7 +700,7 @@ window.EQUIP_IMG = {
             div.className = 'selected-card card-item' + (isPlaced ? ' placed' : '');
             div.dataset.id = card.id; div.dataset.name = heroName; div.dataset.ovKey = name; div.dataset.type = card.type; div.dataset.profession = card.profession; div.dataset.handType = side;
             if (card.isFusion) div.dataset.fusion = 'true'; else div.removeAttribute('data-fusion');
-            div.style.cssText = 'width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;background-color:rgba(28,28,48,0.92);background-size:cover;background-position:center;overflow:hidden;font-size:0.62rem;padding:2px 1px;'
+            div.style.cssText = 'width:100%;height:100%;min-width:0;max-width:100%;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;background-color:rgba(28,28,48,0.92);background-size:cover;background-position:center;overflow:hidden;font-size:0.62rem;padding:2px 1px;border-radius:8px;'
                 + (isPlaced ? 'border:1px dashed rgba(78,205,196,0.6);opacity:0.42;filter:grayscale(1);' : 'border:1px solid rgba(255,255,255,0.15);');
             if (isPlaced) div.title = '已上场';
             div.innerHTML = simBadgeHTML(card, side) + '<span class="card-name" data-full-name="' + esc(heroName) + '" style="text-align:center;text-shadow:0 1px 3px rgba(0,0,0,0.9);">' + esc(display) + '</span>';
