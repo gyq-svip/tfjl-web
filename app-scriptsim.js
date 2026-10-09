@@ -296,14 +296,14 @@ window.EQUIP_IMG = {
             + '</div>'
             + '</div>'
             // 主体
-            + '<div style="flex:1 1 auto;display:flex;overflow:hidden;padding:10px;gap:10px;">'
+            + '<div style="flex:1 1 auto;display:flex;overflow:hidden;padding:10px;gap:14px;justify-content:center;">'
             // 左：脚本①歌词（只显示 上一条/当前/下一条，小框跟随波数）
-            + '<div style="flex:0 0 185px;display:flex;flex-direction:column;gap:6px;align-self:flex-start;margin-top:36px;">'
+            + '<div style="flex:0 0 175px;display:flex;flex-direction:column;gap:6px;align-self:flex-start;margin-top:30px;">'
             + '<div style="color:#4ecdc4;font-size:0.8rem;font-weight:700;">脚本① · 歌词</div>'
             + '<div id="simMainLyric" style="min-height:80px;background:rgba(0,0,0,0.35);border-radius:8px;border:1px solid rgba(78,205,196,0.15);padding:6px 8px;overflow:hidden;font-size:0.72rem;line-height:1.6;color:rgba(255,255,255,0.7);"></div>'
             + '</div>'
             // 中：双卡组
-            + '<div style="flex:1 1 auto;display:flex;flex-direction:column;gap:8px;align-items:center;overflow:auto;">'
+            + '<div style="flex:0 0 auto;display:flex;flex-direction:column;gap:8px;align-items:center;overflow:auto;">'
             + '<div id="simWaveBanner" style="color:#ffd700;font-size:1.4rem;font-weight:700;text-shadow:0 0 8px rgba(255,215,0,0.4);">第 1 波</div>'
             + '<div style="display:flex;gap:20px;align-items:flex-start;justify-content:center;flex-wrap:wrap;">'
             + renderDeckColumn(SIDE_MY, '📋 脚本①（我的卡组）', 'simMyDr', 'simMyBattleSlots', 'sim-hand-my')
@@ -312,7 +312,7 @@ window.EQUIP_IMG = {
             + '<div id="simEquipmentArea" style="padding:8px 16px;border-radius:10px;border:1px solid rgba(255,215,0,0.3);background:rgba(255,215,0,0.08);display:flex;align-items:center;gap:16px;flex-wrap:wrap;color:#ffd700;font-size:0.85rem;font-weight:700;">装备区</div>'
             + '</div>'
             // 右：脚本②歌词
-            + '<div style="flex:0 0 185px;display:flex;flex-direction:column;gap:6px;align-self:flex-start;margin-top:36px;">'
+            + '<div style="flex:0 0 175px;display:flex;flex-direction:column;gap:6px;align-self:flex-start;margin-top:30px;">'
             + '<div style="color:#ff6b6b;font-size:0.8rem;font-weight:700;">脚本② · 歌词</div>'
             + '<div id="simSubLyric" style="min-height:80px;background:rgba(0,0,0,0.35);border-radius:8px;border:1px solid rgba(255,107,107,0.15);padding:6px 8px;overflow:hidden;font-size:0.72rem;line-height:1.6;color:rgba(255,255,255,0.7);"></div>'
             + '</div>'
@@ -418,10 +418,10 @@ window.EQUIP_IMG = {
         reader.onload = function (e) {
             const sc = parseScript(e.target.result);
             if (which === 'main') state.mainScript = sc; else state.subScript = sc;
-            // 战车跟随脚本（手动设置过则保留用户设置）
+            // 战车跟随脚本（每人有主车+副车；手动设置过则保留用户设置）
             const sideKey = which === 'main' ? SIDE_MY : SIDE_TEAMMATE;
-            if (!state.chariot[sideKey] || !state.chariot[sideKey].name) {
-                state.chariot[sideKey] = { name: (which === 'main' ? sc.header.mainVehicle : sc.header.subVehicle) || '', lv: 1 };
+            if (!state.chariot[sideKey] || (!state.chariot[sideKey].name && !state.chariot[sideKey].subName)) {
+                state.chariot[sideKey] = { name: sc.header.mainVehicle || '', lv: 1, subName: sc.header.subVehicle || '', subLv: 1 };
             }
             rebuildTimeline();
             state.waveIndex = 0;
@@ -497,25 +497,36 @@ window.EQUIP_IMG = {
     }
 
     function openChariotSettings(side, ev) {
-        const conf = state.chariot[side] || { name: '', lv: 1 };
+        // 与主页一致：每边有 主车+副车，各带等级
+        const conf = state.chariot[side] || { name: '', lv: 1, subName: '', subLv: 1 };
         const p = buildSimPopup('🚗 战车设置（' + (side === SIDE_MY ? '脚本①' : '脚本②') + '）', ev);
         const selStyle = 'flex:1;padding:4px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.4);color:#fff;font-size:0.75rem;';
-        let cOpts = '<option value="">跟随脚本</option>';
-        (window.CHARIOT_LIST || []).forEach(function (n) { cOpts += '<option value="' + esc(n) + '"' + (conf.name === n ? ' selected' : '') + '>' + esc(n) + '</option>'; });
-        const cSel = popupRow(p, '战车', '<select id="simPopCh" style="' + selStyle + '">' + cOpts + '</select>');
-        let lvOpts = '';
-        for (let i = 1; i <= 20; i++) lvOpts += '<option value="' + i + '"' + ((conf.lv || 1) === i ? ' selected' : '') + '>Lv.' + i + '</option>';
-        const lvSel = popupRow(p, '等级', '<select id="simPopChLv" style="' + selStyle + '">' + lvOpts + '</select>');
+        function carOpts(cur) {
+            let o = '<option value="">无</option>';
+            (window.CHARIOT_LIST || []).forEach(function (n) { o += '<option value="' + esc(n) + '"' + (cur === n ? ' selected' : '') + '>' + esc(n) + '</option>'; });
+            return o;
+        }
+        function lvOpts(cur) {
+            let o = '';
+            for (let i = 1; i <= 20; i++) o += '<option value="' + i + '"' + ((cur || 1) === i ? ' selected' : '') + '>Lv.' + i + '</option>';
+            return o;
+        }
+        const cSel = popupRow(p, '主车', '<select id="simPopCh" style="' + selStyle + '">' + carOpts(conf.name) + '</select>');
+        const lvSel = popupRow(p, '主车级', '<select id="simPopChLv" style="' + selStyle + '">' + lvOpts(conf.lv) + '</select>');
+        const sSel = popupRow(p, '副车', '<select id="simPopChSub" style="' + selStyle + '">' + carOpts(conf.subName) + '</select>');
+        const sLvSel = popupRow(p, '副车级', '<select id="simPopChSubLv" style="' + selStyle + '">' + lvOpts(conf.subLv) + '</select>');
         const tip = document.createElement('div');
         tip.style.cssText = 'color:rgba(255,255,255,0.45);font-size:0.68rem;line-height:1.5;';
-        tip.textContent = '减伤按此战车配置实时计入（游戏里仅走马江湖号提供减伤）。';
+        tip.textContent = '主/副车配置实时计入减伤（游戏里仅走马江湖号提供减伤）。';
         p.appendChild(tip);
         function apply() {
-            state.chariot[side] = { name: cSel.value, lv: parseInt(lvSel.value, 10) || 1 };
+            state.chariot[side] = {
+                name: cSel.value, lv: parseInt(lvSel.value, 10) || 1,
+                subName: sSel.value, subLv: parseInt(sLvSel.value, 10) || 1
+            };
             render();
         }
-        cSel.addEventListener('change', apply);
-        lvSel.addEventListener('change', apply);
+        [cSel, lvSel, sSel, sLvSel].forEach(function (sel) { sel.addEventListener('change', apply); });
     }
 
     function togglePlay() {
@@ -619,10 +630,12 @@ window.EQUIP_IMG = {
         if (handContainer) renderHand(handContainer, sideState.hand, side, sideState.placedBases || new Set());
         const chariot = state.root.querySelector('#simChariot-' + side);
         if (chariot) {
-            const conf = state.chariot[side];
-            const name = (conf && conf.name) || (side === SIDE_MY ? sideState.vehicle.main : sideState.vehicle.sub) || '';
-            const lv = (conf && conf.lv) || 1;
-            chariot.textContent = '🚗 战车：' + (name ? name + ' Lv.' + lv : '未设置') + '（点击设置）';
+            const conf = state.chariot[side] || {};
+            const mainName = conf.name || sideState.vehicle.main || '';
+            const subName = conf.subName || sideState.vehicle.sub || '';
+            const mainLv = conf.lv || 1;
+            const subLv = conf.subLv || 1;
+            chariot.textContent = '🚗 主:' + (mainName || '无') + ' Lv.' + mainLv + '｜副:' + (subName || '无') + ' Lv.' + subLv + '（点击设置）';
         }
     }
 
@@ -657,7 +670,8 @@ window.EQUIP_IMG = {
             + '<span class="card-name" data-full-name="' + esc(card.hero) + '">' + esc(display) + '</span></span>';
         markSameRow(slot, card, side);
         if (typeof window.applySkinBgToSlot === 'function') {
-            try { window.applySkinBgToSlot(slot, card.hero, card.id, side, card.skin, card.skin); } catch (e) {}
+            // 融合卡不强制皮肤：让主页弹窗设置的融合形态（全局 fusionSkins）生效，否则会被脚本皮肤覆盖回原样（"一闪而过"的根因）
+            try { window.applySkinBgToSlot(slot, card.hero, card.id, side, card.isFusion ? undefined : card.skin, card.isFusion ? undefined : card.skin); } catch (e) {}
         }
     }
 
@@ -706,12 +720,9 @@ window.EQUIP_IMG = {
             div.innerHTML = simBadgeHTML(card, side) + '<span class="card-name" data-full-name="' + esc(heroName) + '" style="text-align:center;text-shadow:0 1px 3px rgba(0,0,0,0.9);">' + esc(display) + '</span>';
             div.addEventListener('click', function (ev) { ev.stopPropagation(); openCardSettings(div, ev); });
             container.appendChild(div);
-            // 皮肤背景：默认皮肤 = 以英雄名作皮肤名解析（与主页 getSkinUrlForCard 同款兜底）
-            const skinArg = (!skin || skin === '默认') ? name : skin;
-            if (typeof window.resolveHeroSkinUrl === 'function') {
-                window.resolveHeroSkinUrl(name, skinArg).then(function (url) {
-                    if (url) { div.classList.add('skin-bg'); div.style.backgroundImage = 'url("' + url + '")'; }
-                }).catch(function () {});
+            // 皮肤背景：与上阵槽同一条管线（applySkinBgToSlot）；融合卡不强制皮肤，让主页融合状态(fusionSkins)生效
+            if (typeof window.applySkinBgToSlot === 'function') {
+                try { window.applySkinBgToSlot(div, heroName, card.id, side, card.isFusion ? undefined : skin, card.isFusion ? undefined : skin); } catch (e) {}
             }
         });
     }
@@ -780,16 +791,19 @@ window.EQUIP_IMG = {
             if (c) cards.push({ name: c.hero, id: c.id, type: c.type, profession: c.profession });
         }
         if (!cards.length) return '0';
-        // 临时把（脚本/手动设置的）战车写入全局战车状态，算完即还原（不影响主页）
-        const conf = state.chariot[side];
-        const chariotName = (conf && conf.name) || (side === SIDE_MY ? sideState.vehicle.main : sideState.vehicle.sub) || '';
-        const chariotLv = (conf && conf.lv) || 1;
+        // 临时把（脚本/手动设置的）主车+副车写入全局战车状态，算完即还原（不影响主页）
+        const conf = state.chariot[side] || {};
+        const mainName = conf.name || sideState.vehicle.main || '';
+        const subName = conf.subName || sideState.vehicle.sub || '';
+        const mainLv = conf.lv || 1;
+        const subLv = conf.subLv || 1;
         let saved = null;
-        if (chariotName && window.__tfjlChariot && window.CHARIOT_LIST) {
-            const idx = window.CHARIOT_LIST.indexOf(chariotName);
-            if (idx >= 0) {
+        if ((mainName || subName) && window.__tfjlChariot && window.CHARIOT_LIST) {
+            const mainIdx = mainName ? window.CHARIOT_LIST.indexOf(mainName) : -1;
+            const subIdx = subName ? window.CHARIOT_LIST.indexOf(subName) : -1;
+            if (mainIdx >= 0 || subIdx >= 0) {
                 saved = window.__tfjlChariot[side];
-                window.__tfjlChariot[side] = { main: idx, mainLv: chariotLv, sub: '', subLv: 0 };
+                window.__tfjlChariot[side] = { main: mainIdx >= 0 ? mainIdx : '', mainLv: mainLv, sub: subIdx >= 0 ? subIdx : '', subLv: subLv };
             }
         }
         let result = '0';
