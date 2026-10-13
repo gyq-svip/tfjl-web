@@ -8987,6 +8987,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         // 单个副卡英雄切皮：加载其全部皮肤 → 生成 融合XX 整图皮 → 写入 registry 与 skins/融合XX/
         // 已切过的默认跳过（force=true 强制重切，供列表单卡按钮用）。
         // 返回 { ok, skipped, msg }。供「添加融合卡自动切」「列表单卡切」「一键全切增量」三处复用。
+        // 🔴 2026-10-14 已废弃：副卡显示改为「本地直接拼接副卡英雄自己的皮肤原图缩小贴角」（见 resolveFusionHalf），
+        //    所有皮肤本地都有，无需再预切/推送「融合XX」虚拟英雄皮。UI 入口（一键全切 / 列表切皮按钮）已移除；
+        //    本函数与 cgmWriteFusedHero 仅保留供内部清理（cgmDeleteFusionSkin 删除历史融合皮）与向后兼容，不再主动调用。
         async function cgmCutFusionSkins(subHero, force = false) {
             if (!subHero) return { ok: false, msg: '缺少副卡英雄' };
             let registry = null;
@@ -9060,25 +9063,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 edt.title = '修改「' + n + '」组成 / 属性（覆盖同名条目）';
                 edt.style.cssText = 'flex:none;padding:5px 10px;border-radius:6px;border:1px solid rgba(255,215,0,0.5);background:rgba(255,215,0,0.15);color:#ffd700;cursor:pointer;font-size:0.76rem;white-space:nowrap;';
                 edt.addEventListener('click', () => cgmEditFusionCard(n));
-                const cut = document.createElement('button');
-                const subHero = (c.length >= 2 ? c[1] : null);
-                cut.textContent = '✂️ 切皮';
-                cut.title = '单独切「' + (subHero || '?') + '」这张副卡的全部皮肤（强制重切，与一键全切互不影响）';
-                cut.style.cssText = 'flex:none;padding:5px 10px;border-radius:6px;border:1px solid rgba(74,222,128,0.5);background:rgba(74,222,128,0.12);color:#4ade80;cursor:pointer;font-size:0.76rem;white-space:nowrap;';
-                cut.addEventListener('click', async () => {
-                    if (!subHero) { if (typeof showToast === 'function') showToast('该融合卡缺少副卡组成', 'error'); return; }
-                    const st = document.getElementById('cgmFusionStatus');
-                    cut.disabled = true; cut.textContent = '⏳ 切皮中…';
-                    try {
-                        const r = await cgmCutFusionSkins(subHero, true);
-                        if (st) { st.style.color = r.ok ? '#4ade80' : '#ff9e80'; st.textContent = (r.ok ? '✓ ' : '✗ ') + r.msg + (r.ok ? '\n👉 点上方「🚀 一键推送」上线' : ''); }
-                        if (typeof showToast === 'function') showToast(r.ok ? '切皮完成' : '切皮失败：' + r.msg, r.ok ? 'success' : 'error');
-                    } catch (e) {
-                        if (st) { st.style.color = '#ff9e80'; st.textContent = '✗ 切皮失败：' + e.message; }
-                    } finally { cut.disabled = false; cut.textContent = '✂️ 切皮'; }
-                });
                 row.appendChild(info);
-                row.appendChild(cut);
                 row.appendChild(edt);
                 row.appendChild(del);
                 list.appendChild(row);
@@ -9196,8 +9181,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             window.skinRegistry[key] = blobs.map(b => ({ name: b.name, url: URL.createObjectURL(b.blob), path: null, loaded: true, remote: false }));
             return blobs.map(b => ({ name: b.name, file: key + '_' + (b.name === '默认' ? 'default' : b.name) + '.png' }));
         }
-        // 一键全切（增量）：遍历所有融合卡副卡，已切过的自动跳过，只切新出的
-        // 想强制重切某一张 → 用列表里该卡的「✂️ 切皮」按钮
+        // 🔴 2026-10-14 已废弃（UI 入口已移除）：副卡显示改为本地直接拼接副卡原皮，无需批量切皮。
+        //    函数保留仅供向后兼容，无界面触发。
         async function cgmCutAllFusions() {
             const status = document.getElementById('cgmFusedStatus');
             const btn = document.getElementById('cgmCutAllBtn');
