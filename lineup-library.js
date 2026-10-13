@@ -521,8 +521,16 @@
     //    createLevelBadgeHTML 读的就是卡池那套等级/魔化存储（my_<池id>），改卡池=全局生效，图库只做显示。
     //    副卡等级/魔化不用这里管：applySkinBgToSlot 的融合分支会按全局 fusionLevels/fusionMoHua 自动挂副卡角标（同为卡池数据源）。
     function _poolTypeMap() {
+        // 🔴 2026-10-14 性能：旧实现调 collectPoolCards()（遍历整个卡池 + 每张查手牌 some + 算拼音 + 全列表排序），
+        //    而图库每次重铺槽位竟跑 3 遍（_poolTypeMap×2 + _lvBadge 内 1 次）→「图库设置卡、主页却丝滑」的根因（主页不碰它）。
+        //    这里只按需读 dataset 的 name/id/type 建 name→{id,type} 映射，不做任何重活。
         const m = {};
-        try { (window.collectPoolCards() || []).forEach(function (p) { if (p && p._ds && p._ds.name) m[p._ds.name] = { id: p._ds.id, type: p._ds.type || 'gold' }; }); } catch (e) {}
+        try {
+            document.querySelectorAll('.collapsible-section .card-item, #favoriteCardsGrid .card-item').forEach(function (el) {
+                const name = el.dataset && el.dataset.name;
+                if (name && !m[name]) m[name] = { id: el.dataset.id, type: el.dataset.type || 'gold' };
+            });
+        } catch (e) {}
         return m;
     }
     function _lvBadge(el, hero, fus, poolMap) {
@@ -547,9 +555,10 @@
         const fus = _fusOf(L, hero, side);
         const cur = fus || hero;
         const skin = _skinOf(L, hero, side);
-        const pc = _poolTypeMap()[hero] || _poolTypeMap()[cur];
+        const pm = _poolTypeMap();               // 🔴 2026-10-14 只建一次映射，复用给下方与 _lvBadge，避免 2+1 次重复查询
+        const pc = pm[hero] || pm[cur];
         // 🔴 2026-10-07 角标（等级/融合）先同步刷新做到瞬时反馈，皮肤底图异步铺不阻塞
-        _fusBadge(el, fus); _lvBadge(el, hero, fus);
+        _fusBadge(el, fus); _lvBadge(el, hero, fus, pm);
         return Promise.resolve().then(function () { return window.applySkinBgToSlot(el, cur, pc ? pc.id : undefined, 'my', fus ? undefined : (skin || undefined)); })
             .catch(function () {});
     };
