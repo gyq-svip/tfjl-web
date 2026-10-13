@@ -317,7 +317,7 @@ window.EQUIP_IMG = {
         div.id = 'scriptSimRoot';
         div.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);z-index:99998;display:flex;align-items:center;justify-content:center;font-family:inherit;';
         div.innerHTML =
-            '<div id="scriptSimPanel" style="position:relative;width:min(97vw,1150px);height:94vh;background:linear-gradient(180deg,#1a1a2e,#16213e);border:1px solid rgba(78,205,196,0.4);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,0.6);display:flex;flex-direction:column;overflow:hidden;">'
+            '<div id="scriptSimPanel" style="position:relative;width:min(99vw,1340px);height:94vh;background:linear-gradient(180deg,#1a1a2e,#16213e);border:1px solid rgba(78,205,196,0.4);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,0.6);display:flex;flex-direction:column;overflow:hidden;">'
             // 标题栏
             + '<div style="flex:0 0 auto;padding:8px 16px;background:rgba(0,0,0,0.35);border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between;">'
             + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
@@ -333,7 +333,7 @@ window.EQUIP_IMG = {
             + '</div>'
             + '</div>'
             // 主体
-            + '<div style="flex:1 1 auto;display:flex;overflow:hidden;padding:10px;gap:14px;justify-content:center;">'
+            + '<div style="flex:1 1 auto;display:flex;overflow:auto;padding:10px;gap:14px;justify-content:center;">'
             // 左：脚本①歌词（只显示 上一条/当前/下一条，小框跟随波数）
             + '<div style="flex:0 0 175px;display:flex;flex-direction:column;gap:6px;align-self:flex-start;margin-top:30px;">'
             + '<div style="color:#4ecdc4;font-size:0.8rem;font-weight:700;">脚本① · 歌词</div>'
@@ -342,7 +342,7 @@ window.EQUIP_IMG = {
             // 中：双卡组
             + '<div style="flex:0 0 auto;display:flex;flex-direction:column;gap:8px;align-items:center;overflow:auto;">'
             + '<div id="simWaveBanner" style="color:#ffd700;font-size:1.4rem;font-weight:700;text-shadow:0 0 8px rgba(255,215,0,0.4);">第 1 波</div>'
-            + '<div style="display:flex;gap:20px;align-items:flex-start;justify-content:center;flex-wrap:wrap;">'
+            + '<div style="display:flex;gap:20px;align-items:flex-start;justify-content:center;flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;">'
             + renderDeckColumn(SIDE_MY, '📋 脚本①（我的卡组）', 'simMyDr', 'simMyBattleSlots', 'sim-hand-my')
             + renderDeckColumn(SIDE_TEAMMATE, '📋 脚本②（队友卡组）', 'simTeammateDr', 'simTeammateBattleSlots', 'sim-hand-teammate')
             + '</div>'
@@ -378,7 +378,7 @@ window.EQUIP_IMG = {
             heroSlots += '<div class="battle-slot empty" data-slot="sim-' + side + '-' + n + '">空</div>';
         });
         // 布局照主页：卡槽在上，手牌 5列×2行 网格紧贴卡槽正下方
-        return '<div class="battle-column" style="display:flex;flex-direction:column;align-items:center;gap:4px;width:345px;">'
+        return '<div class="battle-column" style="display:flex;flex-direction:column;align-items:center;gap:4px;width:452px;">'
             + '<h4 style="margin:0;color:#fff;font-size:0.85rem;">' + title + ' <span id="' + drId + '" style="color:#4ecdc4;font-size:0.78rem;margin-left:6px;">减伤:0</span></h4>'
             + '<div class="battle-slots-container" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px;border-radius:10px;background:rgba(0,0,0,0.22);border:1px solid rgba(255,255,255,0.08);">'
             + '<div class="battle-slot engineering-slot empty" data-slot="sim-' + side + '-0" data-type="engineering" style="margin:0;"><span class="slot-label">🔧</span><span class="slot-empty">空</span></div>'
@@ -386,7 +386,7 @@ window.EQUIP_IMG = {
             + '</div>'
             + '<div class="chariot-box" id="simChariot-' + side + '" title="点击设置战车" style="margin-top:4px;font-size:0.7rem;color:#ffd700;cursor:pointer;padding:2px 8px;border-radius:6px;border:1px dashed rgba(255,215,0,0.35);">🚗 战车：未设置</div>'
             + '<div style="width:100%;color:rgba(255,255,255,0.6);font-size:0.68rem;text-align:center;margin-top:2px;">上阵手牌（灰=已上场）</div>'
-            + '<div class="sim-hand-container" id="' + handId + '" style="display:grid;grid-template-columns:repeat(5,62px);grid-auto-rows:46px;gap:3px;justify-content:center;min-height:46px;"></div>'
+            + '<div class="sim-hand-container" id="' + handId + '" style="display:grid;grid-template-columns:repeat(5,84px);grid-auto-rows:52px;gap:4px;justify-content:center;min-height:52px;"></div>'
             + '</div>';
     }
 
@@ -751,7 +751,7 @@ window.EQUIP_IMG = {
             div.className = 'selected-card card-item' + (isPlaced ? ' placed' : '');
             div.dataset.id = card.id; div.dataset.name = heroName; div.dataset.ovKey = name; div.dataset.type = card.type; div.dataset.profession = card.profession; div.dataset.handType = side;
             if (card.isFusion) div.dataset.fusion = 'true'; else div.removeAttribute('data-fusion');
-            div.style.cssText = 'width:100%;height:100%;min-width:0;max-width:100%;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;background-color:rgba(28,28,48,0.92);background-size:cover;background-position:center;overflow:hidden;font-size:0.62rem;padding:2px 1px;border-radius:8px;'
+            div.style.cssText = 'width:100%;height:100%;min-width:0;max-width:100%;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;background-color:rgba(28,28,48,0.92);background-size:cover;background-position:center;overflow:hidden;font-size:0.72rem;padding:4px 2px;border-radius:8px;'
                 + (isPlaced ? 'border:1px dashed rgba(78,205,196,0.6);opacity:0.42;filter:grayscale(1);' : 'border:1px solid rgba(255,255,255,0.15);');
             if (isPlaced) div.title = '已上场';
             div.innerHTML = simBadgeHTML(card, side) + '<span class="card-name" data-full-name="' + esc(heroName) + '" style="text-align:center;text-shadow:0 1px 3px rgba(0,0,0,0.9);">' + esc(display) + '</span>';
