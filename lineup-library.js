@@ -308,8 +308,23 @@
     // ---------- 主页同款卡槽 ----------
     // battle-slot 结构 + 主页渲染管线 applySkinBgToSlot(slot, hero, hero, 'my', forceSkin)
     // forceSkin = 本阵容个人皮肤；徽标（Lv/魔/减伤）在渲染后叠加
+    // 🔴 2026-10-13 工程卡识别：活动阵容里有「侏儒射线 / 地精宝库 / 邪能火炮」这类变体名，
+    //    它们的主卡名（侏儒/地精/邪能）是战士等普通职业，但本质是工程卡（游戏里只能上工程位）。
+    //    只按 profession 判会漏 → 再按工程卡名（火炮/宝库/射线/咬人娃娃/潜艇）做子串匹配。
+    const _ENG_HEROES = ['火炮', '宝库', '射线', '咬人娃娃', '潜艇'];
+    function _isEngHero(name) {
+        const n = String(name || '').trim();
+        if (!n) return false;
+        let parts = null;
+        try { parts = (typeof window.getFusionParts === 'function') ? window.getFusionParts(n) : null; } catch (e) {}
+        const list = (parts && parts.length ? parts : [n]);
+        return list.some(function (p) {
+            return _ENG_HEROES.some(function (e) { return String(p).indexOf(e) >= 0; });
+        });
+    }
     function _slotHtml(which, idx, hero, tab, id, sz) {
         const s = sz || 50;
+        const engOrig = _isEngHero(hero);   // 用原始名判（后面可能被归一化成主卡名）
         // 🔴 2026-09-29 备份/项目导入的卡可能已是「融合名」（A·B 形态）：图库此前把它当普通单卡渲染，
         //    getFusionVariantsForBase(融合名) 查不到变体 → 融合选项"消失"、看起来像写死。
         //    这里统一拆回主卡 + 初始化本阵容融合状态（保留导入时的融合形态），之后切融合/设置弹窗全部正常。
@@ -327,10 +342,14 @@
         // 🔴 2026-09-22 全局 .battle-slot 写死 min/max-width:72px、min-height:72px（styles.css:545），
         //    min-width 会压过内联 width → 图库小格子里实际渲染 72px → 相邻卡槽互相重叠（用户实测）。
         //    内联把 min/max 全部钉死 + overflow:hidden，保证槽位永远等于格子尺寸。
-        const box = 'width:' + s + 'px;height:' + s + 'px;min-width:' + s + 'px;max-width:' + s + 'px;min-height:' + s + 'px;max-height:' + s + 'px;padding:0;border-radius:6px;cursor:pointer;position:relative;overflow:hidden;';
+        // 🔴 2026-10-13 工程卡：橙色描边 + 右上角 🔧 角标（一眼看出这张要上工程位，不能当普通卡站位）
+        const eng = engOrig || _isEngHero(hero);
+        const box = 'width:' + s + 'px;height:' + s + 'px;min-width:' + s + 'px;max-width:' + s + 'px;min-height:' + s + 'px;max-height:' + s + 'px;padding:0;border-radius:6px;cursor:pointer;position:relative;overflow:hidden;'
+            + (eng ? 'border:1.5px solid rgba(240,147,43,0.95);box-shadow:0 0 6px rgba(240,147,43,0.35);' : '');
         // 🔴 2026-09-22 卡下方名字标签移除（皮肤图上已有名字）；卡放大 44→54px（用户反馈太小、融合卡看不清）
-        return '<div class="battle-slot filled ll-slot" data-slot="ll-' + tab + '-' + id + '-' + which + idx + '" data-hero="' + _esc(hero) + '" data-tab="' + tab + '" data-lid="' + _esc(id) + '" data-w="' + which + '" title="' + _esc(hero) + '（点击：设置皮肤/等级/魔化/融合副卡）" style="' + box + '">'
+        return '<div class="battle-slot filled ll-slot" data-slot="ll-' + tab + '-' + id + '-' + which + idx + '" data-hero="' + _esc(hero) + '" data-tab="' + tab + '" data-lid="' + _esc(id) + '" data-w="' + which + '" data-eng="' + (eng ? '1' : '0') + '" title="' + _esc(hero) + (eng ? '（🔧 工程卡：只能上工程位）' : '') + '（点击：设置皮肤/等级/魔化/融合副卡）" style="' + box + '">'
             + '<span class="card-item"><span class="card-name">' + _esc(hero) + '</span></span>'
+            + (eng ? '<span style="position:absolute;top:0;right:2px;font-size:0.6rem;line-height:1;text-shadow:0 1px 2px #000;pointer-events:none;">🔧</span>' : '')
             + '</div>';
     }
     // 🔴 2026-09-22 减伤计算全部改用主页现成的 getDamageReductionBreakdown（洗炼+小野/酋长/宝库特殊技能+战车，

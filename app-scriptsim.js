@@ -114,9 +114,18 @@ window.EQUIP_IMG = {
         return { id: name, name: name, type: 'gold', profession: '', engineering: 'false' };
     }
 
+    // 🔴 2026-10-13 工程卡识别：「侏儒射线 / 地精宝库 / 邪能火炮」这类变体名的主卡名是战士等普通职业，
+    //    但本质是工程卡 → 只按 profession 判会漏，导致被塞进普通卡位。这里再按工程卡名做子串匹配。
+    const ENG_HEROES = ['火炮', '宝库', '射线', '咬人娃娃', '潜艇'];
     function isEngineering(name) {
         const info = getCardInfo(name);
-        return info.profession === 'engineering' || info.engineering === 'true';
+        if (info.profession === 'engineering' || info.engineering === 'true') return true;
+        let parts = null;
+        try { parts = (typeof window.getFusionParts === 'function') ? window.getFusionParts(name) : null; } catch (e) {}
+        const list = (parts && parts.length ? parts : [name]);
+        return list.some(function (p) {
+            return ENG_HEROES.some(function (e) { return String(p).indexOf(e) >= 0; });
+        });
     }
 
     function getMaxLevel(cardType) {
@@ -213,14 +222,21 @@ window.EQUIP_IMG = {
 
     function createSideState() { return { slots: {}, equipment: null, sameRowPairs: [], vehicle: { main: '', sub: '' }, hand: [], placedBases: null }; }
 
+    // 工程变体卡（地精宝库/侏儒射线/邪能火炮）用完整名当键，避免和主卡（地精/侏儒/邪能）互相顶掉
+    function cardBase(name) {
+        const b = getMainCardName(name);
+        if (isEngineering(name) && !ENG_HEROES.some(function (e) { return String(b).indexOf(e) >= 0; })) return name;
+        return b;
+    }
+
     function removeCard(s, hero) {
-        const base = getMainCardName(hero);
+        const base = cardBase(hero);
         for (let i = 0; i <= 6; i++) if (s.slots[i] && s.slots[i].base === base) { s.slots[i] = null; return; }
     }
 
     function placeCard(s, action, script, side) {
         const scriptHero = action.hero;
-        const base = getMainCardName(scriptHero);
+        const base = cardBase(scriptHero);
         const ov = (state.overrides[side] && state.overrides[side][scriptHero]) || null;
         const hero = (ov && ov.fusion) ? ov.fusion : scriptHero; // 融合覆盖：显示为融合卡，仍按本体占位/下卡
         const info = getCardInfo(hero);
