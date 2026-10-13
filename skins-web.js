@@ -151,7 +151,7 @@
     var p = (async function () {
       var url = SKIN_BASE + '/' + encodeURIComponent(hero) + '/' + encodeURIComponent(file);
       try {
-        var resp = await _fetchWithRetry(url, 10000, 2, function () { _skin404Mark(key); }); // 404 → 记入负缓存
+        var resp = await _fetchWithRetry(url, 10000, 2, function () { _skin404Mark(key); }, 'force-cache'); // 404 → 记入负缓存；force-cache 命中 HTTP 缓存零往返
         if (resp && resp.ok) {
           var blob = await resp.blob();
           _idbPut(key, blob); // 回写缓存，下次刷新即稳定
@@ -170,7 +170,7 @@
   function _sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   // fetch + 超时 + 重试（指数退避），单一同源即可（GitHub Pages 已相当稳定）
   // on404：可选回调——命中的是"资源确实不存在"（非网络故障），调用方（404 负缓存）据此记录
-  async function _fetchWithRetry(url, ms, retries, on404) {
+  async function _fetchWithRetry(url, ms, retries, on404, cacheMode) {
     retries = retries || 2;
     var lastErr;
     for (var i = 0; i <= retries; i++) {
@@ -178,7 +178,9 @@
       try {
         ctrl = new AbortController();
         timer = setTimeout(function () { ctrl.abort(); }, ms || 8000);
-        var resp = await fetch(url, { cache: 'no-cache', signal: ctrl.signal });
+        // 🔴 2026-10-13 支持 cacheMode：皮肤图（内容不变、文件名即版本）用 'force-cache'，
+        //    命中浏览器 HTTP 缓存零网络往返；registry 等索引仍默认 'no-cache' 保证更新及时。
+        var resp = await fetch(url, { cache: cacheMode || 'no-cache', signal: ctrl.signal });
         clearTimeout(timer);
         if (resp.ok) return resp;
         // 铁律：404 = 资源不存在（如用户自定义融合皮肤 .skin 文件缺失），重试无意义，直接放弃避免刷屏
@@ -441,16 +443,29 @@
   // 缓存 sync 的 promise，让 resolve* 调用可 await 注册表就绪（解决首屏皮肤不显示的时序问题）
   var _syncInFlight = false;
   var _syncPromise = null;
+  // 🔴 2026-10-13 性能修复（图库设置弹窗卡 5 秒根因）：
+  //   旧逻辑 sync 失败即复位锁 → 之后每次点皮肤/换融合（applySkinBgToSlot → resolveHeroSkinInfo → _ensureSynced）
+  //   都重新发起完整 sync（registry+fusions+attributes 三连，每个 8s 超时×4 次尝试）→ 弱网下每次点击都白等数秒。
+  //   现改为：成功后 TTL 内不再拉；失败后退避期内不重试（后台兜底照旧，绝不永久阻塞）。
+  var _lastSyncOkTs = 0;
+  var _lastSyncFailTs = 0;
+  var _SYNC_TTL_OK = 60000;      // 成功后 60s 内不重复补拉
+  var _SYNC_BACKOFF_FAIL = 30000; // 失败后 30s 内不重试（弱网防 8s×4 失败循环）
   function _ensureSynced() {
+    var _now = Date.now();
     // 已有 registry（含 IndexedDB 恢复来的）→ 立即就绪，绝不阻塞首屏
     if (window.skinRegistry && Object.keys(window.skinRegistry).length) {
-      // 即使命中本地缓存，也异步补拉一次远端注册表：
+      // 即使命中本地缓存，也按 TTL 异步补拉远端注册表（原为每次调用都拉 → 每次点皮肤都三连请求）：
       // ① 修复「IndexedDB 缓存的 registry 是旧版（如不含新英雄水人）→ 首屏解析新英雄为 null → 显示诡异/刷新出问题」；
       // ② 远端 sync 成功会把新英雄补进 registry 并触发 reapplyAllSkins 重绘，无需手动设置。
-      if (!_syncInFlight) { _startSync().catch(function () {}); }
+      if (!_syncInFlight && (_now - _lastSyncOkTs > _SYNC_TTL_OK) && (_now - _lastSyncFailTs > _SYNC_BACKOFF_FAIL)) {
+        _startSync().catch(function () {});
+      }
       return Promise.resolve();
     }
     if (_syncInFlight) return _syncPromise;
+    // 🔴 无 registry 且处于失败退避期：立即放行（用 IndexedDB/兜底渲染），不再走 8s×4 的失败循环
+    if (_now - _lastSyncFailTs <= _SYNC_BACKOFF_FAIL) return Promise.resolve();
     return _startSync();
   }
   async function _startSync() {
@@ -459,13 +474,18 @@
     _syncPromise = (async function () {
       try {
         var ok = await _syncRemoteRegistry();
-        if (!ok) {
-          // 🔴 失败不永久锁定：清空 promise，下次调用（或用户刷新）可重试 —— 修复「一次失败整轮刷新全不显示」
+        if (ok) {
+          _lastSyncOkTs = Date.now();
+        } else {
+          // 🔴 失败不永久锁定：清空 promise 可重试 —— 修复「一次失败整轮刷新全不显示」；
+          //    但记录失败时间进 30s 退避（原实现无退避 → 每次点皮肤都重新拉完整注册表 = 卡 5 秒根因）
+          _lastSyncFailTs = Date.now();
           _syncInFlight = false;
           _syncPromise = null;
         }
       } catch (e) {
         console.warn('[SKIN-WEB] syncRemoteRegistry() failed:', String(e).slice(0, 200));
+        _lastSyncFailTs = Date.now();
         _syncInFlight = false;
         _syncPromise = null;
       } finally {
@@ -477,7 +497,7 @@
   }
   // 兼容旧接口（app-core.js 可能直接调 window.syncRemoteSkins）
   async function syncRemoteSkins(force) {
-    if (force) { _syncInFlight = false; _syncPromise = null; }
+    if (force) { _syncInFlight = false; _syncPromise = null; _lastSyncOkTs = 0; _lastSyncFailTs = 0; }  // force = 管理员显式修复，同时清 TTL/退避
     return _ensureSynced();
   }
 
