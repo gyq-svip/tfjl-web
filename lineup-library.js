@@ -500,7 +500,7 @@
             const pc = poolMap[cur];
             // 角标（融合/等级）同步先渲染，避免被皮肤异步加载阻塞；皮肤底图异步铺（失败不影响角标）
             _fusBadge(el, fus); _lvBadge(el, hero, fus, poolMap);
-            if (window.applySkinBgToSlot) { try { window.applySkinBgToSlot(el, cur, pc ? pc.id : undefined, 'my', fus ? undefined : (skin || undefined)).catch(function () {}); } catch (e) {} }
+            if (window.applySkinBgToSlot) { try { window.applySkinBgToSlot(el, cur, pc ? pc.id : undefined, 'my', fus ? undefined : (skin || undefined), fus ? (skin || undefined) : undefined).catch(function () {}); } catch (e) {} }
             step();
         })();
     }
@@ -559,7 +559,7 @@
         const pc = pm[hero] || pm[cur];
         // 🔴 2026-10-07 角标（等级/融合）先同步刷新做到瞬时反馈，皮肤底图异步铺不阻塞
         _fusBadge(el, fus); _lvBadge(el, hero, fus, pm);
-        return Promise.resolve().then(function () { return window.applySkinBgToSlot(el, cur, pc ? pc.id : undefined, 'my', fus ? undefined : (skin || undefined)); })
+        return Promise.resolve().then(function () { return window.applySkinBgToSlot(el, cur, pc ? pc.id : undefined, 'my', fus ? undefined : (skin || undefined), fus ? (skin || undefined) : undefined); })
             .catch(function () {});
     };
     // 🔴 2026-10-07 图库融合变体发现（修复「第1天有融合、第4天同主卡却无融合选项」）：
@@ -692,7 +692,7 @@
                             const pc2 = pm[shown];
                             // 🔴 2026-10-14 不重开整个弹窗：避免重复创建所有缩略图/DOM 导致选副卡卡顿；改为只更新必要部分
                             Promise.resolve()
-                                .then(function () { return window.applySkinBgToSlot(sl, shown, pc2 ? pc2.id : undefined, 'my'); })
+                                .then(function () { var _sk = _skinOf(_slot(tab, lid), hero, side); return window.applySkinBgToSlot(sl, shown, pc2 ? pc2.id : undefined, 'my', newFus ? undefined : (_sk || undefined), newFus ? (_sk || undefined) : undefined); })
                                 .catch(function () {})
                                 .then(function () {
                                     _fusBadge(sl, newFus); _lvBadge(sl, hero, newFus, pm);
@@ -765,7 +765,7 @@
         const shown = next.v || hero;
         const pm = _poolTypeMap();
         const pc2 = pm[shown];
-        return Promise.resolve().then(function () { return window.applySkinBgToSlot(el, shown, pc2 ? pc2.id : undefined, 'my'); }).catch(function () {}).then(function () { _fusBadge(el, next.v); _lvBadge(el, hero, next.v, pm); _refreshDrSums(document.getElementById('llList')); });
+        return Promise.resolve().then(function () { var _sk = _skinOf(L, hero, side); return window.applySkinBgToSlot(el, shown, pc2 ? pc2.id : undefined, 'my', next.v ? undefined : (_sk || undefined), next.v ? (_sk || undefined) : undefined); }).catch(function () {}).then(function () { _fusBadge(el, next.v); _lvBadge(el, hero, next.v, pm); _refreshDrSums(document.getElementById('llList')); });
         try { if (typeof showToast === 'function') showToast(next.v ? (next.v + (next.skin ? ' · 副卡皮:' + next.skin : ' · 副卡默认皮')) : '已关闭融合（' + hero + '）', 'info'); } catch (e2) {}
     };
     //   右键 = 循环【主卡】皮肤（🔴 2026-09-22 修复：融合后也一直可切，与左键融合循环互不影响；列表=主页卡池 getHeroSkins）
