@@ -502,9 +502,11 @@
         if (!window.createLevelBadgeHTML) return;
         el.querySelectorAll('.card-level-badge').forEach(function (b) { b.remove(); });   // 只清主卡角标（等级+魔化图标）；副卡角标归主页融合管线管
         try {
+            // 🔴 2026-10-13 已融合的卡：等级按基础英雄(hero)取池与等级存储，不能用融合名(cur)查（融合名不在卡池），否则角标消失
             const cur = fus || hero;
-            const pc = (poolMap || _poolTypeMap())[cur];
-            if (pc) el.insertAdjacentHTML('afterbegin', window.createLevelBadgeHTML(pc.id, pc.type, 'my', cur));
+            const pm = poolMap || _poolTypeMap();
+            const pc = pm[hero] || pm[cur];
+            if (pc) el.insertAdjacentHTML('afterbegin', window.createLevelBadgeHTML(pc.id, pc.type, 'my', hero));
         } catch (e) {}
     }
     // 🔴 2026-09-29 供主页设置弹窗（点图库角标弹出）回调：图库槽位按「阵容个人覆盖 + 卡池等级/魔化」整体重铺
@@ -516,7 +518,7 @@
         const L = _slot(tab, lid);
         const fus = (L.fus && L.fus[hero]) || '';
         const cur = fus || hero;
-        const pc = _poolTypeMap()[cur];
+        const pc = _poolTypeMap()[hero] || _poolTypeMap()[cur];
         // 🔴 2026-10-07 角标（等级/融合）先同步刷新做到瞬时反馈，皮肤底图异步铺不阻塞
         _fusBadge(el, fus); _lvBadge(el, hero, fus);
         return Promise.resolve().then(function () { return window.applySkinBgToSlot(el, cur, pc ? pc.id : undefined, 'my'); })
@@ -602,7 +604,9 @@
         const L = _slot(tab, lid);
         const fus = (L.fus && L.fus[hero]) || '';
         const cur = fus || hero;
-        const pc = _poolTypeMap()[cur];
+        // 🔴 2026-10-13 修复：已融合的卡 cur 是融合名（如 小野酋长），而 _poolTypeMap 只认基础英雄名 → 查不到 → 弹窗打不开，
+        //    导致融合一次后无法再打开设置来切换/取消融合（"只能选一个、不能切换"）。改用基础英雄 hero 查池（兜底 cur）。
+        const pc = _poolTypeMap()[hero] || _poolTypeMap()[cur];
         if (!pc) { try { if (typeof showToast === 'function') showToast(cur + ' 不在卡池，无法设置', 'info'); } catch (e2) {} return; }
         if (!window.showLevelDropdown) return;
         window.showLevelDropdown(e, pc.id, pc.type, 'my', cur);
