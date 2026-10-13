@@ -15998,11 +15998,19 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 if (badge) {
                     e.stopPropagation();
                     e.preventDefault();
-                    const cardId = badge.dataset.cardId;
-                    const cardType = badge.dataset.cardType;
-                    const handType = badge.dataset.handType || 'my';
-                    const cardName = badge.dataset.cardName || '';
-                    showLevelDropdown(e, cardId, cardType, handType, cardName);
+                    // 🔴 2026-10-13 图库槽位（.ll-slot）上的等级角标：改走阵容库的 _llOpenSettings，
+                    //    因为它会补加「🔗 融合变体」区（支持切换/取消融合）；直接调 showLevelDropdown 时
+                    //    图库 isProjectScope=false 不会渲染融合区，导致"点等级角标=设置"看不到融合选项。
+                    const slot = badge.closest('.ll-slot');
+                    if (slot && typeof window._llOpenSettings === 'function') {
+                        window._llOpenSettings(slot, e);
+                    } else {
+                        const cardId = badge.dataset.cardId;
+                        const cardType = badge.dataset.cardType;
+                        const handType = badge.dataset.handType || 'my';
+                        const cardName = badge.dataset.cardName || '';
+                        showLevelDropdown(e, cardId, cardType, handType, cardName);
+                    }
                     return;
                 }
                 
