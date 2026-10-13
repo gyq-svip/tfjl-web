@@ -306,7 +306,7 @@
         _refreshDrSums(p);
         // 每次重绘活动卡片后，异步合并云端共享脚本刷新（切 tab/搜索/分页后，上传的云端脚本不会从卡片消失）
         if (!isSail) setTimeout(function () { try { _llRefreshCloud(); } catch (e) {} }, 300);
-        if (state.tab === 'act') { _actPackRender(); _ensureAdmin().then(function () { try { _actPackRender(); } catch (e) {} }); }
+        if (state.tab === 'act') { _actPackRender('llPackArea', { upload: false, del: false }); _ensureAdmin().then(function () { try { _actPackRender('llPackArea', { upload: false, del: false }); } catch (e) {} }); }
     }
     // ---------- 主页同款卡槽 ----------
     // battle-slot 结构 + 主页渲染管线 applySkinBgToSlot(slot, hero, hero, 'my', forceSkin)
@@ -790,7 +790,7 @@
     function _llRefresh(id) {
         if (typeof _llRenderScripts === 'function') _llRenderScripts(id);
         if (document.getElementById('llScriptDlg') && typeof _llScriptDlg === 'function') _llScriptDlg(id);
-        if (state.tab === 'act') _actPackRender();
+        if (state.tab === 'act') _actPackRender('llPackArea', { upload: false, del: false });
     }
     // 一键导入到老马：复用项目现成的 importToLaoMaFromWall（桌面端 Tauri 写老马目录）
     window._llImportToLaoMa = async function (id, sid) {
@@ -1173,23 +1173,15 @@ let _adminVerified=false, _adminLastTok='', _featItems=[], _featData=null, _feat
         const btn = document.getElementById('llScriptBtn-' + id);
         if (btn) btn.innerHTML = btn.innerHTML.replace(/（\d+）/, '（' + arr.length + '）');
     };
-    // 🔴 2026-10-13（二次调整）活动脚本不再按天单独上传/展示：改成「一个压缩包（zip/rar）由管理员统一上传，所有人直接下载」
-    //    整包以 base64 存云端索引 lineup_scripts.json 的 pack 字段（并镜像本机），不解析、不按天拆；用户只下载，管理员可上传/删除。
+    // 🔴 2026-10-13（二次调整）活动脚本改为「一个压缩包（zip/rar）由管理员在「活动阵容维护」页统一上传/删除，主界面所有人只下载」
+    //    整包以 base64 存云端索引 lineup_scripts.json 的 pack 字段（并镜像本机），不解析、不按天拆。
     function _actPackHtml() {
-        let h = ''
+        return ''
             + '<div style="margin-top:14px;padding:12px 14px;border:1px solid rgba(78,205,196,0.4);border-radius:12px;background:rgba(78,205,196,0.06);">'
-            + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
             + '<b style="color:#4ecdc4;font-size:0.92rem;">📦 7 天阵容脚本包</b>'
-            + '<span style="flex:1;"></span>'
-            + '<span id="llPackAdmin" style="display:' + (_isAdmin() ? 'inline-flex' : 'none') + ';gap:8px;align-items:center;">'
-            + '<input type="file" id="llPackFile" accept=".zip,.rar,.txt,application/zip,application/x-rar-compressed" style="max-width:220px;padding:5px 8px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.76rem;">'
-            + '<button onclick="_actPackUpload()" title="上传一个压缩包（zip/rar/txt）作为 7 天脚本包，覆盖旧包" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(78,205,196,0.6);background:rgba(78,205,196,0.18);color:#4ecdc4;cursor:pointer;font-size:0.8rem;font-weight:700;">☁ 上传</button>'
-            + '</span>'
-            + '</div>'
-            + '<div style="color:rgba(255,255,255,0.5);font-size:0.68rem;margin:7px 0 2px;line-height:1.6;">管理员可上传一个 <b style="color:#4ecdc4;">.zip / .rar</b>（内含 7 天 .txt 脚本），会覆盖旧包；所有人可直接下载。</div>'
+            + '<div style="color:rgba(255,255,255,0.5);font-size:0.68rem;margin:7px 0 2px;line-height:1.6;">下载管理员上传的 7 天阵容脚本包（.zip / .rar），解压后按天使用。</div>'
             + '<div id="llPackArea" style="margin-top:8px;"></div>'
             + '</div>';
-        return h;
     }
     function _fmtSize(n) { n = n || 0; if (n < 1024) return n + ' B'; if (n < 1048576) return (n / 1024).toFixed(1) + ' KB'; return (n / 1048576).toFixed(2) + ' MB'; }
     function _b64ToBytes(b64) { const bin = atob(b64); const len = bin.length; const u = new Uint8Array(len); for (let i = 0; i < len; i++) u[i] = bin.charCodeAt(i); return u; }
@@ -1234,47 +1226,58 @@ let _adminVerified=false, _adminLastTok='', _featItems=[], _featData=null, _feat
             try { if (typeof showToast === 'function') showToast('已开始下载：' + (p.name || ''), 'success'); } catch (e) {}
         } catch (e) { try { if (typeof showToast === 'function') showToast('下载失败：' + (e && e.message || e), 'error'); } catch (e2) {} }
     };
-    // 管理员：从底部文件框读取并上传（带管理员校验）
-    window._actPackUpload = async function () {
+    // 渲染脚本包区块到指定容器。opts: { upload: 是否显示上传控件, del: 是否显示删除按钮 }
+    window._actPackRender = async function (areaId, opts) {
+        opts = opts || {};
+        const el = document.getElementById(areaId);
+        if (!el) return;
+        const p = await window.__actPackGet();
+        const upload = opts.upload !== false;
+        const del = !!opts.del;
+        let html = '';
+        if (!p) {
+            html += '<div style="color:rgba(255,255,255,0.4);font-size:0.72rem;">（' + (upload ? '尚未上传脚本包' : '管理员尚未上传脚本包') + '）</div>';
+        } else {
+            const when = p.ts ? new Date(p.ts).toLocaleString('zh-CN') : '';
+            html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 8px;background:rgba(0,0,0,0.25);border-radius:8px;border:1px solid rgba(78,205,196,0.3);">'
+                + '<span style="color:#4ecdc4;font-size:0.78rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + _esc(p.name || '') + '">📄 ' + _esc(p.name || '脚本包') + '（' + _fmtSize(p.size || 0) + '）' + (when ? ' · ' + when : '') + '</span>'
+                + '<button onclick="_actPackDownload()" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(78,205,196,0.5);background:rgba(78,205,196,0.12);color:#4ecdc4;cursor:pointer;font-size:0.74rem;">📥 下载</button>'
+                + (del ? '<button onclick="_actPackDelete(\'' + areaId + '\',{upload:true,del:true})" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(255,107,107,0.4);background:rgba(255,107,107,0.12);color:#ff6b6b;cursor:pointer;font-size:0.74rem;">🗑 删除</button>' : '')
+                + '</div>';
+        }
+        if (upload) {
+            html += '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;">'
+                + '<input type="file" id="actPackFile" accept=".zip,.rar,.txt,application/zip,application/x-rar-compressed" style="max-width:240px;padding:5px 8px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.76rem;">'
+                + '<button onclick="_actPackUploadFrom(\'actPackFile\',\'' + areaId + '\',{upload:true,del:true})" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(78,205,196,0.6);background:rgba(78,205,196,0.18);color:#4ecdc4;cursor:pointer;font-size:0.8rem;font-weight:700;">☁ ' + (p ? '重新上传' : '上传') + '</button>'
+                + '</div>';
+        }
+        el.innerHTML = html;
+    };
+    // 从指定文件框读取并上传（带管理员校验）
+    window._actPackUploadFrom = async function (inputId, areaId, opts) {
         if (!_isAdmin()) { try { if (typeof showToast === 'function') showToast('仅管理员可上传脚本包', 'error'); } catch (e) {} return; }
-        const inp = document.getElementById('llPackFile');
+        const inp = document.getElementById(inputId);
         const f = inp && inp.files && inp.files[0];
         if (!f) { try { if (typeof showToast === 'function') showToast('请先选择 .zip / .rar / .txt 文件', 'warn'); } catch (e) {} return; }
-        const area = document.getElementById('llPackArea');
-        if (area) area.innerHTML = '<div style="color:rgba(255,255,255,0.6);font-size:0.74rem;">⏳ 正在上传 ' + _esc(f.name) + ' …</div>';
+        const el = document.getElementById(areaId);
+        if (el) el.innerHTML = '<div style="color:rgba(255,255,255,0.6);font-size:0.74rem;">⏳ 正在上传 ' + _esc(f.name) + ' …</div>';
         try {
             const ok = await window.__actPackSet(f);
             if (!ok) throw new Error('写入云端失败');
             try { if (typeof showToast === 'function') showToast('✅ 已上传脚本包：' + f.name, 'success'); } catch (e) {}
-            await _actPackRender();
         } catch (e) {
-            if (area) area.innerHTML = '<div style="color:#ff6b6b;font-size:0.74rem;">❌ 上传失败：' + _esc(e && e.message || e) + '</div>';
             try { if (typeof showToast === 'function') showToast('上传失败：' + (e && e.message || e), 'error'); } catch (e2) {}
         }
+        await window._actPackRender(areaId, opts || { upload: true, del: true });
     };
-    // 渲染底部「当前脚本包」信息（下载按钮常驻；管理员额外显示删除，并同步上传区可见性）
-    async function _actPackRender() {
-        const el = document.getElementById('llPackArea');
-        if (!el) return;
-        const ad = document.getElementById('llPackAdmin');
-        if (ad) ad.style.display = _isAdmin() ? 'inline-flex' : 'none';
-        const p = await window.__actPackGet();
-        if (!p) { el.innerHTML = '<div style="color:rgba(255,255,255,0.4);font-size:0.72rem;">（' + (_isAdmin() ? '尚未上传脚本包' : '管理员尚未上传脚本包') + '）</div>'; return; }
-        const when = p.ts ? new Date(p.ts).toLocaleString('zh-CN') : '';
-        el.innerHTML = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 8px;background:rgba(0,0,0,0.25);border-radius:8px;border:1px solid rgba(78,205,196,0.3);">'
-            + '<span style="color:#4ecdc4;font-size:0.78rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + _esc(p.name || '') + '">📄 ' + _esc(p.name || '脚本包') + '（' + _fmtSize(p.size || 0) + '）' + (when ? ' · ' + when : '') + '</span>'
-            + '<button onclick="_actPackDownload()" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(78,205,196,0.5);background:rgba(78,205,196,0.12);color:#4ecdc4;cursor:pointer;font-size:0.74rem;">📥 下载</button>'
-            + (_isAdmin() ? '<button onclick="_actPackDelete()" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(255,107,107,0.4);background:rgba(255,107,107,0.12);color:#ff6b6b;cursor:pointer;font-size:0.74rem;">🗑 删除</button>' : '')
-            + '</div>';
-    }
     // 管理员删除（带确认 + 管理员校验）
-    window._actPackDelete = async function () {
+    window._actPackDelete = async function (areaId, opts) {
         if (!_isAdmin()) { try { if (typeof showToast === 'function') showToast('仅管理员可删除', 'error'); } catch (e) {} return; }
         if (typeof confirm === 'function' && !confirm('确定删除当前 7 天脚本包？所有人将不再能下载。')) return;
         try {
             const ok = await window.__actPackDel();
             try { if (typeof showToast === 'function') showToast(ok ? '已删除脚本包' : '删除失败', ok ? 'info' : 'error'); } catch (e) {}
-            await _actPackRender();
         } catch (e) {}
+        await window._actPackRender(areaId, opts || { upload: true, del: true });
     };
 })();
