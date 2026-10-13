@@ -659,6 +659,7 @@
                     t.style.cssText = 'color:#60a5fa;margin-bottom:6px;';
                     t.textContent = '🔗 融合变体（选副卡）';
                     const row = document.createElement('div');
+                    row.id = 'csFusionVariantRow';
                     row.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;';
                     const opts = [hero].concat(variants);
                     opts.forEach(function (opt) {
@@ -667,6 +668,7 @@
                         const selected = (opt === cur);
                         const b = document.createElement('button');
                         b.textContent = label;
+                        b.dataset.value = opt;
                         b.style.cssText = 'padding:4px 8px;border-radius:7px;border:1px solid ' + (selected ? '#60a5fa' : 'rgba(255,255,255,0.2)') + ';background:' + (selected ? '#60a5fa' : 'transparent') + ';color:' + (selected ? '#1a1a2e' : '#fff') + ';cursor:pointer;font-size:0.76rem;font-weight:' + (selected ? '600' : '400') + ';';
                         b.onclick = function () {
                             _llTrack('阵容图库选融合');
@@ -679,19 +681,40 @@
                             if (sub) { try { window.fusionSkins = window.fusionSkins || {}; window.fusionSkins[sub] = ''; } catch (e2) {} }
                             const pm = _poolTypeMap();
                             const pc2 = pm[shown];
-                            root.remove();
+                            // 🔴 2026-10-14 不重开整个弹窗：避免重复创建所有缩略图/DOM 导致选副卡卡顿；改为只更新必要部分
                             Promise.resolve()
                                 .then(function () { return window.applySkinBgToSlot(sl, shown, pc2 ? pc2.id : undefined, 'my'); })
                                 .catch(function () {})
-                                .then(function () { _fusBadge(sl, newFus); _lvBadge(sl, hero, newFus, pm); _refreshDrSums(document.getElementById('llList')); })
-                                .then(function () { _llOpenSettings(sl, e); })
+                                .then(function () {
+                                    _fusBadge(sl, newFus); _lvBadge(sl, hero, newFus, pm);
+                                    // 减伤重算放到空闲时执行，不阻塞即时反馈
+                                    (typeof requestIdleCallback === 'function' ? requestIdleCallback : function (fn) { setTimeout(fn, 150); })(function () {
+                                        try { _refreshDrSums(document.getElementById('llList')); } catch (e2) {}
+                                    });
+                                    try {
+                                        var rbox = document.querySelector('.card-settings-popup-root');
+                                        var vr = rbox && rbox.querySelector('#csFusionVariantRow');
+                                        if (vr) vr.querySelectorAll('button').forEach(function (x) {
+                                            var sel = (x.dataset.value === pick);
+                                            x.style.borderColor = sel ? '#60a5fa' : 'rgba(255,255,255,0.2)';
+                                            x.style.background = sel ? '#60a5fa' : 'transparent';
+                                            x.style.color = sel ? '#1a1a2e' : '#fff';
+                                            x.style.fontWeight = sel ? '600' : '400';
+                                        });
+                                        // 只重建副卡设置区（删旧建新），不重建整个弹窗
+                                        if (typeof window.__rerenderFusionSubSection === 'function') window.__rerenderFusionSubSection(shown);
+                                    } catch (e3) {}
+                                })
                                 .catch(function () {});
                         };
                         row.appendChild(b);
                     });
                     sec.appendChild(t);
                     sec.appendChild(row);
-                    box.appendChild(sec);
+                    // 🔴 2026-10-14 插入到「魔化（主卡）」之下（#csMhEnd 锚点，由 showLevelDropdown 提供），而非弹窗最底部
+                    var _anchor = box.querySelector('#csMhEnd');
+                    if (_anchor && _anchor.parentNode) _anchor.parentNode.insertBefore(sec, _anchor);
+                    else box.appendChild(sec);
                 }
             }
         } catch (e2) {}
