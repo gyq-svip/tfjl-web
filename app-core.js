@@ -11521,9 +11521,13 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
             const skin = getCardSkin(cardId, cardName, handType);
             const hasMoHua = getCardMoHua(cardId, handType);
-            // 🔴 2026-09-29 从等级角标上读取当前等级，传给动态属性生成器
-            const levelText = (event.target && event.target.textContent || '').trim();
-            const level = parseInt(levelText, 10) || 1;
+            // 🔴 2026-10-14 以当前卡等级为主：直接从等级存储 getCardLevel 读当前等级（不再从角标文本猜——
+            //    悬停魔化图标(.card-mohua-icon 是<img>无文本)或文本异常时会退成1级，导致显示的不是当前等级信息）；
+            //    读不到再回落角标文本；最终兜底1（getHeroAttrText 对无 talents 数据的卡会显示 base 原始信息=兜底）。
+            let level = 0;
+            try { if (typeof getCardLevel === 'function') level = getCardLevel(cardId, undefined, handType) || 0; } catch (e) {}
+            if (!level) { try { level = parseInt((event.target && event.target.textContent || '').trim(), 10) || 0; } catch (e2) {} }
+            if (!level) level = 1;
             const skinAttr = getSkinAttribute(cardName, skin, hasMoHua, level);
             const mainCardName = getMainCardName(cardName);
             const displayCardName = mainCardName !== cardName ? `${cardName} (${mainCardName})` : cardName;
