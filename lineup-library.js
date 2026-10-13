@@ -1214,16 +1214,30 @@ let _adminVerified=false, _adminLastTok='', _featItems=[], _featData=null, _feat
         const ok = await _llIdxMutate(function (d) { delete d.pack; });
         return ok;
     };
-    // 所有人下载当前脚本包（base64 → blob → 触发下载）
+    // 所有人下载当前脚本包：直接走 APP/网页「通用下载框」（不再裸用 blob）
+    //   · APP（Tauri）：复用原生保存弹窗（老马目录 / 浏览文件夹），二进制安全写入 zip/rar
+    //   · 网页：浏览器原生下载框（blob）
     window._actPackDownload = async function () {
         try {
             const p = await window.__actPackGet();
             if (!p || !p.b64) { try { if (typeof showToast === 'function') showToast('暂无脚本包，请联系管理员上传', 'warn'); } catch (e) {} return; }
-            const blob = new Blob([_b64ToBytes(p.b64)], { type: p.mime || 'application/octet-stream' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = p.name || '活动脚本包.zip'; document.body.appendChild(a); a.click();
-            setTimeout(function () { try { URL.revokeObjectURL(url); a.remove(); } catch (e) {} }, 2000);
-            try { if (typeof showToast === 'function') showToast('已开始下载：' + (p.name || ''), 'success'); } catch (e) {}
+            const fname = p.name || '活动脚本包.zip';
+            const sizeKB = p.size != null ? (p.size / 1024) : null;
+            const isTauri = !!(window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke || window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke);
+            if (isTauri && typeof window._downloadScriptTauri === 'function') {
+                await window._downloadScriptTauri(fname, p.b64, { binary: true, sizeKB: sizeKB, title: '📥 下载活动阵容脚本包' });
+                return;
+            }
+            // 网页：二进制 blob 下载（弹浏览器下载框）
+            const bytes = typeof window._b64ToBytes === 'function' ? window._b64ToBytes(p.b64) : _b64ToBytes(p.b64);
+            if (typeof window._downloadBlobBytes === 'function') window._downloadBlobBytes(fname, bytes, p.mime);
+            else {
+                const blob = new Blob([bytes], { type: p.mime || 'application/octet-stream' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = fname; document.body.appendChild(a); a.click();
+                setTimeout(function () { try { URL.revokeObjectURL(url); a.remove(); } catch (e) {} }, 4000);
+                try { if (typeof showToast === 'function') showToast('已开始下载：' + fname, 'success'); } catch (e) {}
+            }
         } catch (e) { try { if (typeof showToast === 'function') showToast('下载失败：' + (e && e.message || e), 'error'); } catch (e2) {} }
     };
     // 渲染脚本包区块到指定容器。opts: { upload: 是否显示上传控件, del: 是否显示删除按钮 }

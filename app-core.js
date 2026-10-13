@@ -24727,7 +24727,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
             if (!invokeFn) { _downloadScriptBlob(fileName, content); return; }
 
-            const fileSizeKB = (content.length / 1024).toFixed(1);
+            const fileSizeKB = (opts.sizeKB != null ? Number(opts.sizeKB) : (content.length / 1024)).toFixed(1);
             const dirLabels = (opts.dirs === null) ? null : (opts.dirs || {
                 coop:       { label: '合作脚本', icon: '🤝' },
                 activity:   { label: '活动',     icon: '🎉' },
@@ -24816,13 +24816,22 @@ ${maSection}
                 async function doSave(savePath) {
                     modal.remove();
                     try {
-                        await invokeFn('write_text_file', { filePath: savePath, content: content });
+                        if (opts.binary) {
+                            await invokeFn('write_binary_file', { filePath: savePath, content_base64: content });
+                        } else {
+                            await invokeFn('write_text_file', { filePath: savePath, content: content });
+                        }
                         if (typeof opts.onSaved === 'function') opts.onSaved(savePath);
                         else showToast('✅ 已保存: ' + fileName);
                         resolve(true);
                     } catch (e) {
                         console.warn('Tauri保存失败，降级到浏览器下载:', e);
-                        if (typeof opts.fallback === 'function') opts.fallback(fileName, content);
+                        if (opts.binary) {
+                            try {
+                                const bytes = _b64ToBytes(content);
+                                _downloadBlobBytes(fileName, bytes);
+                            } catch (e2) { showToast('保存失败：' + (e && e.message || e), 'error'); }
+                        } else if (typeof opts.fallback === 'function') opts.fallback(fileName, content);
                         else _downloadScriptBlob(fileName, content);
                         resolve(true);
                     }
@@ -24875,6 +24884,34 @@ ${maSection}
             URL.revokeObjectURL(blobUrl);
             showToast('✅ 已下载: ' + fileName);
         }
+
+        // base64 → Uint8Array（供二进制文件下载/写入使用）
+        function _b64ToBytes(b64) {
+            const bin = atob(String(b64 || '').replace(/\s/g, ''));
+            const len = bin.length;
+            const u = new Uint8Array(len);
+            for (let i = 0; i < len; i++) u[i] = bin.charCodeAt(i);
+            return u;
+        }
+
+        // 浏览器二进制 Blob 下载（弹浏览器下载框；用于 APP 保存失败降级 / 网页版二进制）
+        function _downloadBlobBytes(fileName, bytes, mime) {
+            const blob = new Blob([bytes], { type: mime || 'application/octet-stream' });
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(function () { try { URL.revokeObjectURL(blobUrl); } catch (e) {} }, 4000);
+            showToast('✅ 已下载: ' + fileName);
+        }
+
+        // 暴露给 lineup-library 等模块复用（统一下载入口，含 APP 原生保存弹窗 / 网页 blob）
+        window._downloadScriptTauri = _downloadScriptTauri;
+        window._downloadBlobBytes = _downloadBlobBytes;
+        window._b64ToBytes = _b64ToBytes;
 
         // 显示TXT导入选项对话框
         function showTxtImportDialog(fileName, content) {
