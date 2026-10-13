@@ -533,15 +533,25 @@
         } catch (e) {}
         return m;
     }
+    var _llIdMemo = {};
+    // 🔴 2026-10-14 统一图库 cardId 解析：开魔化(setCardMoHua)与画卡面角标(createLevelBadgeHTML→getCardMoHua)必须用同一个 key，
+    //    否则出现「设置弹窗显示魔化已开启、卡面无图标」。带记忆防「云卡/融合卡异步灌入卡池导致 base id↔fusion id 时序翻转」，
+    //    卡池暂时查不到时用确定性兜底 hero_<名>，保证存/读 key 永远一致（等级+魔化角标至少能画出、不再时好时坏）。
+    function _llCardInfo(hero, cur, poolMap) {
+        const pm = poolMap || _poolTypeMap();
+        const pc = pm[hero] || pm[cur];
+        if (pc) { _llIdMemo[hero] = pc; return pc; }
+        if (_llIdMemo[hero]) return _llIdMemo[hero];
+        return { id: 'hero_' + hero, type: 'gold' };
+    }
     function _lvBadge(el, hero, fus, poolMap) {
         if (!window.createLevelBadgeHTML) return;
         el.querySelectorAll('.card-level-badge').forEach(function (b) { b.remove(); });   // 只清主卡角标（等级+魔化图标）；副卡角标归主页融合管线管
         try {
-            // 🔴 2026-10-13 已融合的卡：等级按基础英雄(hero)取池与等级存储，不能用融合名(cur)查（融合名不在卡池），否则角标消失
+            // 🔴 2026-10-13 已融合的卡：等级/魔化按基础英雄(hero)取 id（融合名不在卡池）；_llCardInfo 统一 id + 兜底，保证与设置弹窗存 key 一致
             const cur = fus || hero;
-            const pm = poolMap || _poolTypeMap();
-            const pc = pm[hero] || pm[cur];
-            if (pc) el.insertAdjacentHTML('afterbegin', window.createLevelBadgeHTML(pc.id, pc.type, 'my', hero));
+            const pc = _llCardInfo(hero, cur, poolMap);
+            el.insertAdjacentHTML('afterbegin', window.createLevelBadgeHTML(pc.id, pc.type, 'my', hero));
         } catch (e) {}
     }
     // 🔴 2026-09-29 供主页设置弹窗（点图库角标弹出）回调：图库槽位按「阵容个人覆盖 + 卡池等级/魔化」整体重铺
@@ -647,9 +657,11 @@
         //    导致融合一次后无法再打开设置来切换/取消融合（"只能选一个、不能切换"）。改用基础英雄 hero 查池（兜底 cur）。
         //    同时：融合只取决于 cloudFusions（按英雄名），不强依赖卡在已渲染卡池里；若 _poolTypeMap 没有该卡（如小野未纳入主页面卡池渲染），
         //    用兜底 id=hero / type='gold' 让设置弹窗照常打开，否则单卡右键会直接打不开、看不到任何融合选项。
-        const pc = _poolTypeMap()[hero] || _poolTypeMap()[cur];
-        const pcId = pc ? pc.id : hero;
-        const pcType = pc ? pc.type : 'gold';
+        // 🔴 2026-10-14 用 _llCardInfo 统一 cardId（与 _lvBadge 画卡面角标同一解析 + 记忆 + 兜底），
+        //    保证「设置里开魔化存的 key」与「卡面 getCardMoHua 读的 key」永远一致，杜绝"设置已开启、卡面无图标/时好时坏"。
+        const _ci = _llCardInfo(hero, cur);
+        const pcId = _ci.id;
+        const pcType = _ci.type;
         if (!window.showLevelDropdown) return;
         window.showLevelDropdown(e, pcId, pcType, 'my', cur);
         try {
