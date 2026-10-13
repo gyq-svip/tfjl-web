@@ -298,15 +298,15 @@
             }
             pageList.forEach(function (a) { h += _actCard(a); });
             if (!pageList.length) h += '<div style="color:rgba(255,255,255,0.4);padding:20px;text-align:center;">没有匹配的阵容</div>';
-            // 🔴 2026-10-13 批量导入 7 天脚本包（替代原来每天单独的「📜 阵容脚本」弹窗：一次上传一个 zip 搞定）
-            h += _bulkImportHtml();
+            // 🔴 2026-10-13 底部「7 天阵容脚本包」：管理员上传压缩包 / 所有人下载
+            h += _actPackHtml();
         }
         p.innerHTML = h;
         _applySlots(p);
         _refreshDrSums(p);
         // 每次重绘活动卡片后，异步合并云端共享脚本刷新（切 tab/搜索/分页后，上传的云端脚本不会从卡片消失）
         if (!isSail) setTimeout(function () { try { _llRefreshCloud(); } catch (e) {} }, 300);
-        if (state.tab === 'act') _llRenderBulkScripts();
+        if (state.tab === 'act') { _actPackRender(); _ensureAdmin().then(function () { try { _actPackRender(); } catch (e) {} }); }
     }
     // ---------- 主页同款卡槽 ----------
     // battle-slot 结构 + 主页渲染管线 applySkinBgToSlot(slot, hero, hero, 'my', forceSkin)
@@ -786,11 +786,11 @@
         try { if (typeof showToast === 'function') showToast('已删除脚本', 'info'); } catch (e) {}
         _llRefresh(id);
     };
-    // 🔴 列表刷新：旧弹窗列表（已停用）+ 底部批量列表（按天展示），保证两处一致
+    // 🔴 列表刷新：旧弹窗列表（已停用）+ 底部脚本包区块，保证两处一致
     function _llRefresh(id) {
         if (typeof _llRenderScripts === 'function') _llRenderScripts(id);
         if (document.getElementById('llScriptDlg') && typeof _llScriptDlg === 'function') _llScriptDlg(id);
-        _llRenderBulkScripts();
+        if (state.tab === 'act') _actPackRender();
     }
     // 一键导入到老马：复用项目现成的 importToLaoMaFromWall（桌面端 Tauri 写老马目录）
     window._llImportToLaoMa = async function (id, sid) {
@@ -1173,147 +1173,108 @@ let _adminVerified=false, _adminLastTok='', _featItems=[], _featData=null, _feat
         const btn = document.getElementById('llScriptBtn-' + id);
         if (btn) btn.innerHTML = btn.innerHTML.replace(/（\d+）/, '（' + arr.length + '）');
     };
-    // 🔴 2026-10-13 活动脚本改为「底部一次性导入 7 天脚本包」：一个 zip（含 7 个 .txt）搞定，不再每天单独弹窗上传
-    //    原来的「📜 阵容脚本」按天弹窗（_llScriptDlg）已停用，统一走这里批量导入 + 底部按天展示
-    function _bulkImportHtml() {
-        return ''
+    // 🔴 2026-10-13（二次调整）活动脚本不再按天单独上传/展示：改成「一个压缩包（zip/rar）由管理员统一上传，所有人直接下载」
+    //    整包以 base64 存云端索引 lineup_scripts.json 的 pack 字段（并镜像本机），不解析、不按天拆；用户只下载，管理员可上传/删除。
+    function _actPackHtml() {
+        let h = ''
             + '<div style="margin-top:14px;padding:12px 14px;border:1px solid rgba(78,205,196,0.4);border-radius:12px;background:rgba(78,205,196,0.06);">'
             + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
-            + '<b style="color:#4ecdc4;font-size:0.92rem;">📦 7 天阵容脚本包（一次性导入）</b>'
+            + '<b style="color:#4ecdc4;font-size:0.92rem;">📦 7 天阵容脚本包</b>'
             + '<span style="flex:1;"></span>'
-            + '<input type="file" id="llBulkFile" accept=".zip,.txt,application/zip,application/x-rar-compressed" style="max-width:240px;padding:5px 8px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.76rem;">'
-            + '<button onclick="_llBulkImport()" title="把 7 天的脚本 .txt 打包成一个 zip 上传，按文件名里的天数自动归类到对应天" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(78,205,196,0.6);background:rgba(78,205,196,0.18);color:#4ecdc4;cursor:pointer;font-size:0.8rem;font-weight:700;">📥 导入</button>'
+            + '<span id="llPackAdmin" style="display:' + (_isAdmin() ? 'inline-flex' : 'none') + ';gap:8px;align-items:center;">'
+            + '<input type="file" id="llPackFile" accept=".zip,.rar,.txt,application/zip,application/x-rar-compressed" style="max-width:220px;padding:5px 8px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.76rem;">'
+            + '<button onclick="_actPackUpload()" title="上传一个压缩包（zip/rar/txt）作为 7 天脚本包，覆盖旧包" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(78,205,196,0.6);background:rgba(78,205,196,0.18);color:#4ecdc4;cursor:pointer;font-size:0.8rem;font-weight:700;">☁ 上传</button>'
+            + '</span>'
             + '</div>'
-            + '<div style="color:rgba(255,255,255,0.5);font-size:0.68rem;margin:7px 0 2px;line-height:1.6;">把 7 天的脚本 .txt 打成一个 <b style="color:#4ecdc4;">.zip</b>（或单个 .txt）上传即可，<b style="color:rgba(255,255,255,0.85);">文件名含「第N天」或数字</b>会自动归类到对应天（如「第3天.txt」「day3.txt」「3.txt」）。<b style="color:#ff6b6b;">.rar 暂不支持，请用 zip。</b></div>'
-            + '<div id="llBulkResult" style="margin-top:8px;"></div>'
+            + '<div style="color:rgba(255,255,255,0.5);font-size:0.68rem;margin:7px 0 2px;line-height:1.6;">管理员可上传一个 <b style="color:#4ecdc4;">.zip / .rar</b>（内含 7 天 .txt 脚本），会覆盖旧包；所有人可直接下载。</div>'
+            + '<div id="llPackArea" style="margin-top:8px;"></div>'
             + '</div>';
+        return h;
     }
-    // 解析 zip：支持 store(0) 与 deflate(8，用浏览器原生 DecompressionStream 解压)，无需外部库
-    async function _llUnzip(buf) {
-        const u8 = new Uint8Array(buf); const dv = new DataView(buf); const out = [];
-        let i = 0;
-        const findNextSig = function (from) {
-            for (let k = from; k + 4 <= u8.length; k++) { const s = dv.getUint32(k, true); if (s === 0x04034b50 || s === 0x02014b50 || s === 0x06054b50) return k; }
-            return u8.length;
-        };
-        while (i + 30 <= u8.length) {
-            const sig = dv.getUint32(i, true);
-            if (sig !== 0x04034b50) { i++; continue; }
-            const method = dv.getUint16(i + 8, true);
-            let csize = dv.getUint32(i + 18, true);
-            const nlen = dv.getUint16(i + 26, true);
-            const elen = dv.getUint16(i + 28, true);
-            let name = 'file';
-            try { name = new TextDecoder('utf-8', { fatal: false }).decode(u8.subarray(i + 30, i + 30 + nlen)); } catch (e) {}
-            const start = i + 30 + nlen + elen;
-            let end = start + csize;
-            if (csize === 0) end = findNextSig(start + 4);   // 数据描述符(zip64/流式)：本地头 csize=0，靠下一个签名兜底
-            if (method === 0) {
-                let content = '';
-                try { content = new TextDecoder('utf-8', { fatal: false }).decode(u8.subarray(start, end)); } catch (e) {}
-                out.push({ name: name, content: content });
-            } else if (method === 8) {
-                try {
-                    const comp = u8.subarray(start, end);
-                    const ds = new DecompressionStream('deflate-raw');
-                    const stream = new Response(comp).body.pipeThrough(ds);
-                    const ab = await new Response(stream).arrayBuffer();
-                    let content = '';
-                    try { content = new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(ab)); } catch (e) {}
-                    out.push({ name: name, content: content });
-                } catch (e) { out.push({ name: name, content: '' }); }
-            } else { out.push({ name: name, content: '' }); }
-            i = end;
-        }
-        return out;
-    }
-    function _parseDayFromName(name) {
-        let m = String(name).match(/第\s*(\d{1,2})\s*天/i);
-        if (m) return parseInt(m[1], 10);
-        m = String(name).match(/day\s*(\d{1,2})/i);
-        if (m) return parseInt(m[1], 10);
-        m = String(name).match(/(\d{1,2})/);
-        if (m) return parseInt(m[1], 10);
-        return null;
-    }
-    function _cleanFname(name) {
-        let n = String(name || '').replace(/^.*[\\/]/, '').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]/g, '_').trim();
-        if (!n) n = '活动脚本_' + String(Date.now()).slice(-6);
-        if (!/\.txt$/i.test(n)) n += '.txt';
-        return n;
-    }
-    window._llBulkImport = async function () {
-        const inp = document.getElementById('llBulkFile');
-        const f = inp && inp.files && inp.files[0];
-        if (!f) { try { if (typeof showToast === 'function') showToast('请先选择 .zip / .txt 文件', 'warn'); } catch (e) {} return; }
-        const res = document.getElementById('llBulkResult');
-        const lower = f.name.toLowerCase();
-        if (res) res.innerHTML = '<div style="color:rgba(255,255,255,0.6);font-size:0.74rem;">⏳ 正在解析 ' + _esc(f.name) + ' …</div>';
+    function _fmtSize(n) { n = n || 0; if (n < 1024) return n + ' B'; if (n < 1048576) return (n / 1024).toFixed(1) + ' KB'; return (n / 1048576).toFixed(2) + ' MB'; }
+    function _b64ToBytes(b64) { const bin = atob(b64); const len = bin.length; const u = new Uint8Array(len); for (let i = 0; i < len; i++) u[i] = bin.charCodeAt(i); return u; }
+    function _packLocalKey() { return 'll_act_pack'; }
+    function _packLocalGet() { try { const s = localStorage.getItem(_packLocalKey()); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
+    function _packLocalSet(p) { try { if (p) localStorage.setItem(_packLocalKey(), JSON.stringify(p)); else localStorage.removeItem(_packLocalKey()); } catch (e) {} }
+    // 读取当前脚本包：优先云端，回退本机
+    window.__actPackGet = async function () {
+        try { const d = await _llIdxLoad(); if (d && d.pack) return d.pack; } catch (e) {}
+        return _packLocalGet();
+    };
+    // 管理员上传：整包 base64 存云端 + 本机（覆盖旧包）
+    window.__actPackSet = async function (file) {
+        if (!file) return false;
+        const b64 = await new Promise(function (res, rej) {
+            const r = new FileReader();
+            r.onload = function () { const s = String(r.result || ''); const i = s.indexOf(','); res(i >= 0 ? s.slice(i + 1) : s); };
+            r.onerror = function () { rej(new Error('读取文件失败')); };
+            r.readAsDataURL(file);
+        });
+        const pack = { name: file.name, mime: file.type || 'application/octet-stream', size: file.size, b64: b64, ts: Date.now(), author: _llAuthor() };
+        _packLocalSet(pack);
+        const ok = await _llIdxMutate(function (d) { d.pack = pack; });
+        if (!ok) return false;
+        return true;
+    };
+    // 管理员删除
+    window.__actPackDel = async function () {
+        _packLocalSet(null);
+        const ok = await _llIdxMutate(function (d) { delete d.pack; });
+        return ok;
+    };
+    // 所有人下载当前脚本包（base64 → blob → 触发下载）
+    window._actPackDownload = async function () {
         try {
-            let files = [];
-            if (lower.endsWith('.zip')) {
-                const buf = await f.arrayBuffer();
-                files = await _llUnzip(buf);
-            } else if (lower.endsWith('.txt')) {
-                files = [{ name: f.name, content: await f.text() }];
-            } else if (lower.endsWith('.rar')) {
-                if (res) res.innerHTML = '<div style="color:#ff6b6b;font-size:0.74rem;">❌ 暂不支持 .rar，请把 7 天的 .txt 打成一个 .zip 再上传。</div>';
-                return;
-            } else {
-                if (res) res.innerHTML = '<div style="color:#ff6b6b;font-size:0.74rem;">❌ 不支持的文件类型，请上传 .zip 或 .txt。</div>';
-                return;
-            }
-            const txtFiles = files.filter(function (x) { return /\.txt$/i.test(x.name); });
-            if (!txtFiles.length) { if (res) res.innerHTML = '<div style="color:#ff6b6b;font-size:0.74rem;">❌ 文件里没有 .txt 脚本（zip 里请放 .txt）。</div>'; return; }
-            const D = _data();
-            const dayNums = (D.activity || []).map(function (a) { return a.day; });
-            const byDay = {}; const unmatched = [];
-            txtFiles.forEach(function (x) {
-                const d = _parseDayFromName(x.name);
-                if (d != null && dayNums.indexOf(d) >= 0) (byDay[d] = byDay[d] || []).push(x);
-                else unmatched.push(x.name);
-            });
-            if (!Object.keys(byDay).length) {
-                if (res) res.innerHTML = '<div style="color:#ff6b6b;font-size:0.74rem;">❌ 没有能识别天数的文件（文件名要含「第N天」或数字）。未识别：' + _esc(unmatched.join('、')) + '</div>';
-                return;
-            }
-            let imported = 0, cloud = 0;
-            for (const d in byDay) {
-                const id = 'd' + d;
-                for (const x of byDay[d]) {
-                    const fname = _cleanFname(x.name);
-                    const content = String(x.content || '').trim();
-                    if (!content) continue;
-                    const sid = _newSid();
-                    let url = '';
-                    try { url = await window._doScriptUpload(content, fname); } catch (e) { url = ''; }
-                    _upsertScript(id, { id: sid, name: fname, content: content, url: url, shared: !!url });
-                    if (url) { cloud++; try { await _llIdxMutate(function (dd) { (dd[id] = dd[id] || []).unshift({ id: sid, name: fname, url: url, author: _llAuthor(), ts: Date.now() }); }); } catch (e2) {} }
-                    imported++;
-                }
-            }
-            await _llRenderBulkScripts();
-            try { if (typeof showToast === 'function') showToast('✅ 已导入 ' + imported + ' 个脚本（' + cloud + ' 个已云端分享）' + (unmatched.length ? '；' + unmatched.length + ' 个未识别天数已跳过' : ''), 'success'); } catch (e) {}
+            const p = await window.__actPackGet();
+            if (!p || !p.b64) { try { if (typeof showToast === 'function') showToast('暂无脚本包，请联系管理员上传', 'warn'); } catch (e) {} return; }
+            const blob = new Blob([_b64ToBytes(p.b64)], { type: p.mime || 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = p.name || '活动脚本包.zip'; document.body.appendChild(a); a.click();
+            setTimeout(function () { try { URL.revokeObjectURL(url); a.remove(); } catch (e) {} }, 2000);
+            try { if (typeof showToast === 'function') showToast('已开始下载：' + (p.name || ''), 'success'); } catch (e) {}
+        } catch (e) { try { if (typeof showToast === 'function') showToast('下载失败：' + (e && e.message || e), 'error'); } catch (e2) {} }
+    };
+    // 管理员：从底部文件框读取并上传（带管理员校验）
+    window._actPackUpload = async function () {
+        if (!_isAdmin()) { try { if (typeof showToast === 'function') showToast('仅管理员可上传脚本包', 'error'); } catch (e) {} return; }
+        const inp = document.getElementById('llPackFile');
+        const f = inp && inp.files && inp.files[0];
+        if (!f) { try { if (typeof showToast === 'function') showToast('请先选择 .zip / .rar / .txt 文件', 'warn'); } catch (e) {} return; }
+        const area = document.getElementById('llPackArea');
+        if (area) area.innerHTML = '<div style="color:rgba(255,255,255,0.6);font-size:0.74rem;">⏳ 正在上传 ' + _esc(f.name) + ' …</div>';
+        try {
+            const ok = await window.__actPackSet(f);
+            if (!ok) throw new Error('写入云端失败');
+            try { if (typeof showToast === 'function') showToast('✅ 已上传脚本包：' + f.name, 'success'); } catch (e) {}
+            await _actPackRender();
         } catch (e) {
-            if (res) res.innerHTML = '<div style="color:#ff6b6b;font-size:0.74rem;">❌ 解析失败：' + _esc(e && e.message || e) + '</div>';
-            try { if (typeof showToast === 'function') showToast('解析失败：' + (e && e.message || e), 'error'); } catch (e2) {}
+            if (area) area.innerHTML = '<div style="color:#ff6b6b;font-size:0.74rem;">❌ 上传失败：' + _esc(e && e.message || e) + '</div>';
+            try { if (typeof showToast === 'function') showToast('上传失败：' + (e && e.message || e), 'error'); } catch (e2) {}
         }
     };
-    // 异步渲染底部「已导入脚本」：按天分组，复用现有 _scriptsHtml（可打开记事本 / 导入老马 / 删除）
-    async function _llRenderBulkScripts() {
-        const el = document.getElementById('llBulkResult');
+    // 渲染底部「当前脚本包」信息（下载按钮常驻；管理员额外显示删除，并同步上传区可见性）
+    async function _actPackRender() {
+        const el = document.getElementById('llPackArea');
         if (!el) return;
-        const D = _data();
-        const days = (D.activity || []).map(function (a) { return a.day; });
-        let html = '';
-        for (let k = 0; k < days.length; k++) {
-            const id = 'd' + days[k];
-            const arr = await _llDayScriptsAll(id);
-            html += '<div style="margin-bottom:8px;">'
-                + '<div style="color:#ffd700;font-size:0.72rem;font-weight:700;margin-bottom:3px;">第 ' + days[k] + ' 天（' + arr.length + '）</div>'
-                + (arr.length ? _scriptsHtml(arr, id) : '<div style="color:rgba(255,255,255,0.35);font-size:0.66rem;padding:2px 4px;">（空，用上方「📦 7 天脚本包」导入）</div>')
-                + '</div>';
-        }
-        el.innerHTML = html;
+        const ad = document.getElementById('llPackAdmin');
+        if (ad) ad.style.display = _isAdmin() ? 'inline-flex' : 'none';
+        const p = await window.__actPackGet();
+        if (!p) { el.innerHTML = '<div style="color:rgba(255,255,255,0.4);font-size:0.72rem;">（' + (_isAdmin() ? '尚未上传脚本包' : '管理员尚未上传脚本包') + '）</div>'; return; }
+        const when = p.ts ? new Date(p.ts).toLocaleString('zh-CN') : '';
+        el.innerHTML = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 8px;background:rgba(0,0,0,0.25);border-radius:8px;border:1px solid rgba(78,205,196,0.3);">'
+            + '<span style="color:#4ecdc4;font-size:0.78rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + _esc(p.name || '') + '">📄 ' + _esc(p.name || '脚本包') + '（' + _fmtSize(p.size || 0) + '）' + (when ? ' · ' + when : '') + '</span>'
+            + '<button onclick="_actPackDownload()" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(78,205,196,0.5);background:rgba(78,205,196,0.12);color:#4ecdc4;cursor:pointer;font-size:0.74rem;">📥 下载</button>'
+            + (_isAdmin() ? '<button onclick="_actPackDelete()" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(255,107,107,0.4);background:rgba(255,107,107,0.12);color:#ff6b6b;cursor:pointer;font-size:0.74rem;">🗑 删除</button>' : '')
+            + '</div>';
     }
+    // 管理员删除（带确认 + 管理员校验）
+    window._actPackDelete = async function () {
+        if (!_isAdmin()) { try { if (typeof showToast === 'function') showToast('仅管理员可删除', 'error'); } catch (e) {} return; }
+        if (typeof confirm === 'function' && !confirm('确定删除当前 7 天脚本包？所有人将不再能下载。')) return;
+        try {
+            const ok = await window.__actPackDel();
+            try { if (typeof showToast === 'function') showToast(ok ? '已删除脚本包' : '删除失败', ok ? 'info' : 'error'); } catch (e) {}
+            await _actPackRender();
+        } catch (e) {}
+    };
 })();
