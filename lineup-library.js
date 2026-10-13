@@ -606,16 +606,20 @@
         const cur = fus || hero;
         // 🔴 2026-10-13 修复：已融合的卡 cur 是融合名（如 小野酋长），而 _poolTypeMap 只认基础英雄名 → 查不到 → 弹窗打不开，
         //    导致融合一次后无法再打开设置来切换/取消融合（"只能选一个、不能切换"）。改用基础英雄 hero 查池（兜底 cur）。
+        //    同时：融合只取决于 cloudFusions（按英雄名），不强依赖卡在已渲染卡池里；若 _poolTypeMap 没有该卡（如小野未纳入主页面卡池渲染），
+        //    用兜底 id=hero / type='gold' 让设置弹窗照常打开，否则单卡右键会直接打不开、看不到任何融合选项。
         const pc = _poolTypeMap()[hero] || _poolTypeMap()[cur];
-        if (!pc) { try { if (typeof showToast === 'function') showToast(cur + ' 不在卡池，无法设置', 'info'); } catch (e2) {} return; }
+        const pcId = pc ? pc.id : hero;
+        const pcType = pc ? pc.type : 'gold';
         if (!window.showLevelDropdown) return;
-        window.showLevelDropdown(e, pc.id, pc.type, 'my', cur);
+        window.showLevelDropdown(e, pcId, pcType, 'my', cur);
         try {
             const base = fus ? hero : cur;
             const variants = _llFusionVariantsFor(base);
             if (variants.length) {
                 const root = document.querySelector('.card-settings-popup-root');
-                const box = root ? root.firstElementChild : null;
+                let box = root ? root.firstElementChild : null;
+                if (!box && root) box = root;   // 兜底：弹窗结构变化时挂到 root 本身，保证融合变体区一定能显示
                 if (box) {
                     // 🔴 2026-10-07 与主页完全一致：用「🔗 融合变体（选副卡）」按钮组（不融合 + 各融合变体），
                     //    取代原「🔄 循环切换融合」按钮——图库此前交互与主页不一致，且只能循环、不能像主页那样直接选副卡。
