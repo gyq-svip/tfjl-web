@@ -10654,6 +10654,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const img = document.createElement('img');
                 img.style.cssText = 'width:100%;height:100%;object-fit:cover;opacity:0.45;';
                 img.alt = '';
+                img.decoding = 'async';  // 🔴 2026-10-14 缩略图异步解码，避免阻塞主线程
                 b.appendChild(img);
                 const label = document.createElement('div');
                 label.textContent = skin;
@@ -10862,6 +10863,80 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 box.appendChild(mhInfo);
             }
 
+            // 🔴 2026-10-14 锚点：图库弹窗的「融合变体（选副卡）」由 lineup-library.js 在 showLevelDropdown 之后手动 append，
+            //    此处提供一个稳定锚点，让融合变体插入到「魔化（主卡）」之下（而非弹窗最底部）。
+            (function () {
+                var _mhEnd = document.createElement('div');
+                _mhEnd.id = 'csMhEnd';
+                _mhEnd.style.display = 'none';
+                box.appendChild(_mhEnd);
+            })();
+
+            // 融合变体选择（只对基础英雄且存在融合变体时显示；卡池/收藏中不处理上阵关系）
+            // 🔴 2026-10-14 UX 调整：从弹窗底部上移到「魔化（主卡）」之下，方便先选副卡再看副卡皮肤/等级/魔化
+            if (isProjectScope && hasVariants) {
+                const fvTitle = document.createElement('div');
+                fvTitle.style.cssText = 'color:#60a5fa;margin:14px 0 6px;border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;';
+                fvTitle.textContent = '🔗 融合变体（选副卡）';
+                box.appendChild(fvTitle);
+                const fvWrap = document.createElement('div');
+                fvWrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;';
+                const opts = [baseHero].concat(variants);
+                opts.forEach(opt => {
+                    const b = document.createElement('button');
+                    const sel = opt === cardName;
+                    const parts = (typeof getFusionParts === 'function') ? getFusionParts(opt) : null;
+                    const label = opt === baseHero ? '不融合' : ((parts && parts.length >= 2) ? parts[1] : opt);
+                    b.dataset.value = opt;
+                    b.textContent = label;
+                    b.style.cssText = 'padding:4px 8px;border-radius:7px;border:1px solid ' + (sel ? '#60a5fa' : 'rgba(255,255,255,0.2)') + ';background:' + (sel ? '#60a5fa' : 'transparent') + ';color:' + (sel ? '#1a1a2e' : '#fff') + ';cursor:pointer;font-size:0.76rem;font-weight:' + (sel ? '600' : '400') + ';';
+                    b.onclick = async () => {
+                        const pick = b.dataset.value;
+                        // 直接改名即可：槽位用现有 upgradeCardToFusion；手牌直接改手牌数组 + 原地重绘
+                        const slotEl = badge.closest('.battle-slot');
+                        if (slotEl && typeof upgradeCardToFusion === 'function') {
+                            await upgradeCardToFusion(slotEl, pick);
+                        } else {
+                            const handArr = (handType === 'my') ? myHandCards : teammateHandCards;
+                            const hc = handArr && handArr.find(c => c.id === cardId);
+                            if (hc) hc.name = pick;
+                            const handCard = badge.closest('.selected-card.card-item');
+                            if (handCard) { handCard.dataset.name = pick; }
+                            if (typeof reapplySingleHandCard === 'function' && handCard) { await reapplySingleHandCard(handCard, cardId, handType); }
+                            if (typeof autoSaveProject === 'function') autoSaveProject();
+                        }
+                        // 刷新弹窗状态，不关闭
+                        cardName = pick;
+                        const newParts = (typeof getFusionParts === 'function') ? getFusionParts(cardName) : null;
+                        isFusion = !!(newParts && newParts.length >= 2);
+                        subHero = isFusion ? newParts[1] : '';
+                        baseHero = isFusion ? newParts[0] : ((typeof getBaseHeroName === 'function') ? getBaseHeroName(cardName).heroName : cardName);
+                        title.querySelector('span').textContent = '⚙️ ' + (cardName || cardId);
+                        // 刷新变体按钮选中态
+                        fvWrap.querySelectorAll('button').forEach(x => {
+                            const selected = x.dataset.value === cardName;
+                            x.style.borderColor = selected ? '#60a5fa' : 'rgba(255,255,255,0.2)';
+                            x.style.background = selected ? '#60a5fa' : 'transparent';
+                            x.style.color = selected ? '#1a1a2e' : '#fff';
+                            x.style.fontWeight = selected ? '600' : '400';
+                        });
+                        renderFusionSubSection(box, cardName);
+                        updateAllCardLevelBadges();
+                        await _reapplyCard();
+                        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('卡牌设置-选择融合副卡');
+
+                        // 同步刷新减伤值输入（因为 baseHero 可能已变；目标表按卡片归属解析）
+                        const drInput = box.querySelector('#csDrInput');
+                        if (drInput) {
+                            const drTable = (window.drTables && window.drTables[_csResolveDrTableName()]) || { 洗炼: {} };
+                            drInput.value = (drTable.洗炼 && baseHero && drTable.洗炼[baseHero] !== undefined) ? drTable.洗炼[baseHero] : '';
+                        }
+                    };
+                    fvWrap.appendChild(b);
+                });
+                box.appendChild(fvWrap);
+            }
+
             // 融合副卡设置（渲染函数，初始化与切换变体后复用）
             function renderFusionSubSection(container, _cardName) {
                 const old = container.querySelector('#csFusionSubSection');
@@ -10896,6 +10971,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const subSkinWrap = document.createElement('div');
                 subSkinWrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;';
                 const subSkins = getAvailableSkins(_subHero);
+                // 🔴 2026-10-14 性能：打开副卡设置即并行预取副卡所有皮肤图（缓存优先 + 单飞去重），
+                //    让缩略图显示/点击都尽快命中缓存，避免弱网下逐张现下导致"选皮肤慢"。
+                subSkins.forEach(function (sk) { try { if (window.resolveHeroSkinUrl) window.resolveHeroSkinUrl(_subHero, sk.name); } catch (e) {} });
                 const subCurSkin = (typeof getFusionComponentSkin === 'function') ? getFusionComponentSkin(_subHero) : '默认';
                 subSkins.forEach(skin => {
                     const sel = skin === subCurSkin;
@@ -11007,70 +11085,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 else container.appendChild(sec);
             }
 
-            // 融合变体选择（只对基础英雄且存在融合变体时显示；卡池/收藏中不处理上阵关系）
-            if (isProjectScope && hasVariants) {
-                const fvTitle = document.createElement('div');
-                fvTitle.style.cssText = 'color:#60a5fa;margin:14px 0 6px;border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;';
-                fvTitle.textContent = '🔗 融合变体（选副卡）';
-                box.appendChild(fvTitle);
-                const fvWrap = document.createElement('div');
-                fvWrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;';
-                const opts = [baseHero].concat(variants);
-                opts.forEach(opt => {
-                    const b = document.createElement('button');
-                    const sel = opt === cardName;
-                    const parts = (typeof getFusionParts === 'function') ? getFusionParts(opt) : null;
-                    const label = opt === baseHero ? '不融合' : ((parts && parts.length >= 2) ? parts[1] : opt);
-                    b.dataset.value = opt;
-                    b.textContent = label;
-                    b.style.cssText = 'padding:4px 8px;border-radius:7px;border:1px solid ' + (sel ? '#60a5fa' : 'rgba(255,255,255,0.2)') + ';background:' + (sel ? '#60a5fa' : 'transparent') + ';color:' + (sel ? '#1a1a2e' : '#fff') + ';cursor:pointer;font-size:0.76rem;font-weight:' + (sel ? '600' : '400') + ';';
-                    b.onclick = async () => {
-                        const pick = b.dataset.value;
-                        // 直接改名即可：槽位用现有 upgradeCardToFusion；手牌直接改手牌数组 + 原地重绘
-                        const slotEl = badge.closest('.battle-slot');
-                        if (slotEl && typeof upgradeCardToFusion === 'function') {
-                            await upgradeCardToFusion(slotEl, pick);
-                        } else {
-                            const handArr = (handType === 'my') ? myHandCards : teammateHandCards;
-                            const hc = handArr && handArr.find(c => c.id === cardId);
-                            if (hc) hc.name = pick;
-                            const handCard = badge.closest('.selected-card.card-item');
-                            if (handCard) { handCard.dataset.name = pick; }
-                            if (typeof reapplySingleHandCard === 'function' && handCard) { await reapplySingleHandCard(handCard, cardId, handType); }
-                            if (typeof autoSaveProject === 'function') autoSaveProject();
-                        }
-                        // 刷新弹窗状态，不关闭
-                        cardName = pick;
-                        const newParts = (typeof getFusionParts === 'function') ? getFusionParts(cardName) : null;
-                        isFusion = !!(newParts && newParts.length >= 2);
-                        subHero = isFusion ? newParts[1] : '';
-                        baseHero = isFusion ? newParts[0] : ((typeof getBaseHeroName === 'function') ? getBaseHeroName(cardName).heroName : cardName);
-                        title.querySelector('span').textContent = '⚙️ ' + (cardName || cardId);
-                        // 刷新变体按钮选中态
-                        fvWrap.querySelectorAll('button').forEach(x => {
-                            const selected = x.dataset.value === cardName;
-                            x.style.borderColor = selected ? '#60a5fa' : 'rgba(255,255,255,0.2)';
-                            x.style.background = selected ? '#60a5fa' : 'transparent';
-                            x.style.color = selected ? '#1a1a2e' : '#fff';
-                            x.style.fontWeight = selected ? '600' : '400';
-                        });
-                        renderFusionSubSection(box, cardName);
-                        updateAllCardLevelBadges();
-                        await _reapplyCard();
-                        if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('卡牌设置-选择融合副卡');
-
-                        // 同步刷新减伤值输入（因为 baseHero 可能已变；目标表按卡片归属解析）
-                        const drInput = box.querySelector('#csDrInput');
-                        if (drInput) {
-                            const drTable = (window.drTables && window.drTables[_csResolveDrTableName()]) || { 洗炼: {} };
-                            drInput.value = (drTable.洗炼 && baseHero && drTable.洗炼[baseHero] !== undefined) ? drTable.洗炼[baseHero] : '';
-                        }
-                    };
-                    fvWrap.appendChild(b);
-                });
-                box.appendChild(fvWrap);
-            }
-
             // 初始化融合副卡设置
             renderFusionSubSection(box, cardName);
             
@@ -11112,6 +11126,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 };
                 box.appendChild(drInput);
             } catch (e) {}
+
+            // 🔴 2026-10-14 暴露：图库切换副卡后无需重开整个弹窗，只重建副卡设置区（避免重复创建所有缩略图/DOM 导致选副卡卡顿）
+            window.__rerenderFusionSubSection = function (newCardName) {
+                try { renderFusionSubSection(box, newCardName); } catch (e) {}
+            };
 
             document.body.appendChild(root);
         }
