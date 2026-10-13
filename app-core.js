@@ -1902,7 +1902,7 @@
             if (!box) return;
             const pop = document.createElement('div');
             pop.className = 'chariot-picker';
-            pop.style.cssText = 'position:absolute;z-index:3000;background:rgba(26,26,48,0.99);border:1px solid rgba(255,215,0,0.45);border-radius:10px;padding:10px;box-shadow:0 10px 30px rgba(0,0,0,0.6);font-size:0.78rem;color:#fff;min-width:262px;';
+            pop.style.cssText = 'position:absolute;z-index:100050;background:rgba(26,26,48,0.99);border:1px solid rgba(255,215,0,0.45);border-radius:10px;padding:10px;box-shadow:0 10px 30px rgba(0,0,0,0.6);font-size:0.78rem;color:#fff;min-width:262px;';
             const opts = function (withUnset, cur) {
                 let h = '';
                 if (withUnset) h += '<option value="0"' + (Number(cur) === 0 ? ' selected' : '') + '>未设置</option>';
@@ -1957,6 +1957,7 @@
                     : '未配置走马江湖号 → 不计战车减伤（可在「减伤记录」手填兜底）';
                 if (typeof autoSaveProject === 'function') autoSaveProject();
                 if (typeof updateDamageReductionDisplay === 'function') updateDamageReductionDisplay();
+                if (typeof window.__onChariotChange === 'function') window.__onChariotChange();   // 🔴 2026-10-13 阵容库战车 chip 刷新
             };
             ['chariotMainSel', 'chariotMainLvSel', 'chariotSubSel', 'chariotSubLvSel', 'chariotFusSel'].forEach(function (id) {
                 const el = document.getElementById(id); if (el) el.onchange = onCh;
@@ -1970,6 +1971,7 @@
         }
         window.openChariotPicker = openChariotPicker;
         window.chariotShort = chariotShort;   // 供分享图(app-features.js)复用同一套显示规则
+        window.chariotTip = chariotTip;       // 🔴 2026-10-13 供阵容库战车 chip 悬浮提示复用
 
         // 从IndexedDB加载项目列表
         function loadProjectListFromDB() {
