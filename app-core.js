@@ -27458,6 +27458,133 @@ ${maSection}
             });
             if (!r.ok) throw new Error('HTTP ' + r.status);
         }
+
+        // ==================== 🏆 活动阵容云端维护（管理员，2026-10-13）====================
+        // 存索引 Gist 的 activity_lineup.json → { title, list: [{ day, A:[10], B:[10] }], ts }
+        // 所有人打开「阵容图库 → 🏆 活动阵容」时自动拉取覆盖本地 lineup-data.js（换期不用改代码/不用部署）
+        const ACT_LINEUP_GIST_FILE = 'activity_lineup.json';
+
+        // 数据 → 文本（回填编辑框）
+        function _actLineupToText(d) {
+            let s = (d && d.title) ? (d.title + '\n\n') : '';
+            ((d && d.list) || []).forEach(function (it) {
+                s += '第' + it.day + '天\n';
+                s += '  A: ' + ((it.A || []).join('、')) + '\n';
+                s += '  B: ' + ((it.B || []).join('、')) + '\n\n';
+            });
+            return s.replace(/\n+$/, '\n');
+        }
+
+        // 文本 → 数据（兼容：第N天 / A: / B: ，顿号·逗号·空格·分号分隔，括号备注自动去掉）
+        function _actLineupFromText(txt) {
+            const lines = String(txt || '').replace(/\r/g, '').split('\n');
+            let title = '';
+            const list = [];
+            let cur = null;
+            lines.forEach(function (ln) {
+                const t = String(ln || '').trim();
+                if (!t) return;
+                const dm = t.match(/第\s*(\d+)\s*天/);
+                if (dm) { cur = { day: parseInt(dm[1], 10), A: [], B: [] }; list.push(cur); return; }
+                const ab = t.match(/^([ABab])\s*[:：]\s*(.+)$/);
+                if (ab && cur) {
+                    cur[ab[1].toUpperCase()] = ab[2]
+                        .split(/[、,，;；\s]+/)
+                        .map(function (x) { return String(x).trim().replace(/[（(].*?[)）]/g, '').trim(); })
+                        .filter(Boolean);
+                    return;
+                }
+                if (!cur && !title && !/[:：]/.test(t)) title = t;   // 第一行非「第N天」且不含冒号 → 当标题
+            });
+            if (!list.length) throw new Error('没解析到任何「第N天」');
+            list.forEach(function (it) {
+                ['A', 'B'].forEach(function (k) {
+                    if (!it[k] || !it[k].length) throw new Error('第' + it.day + '天 ' + k + ' 组为空');
+                });
+            });
+            return { title: title, list: list };
+        }
+        window._actLineupFromText = _actLineupFromText;
+
+        // 拉取云端活动阵容 → 覆盖 LINEUP_LIBRARY（所有人联网即更新）
+        window.__loadActLineupRemote = async function () {
+            try {
+                const token = getGistToken();
+                if (!token || typeof wallReadGistFile !== 'function') return null;
+                const c = await wallReadGistFile(GIST_ID, ACT_LINEUP_GIST_FILE, token);
+                if (!c) return null;
+                const d = JSON.parse(c);
+                if (!d || !Array.isArray(d.list) || !d.list.length) return null;
+                window.__ACT_LINEUP_REMOTE = d;
+                try { if (window.LINEUP_LIBRARY) window.LINEUP_LIBRARY.activity = d.list; } catch (e) {}
+                return d;
+            } catch (e) { return null; }
+        };
+        window.__reloadActLineup = async function () {
+            await window.__loadActLineupRemote();
+            try { if (typeof window._llRenderAll === 'function') window._llRenderAll(); } catch (e) {}
+        };
+        // 页面起来后异步拉一次（无 Token / 无云端数据时静默用本地 lineup-data.js）
+        setTimeout(function () { try { window.__loadActLineupRemote(); } catch (e) {} }, 2500);
+
+        // 管理员页：载入
+        window.renderActLineupAdmin = async function () {
+            const box = document.getElementById('adminActLineupText');
+            const info = document.getElementById('adminActLineupInfo');
+            if (!box) return;
+            box.value = '加载中…';
+            if (info) info.textContent = '正在读取云端数据…';
+            let d = null;
+            try { d = await window.__loadActLineupRemote(); } catch (e) {}
+            if (!d) {
+                const L = window.LINEUP_LIBRARY || {};
+                box.value = _actLineupToText({ title: '', list: L.activity || [] });
+                if (info) info.textContent = '☁ 云端暂无数据 —— 当前显示的是本地内置阵容。粘贴新文本后点「保存并下发」即可覆盖所有人。';
+            } else {
+                box.value = _actLineupToText(d);
+                if (info) info.textContent = '☁ 云端已生效：' + (d.title || '（无标题）') + ' · ' + d.list.length + ' 天 · 更新于 ' + new Date(d.ts || Date.now()).toLocaleString('zh-CN');
+            }
+        };
+        // 管理员页：保存下发
+        window.saveActLineupAdmin = async function () {
+            const box = document.getElementById('adminActLineupText');
+            if (!box) return;
+            let data;
+            try { data = _actLineupFromText(box.value); }
+            catch (e) { alert('❌ 解析失败：' + ((e && e.message) || e)); return; }
+            const bad = data.list.filter(function (it) { return (it.A.length !== 10 && it.A.length !== 0) || (it.B.length !== 10 && it.B.length !== 0); });
+            if (bad.length && !confirm('有 ' + bad.length + ' 天的卡数不是 10 张（第' + bad.map(function (b) { return b.day; }).join('、') + '天）。\n仍要保存吗？')) return;
+            data.ts = Date.now();
+            try {
+                await _actGistPatch(ACT_LINEUP_GIST_FILE, data);
+                await window.__reloadActLineup();
+                await window.renderActLineupAdmin();
+                alert('✅ 已保存并下发（' + data.list.length + ' 天）\n所有人刷新页面即可看到最新活动阵容。');
+            } catch (e) { alert('❌ 保存失败：' + ((e && e.message) || e)); }
+        };
+        // 载入本地内置（用于对照/回滚）
+        window._actLineupFillLocal = function () {
+            const box = document.getElementById('adminActLineupText');
+            if (!box) return;
+            const L = window.LINEUP_LIBRARY || {};
+            box.value = _actLineupToText({ title: '', list: L.activity || [] });
+            const info = document.getElementById('adminActLineupInfo');
+            if (info) info.textContent = '已填入本地内置阵容（lineup-data.js）—— 需要点「保存并下发」才会覆盖云端。';
+        };
+        // 校验格式
+        window._actLineupPreview = function () {
+            const box = document.getElementById('adminActLineupText');
+            if (!box) return;
+            try {
+                const d = _actLineupFromText(box.value);
+                const bad = d.list.filter(function (it) { return it.A.length !== 10 || it.B.length !== 10; });
+                let msg = '✅ 解析成功：' + d.list.length + ' 天' + (d.title ? '，标题「' + d.title + '」' : '') + '\n';
+                msg += d.list.map(function (it) { return '第' + it.day + '天 A' + it.A.length + '/B' + it.B.length; }).join('，');
+                if (bad.length) msg += '\n⚠️ 卡数不是 10 的：第' + bad.map(function (b) { return b.day; }).join('、') + '天';
+                alert(msg);
+            } catch (e) { alert('❌ ' + ((e && e.message) || e)); }
+        };
+
         async function _actAdminLoad(force) {
             if (_actAdminLoaded && !force) return;
             _actAdminLoaded = true;
@@ -27939,6 +28066,13 @@ ${maSection}
                     if (typeof window.renderFeedbackAdmin === 'function') window.renderFeedbackAdmin();
                     // 打开反馈页 = 已读 → 清红点
                     if (typeof window.markFeedbackSeen === 'function') window.markFeedbackSeen();
+                }
+            } else if (page === 'actLineup') {
+                // 🔴 2026-10-13 🏆 活动阵容云端维护
+                const pageEl = document.getElementById('adminPageActLineup');
+                if (pageEl) {
+                    pageEl.style.display = 'block';
+                    if (typeof window.renderActLineupAdmin === 'function') window.renderActLineupAdmin();
                 }
             } else if (page === 'oldItems') {
                 const pageEl = document.getElementById('adminPageOldItems');

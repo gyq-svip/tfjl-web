@@ -1743,6 +1743,11 @@
                         <span class="mi-emoji">🎪</span>
                         <div class="mi-text"><div class="mi-title">活动道具</div><div class="mi-sub">旧活动档位/道具维护</div></div>
                     </div>
+                    <!-- 🔴 2026-10-13 活动阵容云端维护：改完保存 → 所有人刷新页面即可看到最新 7 日 A/B 轮转（不用改代码/重新部署） -->
+                    <div class="admin-menu-item" data-key="actLineup" onclick="adminShowPage('actLineup')">
+                        <span class="mi-emoji">🏆</span>
+                        <div class="mi-text"><div class="mi-title">活动阵容</div><div class="mi-sub">7日A/B轮转(云端下发)</div></div>
+                    </div>
 
                 </div>
                 <div id="adminSortEditBtn" style="display:flex;gap:8px;margin-top:8px;">
@@ -2134,6 +2139,27 @@
                     保存后对所有人生效（存云端 Gist）；旧活动存 old_activity_items.json，活动 tab 存 activity_tabs.json。
                 </div>
                 <div id="adminOldItemsBody" style="max-height:66vh;overflow-y:auto;font-size:0.8rem;">加载中…</div>
+            </div>
+
+            <!-- 🔴 2026-10-13 🏆 活动阵容云端维护：粘贴文本 → 保存下发（activity_lineup.json） -->
+            <div id="adminPageActLineup" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🏆 活动阵容维护（7 日 A/B 轮转）</h3>
+                    <button class="admin-btn" onclick="renderActLineupAdmin(true)" style="padding:6px 12px;font-size:0.8rem;margin-left:auto;">🔄 重新载入</button>
+                </div>
+                <div style="font-size:0.72rem;color:rgba(255,255,255,0.55);margin-bottom:10px;background:rgba(255,255,255,0.05);border-radius:6px;padding:8px;line-height:1.6;">
+                    <b style="color:#ffd700;">用法</b>：把新一期活动的文本直接粘进下面（格式见框内示例），点「☁ 保存并下发」即可。<br>
+                    格式：<b>第N天</b> 一行，下面两行 <b>A: 英雄、英雄…</b> 和 <b>B: 英雄、英雄…</b>（顿号/逗号/空格分隔都行，每组 10 张）。第一行可写活动标题（如「第三话·赵无极 7日卡组轮转」）。<br>
+                    保存后存云端 Gist（activity_lineup.json），<b style="color:#4ecdc4;">所有人刷新页面 → 阵容图库 → 🏆 活动阵容 即显示最新</b>，不用改代码也不用重新部署。
+                </div>
+                <div id="adminActLineupInfo" style="font-size:0.75rem;color:#4ecdc4;margin-bottom:8px;">加载中…</div>
+                <textarea id="adminActLineupText" spellcheck="false" style="width:100%;height:min(52vh,440px);box-sizing:border-box;background:rgba(0,0,0,0.4);color:#fff;border:1px solid rgba(255,215,0,0.3);border-radius:8px;padding:10px;font-size:0.8rem;line-height:1.7;font-family:Consolas,Monaco,monospace;white-space:pre;overflow:auto;"></textarea>
+                <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+                    <button class="admin-btn" onclick="saveActLineupAdmin()" style="flex:1;min-width:150px;background:linear-gradient(135deg,#ffd700,#f0932b);color:#1a1a2e;font-weight:700;">☁ 保存并下发</button>
+                    <button class="admin-btn admin-btn-secondary" onclick="_actLineupFillLocal()" style="flex:0 0 auto;">📥 载入本地内置</button>
+                    <button class="admin-btn admin-btn-secondary" onclick="_actLineupPreview()" style="flex:0 0 auto;">🧪 校验格式</button>
+                </div>
             </div>
 
             <div id="adminPageCacheManage" style="display:none;">
