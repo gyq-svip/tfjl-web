@@ -147,9 +147,14 @@
       catch (e) { console.warn('[SKIN-WEB] createObjectURL failed:', e); }
     }
     // 2) 单飞：同一张图正在拉取，复用同一 promise，避免 N 张同英雄并发 N 次 fetch
-    if (_skinInflight[key]) return _skinInflight[key];
+    // 🔴 2026-10-13 核心性能优化（图库弹窗点皮肤 10 秒不换图根因）：
+    //    缓存未命中时**立即返回远端 URL**，不再 await 网络下载（旧逻辑等 fetch 10s超时×3 → 点击后槽位/缩略图 10 秒没图）。
+    //    <img> 标签加载不受 CORS 限制且走浏览器 HTTP 缓存，秒级开始显示；
+    //    后台仍照旧 fetch 入 IndexedDB，下次同皮命中 blob 缓存毫秒级。
+    //    失败安全：img.onerror 由调用方移除图层回退职业底色，404 由 _skin404 负缓存兜底。
+    if (_skinInflight[key]) return remoteUrl;
+    var url = SKIN_BASE + '/' + encodeURIComponent(hero) + '/' + encodeURIComponent(file);
     var p = (async function () {
-      var url = SKIN_BASE + '/' + encodeURIComponent(hero) + '/' + encodeURIComponent(file);
       try {
         var resp = await _fetchWithRetry(url, 10000, 2, function () { _skin404Mark(key); }, 'force-cache'); // 404 → 记入负缓存；force-cache 命中 HTTP 缓存零往返
         if (resp && resp.ok) {
@@ -158,13 +163,14 @@
           var u2 = URL.createObjectURL(blob);
           _objectUrlCache[key] = u2; // 缓存复用，避免后续重复创建
           if (_skin404[key]) { delete _skin404[key]; _skin404Save(); } // 拉到了 → 清除过时的 404 记录
-          return u2;
         }
       } catch (e) { console.warn('[SKIN-WEB] 皮肤加载失败:', url, e); }
-      return null; // 全部失败：返回 null（已有 IndexedDB 兜底，多数情况命中）
+      finally { delete _skinInflight[key]; }
+      return null;
     })();
     _skinInflight[key] = p;
-    try { return await p; } finally { delete _skinInflight[key]; }
+    p.catch(function () {}); // 后台拉取，防 unhandled rejection
+    return remoteUrl;
   }
 
   function _sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }

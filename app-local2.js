@@ -4873,6 +4873,8 @@ if (true) {
             _skinBlobUrlCache.delete(oldestKey);
         }
     }
+    // 🔴 2026-10-13 后台下载去重表：同一 URL 并发只下载一次（点皮肤/铺图/预热并发触发共用）
+    const _skinDlInflight = new Map();
     async function _getCachedSkinUrl(remoteUrl) {
         if (!remoteUrl) return null;
         if (!/^https?:\/\//i.test(remoteUrl)) return remoteUrl;
@@ -4885,93 +4887,88 @@ if (true) {
             return cached;
         }
 
-        // === Tauri APP：磁盘优先 ===
-        if (isTauriApp) {
-            const parsed = _parseSkinUrl(remoteUrl);
-            if (parsed) {
-                const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
-                const skinPath = _skinDiskBase() + '\\' + parsed.hero + '\\' + parsed.file;
-                // 1. 尝试读本地 .skin 二进制缓存（来自 Gitee zip 或后台下载，内容仍是 png）
-                try {
-                    const bytes = await invokeFn('plugin:fs|read_file', { path: skinPath, options: undefined });
-                    const blobUrl = bytesToBlobUrl(bytes, skinPath);
-                    if (blobUrl) { _skinBlobCacheSet(remoteUrl, blobUrl); return blobUrl; }
-                } catch(e) { /* 磁盘无缓存，走网络 */ }
-                // 2. 网络下载 → 写 .skin 二进制缓存
-                try {
-                    await _ensureSkinDiskDir(parsed.hero);
-                    const resp = await _fetchWithTimeout(remoteUrl, 10000);
-                    if (!resp.ok) { console.warn('[SKIN] 单皮肤远程 HTTP', resp.status, parsed.hero, parsed.file, remoteUrl); return remoteUrl; }
-                    const blob = await resp.blob();
-                    const b64 = await _blobToBase64(blob);
-                    let wrote = false;
-                    if (!b64 || b64.length === 0) {
-                        console.warn('[SKIN] 写盘跳过(b64 为空):', parsed.hero, parsed.file, 'blob.size=', blob.size, 'blob.type=', blob.type, 'content-type=', resp.headers.get('content-type'), 'content-length=', resp.headers.get('content-length'), 'path=', skinPath);
-                    }
-                    // 主：自定义 Rust 命令 write_binary_file（已授权、支持二进制、跨 Tauri 版本稳定）
-                    // 失败时重试 1 次（应对偶发 IPC 失败），并打印完整错误对象（message/name/code/stringified）便于诊断
-                    if (b64 && b64.length > 0) {
-                        for (let attempt = 1; attempt <= 2 && !wrote; attempt++) {
-                            try {
-                                // ⚠️ Tauri v2 IPC 序列化：Rust 参数名 file_path → JS 端必须用 filePath(驼峰)
-                                await invokeFn('write_binary_file', { filePath: skinPath, contentBase64: b64 });
-                                wrote = true;
-                            } catch (eW) {
-                                const eWInfo = eW ? (eW.message || eW.name || JSON.stringify(eW) || String(eW)) : 'unknown';
-                                if (attempt === 2) console.warn('[SKIN] write_binary_file 彻底失败(已重试1次)，回退 fs 插件:', parsed.hero, parsed.file, eWInfo);
-                            }
-                        }
-                    } else {
-                        console.warn('[SKIN] 跳过写盘(b64 为空)，上方诊断行已说明网络/解析问题:', parsed.hero, parsed.file);
-                    }
-                    // 备：fs 插件写 base64 字符串（注意 contents 必须是 string，不能传 Uint8Array，Tauri v2 ACL 会拒）
-                    if (!wrote && b64 && b64.length > 0) {
-                        try { await invokeFn('plugin:fs|write_file', { path: skinPath, contents: b64 }); wrote = true; }
-                        catch (eF) { console.warn('[SKIN] 皮肤写盘失败(plugin:fs|write_file 也不允许 base64):', parsed.hero, parsed.file, eF && (eF.message || JSON.stringify(eF) || String(eF))); }
-                    }
-                    const blobUrl = URL.createObjectURL(blob);
-                    _skinBlobCacheSet(remoteUrl, blobUrl);
-                    return blobUrl;
-                } catch(e) {
-                    console.warn('[SKIN] 网络兜底失败:', remoteUrl, e.message || e);
-                    return remoteUrl;
-                }
-            }
-            // URL 解析失败，回退网络
+        // 🔴 2026-10-13 核心性能优化（图库弹窗点皮肤 10 秒不换图根因·桌面版同病）：
+        //   旧逻辑缓存未命中时 await 网络下载完（10s 超时）才返回 → 冷门皮点了半天没反应、弹窗缩略图空很久。
+        //   现改为：本地缓存（磁盘/IndexedDB，毫秒级）命中直接用；未命中**立即返回远端 URL**让 <img> 直接加载
+        //   （img 标签不受 CORS 限制、走浏览器 HTTP 缓存，秒级开始显示），后台照旧下载写缓存，下次同皮秒开。
+        //   失败安全：img.onerror 由调用方移除图层回退职业底色（与旧逻辑下载失败返回 remoteUrl 行为一致）。
+        const parsed = _parseSkinUrl(remoteUrl);
+        const startBgDl = function () {
+            if (_skinDlInflight.has(remoteUrl)) return;
+            const p = _bgDownloadSkin(remoteUrl, parsed).finally(function () { _skinDlInflight.delete(remoteUrl); });
+            _skinDlInflight.set(remoteUrl, p);
+            p.catch(function () {});
+        };
+        // === Tauri APP：磁盘毫秒级命中 → 用本地；未命中 → 后台下载 + 立即回远端 URL ===
+        if (isTauriApp && parsed) {
+            const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
+            const skinPath = _skinDiskBase() + '\\' + parsed.hero + '\\' + parsed.file;
+            // 尝试读本地 .skin 二进制缓存（来自 Gitee zip 或后台下载，内容仍是 png）
             try {
-                const resp = await _fetchWithTimeout(remoteUrl, 10000);
-                if (!resp.ok) return remoteUrl;
-                const blobUrl = URL.createObjectURL(await resp.blob());
-                _skinBlobCacheSet(remoteUrl, blobUrl);
-                return blobUrl;
-            } catch(e) { return remoteUrl; }
+                const bytes = await invokeFn('plugin:fs|read_file', { path: skinPath, options: undefined });
+                const blobUrl = bytesToBlobUrl(bytes, skinPath);
+                if (blobUrl) { _skinBlobCacheSet(remoteUrl, blobUrl); return blobUrl; }
+            } catch (e) { /* 磁盘无缓存 */ }
+            // 磁盘未命中：后台下载写盘（不阻塞换图），立即回远端 URL
+            startBgDl();
+            return remoteUrl;
         }
-
-        // === 网页版：IndexedDB 优先 ===
+        // === 网页版（及 URL 解析失败的兜底）：IndexedDB 毫秒级命中 → 用本地；未命中 → 后台下载 + 立即回远端 URL ===
         const key = 'skin:' + remoteUrl;
-        const cached = await _idbGet(key);
-        if (cached && cached.blob) {
-            try {
-                // 🔴 2026-08-30 关键内存修复：原代码每次命中 IDB 都 createObjectURL 生成新 blob URL，
-                // 旧的从不 revoke → 每切一次皮泄漏一个 blob → 内存暴涨+GC 卡顿。
-                // 改为：先查 _skinBlobUrlCache（已缓存则直接复用），未命中才创建并缓存。
+        try {
+            const cached = await _idbGet(key);
+            if (cached && cached.blob) {
+                // 🔴 2026-08-30 内存修复：先查 _skinBlobUrlCache（上面已查过未命中），未命中才 createObjectURL，
+                // 防止每次切皮都生成新 blob URL 泄漏内存。
                 const blobUrl = URL.createObjectURL(cached.blob);
                 _skinBlobCacheSet(remoteUrl, blobUrl);
                 return blobUrl;
             }
-            catch (e) { console.warn('[SKIN] createObjectURL failed:', e); }
-        }
+        } catch (e) { /* IDB 读失败走网络兜底 */ }
+        startBgDl();
+        return remoteUrl;
+    }
+
+    // 🔴 2026-10-13 后台单皮肤下载（不阻塞换图）：Tauri 写磁盘 + 内存 LRU；网页写 IndexedDB + 内存 LRU。
+    //    失败静默：调用方已先用远端 URL 显示，img.onerror 兜底回退底色；下次调用会重新尝试。
+    async function _bgDownloadSkin(remoteUrl, parsed) {
         try {
-            const resp = await fetch(remoteUrl, { cache: 'force-cache' });
-            if (!resp.ok) return remoteUrl;
-            const blob = await resp.blob();
-            _idbPut(key, blob);
-            const blobUrl = URL.createObjectURL(blob);
-            _skinBlobCacheSet(remoteUrl, blobUrl);
-            return blobUrl;
+            if (isTauriApp && parsed) {
+                const invokeFn = window.__TAURI_INTERNALS__?.invoke || window.__TAURI__?.core?.invoke;
+                const skinPath = _skinDiskBase() + '\\' + parsed.hero + '\\' + parsed.file;
+                try { await _ensureSkinDiskDir(parsed.hero); } catch (e) {}
+                const resp = await _fetchWithTimeout(remoteUrl, 10000);
+                if (!resp.ok) { console.warn('[SKIN] 后台下载 HTTP', resp.status, parsed.hero, parsed.file, remoteUrl); return; }
+                const blob = await resp.blob();
+                const b64 = await _blobToBase64(blob);
+                if (b64 && b64.length > 0) {
+                    let wrote = false;
+                    // 主：自定义 Rust 命令 write_binary_file（已授权、支持二进制、跨 Tauri 版本稳定）；失败重试 1 次
+                    for (let attempt = 1; attempt <= 2 && !wrote; attempt++) {
+                        try { await invokeFn('write_binary_file', { filePath: skinPath, contentBase64: b64 }); wrote = true; }
+                        catch (eW) {
+                            const eWInfo = eW ? (eW.message || eW.name || JSON.stringify(eW) || String(eW)) : 'unknown';
+                            if (attempt === 2) console.warn('[SKIN] write_binary_file 后台写盘失败(已重试1次):', parsed.hero, parsed.file, eWInfo);
+                        }
+                    }
+                    // 备：fs 插件写 base64 字符串（contents 必须是 string，Tauri v2 ACL 拒绝 Uint8Array）
+                    if (!wrote) {
+                        try { await invokeFn('plugin:fs|write_file', { path: skinPath, contents: b64 }); wrote = true; }
+                        catch (eF) { console.warn('[SKIN] 后台写盘失败(plugin:fs|write_file):', parsed.hero, parsed.file, eF && (eF.message || JSON.stringify(eF) || String(eF))); }
+                    }
+                }
+                const blobUrl = URL.createObjectURL(blob);
+                _skinBlobCacheSet(remoteUrl, blobUrl);
+            } else {
+                const resp = await fetch(remoteUrl, { cache: 'force-cache' });
+                if (!resp.ok) return;
+                const blob = await resp.blob();
+                _idbPut('skin:' + remoteUrl, blob);
+                const blobUrl = URL.createObjectURL(blob);
+                _skinBlobCacheSet(remoteUrl, blobUrl);
+            }
         } catch (e) {
-            console.warn('[SKIN] fetch skin failed:', remoteUrl, e);
-            return remoteUrl;
+            console.warn('[SKIN] 后台下载失败:', remoteUrl, (e && e.message) || e);
         }
     }
 

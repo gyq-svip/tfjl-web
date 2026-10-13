@@ -10788,8 +10788,17 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             if (typeof window._llReapplySlot === 'function') window._llReapplySlot(libSlot);
                         } else { await setDefaultCardSkin(cardId, skin); }
                     }
-                    updateAllCardLevelBadges();
-                    await _reapplyCard();
+                    // 🔴 2026-10-13 跟手性修复（图库弹窗点皮肤卡 5 秒根因之二）：
+                    //   图库个人皮肤只影响本槽位显示（_llReapplySlot 已重铺），下面两个全局重活纯属浪费且阻塞反馈：
+                    //   ① updateAllCardLevelBadges() 同步 remove+insert 重铺整个卡池全部角标（几百张卡）；
+                    //   ② await _reapplyCard() 全局遍历主页战斗槽/手牌逐个 await 重铺（对同一图库槽位还会二次重铺）。
+                    //   → 图库路径直接跳过；主页全局默认皮路径仍需要（改了全局默认，主页所有同名卡要变），但延后一帧后台执行。
+                    if (!libSlot) {
+                        setTimeout(function () {
+                            try { updateAllCardLevelBadges(); } catch (e0) {}
+                            Promise.resolve().then(function () { return _reapplyCard(); }).catch(function (e0) {});
+                        }, 0);
+                    }
                     if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('卡牌设置-切换皮肤');
                 });
                 skinWrap.appendChild(b);
