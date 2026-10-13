@@ -130,7 +130,16 @@
     // 🔴 2026-09-23 功能埋点（与主页 __recordFeatureUse 同一 buffer，管理员可在「按 Gist×功能 TOP」看到使用情况）
     function _llTrack(fn) { try { if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse(fn); } catch (e) {} }
     function _escJs(s) { return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
-    function _data() { return (window.LINEUP_LIBRARY && window.LINEUP_LIBRARY.sailing) ? window.LINEUP_LIBRARY : { sailing: [], activity: [] }; }
+    // 🔴 2026-10-13 活动阵容支持云端下发：管理员在「🏆 活动阵容」页保存到 Gist（activity_lineup.json），
+    //    这里优先用云端数据覆盖本地 lineup-data.js（联网即更新，不用改代码/重新部署）
+    function _data() {
+        const L = (window.LINEUP_LIBRARY && window.LINEUP_LIBRARY.sailing) ? window.LINEUP_LIBRARY : { sailing: [], activity: [] };
+        const ov = window.__ACT_LINEUP_REMOTE;
+        if (ov && Array.isArray(ov.list) && ov.list.length) {
+            return { sailing: L.sailing, activity: ov.list, v: L.v, title: ov.title || '', updated: ov.ts || 0 };
+        }
+        return L;
+    }
     function _parseNames(txt) { return String(txt || '').split(/[,，、\n\r]+/).map(s => s.trim()).filter(Boolean); }
     // ---------- 悬浮窗（拖动 + 缩放） ----------
     window.openLineupLibraryPanel = function () {
@@ -208,6 +217,8 @@
     window._llSearch = function (v) { state.q = String(v || '').trim(); state.page = 1; _renderList(); };
     window._llPage = function (d) { state.page = Math.max(1, state.page + d); _renderList(); };
     window._llToggle = function (key) { state.open[key] = !state.open[key]; _renderList(); };
+    // 供外部（管理员云端下发活动阵容后）触发整页重绘
+    window._llRenderAll = function () { try { _renderHead(); _renderList(); } catch (e) {} };
     // ---------- 头部（静态：tab + 搜索框）与列表 ----------
     function _renderHead() {
         const h = document.getElementById('llHead');
@@ -279,6 +290,12 @@
         } else if (state.tab === 'featured') {
             _renderFeatured();
         } else {
+            if (D.title) {
+                h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;padding:5px 10px;border-radius:8px;background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.25);">'
+                    + '<b style="color:#ffd700;font-size:0.82rem;">🏆 ' + _esc(D.title) + '</b>'
+                    + (D.updated ? '<span style="color:rgba(255,255,255,0.45);font-size:0.66rem;">云端更新：' + _esc(new Date(D.updated).toLocaleString('zh-CN')) + '</span>' : '')
+                    + '</div>';
+            }
             pageList.forEach(function (a) { h += _actCard(a); });
             if (!pageList.length) h += '<div style="color:rgba(255,255,255,0.4);padding:20px;text-align:center;">没有匹配的阵容</div>';
         }
