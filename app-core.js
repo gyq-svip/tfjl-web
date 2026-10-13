@@ -10852,8 +10852,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     const on = !getCardMoHua(cardId, handType);
                     setCardMoHua(cardId, on, handType);
                     setMh(on);
-                    updateAllCardLevelBadges();
-                    await _reapplyCard();
+                    // 🔴 2026-10-14 性能：图库槽位只重铺当前槽位，跳过全卡池角标重铺（魔化开关卡顿根因）
+                    const _libSlot = badge.closest('.ll-slot');
+                    if (_libSlot && typeof window._llReapplySlot === 'function') { await window._llReapplySlot(_libSlot); }
+                    else { updateAllCardLevelBadges(); await _reapplyCard(); }
                     if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('卡牌设置-主卡魔化开关');
                     // 主卡魔化变化 → 副卡魔化开关可用状态联动
                     const subMh = box.querySelector('#csSubMh');
@@ -11034,9 +11036,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 subLvInput.onchange = async () => {
                     const newLv = subLevels[Number(subLvInput.value)];
                     if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(_subHero, newLv);
-                    updateAllCardLevelBadges();
                     _renderSubLevelInfo(newLv);
-                    await _reapplyCard();
+                    // 🔴 2026-10-14 性能：图库槽位跳过全卡池角标重铺
+                    const _libSlot = badge.closest('.ll-slot');
+                    if (_libSlot && typeof window._llReapplySlot === 'function') { await window._llReapplySlot(_libSlot); }
+                    else { updateAllCardLevelBadges(); await _reapplyCard(); }
                     if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('卡牌设置-调整副卡等级');
                 };
                 subLvWrap.appendChild(subLvInput);
@@ -11073,8 +11077,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     const on = !(getFusionComponentMoHua(_subHero));
                     setFusionComponentMoHua(_subHero, on);
                     setSubMh(on);
-                    updateAllCardLevelBadges();
-                    await _reapplyCard();
+                    // 🔴 2026-10-14 性能：图库槽位跳过全卡池角标重铺
+                    const _libSlot = badge.closest('.ll-slot');
+                    if (_libSlot && typeof window._llReapplySlot === 'function') { await window._llReapplySlot(_libSlot); }
+                    else { updateAllCardLevelBadges(); await _reapplyCard(); }
                     if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('卡牌设置-副卡魔化开关');
                 };
                 sec.appendChild(subMhBtn);
