@@ -1269,28 +1269,41 @@ let _adminVerified=false, _adminLastTok='', _featItems=[], _featData=null, _feat
         const btn = document.getElementById('llScriptBtn-' + id);
         if (btn) btn.innerHTML = btn.innerHTML.replace(/（\d+）/, '（' + arr.length + '）');
     };
-    // 🔴 2026-10-13（二次调整）活动脚本改为「一个压缩包（zip/rar）由管理员在「活动阵容维护」页统一上传/删除，主界面所有人只下载」
-    //    整包以 base64 存云端索引 lineup_scripts.json 的 pack 字段（并镜像本机），不解析、不按天拆。
+    // 🔴 2026-10-13（二次调整）活动脚本改为「压缩包（zip/rar）由管理员在「活动阵容维护」页统一上传/删除，主界面所有人只下载」
+    //    支持上传多个脚本包（不同大佬各一份），以数组 packs 存云端索引 lineup_scripts.json（并镜像本机），不解析、不按天拆。
+    //    旧版单包字段 d.pack 在读写时自动并入 d.packs（兼容已部署数据）。
     function _actPackHtml() {
         return ''
             + '<div style="margin-top:14px;padding:12px 14px;border:1px solid rgba(78,205,196,0.4);border-radius:12px;background:rgba(78,205,196,0.06);">'
             + '<b style="color:#4ecdc4;font-size:0.92rem;">📦 7 天阵容脚本包</b>'
-            + '<div style="color:rgba(255,255,255,0.5);font-size:0.68rem;margin:7px 0 2px;line-height:1.6;">下载管理员上传的 7 天阵容脚本包（.zip / .rar），解压后按天使用。</div>'
+            + '<div style="color:rgba(255,255,255,0.5);font-size:0.68rem;margin:7px 0 2px;line-height:1.6;">下载管理员上传的 7 天阵容脚本包（支持多个大佬的包，.zip / .rar），解压后按天使用。普通用户只下载、管理员可上传/删除。</div>'
             + '<div id="llPackArea" style="margin-top:8px;"></div>'
             + '</div>';
     }
     function _fmtSize(n) { n = n || 0; if (n < 1024) return n + ' B'; if (n < 1048576) return (n / 1024).toFixed(1) + ' KB'; return (n / 1048576).toFixed(2) + ' MB'; }
     function _b64ToBytes(b64) { const bin = atob(b64); const len = bin.length; const u = new Uint8Array(len); for (let i = 0; i < len; i++) u[i] = bin.charCodeAt(i); return u; }
     function _packLocalKey() { return 'll_act_pack'; }
-    function _packLocalGet() { try { const s = localStorage.getItem(_packLocalKey()); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
-    function _packLocalSet(p) { try { if (p) localStorage.setItem(_packLocalKey(), JSON.stringify(p)); else localStorage.removeItem(_packLocalKey()); } catch (e) {} }
-    // 读取当前脚本包：优先云端，回退本机
-    window.__actPackGet = async function () {
-        try { const d = await _llIdxLoad(); if (d && d.pack) return d.pack; } catch (e) {}
+    function _packLocalGet() {
+        try { const s = localStorage.getItem(_packLocalKey()); if (!s) return []; const v = JSON.parse(s); return Array.isArray(v) ? v : (v ? [v] : []); } catch (e) { return []; }
+    }
+    function _packLocalSet(arr) { try { if (arr && arr.length) localStorage.setItem(_packLocalKey(), JSON.stringify(arr)); else localStorage.removeItem(_packLocalKey()); } catch (e) {} }
+    // 云端 d.packs（新，数组）；兼容旧单包 d.pack 自动并入
+    function _packsFromIdx(d) {
+        if (!d) return [];
+        if (Array.isArray(d.packs) && d.packs.length) return d.packs;
+        if (d.pack) return [d.pack];
+        return [];
+    }
+    // 读取脚本包列表：优先云端，回退本机
+    window.__actPackList = async function () {
+        try { const d = await _llIdxLoad(); const arr = _packsFromIdx(d); if (arr.length) return arr; } catch (e) {}
         return _packLocalGet();
     };
-    // 管理员上传：整包 base64 存云端 + 本机（覆盖旧包）
-    window.__actPackSet = async function (file) {
+    // 兼容旧名（返回列表首项或 null）
+    window.__actPackGet = async function () { const a = await window.__actPackList(); return a && a.length ? a[0] : null; };
+    function _genPackId() { return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+    // 管理员上传：追加一个新脚本包（不覆盖已有），存云端 + 本机镜像
+    window.__actPackSet = async function (file, author) {
         if (!file) return false;
         const b64 = await new Promise(function (res, rej) {
             const r = new FileReader();
@@ -1298,30 +1311,40 @@ let _adminVerified=false, _adminLastTok='', _featItems=[], _featData=null, _feat
             r.onerror = function () { rej(new Error('读取文件失败')); };
             r.readAsDataURL(file);
         });
-        const pack = { name: file.name, mime: file.type || 'application/octet-stream', size: file.size, b64: b64, ts: Date.now(), author: _llAuthor() };
-        _packLocalSet(pack);
-        const ok = await _llIdxMutate(function (d) { d.pack = pack; });
+        const pack = { id: _genPackId(), name: file.name, author: (author && String(author).trim()) || _llAuthor(), mime: file.type || 'application/octet-stream', size: file.size, b64: b64, ts: Date.now() };
+        const ok = await _llIdxMutate(function (d) {
+            if (!Array.isArray(d.packs)) d.packs = d.pack ? [d.pack] : [];
+            delete d.pack;                 // 旧单包字段并入 packs 后废弃
+            d.packs.push(pack);
+        });
         if (!ok) return false;
+        try { const d = await _llIdxLoad(); _packLocalSet(_packsFromIdx(d)); } catch (e) {}
         return true;
     };
-    // 管理员删除
-    window.__actPackDel = async function () {
-        _packLocalSet(null);
-        const ok = await _llIdxMutate(function (d) { delete d.pack; });
+    // 管理员删除指定脚本包（按 id；不传 id 则清空全部，兼容旧「删除当前」语义）
+    window.__actPackDel = async function (id) {
+        const ok = await _llIdxMutate(function (d) {
+            if (!Array.isArray(d.packs)) d.packs = d.pack ? [d.pack] : [];
+            delete d.pack;
+            if (id) d.packs = d.packs.filter(function (x) { return x.id !== id; });
+            else d.packs = [];
+        });
+        if (!ok) return false;
+        try { const d = await _llIdxLoad(); _packLocalSet(_packsFromIdx(d)); } catch (e) {}
         return ok;
     };
-    // 所有人下载当前脚本包：直接走 APP/网页「通用下载框」（不再裸用 blob）
-    //   · APP（Tauri）：复用原生保存弹窗（老马目录 / 浏览文件夹），二进制安全写入 zip/rar
-    //   · 网页：浏览器原生下载框（blob）
-    window._actPackDownload = async function () {
+    // 所有人下载指定脚本包（idx 下标或 id）
+    window._actPackDownload = async function (idx) {
         try {
-            const p = await window.__actPackGet();
-            if (!p || !p.b64) { try { if (typeof showToast === 'function') showToast('暂无脚本包，请联系管理员上传', 'warn'); } catch (e) {} return; }
+            const list = await window.__actPackList();
+            if (!list || !list.length) { try { if (typeof showToast === 'function') showToast('暂无脚本包，请联系管理员上传', 'warn'); } catch (e) {} return; }
+            const p = (typeof idx === 'number') ? list[idx] : list.find(function (x) { return x.id === idx; });
+            if (!p || !p.b64) { try { if (typeof showToast === 'function') showToast('该脚本包不存在', 'warn'); } catch (e) {} return; }
             const fname = p.name || '活动脚本包.zip';
             const sizeKB = p.size != null ? (p.size / 1024) : null;
             const isTauri = !!(window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke || window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke);
             if (isTauri && typeof window._downloadScriptTauri === 'function') {
-                await window._downloadScriptTauri(fname, p.b64, { binary: true, sizeKB: sizeKB, title: '📥 下载活动阵容脚本包' });
+                await window._downloadScriptTauri(fname, p.b64, { binary: true, sizeKB: sizeKB, title: '📥 下载活动阵容脚本包：' + (p.author || '') });
                 return;
             }
             // 网页：二进制 blob 下载（弹浏览器下载框）
@@ -1341,52 +1364,60 @@ let _adminVerified=false, _adminLastTok='', _featItems=[], _featData=null, _feat
         opts = opts || {};
         const el = document.getElementById(areaId);
         if (!el) return;
-        const p = await window.__actPackGet();
+        const list = await window.__actPackList();
         const upload = opts.upload !== false;
         const del = !!opts.del;
         let html = '';
-        if (!p) {
+        if (!list.length) {
             html += '<div style="color:rgba(255,255,255,0.4);font-size:0.72rem;">（' + (upload ? '尚未上传脚本包' : '管理员尚未上传脚本包') + '）</div>';
         } else {
-            const when = p.ts ? new Date(p.ts).toLocaleString('zh-CN') : '';
-            html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 8px;background:rgba(0,0,0,0.25);border-radius:8px;border:1px solid rgba(78,205,196,0.3);">'
-                + '<span style="color:#4ecdc4;font-size:0.78rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + _esc(p.name || '') + '">📄 ' + _esc(p.name || '脚本包') + '（' + _fmtSize(p.size || 0) + '）' + (when ? ' · ' + when : '') + '</span>'
-                + '<button onclick="_actPackDownload()" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(78,205,196,0.5);background:rgba(78,205,196,0.12);color:#4ecdc4;cursor:pointer;font-size:0.74rem;">📥 下载</button>'
-                + (del ? '<button onclick="_actPackDelete(\'' + areaId + '\',{upload:true,del:true})" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(255,107,107,0.4);background:rgba(255,107,107,0.12);color:#ff6b6b;cursor:pointer;font-size:0.74rem;">🗑 删除</button>' : '')
-                + '</div>';
+            list.forEach(function (p, i) {
+                const when = p.ts ? new Date(p.ts).toLocaleString('zh-CN') : '';
+                html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 8px;margin-bottom:6px;background:rgba(0,0,0,0.25);border-radius:8px;border:1px solid rgba(78,205,196,0.3);">'
+                    + '<span style="color:#4ecdc4;font-size:0.78rem;flex:1;min-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + _esc(p.name || '') + '">📄 ' + _esc(p.name || '脚本包') + '（' + _fmtSize(p.size || 0) + '）' + (p.author ? ' · ✍️' + _esc(p.author) : '') + (when ? ' · ' + when : '') + '</span>'
+                    + '<button onclick="_actPackDownload(' + i + ')" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(78,205,196,0.5);background:rgba(78,205,196,0.12);color:#4ecdc4;cursor:pointer;font-size:0.74rem;">📥 下载</button>'
+                    + (del ? '<button onclick="_actPackDelete(\'' + areaId + '\',\'' + _esc(p.id || '') + '\',{upload:true,del:true})" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(255,107,107,0.4);background:rgba(255,107,107,0.12);color:#ff6b6b;cursor:pointer;font-size:0.74rem;">🗑 删除</button>' : '')
+                    + '</div>';
+            });
         }
         if (upload) {
             html += '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;">'
+                + '<input type="text" id="actPackAuthor" placeholder="作者/大佬名（如：bi锋）" value="' + _esc(_llAuthor()) + '" style="width:150px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.3);border-radius:6px;color:#ffd700;font-size:0.74rem;padding:5px 8px;outline:none;">'
                 + '<input type="file" id="actPackFile" accept=".zip,.rar,.txt,application/zip,application/x-rar-compressed" style="max-width:240px;padding:5px 8px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.76rem;">'
-                + '<button onclick="_actPackUploadFrom(\'actPackFile\',\'' + areaId + '\',{upload:true,del:true})" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(78,205,196,0.6);background:rgba(78,205,196,0.18);color:#4ecdc4;cursor:pointer;font-size:0.8rem;font-weight:700;">☁ ' + (p ? '重新上传' : '上传') + '</button>'
+                + '<button onclick="_actPackUploadFrom(\'actPackFile\',\'actPackAuthor\',\'' + areaId + '\',{upload:true,del:true})" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(78,205,196,0.6);background:rgba(78,205,196,0.18);color:#4ecdc4;cursor:pointer;font-size:0.8rem;font-weight:700;">☁ 上传新脚本包</button>'
                 + '</div>';
         }
         el.innerHTML = html;
     };
-    // 从指定文件框读取并上传（带管理员校验）
-    window._actPackUploadFrom = async function (inputId, areaId, opts) {
+    // 从指定文件框读取并上传（带管理员校验，追加而非覆盖）
+    window._actPackUploadFrom = async function (inputId, authorId, areaId, opts) {
         if (!_isAdmin()) { try { if (typeof showToast === 'function') showToast('仅管理员可上传脚本包', 'error'); } catch (e) {} return; }
         const inp = document.getElementById(inputId);
         const f = inp && inp.files && inp.files[0];
         if (!f) { try { if (typeof showToast === 'function') showToast('请先选择 .zip / .rar / .txt 文件', 'warn'); } catch (e) {} return; }
+        const aInp = document.getElementById(authorId);
+        const author = aInp ? aInp.value : '';
         const el = document.getElementById(areaId);
         if (el) el.innerHTML = '<div style="color:rgba(255,255,255,0.6);font-size:0.74rem;">⏳ 正在上传 ' + _esc(f.name) + ' …</div>';
         try {
-            const ok = await window.__actPackSet(f);
+            const ok = await window.__actPackSet(f, author);
             if (!ok) throw new Error('写入云端失败');
-            try { if (typeof showToast === 'function') showToast('✅ 已上传脚本包：' + f.name, 'success'); } catch (e) {}
+            try { if (typeof showToast === 'function') showToast('✅ 已上传脚本包：' + f.name + (author ? '（' + author + '）' : ''), 'success'); } catch (e) {}
         } catch (e) {
             try { if (typeof showToast === 'function') showToast('上传失败：' + (e && e.message || e), 'error'); } catch (e2) {}
         }
         await window._actPackRender(areaId, opts || { upload: true, del: true });
     };
-    // 管理员删除（带确认 + 管理员校验）
-    window._actPackDelete = async function (areaId, opts) {
+    // 管理员删除指定脚本包（带确认 + 管理员校验）
+    window._actPackDelete = async function (areaId, id, opts) {
         if (!_isAdmin()) { try { if (typeof showToast === 'function') showToast('仅管理员可删除', 'error'); } catch (e) {} return; }
-        if (typeof confirm === 'function' && !confirm('确定删除当前 7 天脚本包？所有人将不再能下载。')) return;
+        const list = await window.__actPackList();
+        const target = list.find(function (x) { return x.id === id; });
+        const label = target ? (target.name + (target.author ? '（' + target.author + '）' : '')) : '该脚本包';
+        if (typeof confirm === 'function' && !confirm('确定删除脚本包「' + label + '」？其他人将不再能下载它。')) return;
         try {
-            const ok = await window.__actPackDel();
-            try { if (typeof showToast === 'function') showToast(ok ? '已删除脚本包' : '删除失败', ok ? 'info' : 'error'); } catch (e) {}
+            const ok = await window.__actPackDel(id);
+            try { if (typeof showToast === 'function') showToast(ok ? '已删除：' + label : '删除失败', ok ? 'info' : 'error'); } catch (e) {}
         } catch (e) {}
         await window._actPackRender(areaId, opts || { upload: true, del: true });
     };
