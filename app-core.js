@@ -10733,8 +10733,13 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             };
             slider.onchange = () => {
                 const newLv = levels[Number(slider.value)];
-                setCardLevel(cardId, newLv, cardType, handType); updateAllCardLevelBadges();
+                setCardLevel(cardId, newLv, cardType, handType);
                 _renderLevelInfo(newLv);
+                // 🔴 2026-10-14 图库槽位：updateAllCardLevelBadges 只重铺卡池/手牌，不覆盖 .ll-slot → 等级数值不变；
+                //    图库槽位单独 _llReapplySlot 重铺该槽（_lvBadge 用同一 cardId 重画等级数字）。
+                const _libSlot = badge.closest('.ll-slot');
+                if (_libSlot && typeof window._llReapplySlot === 'function') { window._llReapplySlot(_libSlot); }
+                else { updateAllCardLevelBadges(); }
                 if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('卡牌设置-调整等级');
             };
             lvWrap.appendChild(slider);
