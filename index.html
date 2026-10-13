@@ -436,6 +436,13 @@
                 <input type="range" id="smMargin" min="0" max="30" step="1" value="6" style="width:120px;accent-color:#ffd700;">
                 <button id="smReset" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:0.8rem;">重置</button>
               </div>
+              <!-- 调参：镜像（左右/上下翻转，镜像后再缩放裁剪，导出即镜像成品） -->
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+                <span style="color:#ffd700;font-size:0.8rem;">镜像：</span>
+                <button id="smFlipH" title="左右翻转（水平镜像）" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.25);color:#fff;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:0.8rem;">↔ 左右镜像</button>
+                <button id="smFlipV" title="上下翻转（垂直镜像）" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.25);color:#fff;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:0.8rem;">↕ 上下翻转</button>
+                <span style="color:rgba(255,255,255,0.5);font-size:0.72rem;">（有的原图是反的，先镜像再缩放 / 裁剪，导出的成品即镜像后的正确图）</span>
+              </div>
               <!-- 入库信息（在按钮上方，先填好再下载/保存/推送） -->
               <div style="margin-bottom:14px;">
                 <div style="color:#ffd700;font-size:0.85rem;margin-bottom:6px;">入库信息（先填好，再下载 / 保存 / 推送）</div>

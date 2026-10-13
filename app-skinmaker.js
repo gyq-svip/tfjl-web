@@ -1,6 +1,6 @@
 
   (function(){
-    var smImg=null, smScale=1, smOffX=0, smOffY=0, smMargin=6, smRarity='gold';
+    var smImg=null, smScale=1, smOffX=0, smOffY=0, smMargin=6, smRarity='gold', smFlipH=false, smFlipV=false;
     var SM_W=206, SM_H=200, SM_D=2;
     var SM_RARITY={
       gold:['#ffd86b','#c8862a'],
@@ -50,7 +50,14 @@
       var dw=smImg.width*base*smScale, dh=smImg.height*base*smScale;
       var cx=SM_W/2+smOffX, cy=SM_H/2+smOffY;
       var dx=cx-dw/2, dy=cy-dh/2;
-      ctx.drawImage(smImg, dx*scale, dy*scale, dw*scale, dh*scale);
+      var x0=dx*scale, y0=dy*scale, w=dw*scale, h=dh*scale;
+      // 🔴 2026-10-13 镜像：左右/上下翻转（在裁剪框内围绕图片中心翻），导出即镜像成品
+      if(smFlipH||smFlipV){
+        ctx.translate(x0+w/2, y0+h/2);
+        ctx.scale(smFlipH?-1:1, smFlipV?-1:1);
+        ctx.translate(-(x0+w/2), -(y0+h/2));
+      }
+      ctx.drawImage(smImg, x0, y0, w, h);
       ctx.restore();
       ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=Math.max(1,scale);
       ctx.strokeRect(0.5,0.5,W-1,H-1);
@@ -72,7 +79,7 @@
       var r=new FileReader();
       r.onload=function(ev){
         var img=new Image();
-        img.onload=function(){ smImg=img; smScale=1; smOffX=0; smOffY=0; var z=document.getElementById('smZoom'); if(z){z.value=1; document.getElementById('smZoomVal').textContent='1.00';} smRenderAll(); };
+        img.onload=function(){ smImg=img; smScale=1; smOffX=0; smOffY=0; smFlipH=false; smFlipV=false; var z=document.getElementById('smZoom'); if(z){z.value=1; document.getElementById('smZoomVal').textContent='1.00';} var fh=document.getElementById('smFlipH'), fv=document.getElementById('smFlipV'); if(fh) fh.style.outline='none'; if(fv) fv.style.outline='none'; smRenderAll(); };
         img.src=ev.target.result;
       };
       r.readAsDataURL(f);
@@ -87,6 +94,8 @@
       var cx=SM_W/2+smOffX, cy=SM_H/2+smOffY;
       var dx=cx-dw/2, dy=cy-dh/2;
       var localX=(cardX-dx)/dw*smImg.width, localY=(cardY-dy)/dh*smImg.height;
+      if(smFlipH) localX=smImg.width-localX;   // 左右镜像后，光标对应的源坐标也需镜像，缩放才对准视觉位置
+      if(smFlipV) localY=smImg.height-localY;
       var factor=e.deltaY<0?1.12:0.89;
       var ns=Math.min(6,Math.max(0.2,smScale*factor));
       var ndw=smImg.width*base*ns, ndh=smImg.height*base*ns;
@@ -378,7 +387,9 @@
       for(var i=0;i<btns.length;i++){ btns[i].addEventListener('click', (function(b){ return function(){ smSetRarity(b.getAttribute('data-sm-rarity')); }; })(btns[i])); }
       var z=document.getElementById('smZoom'); if(z) z.addEventListener('input', function(e){ smScale=parseFloat(e.target.value); document.getElementById('smZoomVal').textContent=smScale.toFixed(2); smRenderAll(); });
       var m=document.getElementById('smMargin'); if(m) m.addEventListener('input', function(e){ smMargin=parseInt(e.target.value); document.getElementById('smMarginVal').textContent=smMargin; smRenderAll(); });
-      var rs=document.getElementById('smReset'); if(rs) rs.addEventListener('click', function(){ smScale=1; smOffX=0; smOffY=0; if(z){z.value=1; document.getElementById('smZoomVal').textContent='1.00';} smRenderAll(); });
+      var rs=document.getElementById('smReset'); if(rs) rs.addEventListener('click', function(){ smScale=1; smOffX=0; smOffY=0; smFlipH=false; smFlipV=false; if(z){z.value=1; document.getElementById('smZoomVal').textContent='1.00';} var fh=document.getElementById('smFlipH'), fv=document.getElementById('smFlipV'); if(fh) fh.style.outline='none'; if(fv) fv.style.outline='none'; smRenderAll(); });
+      var fh=document.getElementById('smFlipH'); if(fh) fh.addEventListener('click', function(){ smFlipH=!smFlipH; fh.style.outline=smFlipH?'3px solid #ffd700':'none'; smRenderAll(); });
+      var fv=document.getElementById('smFlipV'); if(fv) fv.addEventListener('click', function(){ smFlipV=!smFlipV; fv.style.outline=smFlipV?'3px solid #ffd700':'none'; smRenderAll(); });
       var dl=document.getElementById('smDownload'); if(dl) dl.addEventListener('click', smDownload);
       var sv=document.getElementById('smSave'); if(sv) sv.addEventListener('click', smSave);
       var pb=document.getElementById('smPush'); if(pb) pb.addEventListener('click', function(){ smPush(); });
