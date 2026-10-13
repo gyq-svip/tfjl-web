@@ -27544,6 +27544,7 @@ ${maSection}
                 box.value = _actLineupToText(d);
                 if (info) info.textContent = '☁ 云端已生效：' + (d.title || '（无标题）') + ' · ' + d.list.length + ' 天 · 更新于 ' + new Date(d.ts || Date.now()).toLocaleString('zh-CN');
             }
+            try { if (typeof window._actPackRender === 'function') window._actPackRender('actPackArea', { upload: true, del: true }); } catch (e) {}
         };
         // 管理员页：保存下发
         window.saveActLineupAdmin = async function () {
