@@ -8965,19 +8965,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 cgmRefreshFusionList();
                 cgmRefreshAllSlots();
                 if (typeof renderFusionCardsToPool === 'function') renderFusionCardsToPool();
-                // 一步到位：添加融合卡后立即自动切副卡皮并入 skins（副卡 = components[1]）
-                let cutMsg = '';
-                try {
-                    const subHero = (_cgmValidParts && _cgmValidParts[1]) || null;
-                    if (subHero) {
-                        const r = await cgmCutFusionSkins(subHero, false);
-                        cutMsg = '\n' + (r.ok ? (r.skipped ? '• ' : '✓ ') : '⚠ ') + r.msg;
-                    }
-                } catch (e2) {
-                    cutMsg = '\n⚠ 自动切副卡皮失败：' + e2.message + '（可点列表里该卡的「✂️ 切皮」重试）';
-                }
+                // 🔴 2026-10-14 副卡显示改为「本地直接拼接副卡英雄自己的皮肤原图缩小贴角」（见 resolveFusionHalf），
+                //    不再自动切副卡皮 / 推送「融合XX」虚拟英雄（已确认全库无消费方）。仅写 fusions.json 定义。
                 status.style.color = '#4ade80';
-                status.textContent = '✓ 已写入 skins/fusions.json' + cutMsg + '\n👉 点上方「🚀 一键推送」即可全部上线（fusions.json + 融合皮肤一起推，推送失败会自动修复重试）';
+                status.textContent = '✓ 已写入 skins/fusions.json（副卡上阵时自动本地拼接其英雄原皮，无需切皮）\n👉 点上方「🚀 一键推送」即可上线（仅 fusions.json 定义）';
                 if (_cgmEditFusionName) { const ab = document.getElementById('cgmFusionAddBtn'); if (ab) ab.textContent = '✓ 添加融合卡'; _cgmEditFusionName = null; }
             } catch (e) {
                 status.style.color = '#ff9e80';
