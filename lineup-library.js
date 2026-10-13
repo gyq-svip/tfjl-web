@@ -173,9 +173,9 @@
         // 卡槽点击：🔴 2026-09-29 用户要求：去掉左键融合循环/右键皮肤循环（与设置弹窗冲突且连环重渲染卡顿），
         //   左键/右键统一 = 打开主页同款设置弹窗（皮肤/等级/魔化/副卡 + 图库专属融合切换区）
         ov.addEventListener('click', function (e) {
-            if (e.target.closest('.card-level-badge')) return;   // 角标有自己的全局委托，避免双开
+            if (e.target.closest('.card-level-badge')) return;   // 等级/魔化角标 → 全局委托开设置（不动上阵）
             const sl = e.target.closest('.ll-slot');
-            if (sl) { _llOpenSettings(sl, e); }
+            if (sl) { window._llToggleOn(sl); }   // 🔴 2026-10-13 点卡片 = 上阵/不上阵 切换
         });
         ov.addEventListener('contextmenu', function (e) {
             const sl = e.target.closest('.ll-slot');
@@ -241,7 +241,7 @@
             + '<button onclick="_llOpenScriptSim()" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(255,107,107,0.6);background:rgba(255,107,107,0.18);color:#ff6b6b;cursor:pointer;font-size:0.8rem;font-weight:700;">🎮 模拟器</button>'
             + '</div>'
             + '</div>'
-            + '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-top:4px;">左卡组右笔记 · <b style="color:#ce93d8;">左键/右键=打开设置弹窗（皮肤/等级/魔化/副卡/融合切换，改完全局生效）</b> · <b style="color:#ff8a80;">🛡️减伤=鼠标悬浮查看每张卡的减伤明细（0% 减伤的卡自动隐藏）</b> · 活动脚本改在底部「📦 7 天脚本包」一次性导入 ·（个人设置只存本机）· 拖标题栏移动窗口，右下角拉伸大小</div>';
+            + '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-top:4px;">左卡组右笔记 · <b style="color:#4caf50;">左键点卡=上阵↔不上阵</b>（右上角绿点=已上阵，每方最多 7 张，默认前 7 张）；<b style="color:#ce93d8;">右键/点等级角标=设置</b> · <b style="color:#ff8a80;">🛡️减伤只算绿点卡+战车</b>（悬浮看明细） · 活动脚本改在底部「📦 7 天脚本包」一次性导入 ·（个人设置只存本机）· 拖标题栏移动窗口，右下角拉伸大小</div>';
         _ensureAdmin();
     }
     // 🔴 2026-09-23 多关键词搜索：空格/逗号/顿号分隔，必须【同时包含】（AND）——搜"电法 炎魔 悟空"才精准
@@ -325,7 +325,7 @@
             return _ENG_HEROES.some(function (e) { return String(p).indexOf(e) >= 0; });
         });
     }
-    function _slotHtml(which, idx, hero, tab, id, sz) {
+    function _slotHtml(which, idx, hero, tab, id, sz, side, onArr) {
         const s = sz || 50;
         const engOrig = _isEngHero(hero);   // 用原始名判（后面可能被归一化成主卡名）
         // 🔴 2026-09-29 备份/项目导入的卡可能已是「融合名」（A·B 形态）：图库此前把它当普通单卡渲染，
@@ -345,16 +345,53 @@
         // 🔴 2026-09-22 全局 .battle-slot 写死 min/max-width:72px、min-height:72px（styles.css:545），
         //    min-width 会压过内联 width → 图库小格子里实际渲染 72px → 相邻卡槽互相重叠（用户实测）。
         //    内联把 min/max 全部钉死 + overflow:hidden，保证槽位永远等于格子尺寸。
-        // 🔴 2026-10-13 工程卡：橙色描边 + 右上角 🔧 角标（一眼看出这张要上工程位，不能当普通卡站位）
+        // 🔴 2026-10-13 工程卡：橙色描边 + 🔧 角标（一眼看出这张要上工程位，不能当普通卡站位）
+        // 🔴 2026-10-13 上阵绿点：右上角小圆，绿色=已上阵、灰圈=未上阵；点卡片本身切换上阵/不上阵
         const eng = engOrig || _isEngHero(hero);
+        const isOn = !!(onArr && onArr[idx]);
         const box = 'width:' + s + 'px;height:' + s + 'px;min-width:' + s + 'px;max-width:' + s + 'px;min-height:' + s + 'px;max-height:' + s + 'px;padding:0;border-radius:6px;cursor:pointer;position:relative;overflow:hidden;'
             + (eng ? 'border:1.5px solid rgba(240,147,43,0.95);box-shadow:0 0 6px rgba(240,147,43,0.35);' : '');
-        // 🔴 2026-09-22 卡下方名字标签移除（皮肤图上已有名字）；卡放大 44→54px（用户反馈太小、融合卡看不清）
-        return '<div class="battle-slot filled ll-slot" data-slot="ll-' + tab + '-' + id + '-' + which + idx + '" data-hero="' + _esc(hero) + '" data-tab="' + tab + '" data-lid="' + _esc(id) + '" data-w="' + which + '" data-eng="' + (eng ? '1' : '0') + '" title="' + _esc(hero) + (eng ? '（🔧 工程卡：只能上工程位）' : '') + '（点击：设置皮肤/等级/魔化/融合副卡）" style="' + box + '">'
+        const dot = '<span class="ll-ondot" style="position:absolute;top:1px;right:1px;width:11px;height:11px;border-radius:50%;pointer-events:none;z-index:2;'
+            + (isOn ? 'background:#4caf50;box-shadow:0 0 5px rgba(76,175,80,0.85);border:1px solid rgba(0,0,0,0.45);' : 'background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.35);')
+            + '" title="' + (isOn ? '已上阵（点卡片切换为不上阵）' : '未上阵（点卡片切换为上阵）') + '"></span>';
+        return '<div class="battle-slot filled ll-slot" data-slot="ll-' + tab + '-' + id + '-' + which + idx + '" data-hero="' + _esc(hero) + '" data-tab="' + tab + '" data-lid="' + _esc(id) + '" data-w="' + which + '" data-side="' + _esc(side || 'my') + '" data-eng="' + (eng ? '1' : '0') + '" title="' + _esc(hero) + (eng ? '（🔧 工程卡：只能上工程位）' : '') + '（点卡片：上阵/不上阵切换；右键或点等级角标：设置）" style="' + box + '">'
+            + dot
             + '<span class="card-item"><span class="card-name">' + _esc(hero) + '</span></span>'
-            + (eng ? '<span style="position:absolute;top:0;right:2px;font-size:0.6rem;line-height:1;text-shadow:0 1px 2px #000;pointer-events:none;">🔧</span>' : '')
+            + (eng ? '<span style="position:absolute;bottom:0;right:2px;font-size:0.6rem;line-height:1;text-shadow:0 1px 2px #000;pointer-events:none;">🔧</span>' : '')
             + '</div>';
     }
+    // 🔴 2026-10-13 上阵（on-battle）状态：每个阵容每方（A=我的 / B=队友）一个布尔数组，存本机 localStorage，
+    //    默认前 7 张上阵（每方最多 7 张）。减伤只算已上阵的卡。
+    function _onKey(side) { return (side === 'teammate') ? 'B' : 'A'; }
+    function _defaultOn(count) { const a = []; for (let i = 0; i < (count || 0); i++) a.push(i < 7); return a; }
+    function _getOn(tab, lid, side, count) {
+        const o = _load(); o[tab] = o[tab] || {}; o[tab][lid] = o[tab][lid] || {}; const L = o[tab][lid];
+        L.on = L.on || {};
+        const k = _onKey(side);
+        if (!L.on[k] || L.on[k].length !== (count || 0)) { L.on[k] = _defaultOn(count); _save(o); }
+        return L.on[k];
+    }
+    // 点卡片：上阵 ↔ 不上阵 切换（每方最多 7 张；绿点实时更新；减伤随后重算）
+    window._llToggleOn = function (sl) {
+        try {
+            const tab = sl.getAttribute('data-tab'), lid = sl.getAttribute('data-lid'), side = sl.getAttribute('data-side') || 'my';
+            const m = String(sl.dataset.slot || '').match(/([abud])(\d+)$/);
+            const idx = m ? parseInt(m[2], 10) : -1;
+            if (idx < 0) return;
+            const o = _load(); o[tab] = o[tab] || {}; o[tab][lid] = o[tab][lid] || {}; const L = o[tab][lid];
+            L.on = L.on || {}; const k = _onKey(side);
+            const arr = L.on[k] || (L.on[k] = _defaultOn(10));
+            const turningOn = !arr[idx];
+            if (turningOn) { let c = 0; for (let i = 0; i < arr.length; i++) if (arr[i]) c++; if (c >= 7) { try { if (typeof showToast === 'function') showToast('每方最多上阵 7 张卡', 'warn'); } catch (e2) {} return; } }
+            arr[idx] = turningOn; _save(o);
+            const dot = sl.querySelector('.ll-ondot');
+            if (dot) {
+                if (turningOn) { dot.style.background = '#4caf50'; dot.style.boxShadow = '0 0 5px rgba(76,175,80,0.85)'; dot.style.border = '1px solid rgba(0,0,0,0.45)'; dot.title = '已上阵（点卡片切换为不上阵）'; }
+                else { dot.style.background = 'rgba(255,255,255,0.12)'; dot.style.boxShadow = 'none'; dot.style.border = '1px solid rgba(255,255,255,0.35)'; dot.title = '未上阵（点卡片切换为上阵）'; }
+            }
+            _refreshDrSums(document.getElementById('llList'));
+        } catch (e) {}
+    };
     // 🔴 2026-09-22 减伤计算全部改用主页现成的 getDamageReductionBreakdown（洗炼+小野/酋长/宝库特殊技能+战车，
     //    与主页完全一致）——旧的 _cardDr/_sumDr 只读洗炼、漏了特殊卡表级值和战车（用户实测 260% 只算出部分）。
     //    卡上不再画减伤角标（被名字挡住）；组头 🛡️ 悬浮显示主页同款拆分明细。
@@ -370,9 +407,11 @@
         (root || document.getElementById('llList') || document).querySelectorAll('.ll-drsum').forEach(function (el) {
             try {
                 const heroes = JSON.parse(el.getAttribute('data-heroes') || '[]');
-                const tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid');
-                const cards = _drCards(tab, lid, heroes);
-                const side = el.getAttribute('data-side') || 'my', table = el.getAttribute('data-table') || '我的';
+                const tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid'), side = el.getAttribute('data-side') || 'my';
+                const on = _getOn(tab, lid, side, heroes.length);
+                const chosen = heroes.filter(function (h, i) { return on[i]; });   // 🔴 2026-10-13 只算已上阵的卡
+                const cards = _drCards(tab, lid, chosen);
+                const table = el.getAttribute('data-table') || '我的';
                 const calc = window.calculateDamageReductionForCards, bd = window.getDamageReductionBreakdown;
                 if (!calc || !bd) { el.textContent = '🛡️—'; return; }
                 const all = bd(cards, side, table);
@@ -867,7 +906,8 @@
         // 卡组（5×2）+ 右侧波次备注列（🔴 2026-09-22 用户要求：备注放卡组右边，正好填补空白）
         h += '<div style="display:flex;align-items:flex-start;gap:10px;">';
         h += '<div style="display:grid;grid-template-columns:repeat(5,72px);gap:6px;">';
-        s.heroes.forEach(function (n, i) { h += _slotHtml(i < 5 ? 'u' : 'd', i % 5, n, 'sailing', s.id, 72); });
+        const _sailOn = _getOn('sailing', s.id, 'my', s.heroes.length);
+        s.heroes.forEach(function (n, i) { h += _slotHtml(i < 5 ? 'u' : 'd', i % 5, n, 'sailing', s.id, 72, 'my', _sailOn); });
         h += '</div>';
         h += '<div style="flex:1;min-width:150px;display:flex;flex-direction:column;gap:3px;padding-top:2px;">';
         [['n219', '219波'], ['n229', '229波'], ['n230', '230波'], ['other', '其他']].forEach(function (p2) {
@@ -907,7 +947,8 @@
             if (ab === 'A') h += '<button onclick="_llReset(\'activity\',\'d' + a.day + '\')" title="重置该天个人设置（英雄/融合/皮肤/脚本）" style="padding:2px 6px;border-radius:6px;border:1px solid rgba(255,107,107,0.45);background:rgba(255,107,107,0.14);color:#ff6b6b;cursor:pointer;font-size:0.62rem;font-weight:700;white-space:nowrap;">↺ 重置</button>';
             h += '</div>';
             h += '<div style="display:grid;grid-template-columns:repeat(5,94px);gap:6px;">';
-            (a[ab] || []).forEach(function (n, i) { h += _slotHtml(ab.toLowerCase(), i, n, 'activity', 'd' + a.day, 94); });
+            const _actOn = _getOn('activity', 'd' + a.day, st.side, (a[ab] || []).length);
+            (a[ab] || []).forEach(function (n, i) { h += _slotHtml(ab.toLowerCase(), i, n, 'activity', 'd' + a.day, 94, st.side, _actOn); });
             h += '</div></div>';
         });
         h += '</div></div>';
@@ -947,7 +988,7 @@ let _adminVerified=false, _adminLastTok='', _featItems=[], _featData=null, _feat
     function _normPj(pj){ return (pj && pj.project) ? pj.project : (pj || {}); }
     function _featSlug(item){ return 'feat_' + String(item.id || item.name || 'x').replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g,'_'); }
     function _featuredSync(item,pj){ const slug=_featSlug(item); const o=_load(); ['A','B'].forEach(function(ab){ const id=slug+'_'+ab; o['featured']=o['featured']||{}; o['featured'][id]=o['featured'][id]||{}; const slot=o['featured'][id]; const prefix=(ab==='A')?'my_':'teammate_'; const cards=(ab==='A'?pj.myHandCards:pj.teammateHandCards)||[]; const rawSkins=pj.cardSkins||{}; if(!slot.skin || !Object.keys(slot.skin).length){ slot.skin=slot.skin||{}; cards.forEach(function(c){ if(!c||c.id==null) return; const sv=rawSkins[prefix+c.id]; if(c.name&&sv!=null) slot.skin[c.name]=sv; }); } if(!slot.fus || !Object.keys(slot.fus).length){ slot.fus=slot.fus||{}; cards.forEach(function(c){ const nm=(c&&c.name)||''; if(!nm) return; const parts=(window.getFusionParts?window.getFusionParts(nm):null); if(parts&&parts.length>=2) slot.fus[nm]=nm; }); } const ch=(ab==='A'?pj.myChariot:pj.teammateChariot); if(!slot.cart && ch && ch.main) slot.cart=String(ch.main); if(!slot.cart2 && ch && ch.sub) slot.cart2=String(ch.sub); }); const fs=pj.fusionSkins||{}; window.fusionSkins=window.fusionSkins||{}; Object.keys(fs).forEach(function(h){ if(fs[h]!==undefined) window.fusionSkins[h]=fs[h]; }); _save(o); }
-    function _featuredCard(item,pj,idx,src){ const slug=_featSlug(item); const title=item.name || pj.name || '未命名'; const aH=(pj.myHandCards||[]).map(function(c){return c.name||c;}); const bH=(pj.teammateHandCards||[]).map(function(c){return c.name||c;}); let h='<div class="ll-card" style="border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:6px 9px;margin-bottom:10px;background:rgba(0,0,0,0.22);">'; h+='<div style="display:flex;align-items:flex-start;gap:14px;">'; ['A','B'].forEach(function(ab){ const id=slug+'_'+ab; const L=_slot('featured',id); const st=(ab==='A')?{side:'my',table:'我的'}:{side:'teammate',table:'队友'}; h+='<div style="border-radius:9px;padding:4px 7px 7px;background:'+(ab==='A'?'rgba(78,205,196,0.07)':'rgba(240,147,43,0.07)')+';border:1px solid '+(ab==='A'?'rgba(78,205,196,0.32)':'rgba(240,147,43,0.32)')+';">'; h+='<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:4px;">'; if(ab==='A') h+='<b style="color:#ffd700;font-size:0.82rem;margin-right:4px;white-space:nowrap;">'+_esc(title)+'</b>'; h+='<span style="font-weight:800;color:'+(ab==='A'?'#4ecdc4':'#f0932b')+';font-size:0.76rem;">'+ab+'组</span>'; h+='<span style="color:rgba(255,255,255,0.45);font-size:0.62rem;">主</span>'+_cartSelect('featured',id,'cart',L.cart); h+='<span style="color:rgba(255,255,255,0.45);font-size:0.62rem;">副</span>'+_cartSelect('featured',id,'cart2',L.cart2); h+='<span class="ll-drsum" data-tab="featured" data-lid="'+id+'" data-side="'+st.side+'" data-table="'+st.table+'" data-heroes="'+_esc(JSON.stringify(ab==='A'?aH:bH))+'" title="减伤明细" style="color:#ff8a80;font-size:0.64rem;font-weight:700;cursor:help;">减伤</span>'; if(ab==='A'){ h+='<button onclick="_llReset(&quot;featured&quot;,&quot;'+slug+'_A&quot;)" title="重置该阵容个人设置" style="padding:2px 6px;border-radius:6px;border:1px solid rgba(255,107,107,0.45);background:rgba(255,107,107,0.14);color:#ff6b6b;cursor:pointer;font-size:0.62rem;font-weight:700;white-space:nowrap;">重置</button>'; if(src==='local'){ h+='<button onclick="_featuredRemove('+idx+',\'local\')" title="删除该本地阵容（仅本机移除）" style="padding:2px 6px;border-radius:6px;border:1px solid rgba(255,107,107,0.45);background:rgba(255,107,107,0.14);color:#ff6b6b;cursor:pointer;font-size:0.62rem;font-weight:700;white-space:nowrap;">删除(本机)</button>'; } else if(_isAdmin()){ h+='<button onclick="_featuredRemove('+idx+',\'pub\')" title="删除该精选阵容（所有人都会看不到）" style="padding:2px 6px;border-radius:6px;border:1px solid rgba(255,107,107,0.45);background:rgba(255,107,107,0.14);color:#ff6b6b;cursor:pointer;font-size:0.62rem;font-weight:700;white-space:nowrap;">删除</button>'; } } h+='</div>'; h+='<div style="display:grid;grid-template-columns:repeat(5,94px);gap:6px;">'; (ab==='A'?aH:bH).forEach(function(n,i){ h+=_slotHtml(ab.toLowerCase(),i,n,'featured',id,94); }); h+='</div></div>'; }); const sc=_dayScripts(slug); h+='<div style="align-self:flex-start;display:flex;flex-direction:column;gap:5px;min-width:108px;">'; h+='<button id="llScriptBtn-'+slug+'" onclick="_llScriptDlg(&quot;'+slug+'&quot;)" title="管理该阵容脚本" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(240,147,43,0.45);background:rgba(240,147,43,0.12);color:#f0932b;font-size:0.74rem;font-weight:700;cursor:pointer;text-align:left;">阵容脚本（'+sc.length+'）</button>'; h+='<div id="llScripts-'+slug+'">'+(typeof _scriptsHtml==='function'?_scriptsHtml(sc,slug):'')+'</div>'; h+='</div>'; h+='</div></div>'; return h; }
+    function _featuredCard(item,pj,idx,src){ const slug=_featSlug(item); const title=item.name || pj.name || '未命名'; const aH=(pj.myHandCards||[]).map(function(c){return c.name||c;}); const bH=(pj.teammateHandCards||[]).map(function(c){return c.name||c;}); let h='<div class="ll-card" style="border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:6px 9px;margin-bottom:10px;background:rgba(0,0,0,0.22);">'; h+='<div style="display:flex;align-items:flex-start;gap:14px;">'; ['A','B'].forEach(function(ab){ const id=slug+'_'+ab; const L=_slot('featured',id); const st=(ab==='A')?{side:'my',table:'我的'}:{side:'teammate',table:'队友'}; h+='<div style="border-radius:9px;padding:4px 7px 7px;background:'+(ab==='A'?'rgba(78,205,196,0.07)':'rgba(240,147,43,0.07)')+';border:1px solid '+(ab==='A'?'rgba(78,205,196,0.32)':'rgba(240,147,43,0.32)')+';">'; h+='<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:4px;">'; if(ab==='A') h+='<b style="color:#ffd700;font-size:0.82rem;margin-right:4px;white-space:nowrap;">'+_esc(title)+'</b>'; h+='<span style="font-weight:800;color:'+(ab==='A'?'#4ecdc4':'#f0932b')+';font-size:0.76rem;">'+ab+'组</span>'; h+='<span style="color:rgba(255,255,255,0.45);font-size:0.62rem;">主</span>'+_cartSelect('featured',id,'cart',L.cart); h+='<span style="color:rgba(255,255,255,0.45);font-size:0.62rem;">副</span>'+_cartSelect('featured',id,'cart2',L.cart2); h+='<span class="ll-drsum" data-tab="featured" data-lid="'+id+'" data-side="'+st.side+'" data-table="'+st.table+'" data-heroes="'+_esc(JSON.stringify(ab==='A'?aH:bH))+'" title="减伤明细" style="color:#ff8a80;font-size:0.64rem;font-weight:700;cursor:help;">减伤</span>'; if(ab==='A'){ h+='<button onclick="_llReset(&quot;featured&quot;,&quot;'+slug+'_A&quot;)" title="重置该阵容个人设置" style="padding:2px 6px;border-radius:6px;border:1px solid rgba(255,107,107,0.45);background:rgba(255,107,107,0.14);color:#ff6b6b;cursor:pointer;font-size:0.62rem;font-weight:700;white-space:nowrap;">重置</button>'; if(src==='local'){ h+='<button onclick="_featuredRemove('+idx+',\'local\')" title="删除该本地阵容（仅本机移除）" style="padding:2px 6px;border-radius:6px;border:1px solid rgba(255,107,107,0.45);background:rgba(255,107,107,0.14);color:#ff6b6b;cursor:pointer;font-size:0.62rem;font-weight:700;white-space:nowrap;">删除(本机)</button>'; } else if(_isAdmin()){ h+='<button onclick="_featuredRemove('+idx+',\'pub\')" title="删除该精选阵容（所有人都会看不到）" style="padding:2px 6px;border-radius:6px;border:1px solid rgba(255,107,107,0.45);background:rgba(255,107,107,0.14);color:#ff6b6b;cursor:pointer;font-size:0.62rem;font-weight:700;white-space:nowrap;">删除</button>'; } } h+='</div>'; h+='<div style="display:grid;grid-template-columns:repeat(5,94px);gap:6px;">'; const featList=(ab==='A'?aH:bH); const featOn=_getOn('featured',id,st.side,featList.length); featList.forEach(function(n,i){ h+=_slotHtml(ab.toLowerCase(),i,n,'featured',id,94,st.side,featOn); }); h+='</div></div>'; }); const sc=_dayScripts(slug); h+='<div style="align-self:flex-start;display:flex;flex-direction:column;gap:5px;min-width:108px;">'; h+='<button id="llScriptBtn-'+slug+'" onclick="_llScriptDlg(&quot;'+slug+'&quot;)" title="管理该阵容脚本" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(240,147,43,0.45);background:rgba(240,147,43,0.12);color:#f0932b;font-size:0.74rem;font-weight:700;cursor:pointer;text-align:left;">阵容脚本（'+sc.length+'）</button>'; h+='<div id="llScripts-'+slug+'">'+(typeof _scriptsHtml==='function'?_scriptsHtml(sc,slug):'')+'</div>'; h+='</div>'; h+='</div></div>'; return h; }
     function _featHash(s){ let h=5381; for(let i=0;i<s.length;i++){ h=((h<<5)+h+s.charCodeAt(i))>>>0; } return h.toString(36); }
     function _featCacheKey(){ return 'tfjl_feat_cache_v1'; }
     function _idbOpen(){ return new Promise(function(res,rej){ try{ const r=indexedDB.open('tfjl_feat',1); r.onupgradeneeded=function(){ const db=r.result; if(!db.objectStoreNames.contains('kv')) db.createObjectStore('kv'); }; r.onsuccess=function(){ res(r.result); }; r.onerror=function(){ rej(r.error); }; }catch(e){ rej(e); } }); }
