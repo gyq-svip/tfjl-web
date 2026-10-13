@@ -123,6 +123,29 @@
         return o[tab][id];
     }
     function _esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+    // 🔴 2026-10-13 A/B 独立存储：融合/皮肤按「英雄#阵营(my/teammate)」键，使同一天 A、B 两组的同名英雄互不干扰。
+    //    读取带旧数据兼容：优先「英雄#阵营」新键，回退旧「英雄」键（升级前的数据仍可命中）。
+    function _fusOf(L, hero, side) {
+        side = side || 'my';
+        if (L && L.fus) {
+            if (L.fus[hero + '#' + side] != null) return L.fus[hero + '#' + side];
+            if (L.fus[hero] != null) return L.fus[hero];
+        }
+        return '';
+    }
+    function _skinOf(L, hero, side) {
+        side = side || 'my';
+        if (L && L.skin) {
+            if (L.skin[hero + '#' + side] != null) return L.skin[hero + '#' + side];
+            if (L.skin[hero] != null) return L.skin[hero];
+        }
+        return '';
+    }
+    // 暴露给主页设置弹窗（showLevelDropdown）读取图库个人皮肤，使 A/B 高亮正确
+    window._llGetSlotSkin = function (tab, lid, hero, side) {
+        const o = _load(); const L = (o[tab] && o[tab][lid]) || {};
+        return _skinOf(L, hero, side);
+    };
     // 🔴 2026-09-23 英雄名别名（游戏显示名 → 库名）：recognize.js 同款。微型潜艇就是潜艇，
     //    阵容数据若用「微型潜艇」也能正确查减伤/融合/皮肤（主页按「潜艇」存）。
     const _ALIASES = { '微型潜艇': '潜艇' };
@@ -340,7 +363,7 @@
                 const base = parts[0];
                 const L = _slot(tab, id);
                 L.fus = L.fus || {};
-                if (!L.fus[base]) L.fus[base] = hero;   // 保留导入时的融合形态；用户后续可自由切换
+                if (!L.fus[base + '#' + side]) L.fus[base + '#' + side] = hero;   // 按阵营存（A/B 独立）；保留导入时的融合形态
                 hero = base;
             }
         } catch (e) {}
@@ -421,10 +444,10 @@
     // 🔴 2026-09-22 减伤计算全部改用主页现成的 getDamageReductionBreakdown（洗炼+小野/酋长/宝库特殊技能+战车，
     //    与主页完全一致）——旧的 _cardDr/_sumDr 只读洗炼、漏了特殊卡表级值和战车（用户实测 260% 只算出部分）。
     //    卡上不再画减伤角标（被名字挡住）；组头 🛡️ 悬浮显示主页同款拆分明细。
-    function _drCards(tab, lid, heroes) {
+    function _drCards(tab, lid, heroes, side) {
         const L = _slot(tab, lid);
         return (heroes || []).map(function (n) {
-            const f = L.fus && L.fus[n];
+            const f = _fusOf(L, n, side);
             if (f) { const p = (window.getFusionParts ? window.getFusionParts(f) : null); if (p && p.length >= 2) return p.map(_norm).join('+'); return _norm(f); }
             return _norm(n);
         }).map(function (n) { return { name: n }; });   // breakdown 的 cardList 元素格式 = {name}
@@ -436,7 +459,7 @@
                 const tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid'), side = el.getAttribute('data-side') || 'my';
                 const on = _getOn(tab, lid, side, heroes);
                 const chosen = heroes.filter(function (h, i) { return on[i]; });   // 🔴 2026-10-13 只算已上阵的卡
-                const cards = _drCards(tab, lid, chosen);
+                const cards = _drCards(tab, lid, chosen, side);
                 const table = el.getAttribute('data-table') || '我的';
                 const calc = window.calculateDamageReductionForCards, bd = window.getDamageReductionBreakdown;
                 if (!calc || !bd) { el.textContent = '🛡️—'; return; }
@@ -466,15 +489,19 @@
             if (i >= slots.length) return;
             const el = slots[i++];
             const hero = el.getAttribute('data-hero');
+            const side = el.getAttribute('data-side') || 'my';
             const tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid');
             const L = _slot(tab, lid);
-            // 🔴 2026-09-29 皮肤与卡池完全同步：不再用阵容本地皮肤覆盖（L.skin 旧数据废弃不渲染），
-            //    第3参传卡池 id → applySkinBgToSlot 内部 getCardSkin(池id) 解析「卡池默认皮」，改卡池即生效。
-            const fus = (L.fus && L.fus[hero]) || '';
+            // 🔴 2026-10-13 A/B 独立：融合/皮肤按「英雄#阵营」读（A组my / B组teammate 互不干扰）。
+            //    皮肤：非融合态传 forceMainSkin=本阵容个人皮；融合态交给融合分支（保持原行为）。
+            const fus = _fusOf(L, hero, side);
             const cur = fus || hero;
+            const skin = _skinOf(L, hero, side);
             const pc = poolMap[cur];
-            Promise.resolve().then(function () { return window.applySkinBgToSlot(el, cur, pc ? pc.id : undefined, 'my'); })
-                .catch(function () {}).then(function () { _fusBadge(el, fus); _lvBadge(el, hero, fus, poolMap); step(); });
+            // 角标（融合/等级）同步先渲染，避免被皮肤异步加载阻塞；皮肤底图异步铺（失败不影响角标）
+            _fusBadge(el, fus); _lvBadge(el, hero, fus, poolMap);
+            if (window.applySkinBgToSlot) { try { window.applySkinBgToSlot(el, cur, pc ? pc.id : undefined, 'my', fus ? undefined : (skin || undefined)).catch(function () {}); } catch (e) {} }
+            step();
         })();
     }
     // 🔴 2026-09-22 快捷操作（与主页融合一致，用户要求）：
@@ -514,14 +541,16 @@
     //    若该槽有阵容个人皮肤覆盖则覆盖优先（与原逻辑一致）。
     window._llReapplySlot = function (el) {
         const hero = el.getAttribute('data-hero');
+        const side = el.getAttribute('data-side') || 'my';
         const tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid');
         const L = _slot(tab, lid);
-        const fus = (L.fus && L.fus[hero]) || '';
+        const fus = _fusOf(L, hero, side);
         const cur = fus || hero;
+        const skin = _skinOf(L, hero, side);
         const pc = _poolTypeMap()[hero] || _poolTypeMap()[cur];
         // 🔴 2026-10-07 角标（等级/融合）先同步刷新做到瞬时反馈，皮肤底图异步铺不阻塞
         _fusBadge(el, fus); _lvBadge(el, hero, fus);
-        return Promise.resolve().then(function () { return window.applySkinBgToSlot(el, cur, pc ? pc.id : undefined, 'my'); })
+        return Promise.resolve().then(function () { return window.applySkinBgToSlot(el, cur, pc ? pc.id : undefined, 'my', fus ? undefined : (skin || undefined)); })
             .catch(function () {});
     };
     // 🔴 2026-10-07 图库融合变体发现（修复「第1天有融合、第4天同主卡却无融合选项」）：
@@ -600,9 +629,10 @@
     //    （替代原左键循环）。切换完成自动重开弹窗，反映新的当前卡（等级/魔化/皮肤区全部按新卡刷新）。
     window._llOpenSettings = function (sl, e) {
         const hero = sl.getAttribute('data-hero');
+        const side = sl.getAttribute('data-side') || 'my';
         const tab = sl.getAttribute('data-tab'), lid = sl.getAttribute('data-lid');
         const L = _slot(tab, lid);
-        const fus = (L.fus && L.fus[hero]) || '';
+        const fus = _fusOf(L, hero, side);
         const cur = fus || hero;
         // 🔴 2026-10-13 修复：已融合的卡 cur 是融合名（如 小野酋长），而 _poolTypeMap 只认基础英雄名 → 查不到 → 弹窗打不开，
         //    导致融合一次后无法再打开设置来切换/取消融合（"只能选一个、不能切换"）。改用基础英雄 hero 查池（兜底 cur）。
@@ -645,7 +675,7 @@
                             const shown = newFus || hero;
                             const pparts = (window.getFusionParts ? window.getFusionParts(pick) : null) || [];
                             const sub = (newFus && pparts.length >= 2) ? pparts[1] : '';
-                            window._llSet(tab, lid, 'fus', hero, newFus);
+                            window._llSet(tab, lid, 'fus', hero + '#' + side, newFus);
                             if (sub) { try { window.fusionSkins = window.fusionSkins || {}; window.fusionSkins[sub] = ''; } catch (e2) {} }
                             const pm = _poolTypeMap();
                             const pc2 = pm[shown];
@@ -668,6 +698,7 @@
     };
     window._llFuseCycle = function (el) {
         const hero = el.getAttribute('data-hero'), tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid');
+        const side = el.getAttribute('data-side') || 'my';
         const L = _slot(tab, lid);
         const variants = (window.getFusionVariantsForBase ? window.getFusionVariantsForBase(_norm(hero)) : []);
         _llTrack('阵容图库切融合');
@@ -689,7 +720,7 @@
             const skins = hasPool ? ordered.concat(['']) : [''].concat(ordered);
             skins.forEach(function (sk) { steps.push({ v: v, sub: sub, skin: sk }); });
         });
-        const curFuse = (L.fus && L.fus[hero]) || '';
+        const curFuse = _fusOf(L, hero, side);
         const curParts = curFuse ? ((window.getFusionParts ? window.getFusionParts(curFuse) : null) || []) : [];
         const curSub = curParts[1] || '';
         const curSkin = curSub && window.fusionSkins && window.fusionSkins[curSub] !== undefined ? (window.fusionSkins[curSub] || '') : '';
@@ -697,7 +728,7 @@
         if (idx < 0) idx = steps.findIndex(function (s) { return s.v === curFuse; });   // 变体在但副卡皮对不上 → 从该变体段继续
         if (idx < 0) idx = 0;
         const next = steps[(idx + 1) % steps.length];
-        window._llSet(tab, lid, 'fus', hero, next.v);
+        window._llSet(tab, lid, 'fus', hero + '#' + side, next.v);
         if (next.sub) { try { window.fusionSkins = window.fusionSkins || {}; window.fusionSkins[next.sub] = next.skin; } catch (e2) {} }
         const shown = next.v || hero;
         const pm = _poolTypeMap();
@@ -708,17 +739,18 @@
     //   右键 = 循环【主卡】皮肤（🔴 2026-09-22 修复：融合后也一直可切，与左键融合循环互不影响；列表=主页卡池 getHeroSkins）
     window._llSkinCycle = function (el) {
         const hero = el.getAttribute('data-hero'), tab = el.getAttribute('data-tab'), lid = el.getAttribute('data-lid');
+        const side = el.getAttribute('data-side') || 'my';
         const L = _slot(tab, lid);
         const _nm = function (s) { return (typeof s === 'string') ? s : (s && s.name) || ''; };
         _llTrack('阵容图库切皮肤');
-        const cur = (L.skin && L.skin[hero]) || '';
+        const cur = _skinOf(L, hero, side);
         let list = [];
         if (window.getHeroSkins) list = (window.getHeroSkins(_norm(hero)) || []).map(_nm).filter(Boolean);
         else list = ((window.skinRegistry && window.skinRegistry[_norm(hero)]) || []).map(_nm).filter(Boolean);
         const names = [''].concat(list);
         let i = names.indexOf(cur); if (i < 0) i = 0;
         const next = names[(i + 1) % names.length];
-        window._llSet(tab, lid, 'skin', hero, next);
+        window._llSet(tab, lid, 'skin', hero + '#' + side, next);
         const fus = (L.fus && L.fus[hero]) || '';
         const shown = fus || hero;
         // 🔴 融合态必须传第6参 forceMainSkin（融合分支只认它，第5参被忽略）——修复"显示切了但皮肤没换"

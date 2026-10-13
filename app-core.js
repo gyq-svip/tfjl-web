@@ -10680,7 +10680,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const levels = getAvailableLevels(cardType);
             const currentLevel = getCardLevel(cardId, cardType, handType);
             const skins = getAvailableSkins(cardName);
-            const currentSkin = getCardSkin(cardId, cardName, handType);
+            let currentSkin = getCardSkin(cardId, cardName, handType);
             const currentMoHua = getCardMoHua(cardId, handType);
             const canMoHua = hasMoHuaData(cardName);
             const fusionParts = (typeof getFusionParts === 'function') ? getFusionParts(cardName) : null;
@@ -10690,6 +10690,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const variants = (typeof getFusionVariantsForBase === 'function') ? getFusionVariantsForBase(baseHero) : [];
             const hasVariants = variants.length > 0;
             const mainName = getMainCardName(cardName);
+            // 🔴 2026-10-13 图库：捕获弹窗来源槽位（打开时 e.target 在 ll-slot 内），供下方「皮肤写入/高亮」按 A/B 独立处理
+            let libSlot = null;
+            if (!isProjectScope) libSlot = (event && event.target) ? event.target.closest('.ll-slot') : null;
+            if (libSlot && typeof window._llGetSlotSkin === 'function') {
+                const lt = libSlot.getAttribute('data-tab'), ll = libSlot.getAttribute('data-lid'), lsd = libSlot.getAttribute('data-side') || 'my';
+                const baseName = (window.getFusionParts && window.getFusionParts(cardName)) ? (window.getFusionParts(cardName)[0]) : cardName;
+                const libSkin = window._llGetSlotSkin(lt, ll, baseName || cardName, lsd);
+                if (libSkin !== '') currentSkin = libSkin;
+            }
 
             // 弹窗根（遮罩）
             const root = document.createElement('div');
@@ -10769,7 +10778,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     setSkinThumbSelected(skinWrap, skin);   // 🔴 2026-09-29 先亮选中态（瞬时反馈），再做后面的重刷新链
                     // 🔴 2026-10-07 皮肤属性是本地数据，先渲染让弹窗立刻有反应；重铺卡槽/刷新角标放后台（避免换肤要等图片加载）
                     _renderSkinAttrPanel(skin);
-                    if (isProjectScope) await setCardSkin(cardId, skin, handType); else await setDefaultCardSkin(cardId, skin);
+                    if (isProjectScope) { await setCardSkin(cardId, skin, handType); }
+                    else {
+                        // 🔴 2026-10-13 图库：皮肤写本阵容个人覆盖（按 英雄#阵营 独立键），A/B 互不干扰；重铺该槽位
+                        if (libSlot && typeof window._llSet === 'function') {
+                            const lt = libSlot.getAttribute('data-tab'), ll = libSlot.getAttribute('data-lid'), lsd = libSlot.getAttribute('data-side') || 'my';
+                            const baseName = (window.getFusionParts && window.getFusionParts(cardName)) ? (window.getFusionParts(cardName)[0]) : cardName;
+                            window._llSet(lt, ll, 'skin', (baseName || cardName) + '#' + lsd, skin);
+                            if (typeof window._llReapplySlot === 'function') window._llReapplySlot(libSlot);
+                        } else { await setDefaultCardSkin(cardId, skin); }
+                    }
                     updateAllCardLevelBadges();
                     await _reapplyCard();
                     if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('卡牌设置-切换皮肤');
