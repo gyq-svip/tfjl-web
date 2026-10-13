@@ -109,7 +109,7 @@ window.EQUIP_IMG = {
             const main = map[parts[0]];
             if (main) return Object.assign({}, main, { name: name, isFusion: true });
         }
-        const mainName = getMainCardName(name);
+        const mainName = simBaseName(name);
         if (map[mainName]) return Object.assign({}, map[mainName]);
         return { id: name, name: name, type: 'gold', profession: '', engineering: 'false' };
     }
@@ -126,6 +126,29 @@ window.EQUIP_IMG = {
         return list.some(function (p) {
             return ENG_HEROES.some(function (e) { return String(p).indexOf(e) >= 0; });
         });
+    }
+
+    // 🔴 2026-10-13 工程卡主身份：地精宝库/侏儒射线/邪能火炮 这种「战士名+工程名(后缀)」的卡，
+    //    本质是工程卡本身（宝库/射线/火炮），不能退化成主卡名（地精/侏儒/邪能）。
+    //    规则：只要工程英雄名在名字里但不是开头（即工程名是副卡/后缀部分），就以工程英雄作主身份。
+    //    反之 火炮火灵（工程名在开头）→ 仍是普通融合卡，不被误判为工程槽。
+    function engComponentOf(name) {
+        const s = String(name || '').trim();
+        for (let i = 0; i < ENG_HEROES.length; i++) {
+            const e = ENG_HEROES[i];
+            if (s.indexOf(e) >= 0 && !s.startsWith(e)) return e;
+        }
+        return null;
+    }
+    function simBaseName(name) {
+        const eng = engComponentOf(name);
+        if (eng) return eng;
+        return getMainCardName(name);
+    }
+    function simDisplayName(name) {
+        const eng = engComponentOf(name);
+        if (eng) return name;   // 工程变体保留完整名（地精宝库），不退化成主卡名
+        return getFusionDisplayName(name);
     }
 
     function getMaxLevel(cardType) {
@@ -222,11 +245,9 @@ window.EQUIP_IMG = {
 
     function createSideState() { return { slots: {}, equipment: null, sameRowPairs: [], vehicle: { main: '', sub: '' }, hand: [], placedBases: null }; }
 
-    // 工程变体卡（地精宝库/侏儒射线/邪能火炮）用完整名当键，避免和主卡（地精/侏儒/邪能）互相顶掉
+    // 工程变体卡（地精宝库/侏儒射线/邪能火炮）以工程英雄作主身份（宝库/射线/火炮），不再退化成主卡名
     function cardBase(name) {
-        const b = getMainCardName(name);
-        if (isEngineering(name) && !ENG_HEROES.some(function (e) { return String(b).indexOf(e) >= 0; })) return name;
-        return b;
+        return simBaseName(name);
     }
 
     function removeCard(s, hero) {

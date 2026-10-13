@@ -241,7 +241,7 @@
             + '<button onclick="_llOpenScriptSim()" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(255,107,107,0.6);background:rgba(255,107,107,0.18);color:#ff6b6b;cursor:pointer;font-size:0.8rem;font-weight:700;">🎮 模拟器</button>'
             + '</div>'
             + '</div>'
-            + '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-top:4px;">左卡组右笔记 · <b style="color:#ce93d8;">左键/右键=打开设置弹窗（皮肤/等级/魔化/副卡/融合切换，改完全局生效）</b> · <b style="color:#ff8a80;">🛡️减伤=鼠标悬浮查看每张卡的减伤明细（0% 减伤的卡自动隐藏）</b> · 活动 📜=脚本 ·（个人设置只存本机）· 拖标题栏移动窗口，右下角拉伸大小</div>';
+            + '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-top:4px;">左卡组右笔记 · <b style="color:#ce93d8;">左键/右键=打开设置弹窗（皮肤/等级/魔化/副卡/融合切换，改完全局生效）</b> · <b style="color:#ff8a80;">🛡️减伤=鼠标悬浮查看每张卡的减伤明细（0% 减伤的卡自动隐藏）</b> · 活动脚本改在底部「📦 7 天脚本包」一次性导入 ·（个人设置只存本机）· 拖标题栏移动窗口，右下角拉伸大小</div>';
         _ensureAdmin();
     }
     // 🔴 2026-09-23 多关键词搜索：空格/逗号/顿号分隔，必须【同时包含】（AND）——搜"电法 炎魔 悟空"才精准
@@ -298,12 +298,15 @@
             }
             pageList.forEach(function (a) { h += _actCard(a); });
             if (!pageList.length) h += '<div style="color:rgba(255,255,255,0.4);padding:20px;text-align:center;">没有匹配的阵容</div>';
+            // 🔴 2026-10-13 批量导入 7 天脚本包（替代原来每天单独的「📜 阵容脚本」弹窗：一次上传一个 zip 搞定）
+            h += _bulkImportHtml();
         }
         p.innerHTML = h;
         _applySlots(p);
         _refreshDrSums(p);
         // 每次重绘活动卡片后，异步合并云端共享脚本刷新（切 tab/搜索/分页后，上传的云端脚本不会从卡片消失）
         if (!isSail) setTimeout(function () { try { _llRefreshCloud(); } catch (e) {} }, 300);
+        if (state.tab === 'act') _llRenderBulkScripts();
     }
     // ---------- 主页同款卡槽 ----------
     // battle-slot 结构 + 主页渲染管线 applySkinBgToSlot(slot, hero, hero, 'my', forceSkin)
@@ -783,10 +786,11 @@
         try { if (typeof showToast === 'function') showToast('已删除脚本', 'info'); } catch (e) {}
         _llRefresh(id);
     };
-    // 🔴 列表刷新：右侧常驻列表 + 弹窗列表（弹窗开着就重建，保证两处一致）
+    // 🔴 列表刷新：旧弹窗列表（已停用）+ 底部批量列表（按天展示），保证两处一致
     function _llRefresh(id) {
         if (typeof _llRenderScripts === 'function') _llRenderScripts(id);
         if (document.getElementById('llScriptDlg') && typeof _llScriptDlg === 'function') _llScriptDlg(id);
+        _llRenderBulkScripts();
     }
     // 一键导入到老马：复用项目现成的 importToLaoMaFromWall（桌面端 Tauri 写老马目录）
     window._llImportToLaoMa = async function (id, sid) {
@@ -906,11 +910,6 @@
             (a[ab] || []).forEach(function (n, i) { h += _slotHtml(ab.toLowerCase(), i, n, 'activity', 'd' + a.day, 94); });
             h += '</div></div>';
         });
-        const _arrScripts = _dayScripts('d' + a.day);   // 🔴 天级多脚本（与 A/B 槽位分开）
-        h += '<div style="align-self:flex-start;display:flex;flex-direction:column;gap:5px;min-width:108px;">';
-        h += '<button id="llScriptBtn-d' + a.day + '" onclick="_llScriptDlg(\'d' + a.day + '\')" title="管理该天活动脚本（TXT 上传分享 / 记事本打开 / 导入老马）" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(240,147,43,0.45);background:rgba(240,147,43,0.12);color:#f0932b;font-size:0.74rem;font-weight:700;cursor:pointer;text-align:left;">📜 阵容脚本（' + _arrScripts.length + '）</button>';
-        h += '<div id="llScripts-d' + a.day + '">' + _scriptsHtml(_arrScripts, 'd' + a.day) + '</div>';
-        h += '</div>';
         h += '</div></div>';
         return h;
     }
@@ -1174,4 +1173,147 @@ let _adminVerified=false, _adminLastTok='', _featItems=[], _featData=null, _feat
         const btn = document.getElementById('llScriptBtn-' + id);
         if (btn) btn.innerHTML = btn.innerHTML.replace(/（\d+）/, '（' + arr.length + '）');
     };
+    // 🔴 2026-10-13 活动脚本改为「底部一次性导入 7 天脚本包」：一个 zip（含 7 个 .txt）搞定，不再每天单独弹窗上传
+    //    原来的「📜 阵容脚本」按天弹窗（_llScriptDlg）已停用，统一走这里批量导入 + 底部按天展示
+    function _bulkImportHtml() {
+        return ''
+            + '<div style="margin-top:14px;padding:12px 14px;border:1px solid rgba(78,205,196,0.4);border-radius:12px;background:rgba(78,205,196,0.06);">'
+            + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+            + '<b style="color:#4ecdc4;font-size:0.92rem;">📦 7 天阵容脚本包（一次性导入）</b>'
+            + '<span style="flex:1;"></span>'
+            + '<input type="file" id="llBulkFile" accept=".zip,.txt,application/zip,application/x-rar-compressed" style="max-width:240px;padding:5px 8px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:0.76rem;">'
+            + '<button onclick="_llBulkImport()" title="把 7 天的脚本 .txt 打包成一个 zip 上传，按文件名里的天数自动归类到对应天" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(78,205,196,0.6);background:rgba(78,205,196,0.18);color:#4ecdc4;cursor:pointer;font-size:0.8rem;font-weight:700;">📥 导入</button>'
+            + '</div>'
+            + '<div style="color:rgba(255,255,255,0.5);font-size:0.68rem;margin:7px 0 2px;line-height:1.6;">把 7 天的脚本 .txt 打成一个 <b style="color:#4ecdc4;">.zip</b>（或单个 .txt）上传即可，<b style="color:rgba(255,255,255,0.85);">文件名含「第N天」或数字</b>会自动归类到对应天（如「第3天.txt」「day3.txt」「3.txt」）。<b style="color:#ff6b6b;">.rar 暂不支持，请用 zip。</b></div>'
+            + '<div id="llBulkResult" style="margin-top:8px;"></div>'
+            + '</div>';
+    }
+    // 解析 zip：支持 store(0) 与 deflate(8，用浏览器原生 DecompressionStream 解压)，无需外部库
+    async function _llUnzip(buf) {
+        const u8 = new Uint8Array(buf); const dv = new DataView(buf); const out = [];
+        let i = 0;
+        const findNextSig = function (from) {
+            for (let k = from; k + 4 <= u8.length; k++) { const s = dv.getUint32(k, true); if (s === 0x04034b50 || s === 0x02014b50 || s === 0x06054b50) return k; }
+            return u8.length;
+        };
+        while (i + 30 <= u8.length) {
+            const sig = dv.getUint32(i, true);
+            if (sig !== 0x04034b50) { i++; continue; }
+            const method = dv.getUint16(i + 8, true);
+            let csize = dv.getUint32(i + 18, true);
+            const nlen = dv.getUint16(i + 26, true);
+            const elen = dv.getUint16(i + 28, true);
+            let name = 'file';
+            try { name = new TextDecoder('utf-8', { fatal: false }).decode(u8.subarray(i + 30, i + 30 + nlen)); } catch (e) {}
+            const start = i + 30 + nlen + elen;
+            let end = start + csize;
+            if (csize === 0) end = findNextSig(start + 4);   // 数据描述符(zip64/流式)：本地头 csize=0，靠下一个签名兜底
+            if (method === 0) {
+                let content = '';
+                try { content = new TextDecoder('utf-8', { fatal: false }).decode(u8.subarray(start, end)); } catch (e) {}
+                out.push({ name: name, content: content });
+            } else if (method === 8) {
+                try {
+                    const comp = u8.subarray(start, end);
+                    const ds = new DecompressionStream('deflate-raw');
+                    const stream = new Response(comp).body.pipeThrough(ds);
+                    const ab = await new Response(stream).arrayBuffer();
+                    let content = '';
+                    try { content = new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(ab)); } catch (e) {}
+                    out.push({ name: name, content: content });
+                } catch (e) { out.push({ name: name, content: '' }); }
+            } else { out.push({ name: name, content: '' }); }
+            i = end;
+        }
+        return out;
+    }
+    function _parseDayFromName(name) {
+        let m = String(name).match(/第\s*(\d{1,2})\s*天/i);
+        if (m) return parseInt(m[1], 10);
+        m = String(name).match(/day\s*(\d{1,2})/i);
+        if (m) return parseInt(m[1], 10);
+        m = String(name).match(/(\d{1,2})/);
+        if (m) return parseInt(m[1], 10);
+        return null;
+    }
+    function _cleanFname(name) {
+        let n = String(name || '').replace(/^.*[\\/]/, '').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]/g, '_').trim();
+        if (!n) n = '活动脚本_' + String(Date.now()).slice(-6);
+        if (!/\.txt$/i.test(n)) n += '.txt';
+        return n;
+    }
+    window._llBulkImport = async function () {
+        const inp = document.getElementById('llBulkFile');
+        const f = inp && inp.files && inp.files[0];
+        if (!f) { try { if (typeof showToast === 'function') showToast('请先选择 .zip / .txt 文件', 'warn'); } catch (e) {} return; }
+        const res = document.getElementById('llBulkResult');
+        const lower = f.name.toLowerCase();
+        if (res) res.innerHTML = '<div style="color:rgba(255,255,255,0.6);font-size:0.74rem;">⏳ 正在解析 ' + _esc(f.name) + ' …</div>';
+        try {
+            let files = [];
+            if (lower.endsWith('.zip')) {
+                const buf = await f.arrayBuffer();
+                files = await _llUnzip(buf);
+            } else if (lower.endsWith('.txt')) {
+                files = [{ name: f.name, content: await f.text() }];
+            } else if (lower.endsWith('.rar')) {
+                if (res) res.innerHTML = '<div style="color:#ff6b6b;font-size:0.74rem;">❌ 暂不支持 .rar，请把 7 天的 .txt 打成一个 .zip 再上传。</div>';
+                return;
+            } else {
+                if (res) res.innerHTML = '<div style="color:#ff6b6b;font-size:0.74rem;">❌ 不支持的文件类型，请上传 .zip 或 .txt。</div>';
+                return;
+            }
+            const txtFiles = files.filter(function (x) { return /\.txt$/i.test(x.name); });
+            if (!txtFiles.length) { if (res) res.innerHTML = '<div style="color:#ff6b6b;font-size:0.74rem;">❌ 文件里没有 .txt 脚本（zip 里请放 .txt）。</div>'; return; }
+            const D = _data();
+            const dayNums = (D.activity || []).map(function (a) { return a.day; });
+            const byDay = {}; const unmatched = [];
+            txtFiles.forEach(function (x) {
+                const d = _parseDayFromName(x.name);
+                if (d != null && dayNums.indexOf(d) >= 0) (byDay[d] = byDay[d] || []).push(x);
+                else unmatched.push(x.name);
+            });
+            if (!Object.keys(byDay).length) {
+                if (res) res.innerHTML = '<div style="color:#ff6b6b;font-size:0.74rem;">❌ 没有能识别天数的文件（文件名要含「第N天」或数字）。未识别：' + _esc(unmatched.join('、')) + '</div>';
+                return;
+            }
+            let imported = 0, cloud = 0;
+            for (const d in byDay) {
+                const id = 'd' + d;
+                for (const x of byDay[d]) {
+                    const fname = _cleanFname(x.name);
+                    const content = String(x.content || '').trim();
+                    if (!content) continue;
+                    const sid = _newSid();
+                    let url = '';
+                    try { url = await window._doScriptUpload(content, fname); } catch (e) { url = ''; }
+                    _upsertScript(id, { id: sid, name: fname, content: content, url: url, shared: !!url });
+                    if (url) { cloud++; try { await _llIdxMutate(function (dd) { (dd[id] = dd[id] || []).unshift({ id: sid, name: fname, url: url, author: _llAuthor(), ts: Date.now() }); }); } catch (e2) {} }
+                    imported++;
+                }
+            }
+            await _llRenderBulkScripts();
+            try { if (typeof showToast === 'function') showToast('✅ 已导入 ' + imported + ' 个脚本（' + cloud + ' 个已云端分享）' + (unmatched.length ? '；' + unmatched.length + ' 个未识别天数已跳过' : ''), 'success'); } catch (e) {}
+        } catch (e) {
+            if (res) res.innerHTML = '<div style="color:#ff6b6b;font-size:0.74rem;">❌ 解析失败：' + _esc(e && e.message || e) + '</div>';
+            try { if (typeof showToast === 'function') showToast('解析失败：' + (e && e.message || e), 'error'); } catch (e2) {}
+        }
+    };
+    // 异步渲染底部「已导入脚本」：按天分组，复用现有 _scriptsHtml（可打开记事本 / 导入老马 / 删除）
+    async function _llRenderBulkScripts() {
+        const el = document.getElementById('llBulkResult');
+        if (!el) return;
+        const D = _data();
+        const days = (D.activity || []).map(function (a) { return a.day; });
+        let html = '';
+        for (let k = 0; k < days.length; k++) {
+            const id = 'd' + days[k];
+            const arr = await _llDayScriptsAll(id);
+            html += '<div style="margin-bottom:8px;">'
+                + '<div style="color:#ffd700;font-size:0.72rem;font-weight:700;margin-bottom:3px;">第 ' + days[k] + ' 天（' + arr.length + '）</div>'
+                + (arr.length ? _scriptsHtml(arr, id) : '<div style="color:rgba(255,255,255,0.35);font-size:0.66rem;padding:2px 4px;">（空，用上方「📦 7 天脚本包」导入）</div>')
+                + '</div>';
+        }
+        el.innerHTML = html;
+    }
 })();
