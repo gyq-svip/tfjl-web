@@ -12415,10 +12415,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     return;
                 }
                 const engOk = isEngineering === true || isEngineering === 'true';
-                if (engOk ? handCardsArray.filter(c => c.isEngineering).length >= 2 : handCardsArray.filter(c => !c.isEngineering).length >= 9) {
-                    if (typeof showToast === 'function') showToast('⚠️ 手牌数量已满（工程≤2 / 普通≤9）');
-                    return;
-                }
+                // 🔴 2026-10-16 移除错误的分类上限（工程≤2 / 普通≤9）：手牌可携带任意卡（10召唤/10法师/10工程均可），
+                //    只受总数 MAX_HAND_CARDS=10 限制（上方已判）。工程卡限制仅作用于「卡槽上阵」（工程位只有1个），与手牌携带无关。
                 handCardsArray.push({ id: cardId, name: cardName, placed: null, isEngineering: engOk, profession });
                 updateHandDisplay(containerId === 'myHandContainer' ? 'my' : 'teammate');
                 if (window.trackFeature) window.trackFeature(source === 'pool' ? '卡池拖进手牌' : '收藏拖进手牌');
@@ -12464,13 +12462,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const sideName = targetSide === 'teammate' ? '队友' : '我的';
             if (hasThis) { if (typeof showToast === 'function') showToast('⚠️ ' + sideName + '手牌已有「' + cardName + '」'); return; }
             if (target.length >= MAX_HAND_CARDS) { if (typeof showToast === 'function') showToast('⚠️ ' + sideName + '手牌已满（最多 ' + MAX_HAND_CARDS + ' 张）'); return; }
-            if (isEngineering) {
-                const engCount = target.filter(c => c.isEngineering).length;
-                if (engCount >= 2) { if (typeof showToast === 'function') showToast('⚠️ ' + sideName + '手牌工程卡已达上限（2 张）'); return; }
-            } else {
-                const normalCount = target.filter(c => !c.isEngineering).length;
-                if (normalCount >= 9) { if (typeof showToast === 'function') showToast('⚠️ ' + sideName + '手牌普通卡已达上限（9 张）'); return; }
-            }
+            // 🔴 2026-10-16 移除错误的分类上限（工程≤2 / 普通≤9）：手牌可携带任意卡（10召唤/10法师/10工程均可），
+            //    只受总数 MAX_HAND_CARDS=10 限制（上面已判）。工程卡限制仅作用于「卡槽上阵」（工程位只有1个），与手牌携带无关。
             target.push({ id: cardId, name: cardName, placed: null, isEngineering, profession, type: cardType });
             updateHandDisplay(targetSide);
         }
@@ -16295,8 +16288,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                                 if (typeof showToast === 'function') showToast('⚠️ 手牌已有「' + p.name + '」（含融合形态），同一张卡只能带 1 张');
                             } else if (arr.length >= MAX_HAND_CARDS) {
                                 if (typeof showToast === 'function') showToast('⚠️ 手牌已满（' + MAX_HAND_CARDS + ' 张）');
-                            } else if (engOk ? arr.filter(c => c.isEngineering).length >= 2 : arr.filter(c => !c.isEngineering).length >= 9) {
-                                if (typeof showToast === 'function') showToast('⚠️ 手牌数量已满（工程≤2 / 普通≤9）');
+                                // 🔴 2026-10-16 移除错误的分类上限（工程≤2 / 普通≤9）：手牌可携带任意卡，只受总数10限制；
+                                //    工程卡限制仅作用于「卡槽上阵」（工程位只有1个）。
                             } else {
                                 arr.push({ id: p.id, name: p.name, placed: null, isEngineering: engOk, profession: p.profession || '' });
                                 updateHandDisplay(side);
