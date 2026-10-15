@@ -13277,15 +13277,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
                 if (!handCard) {
                     if (targetHand.length >= MAX_HAND_CARDS) return;
-
-                    if (isEngineering) {
-                        const engCount = targetHand.filter(c => c.isEngineering).length;
-                        if (engCount >= 2) return;
-                    } else {
-                        const normalCount = targetHand.filter(c => !c.isEngineering).length;
-                        if (normalCount >= 9) return;
-                    }
-
+                    // 🔴 2026-10-16 移除错误的分类上限（工程≤2 / 普通≤9）：手牌可携带任意卡，只受总数10限制；
+                    //    工程卡限制仅作用于「卡槽上阵」（工程位只有1个）。此前的分类 return 会导致手牌9张普通时拖普通卡上卡槽被静默拦截（表现为"拖不动"）。
                     const poolCard = document.querySelector('.card-item[data-id="' + cardId + '"]');
                     const cardType = poolCard ? poolCard.dataset.type : '';
                     handCard = { id: cardId, name: cardName, placed: slotId, isEngineering, profession, type: cardType };
