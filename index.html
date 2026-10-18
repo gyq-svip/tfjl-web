@@ -180,7 +180,7 @@
 
     <div class="container">
         <!-- 固定头部：标题 + 公告栏 -->
-        <div id="fixedHeader" style="position:fixed;top:20px;left:50%;transform:translateX(-50%);width:min(1400px,calc(100% - 20px));z-index:100;background:linear-gradient(135deg,#0f0f23 0%,#1a1a2e 50%,#16213e 100%);padding-bottom:5px;">
+        <div id="fixedHeader" style="position:fixed;top:8px;left:50%;transform:translateX(-50%);width:min(1400px,calc(100% - 20px));z-index:100;background:linear-gradient(135deg,#0f0f23 0%,#1a1a2e 50%,#16213e 100%);padding-bottom:5px;">
         <h1><span id="mainHeader" style="cursor:default;">🛡️</span> 塔防助手</h1>
         <p id="mainTitle" class="instructions glowing-text" style="cursor:pointer;" onclick="refreshNewsAndTitle()" title="点击刷新公告和标题"> 【工具数据本地化储存】【新增PC客户端】【新增老马脚本一键密文分享】【导出 导入 分享 分类管理】【部分副本支持卡组截图识别一键脚本】  </p>
         
@@ -1159,7 +1159,13 @@
                     <h2 style="margin:0;display:flex;align-items:center;gap:8px;">⚔️ 出战选择<span style="font-size:0.65rem;color:rgba(255,255,255,0.45);font-weight:normal;">鼠标悬停有功能简介</span></h2>
                     <span id="sharedReadOnlyBadge" style="display:none;background:linear-gradient(90deg,#ff9800,#ffc107);color:#1a1a2e;font-size:0.82rem;font-weight:800;padding:5px 13px;border-radius:10px;white-space:nowrap;box-shadow:0 3px 14px rgba(255,152,0,0.5);letter-spacing:0.3px;">📖 共享资源只读 · 请点「📥 导入到本地」可编辑</span>
                 </div>
-                <div style="display:flex;gap:8px;align-items:center;">
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;">
+                    <div style="display:flex;gap:8px;align-items:center;">
+                    <button onclick="showDamageReductionDialog()" data-tip="设置/导出/导入各卡组的洗炼减伤数据（用于计算实际承伤）：多张减伤表的导入导出都在弹窗里，按当前表分别操作" style="background:rgba(78,205,196,0.2);border:1px solid rgba(78,205,196,0.4);color:#4ecdc4;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🛡️ 减伤</button>
+                    <button onclick="resetAll()" data-tip="重置当前卡组：清空我方/队友全部卡槽（不删项目数据，手牌回到未上阵状态）" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🔄 重置</button>
+                    <button id="battleShareBtn" onclick="if(typeof shareLineupImage==='function')shareLineupImage();else showToast('分享功能加载中，请稍候...','info');" data-tip="生成阵容分享图：双方卡组+手牌（每人最多10张，职业渐变+真实皮肤+等级/魔化/融合副卡），可设有效期/密码，对方扫码、报 8 位短码或点链接一键复刻" style="background:linear-gradient(135deg,#f093fb,#f5576c);border:none;color:#fff;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:bold;box-shadow:0 2px 8px rgba(240,147,251,0.3);">📸 分享</button>
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center;">
                     <label style="font-size:0.7rem;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;">
                         <input type="checkbox" id="fusionSkinSplitToggle" checked onchange="toggleFusionSkinSplit(this.checked)" title="勾选：融合卡显示完整融合皮肤（主卡整皮 + 被融合卡右下角小图）；不勾：只显示主卡（单卡）整张皮肤。卡名始终按现状显示。"> 显示融合
                     </label>
@@ -1167,9 +1173,7 @@
                         <input type="checkbox" id="hoverTipToggle" checked onchange="toggleHoverTips(this.checked)"> 悬浮提示
                     </label>
                     <span id="teamTotalDr" data-tip="全队合计减伤 = 我方总减伤 + 队友总减伤（每边已各自含自己的马车：我的=我方卡+我方马车，队友的=队友卡+队友马车，直接相加不重复）。鼠标悬停可看拆分。" style="background:rgba(255,215,0,0.14);border:1px solid rgba(255,215,0,0.45);color:#ffd700;padding:4px 10px;border-radius:6px;font-size:0.75rem;white-space:nowrap;cursor:help;">🛡 全队合计:0</span>
-                    <button onclick="showDamageReductionDialog()" data-tip="设置/导出/导入各卡组的洗炼减伤数据（用于计算实际承伤）：多张减伤表的导入导出都在弹窗里，按当前表分别操作" style="background:rgba(78,205,196,0.2);border:1px solid rgba(78,205,196,0.4);color:#4ecdc4;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🛡️ 减伤</button>
-                    <button onclick="resetAll()" data-tip="重置当前卡组：清空我方/队友全部卡槽（不删项目数据，手牌回到未上阵状态）" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">🔄 重置</button>
-                    <button id="battleShareBtn" onclick="if(typeof shareLineupImage==='function')shareLineupImage();else showToast('分享功能加载中，请稍候...','info');" data-tip="生成阵容分享图：双方卡组+手牌（每人最多10张，职业渐变+真实皮肤+等级/魔化/融合副卡），可设有效期/密码，对方扫码、报 8 位短码或点链接一键复刻" style="background:linear-gradient(135deg,#f093fb,#f5576c);border:none;color:#fff;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:bold;box-shadow:0 2px 8px rgba(240,147,251,0.3);">📸 分享</button>
+                    </div>
                 </div>
             </div>
 
