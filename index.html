@@ -185,7 +185,7 @@
         <p id="mainTitle" class="instructions glowing-text" style="cursor:pointer;" onclick="refreshNewsAndTitle()" title="点击刷新公告和标题"> 【工具数据本地化储存】【新增PC客户端】【新增老马脚本一键密文分享】【导出 导入 分享 分类管理】【部分副本支持卡组截图识别一键脚本】  </p>
         
         <!-- 滚动公告栏 -->
-        <div id="newsMarqueeContainer" style="background:rgba(255,255,255,0.05);border:2px solid rgba(255,215,0,0.3);border-radius:10px;padding:15px;margin-bottom:5px;text-align:center;overflow:hidden;position:relative;cursor:pointer;" onclick="showNewsListModal()" title="点击查看全部公告">
+        <div id="newsMarqueeContainer" style="background:rgba(255,255,255,0.05);border:2px solid rgba(255,215,0,0.3);border-radius:10px;padding:10px;margin-bottom:4px;text-align:center;overflow:hidden;position:relative;cursor:pointer;" onclick="showNewsListModal()" title="点击查看全部公告">
             <div style="display:flex;align-items:center;gap:15px;">
                 <!-- 实时时间显示 -->
                 <div id="currentTime" style="color:#ffd700;font-weight:bold;font-size:1.1rem;white-space:nowrap;min-width:300px;text-align:left;">
@@ -492,7 +492,7 @@
 
         <!-- 项目管理器 -->
         <div id="scheme1">
-            <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;background:rgba(255,255,255,0.05);border-radius:10px;padding:8px 10px;margin-bottom:8px;">
+            <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;background:rgba(255,255,255,0.05);border-radius:10px;padding:6px 10px;margin-bottom:6px;">
                 <!-- 🔴 2026-09-10：本地/共享资源库切换（用户要求放在项目分类前面） -->
                 <select id="projectScopeSelector" onchange="handleProjectScopeChange()" data-tip="🏠 本地 / 🌐 共享：默认显示本地项目；切换到共享可浏览资源库项目（只读）" style="background:#2a2a4a;color:#fff;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);font-size:0.88rem;min-width:66px;cursor:pointer;">
                     <option value="local">🏠 本地</option>
@@ -1154,7 +1154,7 @@
         <input type="file" id="txtFileInput" accept=".txt,.js,.json,.lua,.py,.sh" multiple style="display:none;" onchange="handleTxtFileUpload(this)">
 
         <div class="selection-area">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
                 <div style="display:flex;align-items:center;gap:10px;">
                     <h2 style="margin:0;display:flex;align-items:center;gap:8px;">⚔️ 出战选择<span style="font-size:0.65rem;color:rgba(255,255,255,0.45);font-weight:normal;">鼠标悬停有功能简介</span></h2>
                     <span id="sharedReadOnlyBadge" style="display:none;background:linear-gradient(90deg,#ff9800,#ffc107);color:#1a1a2e;font-size:0.82rem;font-weight:800;padding:5px 13px;border-radius:10px;white-space:nowrap;box-shadow:0 3px 14px rgba(255,152,0,0.5);letter-spacing:0.3px;">📖 共享资源只读 · 请点「📥 导入到本地」可编辑</span>
