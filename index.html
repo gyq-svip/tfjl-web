@@ -180,12 +180,12 @@
 
     <div class="container">
         <!-- 固定头部：标题 + 公告栏 -->
-        <div id="fixedHeader" style="position:fixed;top:8px;left:50%;transform:translateX(-50%);width:min(1400px,calc(100% - 20px));z-index:100;background:linear-gradient(135deg,#0f0f23 0%,#1a1a2e 50%,#16213e 100%);padding-bottom:5px;">
+        <div id="fixedHeader" style="position:fixed;top:8px;left:50%;transform:translateX(-50%);width:min(1400px,calc(100% - 20px));z-index:100;background:linear-gradient(135deg,#0f0f23 0%,#1a1a2e 50%,#16213e 100%);padding-bottom:2px;">
         <h1><span id="mainHeader" style="cursor:default;">🛡️</span> 塔防助手</h1>
         <p id="mainTitle" class="instructions glowing-text" style="cursor:pointer;" onclick="refreshNewsAndTitle()" title="点击刷新公告和标题"> 【工具数据本地化储存】【新增PC客户端】【新增老马脚本一键密文分享】【导出 导入 分享 分类管理】【部分副本支持卡组截图识别一键脚本】  </p>
         
         <!-- 滚动公告栏 -->
-        <div id="newsMarqueeContainer" style="background:rgba(255,255,255,0.05);border:2px solid rgba(255,215,0,0.3);border-radius:10px;padding:10px;margin-bottom:4px;text-align:center;overflow:hidden;position:relative;cursor:pointer;" onclick="showNewsListModal()" title="点击查看全部公告">
+        <div id="newsMarqueeContainer" style="background:rgba(255,255,255,0.05);border:2px solid rgba(255,215,0,0.3);border-radius:10px;padding:10px;margin-bottom:0px;text-align:center;overflow:hidden;position:relative;cursor:pointer;" onclick="showNewsListModal()" title="点击查看全部公告">
             <div style="display:flex;align-items:center;gap:15px;">
                 <!-- 实时时间显示 -->
                 <div id="currentTime" style="color:#ffd700;font-weight:bold;font-size:1.1rem;white-space:nowrap;min-width:300px;text-align:left;">
@@ -3095,7 +3095,7 @@
     </div>
     <!-- 🔴 2026-10-19 出战选择次要控件移到右边缘竖排悬浮（显示融合/悬浮提示/全队合计），让中间卡槽区更清爽、整体上移 -->
     <!-- 🔴 2026-10-19 右侧紧凑：总减伤常驻 + 卡组工具折叠(分享/减伤/重置/显示融合/悬浮提示 竖排)，中间卡槽区最大化 -->
-    <div id="selSideCtrls" style="position:fixed;right:12px;top:285px;z-index:9988;display:flex;flex-direction:column;align-items:stretch;gap:6px;width:132px;">
+    <div id="selSideCtrls" style="position:fixed;right:12px;top:150px;z-index:9988;display:flex;flex-direction:column;align-items:stretch;gap:6px;width:132px;">
         <span id="teamTotalDr" data-tip="全队合计减伤 = 我方总减伤 + 队友总减伤（每边已各自含自己的马车：我的=我方卡+我方马车，队友的=队友卡+队友马车，直接相加不重复）。鼠标悬停可看拆分。" style="background:rgba(255,215,0,0.14);border:1px solid rgba(255,215,0,0.45);color:#ffd700;padding:4px 10px;border-radius:6px;font-size:0.75rem;white-space:nowrap;cursor:help;">🛡 全队合计:0</span>
         <button id="selSideToggle" onclick="var pp=document.getElementById('selSidePanel'),aa=document.getElementById('selSideArrow');var open=pp.style.display!=='none';pp.style.display=open?'none':'flex';if(aa)aa.textContent=open?'▼':'▲';" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);border:none;color:#1a1a2e;padding:5px 10px;border-radius:7px;cursor:pointer;font-size:0.78rem;font-weight:bold;width:100%;text-align:left;">⚙️ 卡组工具 <span id="selSideArrow" style="float:right;">▼</span></button>
         <div id="selSidePanel" style="display:none;flex-direction:column;gap:6px;background:rgba(26,26,46,0.92);border:1px solid rgba(255,215,0,0.28);border-radius:9px;padding:8px;">
