@@ -362,7 +362,7 @@
             justify-content: center;
             align-items: flex-start;
             gap: 24px;
-            margin: 2px auto;
+            margin: 0 auto;
             width: 100%;
             position: relative;
             max-width: 920px;
@@ -376,7 +376,7 @@
             justify-content: center;
             align-items: flex-start;
             gap: 30px;
-            margin: 4px 0;
+            margin: 2px 0;
             width: 100%;
             max-width: 950px;
             margin-left: auto;
