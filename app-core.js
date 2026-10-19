@@ -14594,7 +14594,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (teamEl) {
                 const combined = Math.round((myTotal + teammateTotal) * 10) / 10;
                 teamEl.textContent = `🛡 全队合计:${combined}`;
-                const tip = `${formatDrTooltip(myBd)}｜${formatDrTooltip(tmBd)}｜全队合计=${combined}`;
+                // 🔴 2026-10-19 悬浮提示分三行：我的/队友/全队合计，不再用「｜」混排一行
+                const tip = `🛡 我的：${formatDrTooltip(myBd)}\n🛡 队友：${formatDrTooltip(tmBd)}\n━━━━━━━━\n🛡 全队合计：${combined}`;
                 teamEl.title = tip;
                 teamEl.setAttribute('data-tip', tip);
             }
@@ -14634,7 +14635,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const tmT = getDamageReductionBreakdown(teammatePlacedCards, 'teammate', window._teammateDrTable).total;
                 const combined = Math.round((myT + tmT) * 10) / 10;
                 teamEl.textContent = `🛡 全队合计:${combined}`;
-                const ttip = `${formatDrTooltip(getDamageReductionBreakdown(myPlacedCards, 'my', window._myDrTable))}｜${formatDrTooltip(getDamageReductionBreakdown(teammatePlacedCards, 'teammate', window._teammateDrTable))}｜全队合计=${combined}`;
+                // 🔴 2026-10-19 同上：分三行分区显示
+                const ttip = `🛡 我的：${formatDrTooltip(getDamageReductionBreakdown(myPlacedCards, 'my', window._myDrTable))}\n🛡 队友：${formatDrTooltip(getDamageReductionBreakdown(teammatePlacedCards, 'teammate', window._teammateDrTable))}\n━━━━━━━━\n🛡 全队合计：${combined}`;
                 teamEl.title = ttip;
                 teamEl.setAttribute('data-tip', ttip);
             }
@@ -17468,6 +17470,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                 }, 3000);
             }
             renderIntroPanel(); // 功能简介板：公告加载/刷新后同步渲染
+            renderWindowTitle(); // 窗口标题：公告加载/刷新后同步应用（分类=窗口标题 最新一条）
         }
 
         // ==================== 功能简介板（出战区右侧） ====================
@@ -17494,6 +17497,31 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             bodyEl.textContent = latest.content;
             panel.style.display = 'flex';
             if (changed) panel.classList.remove('min'); // 首载/公告更新 → 默认展开；每分钟兜底刷新且内容未变时不打扰折叠态
+        }
+        // ==================== 窗口标题（公告驱动，后台可随时改，无需打包） ====================
+        // 内容 = 管理员公告里「分类=窗口标题」的最新一条生效公告的正文；没有则保持默认标题（tauri.conf/title 里那条带网址的）。
+        // 网页端：直接改 document.title（浏览器标签页/WebView）；桌面端：再通过 Tauri API 同步设置窗口标题栏。
+        function renderWindowTitle() {
+            const now = new Date();
+            const items = (newsItems || []).filter(it => it && it.category === '窗口标题'
+                && it.content && String(it.content).trim()
+                && !(it.active_time && new Date(it.active_time) > now)
+                && !(it.expire_time && new Date(it.expire_time) <= now));
+            let latest = null;
+            for (const it of items) {
+                if (!latest) { latest = it; continue; }
+                const ta = it.active_time ? new Date(it.active_time).getTime() : 0;
+                const tb = latest.active_time ? new Date(latest.active_time).getTime() : 0;
+                if (ta >= tb) latest = it;
+            }
+            if (!latest) return;
+            const title = String(latest.content).trim();
+            try { document.title = title; } catch (e) {}
+            try {
+                const T = window.__TAURI__;
+                const w = T && T.window && (T.window.getCurrentWindow ? T.window.getCurrentWindow() : (T.window.getCurrent ? T.window.getCurrent() : null));
+                if (w && typeof w.setTitle === 'function') w.setTitle(title);
+            } catch (e2) {}
         }
         function toggleIntroPanelMin() {
             const panel = document.getElementById('introPanel');
