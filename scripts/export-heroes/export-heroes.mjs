@@ -286,6 +286,32 @@ function buildIndexMaps(skillRows, npcRows, talentRows) {
   return { skillById, skillByName, npcRowsById, talentsByHero }
 }
 
+// 按等级属性（官方面板数值源，NpcTemplate / SkillTableData 推导）：
+//   attack = NpcTemplate 行 attack，生命 = 行 carhp，攻速 = 该行 skill_id 对应 SkillTableData.cd（毫秒）
+// 面板「属性详情」用：给定等级取「level ≤ 当前等级」的最后一行。
+function buildHeroStats(maps, npcId) {
+  const { npcRowsById, skillById } = maps
+  const rows = npcRowsById.get(String(npcId)) || []
+  const out = []
+  for (const r of rows) {
+    const sid = String(r.skill_id ?? '')
+    const sk = sid && sid !== '0' ? skillById.get(sid) : null
+    const cd = sk ? Number(sk.cd) : NaN
+    const attack = Number(r.attack)
+    const hp = Number(r.carhp)
+    const dtype = Number(r.damage_type)
+    out.push({
+      level: Number(r.level) || 1,
+      attack: Number.isFinite(attack) ? attack : null,
+      hp: Number.isFinite(hp) ? hp : null,
+      cd: Number.isFinite(cd) ? cd : null,
+      // 攻击类型（面板用）：1物理 2魔法 3真实 4治疗 5其他（部分行缺失）
+      damageType: Number.isFinite(dtype) && String(r.damage_type) !== '' ? dtype : null
+    })
+  }
+  return out
+}
+
 function npcSkillNodes(npcRowsById, npcId) {
   const rows = npcRowsById.get(String(npcId)) || []
   const out = []
@@ -431,6 +457,7 @@ function buildTiers(maps, hid, npcId, heroSkillName, heroSkillDesc, heroPassiveI
         h.passive_desc2
       ),
       spine,
+      stats: buildHeroStats(maps, h.npc_id),
       skins: skinsByHero.get(String(h.id)) || []
     }
   })
