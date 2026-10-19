@@ -1,0 +1,153 @@
+
+bingniao.png
+size: 953,953
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_2
+  rotate: false
+  xy: 846, 799
+  size: 105, 152
+  orig: 225, 225
+  offset: 62, 47
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 510, 121
+  size: 131, 132
+  orig: 225, 225
+  offset: 46, 45
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 739, 246
+  size: 136, 113
+  orig: 225, 225
+  offset: 62, 54
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 739, 384
+  size: 139, 113
+  orig: 225, 225
+  offset: 62, 54
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 510, 3
+  size: 132, 116
+  orig: 225, 225
+  offset: 63, 50
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 826, 535
+  size: 141, 119
+  orig: 225, 225
+  offset: 63, 46
+  index: -1
+fx/TX_hy03_00000
+  rotate: true
+  xy: 846, 678
+  size: 119, 105
+  orig: 137, 113
+  offset: 1, 8
+  index: -1
+fx/TX_hy03_00001
+  rotate: false
+  xy: 717, 138
+  size: 118, 106
+  orig: 137, 113
+  offset: 4, 2
+  index: -1
+fx/TX_hy03_00002
+  rotate: false
+  xy: 837, 140
+  size: 114, 104
+  orig: 137, 113
+  offset: 12, 1
+  index: -1
+fx/TX_hy03_00003
+  rotate: false
+  xy: 644, 36
+  size: 103, 100
+  orig: 137, 113
+  offset: 27, 1
+  index: -1
+fx/TX_hy03_00004
+  rotate: false
+  xy: 643, 176
+  size: 72, 77
+  orig: 137, 113
+  offset: 55, 11
+  index: -1
+idle/idle_00
+  rotate: true
+  xy: 556, 737
+  size: 214, 288
+  orig: 450, 450
+  offset: 125, 91
+  index: -1
+idle/idle_01
+  rotate: true
+  xy: 538, 525
+  size: 210, 286
+  orig: 450, 450
+  offset: 126, 98
+  index: -1
+idle/idle_02
+  rotate: true
+  xy: 245, 524
+  size: 211, 291
+  orig: 450, 450
+  offset: 125, 93
+  index: -1
+idle/idle_03
+  rotate: true
+  xy: 245, 737
+  size: 214, 309
+  orig: 450, 450
+  offset: 123, 75
+  index: -1
+idle/idle_04
+  rotate: false
+  xy: 2, 346
+  size: 225, 308
+  orig: 450, 450
+  offset: 117, 74
+  index: -1
+idle/idle_05
+  rotate: false
+  xy: 2, 656
+  size: 241, 295
+  orig: 450, 450
+  offset: 110, 84
+  index: -1
+idle/idle_06
+  rotate: false
+  xy: 233, 251
+  size: 250, 271
+  orig: 450, 450
+  offset: 106, 103
+  index: -1
+idle/idle_07
+  rotate: false
+  xy: 485, 255
+  size: 252, 267
+  orig: 450, 450
+  offset: 105, 105
+  index: -1
+idle/idle_08
+  rotate: true
+  xy: 233, 5
+  size: 244, 275
+  orig: 450, 450
+  offset: 109, 97
+  index: -1
+idle/idle_09
+  rotate: false
+  xy: 2, 61
+  size: 229, 283
+  orig: 450, 450
+  offset: 116, 92
+  index: -1

@@ -1,0 +1,265 @@
+
+jingling6_1.png
+size: 984,984
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/FX/D4/glow2_00005
+  rotate: false
+  xy: 765, 458
+  size: 206, 210
+  orig: 229, 236
+  offset: 11, 13
+  index: -1
+images/FX/juan/1_064
+  rotate: false
+  xy: 263, 338
+  size: 247, 312
+  orig: 270, 331
+  offset: 12, 6
+  index: -1
+images/FX/juan/1_065
+  rotate: false
+  xy: 263, 338
+  size: 247, 312
+  orig: 270, 331
+  offset: 12, 6
+  index: -1
+images/FX/juan/1_066
+  rotate: false
+  xy: 334, 662
+  size: 247, 320
+  orig: 270, 331
+  offset: 13, 6
+  index: -1
+images/FX/juan/1_067
+  rotate: false
+  xy: 334, 662
+  size: 247, 320
+  orig: 270, 331
+  offset: 13, 6
+  index: -1
+images/FX/juan/1_068
+  rotate: false
+  xy: 2, 21
+  size: 250, 317
+  orig: 270, 331
+  offset: 11, 7
+  index: -1
+images/FX/juan/1_069
+  rotate: false
+  xy: 2, 21
+  size: 250, 317
+  orig: 270, 331
+  offset: 11, 7
+  index: -1
+images/FX/juan/1_070
+  rotate: false
+  xy: 512, 347
+  size: 251, 313
+  orig: 270, 331
+  offset: 11, 6
+  index: -1
+images/FX/juan/1_071
+  rotate: false
+  xy: 512, 347
+  size: 251, 313
+  orig: 270, 331
+  offset: 11, 6
+  index: -1
+images/FX/juan/1_072
+  rotate: false
+  xy: 583, 670
+  size: 255, 312
+  orig: 270, 331
+  offset: 7, 6
+  index: -1
+images/FX/juan/1_073
+  rotate: false
+  xy: 583, 670
+  size: 255, 312
+  orig: 270, 331
+  offset: 7, 6
+  index: -1
+images/FX/juan/1_074
+  rotate: false
+  xy: 2, 340
+  size: 259, 310
+  orig: 270, 331
+  offset: 3, 6
+  index: -1
+images/FX/juan/1_075
+  rotate: false
+  xy: 2, 340
+  size: 259, 310
+  orig: 270, 331
+  offset: 3, 6
+  index: -1
+images/FX/juan/1_076
+  rotate: false
+  xy: 254, 25
+  size: 254, 311
+  orig: 270, 331
+  offset: 6, 6
+  index: -1
+images/FX/juan/1_077
+  rotate: false
+  xy: 254, 25
+  size: 254, 311
+  orig: 270, 331
+  offset: 6, 6
+  index: -1
+images/FX/juan/1_078
+  rotate: false
+  xy: 510, 23
+  size: 251, 313
+  orig: 270, 331
+  offset: 8, 6
+  index: -1
+images/FX/juan/1_079
+  rotate: false
+  xy: 510, 23
+  size: 251, 313
+  orig: 270, 331
+  offset: 8, 6
+  index: -1
+images/FX/li01/li_000
+  rotate: true
+  xy: 765, 288
+  size: 75, 88
+  orig: 110, 127
+  offset: 12, 20
+  index: -1
+images/FX/li01/li_001
+  rotate: false
+  xy: 763, 108
+  size: 79, 88
+  orig: 110, 127
+  offset: 10, 21
+  index: -1
+images/FX/li01/li_002
+  rotate: false
+  xy: 840, 871
+  size: 79, 111
+  orig: 110, 127
+  offset: 9, 5
+  index: -1
+images/FX/li01/li_003
+  rotate: false
+  xy: 840, 777
+  size: 78, 92
+  orig: 110, 127
+  offset: 13, 18
+  index: -1
+images/FX/li01/li_004
+  rotate: false
+  xy: 765, 365
+  size: 88, 91
+  orig: 110, 127
+  offset: 7, 27
+  index: -1
+images/FX/li01/li_005
+  rotate: false
+  xy: 921, 898
+  size: 60, 84
+  orig: 110, 127
+  offset: 31, 35
+  index: -1
+images/FX/li01/li_006
+  rotate: false
+  xy: 840, 671
+  size: 66, 104
+  orig: 110, 127
+  offset: 25, 7
+  index: -1
+images/FX/li01/li_007
+  rotate: false
+  xy: 763, 15
+  size: 66, 91
+  orig: 110, 127
+  offset: 28, 21
+  index: -1
+images/FX/li01/li_008
+  rotate: true
+  xy: 855, 287
+  size: 78, 86
+  orig: 110, 127
+  offset: 19, 25
+  index: -1
+images/FX/li01/li_009
+  rotate: false
+  xy: 763, 198
+  size: 84, 88
+  orig: 110, 127
+  offset: 15, 26
+  index: -1
+images/FX/li01/li_010
+  rotate: false
+  xy: 855, 367
+  size: 87, 89
+  orig: 110, 127
+  offset: 12, 29
+  index: -1
+images/FX/li01/li_011
+  rotate: false
+  xy: 849, 215
+  size: 92, 70
+  orig: 110, 127
+  offset: 10, 32
+  index: -1
+images/FX/li01/li_012
+  rotate: true
+  xy: 908, 677
+  size: 98, 69
+  orig: 110, 127
+  offset: 8, 31
+  index: -1
+images/FX/li01/li_013
+  rotate: false
+  xy: 844, 119
+  size: 76, 57
+  orig: 110, 127
+  offset: 6, 47
+  index: -1
+images/FX/li01/li_014
+  rotate: false
+  xy: 849, 178
+  size: 81, 35
+  orig: 110, 127
+  offset: 5, 66
+  index: -1
+images/FX/li01/li_015
+  rotate: true
+  xy: 867, 37
+  size: 80, 33
+  orig: 110, 127
+  offset: 8, 72
+  index: -1
+images/FX/li01/li_016
+  rotate: true
+  xy: 831, 25
+  size: 81, 34
+  orig: 110, 127
+  offset: 7, 73
+  index: -1
+images/FX/li01/li_017
+  rotate: true
+  xy: 944, 372
+  size: 84, 38
+  orig: 110, 127
+  offset: 4, 70
+  index: -1
+images/FX/li01/li_018
+  rotate: false
+  xy: 921, 885
+  size: 11, 11
+  orig: 110, 127
+  offset: 31, 85
+  index: -1
+images/idle/bbb
+  rotate: false
+  xy: 2, 652
+  size: 330, 330
+  orig: 330, 330
+  offset: 0, 0
+  index: -1

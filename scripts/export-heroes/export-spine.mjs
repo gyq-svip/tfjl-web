@@ -1,5 +1,7 @@
 // 英雄 Spine 动画资源导出（PoC：官方 CDN → 解析 Cocos sp.SkeletonData → 标准 Spine 3.8 文件）
-// 用法：node scripts/export-heroes/export-spine.mjs 小野
+// 用法：
+//   node scripts/export-heroes/export-spine.mjs 小野    # 单英雄
+//   node scripts/export-heroes/export-spine.mjs --all  # 批量（data/heroes.json 里所有带 spine 的英雄）
 // 输出：data/hero-spine/<folder>/  skeleton.json + atlas.txt + p*.png
 // 资源定位机制与官方 CDN 同源。
 import https from 'node:https'
@@ -290,30 +292,33 @@ function parseCocosSkeleton(text) {
   return { skeletonJson, atlasText }
 }
 
-;(async () => {
-  const HERO = (process.argv[2] || '小野').trim()
+// 共享 CDN 上下文：索引/配置/三张表只拉一次，批量导出时复用
+async function setupCtx() {
   const html = await fetchText(`${CDN}/index.html`)
   const m = html && html.match(/src\/settings\.([a-f0-9]+)\.js/)
-  if (!m) return console.log('FAIL: settings hash')
+  if (!m) throw new Error('settings hash 未找到')
   const settings = await fetchText(`${CDN}/src/settings.${m[1]}.js`)
   const ver = parseSettings(settings)['resources']
   console.log('resources ver =', ver)
   const config = JSON.parse(await fetchText(`${CDN}/assets/resources/config.${ver}.json`))
   const index = parseBundleIndexFull(config)
-
   const heroRows = await fetchTable(index, UUIDS.HeroTableData, 'HeroTableData')
   const npcRows = await fetchTable(index, UUIDS.NpcTemplateTableData, 'NpcTemplateTableData')
   const resRows = await fetchTable(index, UUIDS.ResTableData, 'ResTableData')
+  return { index, heroRows, npcRows, resRows }
+}
+
+// 导出单个英雄：下载 → 解析 → 落盘。返回结果对象（不碰 manifest，由调用方汇总）
+async function exportHero(ctx, HERO) {
+  const { index, heroRows, npcRows, resRows } = ctx
   const hero = (heroRows || []).find((h) => String(h.name).trim() === HERO)
-  if (!hero) return console.log('未找到英雄：', HERO)
+  if (!hero) return { ok: false, reason: '未找到英雄' }
   const npc = (npcRows || []).find((r) => String(r.id) === String(hero.npc_id))
   const res = (resRows || []).find((r) => String(r.id) === String(npc && npc.res_id))
   const anim = String((res && res.animation) || '')
-  console.log('英雄', HERO, 'npc_id=', hero.npc_id, 'animation =', anim)
-  if (!anim.startsWith('combat/animation/hero/')) return console.log('非英雄动画资源：', anim)
+  if (!anim.startsWith('combat/animation/hero/')) return { ok: false, reason: '非英雄动画: ' + anim }
 
   const entries = index.uuidByPath.get(anim) || []
-  console.log('path 资源 =', entries.map((e) => e.type).join(', ') || '(空)')
   const typeByUuid = new Map(entries.map((e) => [e.uuid, e.type]))
 
   // 1) 逐个 entry 拉 import：sp.SkeletonData → 解析；并提取 native 引用（贴图）
@@ -324,17 +329,13 @@ function parseCocosSkeleton(text) {
     const rel = index.importRelByUuid.get(e.uuid)
     if (!rel) continue
     const txt = await fetchText(`${CDN}/assets/resources/${rel}`)
-    if (!txt) {
-      console.log('  ✗ import 失败', e.type, rel)
-      continue
-    }
+    if (!txt) continue
     if (e.type === 'sp.SkeletonData') {
       const parsed = parseCocosSkeleton(txt)
       if (parsed) {
         skeletonJson = parsed.skeletonJson
         atlasText = parsed.atlasText
-        console.log('  ✓ 骨架 animations =', Object.keys(parsed.skeletonJson.animations || {}).join(','))
-      } else console.log('  ✗ 骨架解析失败')
+      }
     }
     for (const r of extractNativeRefs(txt, index)) refs.add(r)
   }
@@ -346,11 +347,9 @@ function parseCocosSkeleton(text) {
     if (!rel) continue
     const { status, buf } = await fetchBuffer(`${CDN}/assets/resources/${rel}.png`)
     if (status === 200 && buf.length) pngs.push(buf)
-    else console.log('  ✗ 贴图失败', status, rel)
   }
-  console.log('  贴图数 =', pngs.length)
   if (!skeletonJson || !atlasText || !pngs.length)
-    return console.log('资源不完整', { skeleton: !!skeletonJson, atlas: !!atlasText, pngs: pngs.length })
+    return { ok: false, reason: '资源不完整 skeleton=' + !!skeletonJson + ' atlas=' + !!atlasText + ' pngs=' + pngs.length }
 
   const folder = anim.split('/')[3]
   const outDir = path.join(OUT_DIR, folder)
@@ -358,21 +357,91 @@ function parseCocosSkeleton(text) {
   fs.writeFileSync(path.join(outDir, 'skeleton.json'), JSON.stringify(skeletonJson))
   fs.writeFileSync(path.join(outDir, 'atlas.txt'), atlasText)
   pngs.forEach((b, i) => fs.writeFileSync(path.join(outDir, `p${i}.png`), b))
-  // 维护资源清单 index.json：前端图鉴只对清单内（即已导出）的英雄播放动画，
-  // 避免 123 个英雄逐个 fetch 404。完整资源集后续可托管到 Gitee，前端换 base 即可。
+  const totalKB = Math.round(pngs.reduce((a, b) => a + b.length, 0) / 1024)
+  return {
+    ok: true,
+    folder,
+    anims: Object.keys(skeletonJson.animations || {}),
+    pngCount: pngs.length,
+    totalKB,
+    entry: {
+      hero: HERO,
+      anims: Object.keys(skeletonJson.animations || {}),
+      pngs: pngs.length,
+      updated: new Date().toISOString().slice(0, 10)
+    }
+  }
+}
+
+// 读现有 manifest 并合并新条目后写回
+function mergeManifest(entries) {
   const indexPath = path.join(OUT_DIR, 'index.json')
   let indexJson = {}
   try {
     indexJson = JSON.parse(fs.readFileSync(indexPath, 'utf8'))
   } catch {}
-  indexJson[folder] = {
-    hero: HERO,
-    anims: Object.keys(skeletonJson.animations || {}),
-    pngs: pngs.length,
-    updated: new Date().toISOString().slice(0, 10)
-  }
+  Object.assign(indexJson, entries)
   fs.writeFileSync(indexPath, JSON.stringify(indexJson, null, 2))
-  const totalKB = Math.round(pngs.reduce((a, b) => a + b.length, 0) / 1024)
-  console.log(`✅ ${HERO} -> ${outDir}  skeleton.json + atlas.txt + ${pngs.length} png（贴图共 ${totalKB}KB）`)
-  console.log(`📇 已登记 index.json: ${folder}`)
+  return Object.keys(indexJson).length
+}
+
+;(async () => {
+  const arg = (process.argv[2] || '小野').trim()
+  const ctx = await setupCtx()
+
+  if (arg === '--all' || arg === '--batch') {
+    // 目标清单来自 data/heroes.json 的 spine 字段（export-heroes.mjs 与 CDN 同源生成）
+    const heroesJson = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../data/heroes.json'), 'utf8'))
+    const targets = heroesJson.filter((h) => h.spine).map((h) => ({ name: h.name, spine: h.spine }))
+    console.log(`批量导出：共 ${targets.length} 个英雄`)
+    const entries = {}
+    let ok = 0
+    let fail = 0
+    const failures = []
+    const CHUNK = 4 // 并发度：CDN 友好，失败有重试兜底
+    for (let i = 0; i < targets.length; i += CHUNK) {
+      const chunk = targets.slice(i, i + CHUNK)
+      const results = await Promise.all(
+        chunk.map(async (t) => {
+          try {
+            return { t, r: await exportHero(ctx, t.name) }
+          } catch (e) {
+            return { t, r: { ok: false, reason: String((e && e.message) || e) } }
+          }
+        })
+      )
+      for (const { t, r } of results) {
+        if (r.ok) {
+          ok++
+          entries[r.folder] = r.entry
+          if (r.folder !== t.spine) console.log(`  ⚠ ${t.name}: CDN 目录 ${r.folder} 与 heroes.json 的 ${t.spine} 不一致（按 CDN 为准）`)
+          console.log(`✅ [${ok + fail}/${targets.length}] ${t.name} -> ${r.folder}（${r.pngCount} png / ${r.totalKB}KB / ${r.anims.length} anims）`)
+        } else {
+          fail++
+          failures.push(t.name)
+          console.log(`✗ [${ok + fail}/${targets.length}] ${t.name}: ${r.reason}`)
+        }
+      }
+    }
+    const total = mergeManifest(entries)
+    console.log(`==================== 批量完成 ====================`)
+    console.log(`成功 ${ok} / 失败 ${fail}，manifest 共登记 ${total} 个目录`)
+    if (failures.length) {
+      console.log(`失败清单（可逐个重跑 node scripts/export-heroes/export-spine.mjs <名字>）：`)
+      console.log(failures.join(', '))
+      process.exitCode = 1
+    }
+    return
+  }
+
+  // 单英雄模式
+  const r = await exportHero(ctx, arg)
+  if (!r.ok) {
+    console.log('导出失败：', r.reason)
+    process.exitCode = 1
+    return
+  }
+  mergeManifest({ [r.folder]: r.entry })
+  console.log(`✅ ${arg} -> ${path.join(OUT_DIR, r.folder)}  skeleton.json + atlas.txt + ${r.pngCount} png（贴图共 ${r.totalKB}KB）`)
+  console.log(`📇 已登记 index.json: ${r.folder}`)
 })()

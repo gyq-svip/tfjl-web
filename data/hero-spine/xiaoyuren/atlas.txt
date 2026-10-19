@@ -1,0 +1,153 @@
+
+xiaoyuren.png
+size: 810,810
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 464, 81
+  size: 122, 125
+  orig: 163, 138
+  offset: 20, 13
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 591, 205
+  size: 124, 125
+  orig: 163, 138
+  offset: 13, 13
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 464, 205
+  size: 125, 125
+  orig: 163, 138
+  offset: 11, 13
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 693, 672
+  size: 136, 114
+  orig: 163, 138
+  offset: 27, 12
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 591, 86
+  size: 111, 117
+  orig: 163, 138
+  offset: 52, 13
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 694, 335
+  size: 107, 119
+  orig: 163, 138
+  offset: 52, 13
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 694, 456
+  size: 105, 121
+  orig: 163, 138
+  offset: 50, 13
+  index: -1
+fx/daoguang0003
+  rotate: true
+  xy: 233, 2
+  size: 89, 101
+  orig: 112, 112
+  offset: 3, 5
+  index: -1
+fx/daoguang0005
+  rotate: true
+  xy: 717, 239
+  size: 94, 91
+  orig: 112, 112
+  offset: 6, 18
+  index: -1
+fx/daoguang0007
+  rotate: false
+  xy: 693, 579
+  size: 97, 91
+  orig: 112, 112
+  offset: 7, 20
+  index: -1
+fx/daoguanga_00002
+  rotate: false
+  xy: 52, 23
+  size: 69, 55
+  orig: 96, 96
+  offset: 10, 10
+  index: -1
+fx/daoguanga_00004
+  rotate: true
+  xy: 2, 2
+  size: 76, 48
+  orig: 96, 96
+  offset: 10, 10
+  index: -1
+fx/daoguanga_00008
+  rotate: false
+  xy: 336, 31
+  size: 72, 60
+  orig: 96, 96
+  offset: 14, 11
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 232, 567
+  size: 228, 241
+  orig: 247, 243
+  offset: 10, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 565
+  size: 228, 243
+  orig: 247, 243
+  offset: 11, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 320
+  size: 228, 243
+  orig: 247, 243
+  offset: 12, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 462, 569
+  size: 229, 239
+  orig: 247, 243
+  offset: 12, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 232, 330
+  size: 229, 235
+  orig: 247, 243
+  offset: 11, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 463, 332
+  size: 229, 235
+  orig: 247, 243
+  offset: 11, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 233, 93
+  size: 229, 235
+  orig: 247, 243
+  offset: 10, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 80
+  size: 229, 238
+  orig: 247, 243
+  offset: 10, 0
+  index: -1

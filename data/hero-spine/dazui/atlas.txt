@@ -1,0 +1,167 @@
+
+yaorenwawa.png
+size: 756,756
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 527, 225
+  size: 88, 90
+  orig: 126, 98
+  offset: 7, 4
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 663, 402
+  size: 84, 90
+  orig: 126, 98
+  offset: 2, 4
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 617, 235
+  size: 79, 90
+  orig: 126, 98
+  offset: 0, 4
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 663, 488
+  size: 91, 92
+  orig: 126, 98
+  offset: 35, 4
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 658, 316
+  size: 84, 90
+  orig: 126, 98
+  offset: 35, 1
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 617, 150
+  size: 85, 83
+  orig: 126, 98
+  offset: 35, 4
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 617, 72
+  size: 76, 92
+  orig: 126, 98
+  offset: 27, 4
+  index: -1
+fx/b7_001
+  rotate: true
+  xy: 528, 317
+  size: 123, 128
+  orig: 176, 176
+  offset: 19, 32
+  index: -1
+fx/b7_002
+  rotate: false
+  xy: 528, 442
+  size: 133, 135
+  orig: 176, 176
+  offset: 11, 29
+  index: -1
+fx/b7_003
+  rotate: false
+  xy: 351, 79
+  size: 132, 139
+  orig: 176, 176
+  offset: 10, 29
+  index: -1
+fx/b7_004
+  rotate: false
+  xy: 485, 79
+  size: 130, 139
+  orig: 176, 176
+  offset: 8, 29
+  index: -1
+idle/idle_00
+  rotate: true
+  xy: 537, 582
+  size: 172, 177
+  orig: 196, 177
+  offset: 6, 0
+  index: -1
+idle/idle_01
+  rotate: false
+  xy: 355, 399
+  size: 171, 177
+  orig: 196, 177
+  offset: 1, 0
+  index: -1
+idle/idle_02
+  rotate: false
+  xy: 354, 220
+  size: 171, 177
+  orig: 196, 177
+  offset: 0, 0
+  index: -1
+idle/idle_03
+  rotate: false
+  xy: 177, 41
+  size: 172, 177
+  orig: 196, 177
+  offset: 0, 0
+  index: -1
+idle/idle_04
+  rotate: false
+  xy: 2, 41
+  size: 173, 177
+  orig: 196, 177
+  offset: 3, 0
+  index: -1
+idle/idle_05
+  rotate: false
+  xy: 179, 399
+  size: 174, 177
+  orig: 196, 177
+  offset: 8, 0
+  index: -1
+idle/idle_06
+  rotate: false
+  xy: 2, 399
+  size: 175, 177
+  orig: 196, 177
+  offset: 12, 0
+  index: -1
+idle/idle_07
+  rotate: false
+  xy: 2, 578
+  size: 177, 176
+  orig: 196, 177
+  offset: 16, 0
+  index: -1
+idle/idle_08
+  rotate: false
+  xy: 359, 579
+  size: 176, 175
+  orig: 196, 177
+  offset: 20, 0
+  index: -1
+idle/idle_09
+  rotate: false
+  xy: 181, 578
+  size: 176, 176
+  orig: 196, 177
+  offset: 20, 0
+  index: -1
+idle/idle_10
+  rotate: false
+  xy: 2, 220
+  size: 175, 177
+  orig: 196, 177
+  offset: 17, 0
+  index: -1
+idle/idle_11
+  rotate: false
+  xy: 179, 220
+  size: 173, 177
+  orig: 196, 177
+  offset: 12, 0
+  index: -1

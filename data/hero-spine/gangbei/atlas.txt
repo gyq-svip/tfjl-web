@@ -1,0 +1,174 @@
+
+gangbei.png
+size: 792,792
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/a0000
+  rotate: false
+  xy: 434, 172
+  size: 212, 201
+  orig: 480, 360
+  offset: 156, 73
+  index: -1
+images/a0004
+  rotate: false
+  xy: 434, 375
+  size: 211, 204
+  orig: 480, 360
+  offset: 157, 68
+  index: -1
+images/a0008
+  rotate: false
+  xy: 434, 581
+  size: 212, 209
+  orig: 480, 360
+  offset: 157, 62
+  index: -1
+images/a0012
+  rotate: false
+  xy: 2, 359
+  size: 213, 213
+  orig: 480, 360
+  offset: 157, 59
+  index: -1
+images/a0016
+  rotate: false
+  xy: 2, 574
+  size: 213, 216
+  orig: 480, 360
+  offset: 156, 58
+  index: -1
+images/a0020
+  rotate: false
+  xy: 217, 576
+  size: 215, 214
+  orig: 480, 360
+  offset: 154, 61
+  index: -1
+images/a0024
+  rotate: false
+  xy: 217, 364
+  size: 215, 210
+  orig: 480, 360
+  offset: 154, 66
+  index: -1
+images/a0028
+  rotate: true
+  xy: 2, 142
+  size: 215, 204
+  orig: 480, 360
+  offset: 155, 71
+  index: -1
+images/a0039
+  rotate: true
+  xy: 539, 61
+  size: 109, 87
+  orig: 240, 180
+  offset: 70, 45
+  index: -1
+images/a0043
+  rotate: true
+  xy: 230, 29
+  size: 114, 97
+  orig: 240, 180
+  offset: 58, 45
+  index: -1
+images/a0045
+  rotate: true
+  xy: 648, 554
+  size: 91, 130
+  orig: 240, 180
+  offset: 54, 45
+  index: -1
+images/a0047
+  rotate: false
+  xy: 431, 57
+  size: 106, 113
+  orig: 240, 180
+  offset: 53, 45
+  index: -1
+images/a0049
+  rotate: true
+  xy: 311, 239
+  size: 123, 116
+  orig: 240, 180
+  offset: 59, 45
+  index: -1
+images/a0051
+  rotate: true
+  xy: 647, 392
+  size: 160, 86
+  orig: 240, 180
+  offset: 69, 40
+  index: -1
+images/a0055
+  rotate: true
+  xy: 648, 232
+  size: 158, 86
+  orig: 240, 180
+  offset: 77, 42
+  index: -1
+images/a0059
+  rotate: true
+  xy: 208, 224
+  size: 133, 101
+  orig: 240, 180
+  offset: 82, 31
+  index: -1
+images/a0063
+  rotate: true
+  xy: 329, 34
+  size: 114, 100
+  orig: 240, 180
+  offset: 79, 37
+  index: -1
+images/fx/4
+  rotate: true
+  xy: 208, 145
+  size: 77, 105
+  orig: 78, 107
+  offset: 1, 1
+  index: -1
+images/fx/5
+  rotate: true
+  xy: 315, 150
+  size: 87, 111
+  orig: 88, 112
+  offset: 1, 0
+  index: -1
+images/fx/6
+  rotate: true
+  xy: 628, 43
+  size: 87, 106
+  orig: 88, 108
+  offset: 1, 1
+  index: -1
+images/fx/7
+  rotate: false
+  xy: 648, 132
+  size: 88, 98
+  orig: 89, 100
+  offset: 1, 1
+  index: -1
+images/fx/kuangmozhan_12
+  rotate: false
+  xy: 2, 2
+  size: 124, 138
+  orig: 142, 155
+  offset: 17, 9
+  index: -1
+images/fx/kuangmozhan_13
+  rotate: false
+  xy: 648, 647
+  size: 120, 143
+  orig: 142, 155
+  offset: 13, 5
+  index: -1
+images/fx/kuangmozhan_14
+  rotate: false
+  xy: 128, 4
+  size: 100, 136
+  orig: 142, 155
+  offset: 12, 4
+  index: -1

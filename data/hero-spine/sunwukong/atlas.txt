@@ -1,0 +1,216 @@
+
+sunwukong.png
+size: 622,622
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/attack/b0003
+  rotate: false
+  xy: 553, 224
+  size: 67, 84
+  orig: 179, 179
+  offset: 53, 43
+  index: -1
+images/attack/b0007
+  rotate: false
+  xy: 191, 2
+  size: 71, 73
+  orig: 179, 179
+  offset: 55, 43
+  index: -1
+images/attack/b0010
+  rotate: false
+  xy: 116, 2
+  size: 73, 73
+  orig: 179, 179
+  offset: 54, 42
+  index: -1
+images/attack/b0013
+  rotate: true
+  xy: 390, 102
+  size: 65, 84
+  orig: 179, 179
+  offset: 51, 62
+  index: -1
+images/attack/b0015
+  rotate: false
+  xy: 553, 155
+  size: 67, 67
+  orig: 179, 179
+  offset: 53, 74
+  index: -1
+images/attack/b0018
+  rotate: true
+  xy: 575, 538
+  size: 82, 45
+  orig: 179, 179
+  offset: 51, 92
+  index: -1
+images/attack/b0021
+  rotate: true
+  xy: 366, 47
+  size: 53, 100
+  orig: 179, 179
+  offset: 55, 58
+  index: -1
+images/attack/b0022
+  rotate: true
+  xy: 2, 19
+  size: 52, 104
+  orig: 179, 179
+  offset: 53, 46
+  index: -1
+images/attack/b0025
+  rotate: true
+  xy: 468, 3
+  size: 66, 82
+  orig: 179, 179
+  offset: 55, 43
+  index: -1
+images/attack/b0027
+  rotate: false
+  xy: 550, 71
+  size: 70, 82
+  orig: 179, 179
+  offset: 53, 44
+  index: -1
+images/fx/f03/f3_000
+  rotate: false
+  xy: 473, 178
+  size: 78, 125
+  orig: 84, 167
+  offset: 2, 3
+  index: -1
+images/fx/f03/f3_001
+  rotate: false
+  xy: 390, 169
+  size: 81, 126
+  orig: 84, 167
+  offset: 1, 12
+  index: -1
+images/fx/f03/f3_002
+  rotate: false
+  xy: 509, 310
+  size: 81, 133
+  orig: 84, 167
+  offset: 1, 16
+  index: -1
+images/fx/f03/f3_003
+  rotate: false
+  xy: 427, 305
+  size: 80, 135
+  orig: 84, 167
+  offset: 0, 16
+  index: -1
+images/fx/f03/f3_004
+  rotate: false
+  xy: 347, 297
+  size: 78, 142
+  orig: 84, 167
+  offset: 2, 16
+  index: -1
+images/fx/f03/f3_005
+  rotate: false
+  xy: 229, 125
+  size: 79, 133
+  orig: 84, 167
+  offset: 3, 27
+  index: -1
+images/fx/f03/f3_006
+  rotate: false
+  xy: 310, 132
+  size: 78, 129
+  orig: 84, 167
+  offset: 4, 34
+  index: -1
+images/fx/f03/f3_007
+  rotate: false
+  xy: 264, 13
+  size: 76, 110
+  orig: 84, 167
+  offset: 7, 49
+  index: -1
+images/fx/f03/f3_008
+  rotate: false
+  xy: 476, 75
+  size: 72, 101
+  orig: 84, 167
+  offset: 9, 57
+  index: -1
+images/idle/a0000
+  rotate: false
+  xy: 2, 255
+  size: 113, 181
+  orig: 358, 358
+  offset: 128, 85
+  index: -1
+images/idle/a0004
+  rotate: false
+  xy: 2, 438
+  size: 113, 182
+  orig: 358, 358
+  offset: 127, 85
+  index: -1
+images/idle/a0008
+  rotate: false
+  xy: 117, 439
+  size: 113, 181
+  orig: 358, 358
+  offset: 127, 85
+  index: -1
+images/idle/a0012
+  rotate: false
+  xy: 232, 441
+  size: 114, 179
+  orig: 358, 358
+  offset: 127, 85
+  index: -1
+images/idle/a0016
+  rotate: false
+  xy: 117, 260
+  size: 113, 177
+  orig: 358, 358
+  offset: 128, 85
+  index: -1
+images/idle/a0020
+  rotate: false
+  xy: 232, 263
+  size: 113, 176
+  orig: 358, 358
+  offset: 128, 85
+  index: -1
+images/idle/a0024
+  rotate: false
+  xy: 461, 445
+  size: 112, 175
+  orig: 358, 358
+  offset: 128, 85
+  index: -1
+images/idle/a0028
+  rotate: false
+  xy: 116, 77
+  size: 111, 176
+  orig: 358, 358
+  offset: 128, 85
+  index: -1
+images/idle/a0032
+  rotate: false
+  xy: 348, 442
+  size: 111, 178
+  orig: 358, 358
+  offset: 128, 85
+  index: -1
+images/idle/a0036
+  rotate: false
+  xy: 2, 73
+  size: 112, 180
+  orig: 358, 358
+  offset: 128, 85
+  index: -1
+images/idle/weiba2
+  rotate: false
+  xy: 342, 19
+  size: 22, 111
+  orig: 22, 111
+  offset: 0, 0
+  index: -1

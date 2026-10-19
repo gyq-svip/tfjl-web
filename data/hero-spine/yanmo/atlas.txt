@@ -1,0 +1,153 @@
+
+yanmo.png
+size: 538,538
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+FX/Fire 055 Impact Shot Up_00001
+  rotate: true
+  xy: 477, 40
+  size: 34, 54
+  orig: 88, 88
+  offset: 32, 6
+  index: -1
+FX/Fire 055 Impact Shot Up_00003
+  rotate: true
+  xy: 407, 8
+  size: 40, 58
+  orig: 88, 88
+  offset: 27, 9
+  index: -1
+FX/Fire 055 Impact Shot Up_00005
+  rotate: false
+  xy: 487, 238
+  size: 47, 62
+  orig: 88, 88
+  offset: 21, 15
+  index: -1
+FX/Fire 055 Impact Shot Up_00007
+  rotate: false
+  xy: 137, 150
+  size: 52, 65
+  orig: 88, 88
+  offset: 16, 20
+  index: -1
+FX/Fire 055 Impact Shot Up_00009
+  rotate: false
+  xy: 476, 174
+  size: 52, 62
+  orig: 88, 88
+  offset: 15, 24
+  index: -1
+FX/Fire 055 Impact Shot Up_00011
+  rotate: false
+  xy: 487, 302
+  size: 49, 36
+  orig: 88, 88
+  offset: 15, 51
+  index: -1
+a_0
+  rotate: false
+  xy: 2, 147
+  size: 133, 192
+  orig: 358, 359
+  offset: 104, 69
+  index: -1
+a_1
+  rotate: false
+  xy: 277, 343
+  size: 131, 193
+  orig: 358, 359
+  offset: 105, 69
+  index: -1
+a_2
+  rotate: true
+  xy: 2, 16
+  size: 129, 195
+  orig: 358, 359
+  offset: 106, 69
+  index: -1
+a_3
+  rotate: false
+  xy: 410, 340
+  size: 125, 196
+  orig: 358, 359
+  offset: 108, 69
+  index: -1
+a_4
+  rotate: true
+  xy: 143, 217
+  size: 124, 196
+  orig: 358, 359
+  offset: 109, 69
+  index: -1
+a_5
+  rotate: false
+  xy: 2, 341
+  size: 139, 195
+  orig: 358, 359
+  offset: 94, 69
+  index: -1
+a_6
+  rotate: false
+  xy: 199, 21
+  size: 127, 194
+  orig: 358, 359
+  offset: 106, 69
+  index: -1
+a_7
+  rotate: false
+  xy: 143, 343
+  size: 132, 193
+  orig: 358, 359
+  offset: 103, 69
+  index: -1
+b_1
+  rotate: false
+  xy: 405, 147
+  size: 69, 95
+  orig: 179, 180
+  offset: 47, 36
+  index: -1
+b_2
+  rotate: false
+  xy: 404, 244
+  size: 81, 94
+  orig: 179, 180
+  offset: 33, 36
+  index: -1
+b_3
+  rotate: false
+  xy: 328, 119
+  size: 75, 96
+  orig: 179, 180
+  offset: 37, 36
+  index: -1
+b_4
+  rotate: false
+  xy: 341, 242
+  size: 61, 99
+  orig: 179, 180
+  offset: 51, 36
+  index: -1
+b_5
+  rotate: false
+  xy: 477, 76
+  size: 57, 96
+  orig: 179, 180
+  offset: 55, 36
+  index: -1
+b_6
+  rotate: false
+  xy: 407, 50
+  size: 68, 95
+  orig: 179, 180
+  offset: 50, 36
+  index: -1
+b_7
+  rotate: false
+  xy: 328, 22
+  size: 77, 95
+  orig: 179, 180
+  offset: 52, 36
+  index: -1

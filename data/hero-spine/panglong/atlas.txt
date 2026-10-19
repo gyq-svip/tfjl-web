@@ -1,0 +1,370 @@
+
+panglong.png
+size: 1238,1238
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/c0000
+  rotate: false
+  xy: 873, 742
+  size: 260, 245
+  orig: 512, 512
+  offset: 111, 134
+  index: -1
+images/c0004
+  rotate: false
+  xy: 582, 535
+  size: 260, 231
+  orig: 512, 512
+  offset: 113, 152
+  index: -1
+images/c0008
+  rotate: true
+  xy: 505, 281
+  size: 225, 243
+  orig: 512, 512
+  offset: 115, 150
+  index: -1
+images/c0012
+  rotate: true
+  xy: 582, 768
+  size: 225, 264
+  orig: 512, 512
+  offset: 111, 114
+  index: -1
+images/c0016
+  rotate: true
+  xy: 2, 790
+  size: 203, 279
+  orig: 512, 512
+  offset: 110, 80
+  index: -1
+images/c0020
+  rotate: true
+  xy: 584, 995
+  size: 241, 287
+  orig: 512, 512
+  offset: 112, 58
+  index: -1
+images/c0024
+  rotate: false
+  xy: 2, 524
+  size: 275, 264
+  orig: 512, 512
+  offset: 115, 64
+  index: -1
+images/c0028
+  rotate: false
+  xy: 2, 995
+  size: 289, 241
+  orig: 512, 512
+  offset: 114, 86
+  index: -1
+images/c0030
+  rotate: false
+  xy: 293, 999
+  size: 289, 237
+  orig: 512, 512
+  offset: 114, 95
+  index: -1
+images/c0032
+  rotate: false
+  xy: 293, 757
+  size: 287, 240
+  orig: 512, 512
+  offset: 113, 99
+  index: -1
+images/c0036
+  rotate: false
+  xy: 873, 989
+  size: 269, 247
+  orig: 512, 512
+  offset: 113, 112
+  index: -1
+images/e0000
+  rotate: false
+  xy: 996, 242
+  size: 235, 248
+  orig: 512, 512
+  offset: 113, 117
+  index: -1
+images/e0004
+  rotate: false
+  xy: 996, 492
+  size: 240, 248
+  orig: 512, 512
+  offset: 108, 117
+  index: -1
+images/e0008
+  rotate: false
+  xy: 721, 30
+  size: 246, 249
+  orig: 512, 512
+  offset: 102, 116
+  index: -1
+images/e0012
+  rotate: false
+  xy: 470, 29
+  size: 249, 249
+  orig: 512, 512
+  offset: 97, 116
+  index: -1
+images/e0016
+  rotate: true
+  xy: 279, 508
+  size: 247, 250
+  orig: 512, 512
+  offset: 98, 116
+  index: -1
+images/e0020
+  rotate: false
+  xy: 750, 284
+  size: 244, 249
+  orig: 512, 512
+  offset: 99, 117
+  index: -1
+images/e0024
+  rotate: true
+  xy: 2, 280
+  size: 242, 250
+  orig: 512, 512
+  offset: 101, 116
+  index: -1
+images/e0028
+  rotate: false
+  xy: 2, 28
+  size: 234, 250
+  orig: 512, 512
+  offset: 109, 116
+  index: -1
+images/e0030
+  rotate: false
+  xy: 238, 28
+  size: 230, 250
+  orig: 512, 512
+  offset: 113, 116
+  index: -1
+images/e0032
+  rotate: true
+  xy: 254, 280
+  size: 226, 249
+  orig: 512, 512
+  offset: 118, 117
+  index: -1
+images/e0036
+  rotate: true
+  xy: 969, 12
+  size: 228, 248
+  orig: 512, 512
+  offset: 118, 117
+  index: -1
+images/fx/fire/f_00
+  rotate: true
+  xy: 1204, 1190
+  size: 46, 32
+  orig: 89, 221
+  offset: 25, 156
+  index: -1
+images/fx/fire/f_01
+  rotate: false
+  xy: 1144, 1038
+  size: 55, 44
+  orig: 89, 221
+  offset: 16, 156
+  index: -1
+images/fx/fire/f_02
+  rotate: false
+  xy: 1144, 1084
+  size: 57, 48
+  orig: 89, 221
+  offset: 14, 157
+  index: -1
+images/fx/fire/f_03
+  rotate: false
+  xy: 1144, 1186
+  size: 58, 50
+  orig: 89, 221
+  offset: 13, 158
+  index: -1
+images/fx/fire/f_04
+  rotate: false
+  xy: 1144, 1134
+  size: 57, 50
+  orig: 89, 221
+  offset: 12, 160
+  index: -1
+images/fx/fire/f_05
+  rotate: false
+  xy: 1144, 987
+  size: 54, 49
+  orig: 89, 221
+  offset: 11, 162
+  index: -1
+images/fx/fire/f_06
+  rotate: true
+  xy: 1135, 946
+  size: 39, 46
+  orig: 89, 221
+  offset: 13, 165
+  index: -1
+images/fx/fire/f_07
+  rotate: false
+  xy: 1203, 1118
+  size: 33, 41
+  orig: 89, 221
+  offset: 15, 168
+  index: -1
+images/fx/fire/f_08
+  rotate: true
+  xy: 1201, 1045
+  size: 31, 35
+  orig: 89, 221
+  offset: 15, 172
+  index: -1
+images/fx/fire/f_09
+  rotate: false
+  xy: 279, 778
+  size: 10, 10
+  orig: 89, 221
+  offset: 35, 195
+  index: -1
+images/fx/fire/smok_00
+  rotate: true
+  xy: 848, 890
+  size: 29, 21
+  orig: 80, 221
+  offset: 33, 152
+  index: -1
+images/fx/fire/smok_01
+  rotate: true
+  xy: 1203, 1078
+  size: 38, 33
+  orig: 80, 221
+  offset: 23, 154
+  index: -1
+images/fx/fire/smok_02
+  rotate: false
+  xy: 1179, 858
+  size: 42, 37
+  orig: 80, 221
+  offset: 19, 154
+  index: -1
+images/fx/fire/smok_03
+  rotate: false
+  xy: 1135, 906
+  size: 44, 38
+  orig: 80, 221
+  offset: 17, 155
+  index: -1
+images/fx/fire/smok_04
+  rotate: false
+  xy: 1183, 938
+  size: 44, 39
+  orig: 80, 221
+  offset: 17, 156
+  index: -1
+images/fx/fire/smok_05
+  rotate: false
+  xy: 1181, 897
+  size: 43, 39
+  orig: 80, 221
+  offset: 16, 157
+  index: -1
+images/fx/fire/smok_06
+  rotate: false
+  xy: 1135, 864
+  size: 42, 40
+  orig: 80, 221
+  offset: 16, 157
+  index: -1
+images/fx/fire/smok_07
+  rotate: false
+  xy: 1200, 979
+  size: 36, 38
+  orig: 80, 221
+  offset: 16, 159
+  index: -1
+images/fx/fire/smok_08
+  rotate: false
+  xy: 848, 921
+  size: 21, 37
+  orig: 80, 221
+  offset: 30, 159
+  index: -1
+images/fx/zui/e0000
+  rotate: true
+  xy: 1204, 1161
+  size: 27, 32
+  orig: 512, 512
+  offset: 295, 260
+  index: -1
+images/fx/zui/e0004
+  rotate: true
+  xy: 1171, 830
+  size: 26, 33
+  orig: 512, 512
+  offset: 296, 257
+  index: -1
+images/fx/zui/e0008
+  rotate: true
+  xy: 1135, 784
+  size: 24, 33
+  orig: 512, 512
+  offset: 296, 254
+  index: -1
+images/fx/zui/e0012
+  rotate: true
+  xy: 1201, 1019
+  size: 24, 34
+  orig: 512, 512
+  offset: 294, 252
+  index: -1
+images/fx/zui/e0016
+  rotate: false
+  xy: 848, 960
+  size: 23, 33
+  orig: 512, 512
+  offset: 293, 252
+  index: -1
+images/fx/zui/e0020
+  rotate: true
+  xy: 1135, 838
+  size: 24, 34
+  orig: 512, 512
+  offset: 291, 253
+  index: -1
+images/fx/zui/e0024
+  rotate: true
+  xy: 1170, 803
+  size: 25, 33
+  orig: 512, 512
+  offset: 290, 257
+  index: -1
+images/fx/zui/e0028
+  rotate: true
+  xy: 1135, 810
+  size: 26, 33
+  orig: 512, 512
+  offset: 290, 261
+  index: -1
+images/fx/zui/e0030
+  rotate: false
+  xy: 1205, 790
+  size: 26, 32
+  orig: 512, 512
+  offset: 291, 263
+  index: -1
+images/fx/zui/e0032
+  rotate: false
+  xy: 844, 734
+  size: 27, 32
+  orig: 512, 512
+  offset: 291, 263
+  index: -1
+images/fx/zui/e0036
+  rotate: false
+  xy: 1206, 824
+  size: 27, 32
+  orig: 512, 512
+  offset: 293, 262
+  index: -1

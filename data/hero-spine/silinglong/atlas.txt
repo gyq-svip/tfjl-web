@@ -1,0 +1,118 @@
+
+silinglong.png
+size: 882,882
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+AD1
+  rotate: false
+  xy: 207, 453
+  size: 202, 213
+  orig: 202, 213
+  offset: 0, 0
+  index: -1
+AD2
+  rotate: false
+  xy: 411, 464
+  size: 202, 212
+  orig: 202, 213
+  offset: 0, 1
+  index: -1
+AD3
+  rotate: false
+  xy: 2, 421
+  size: 203, 212
+  orig: 203, 212
+  offset: 0, 0
+  index: -1
+AD4
+  rotate: false
+  xy: 186, 668
+  size: 203, 212
+  orig: 203, 212
+  offset: 0, 0
+  index: -1
+AD5
+  rotate: false
+  xy: 216, 25
+  size: 203, 211
+  orig: 203, 213
+  offset: 0, 1
+  index: -1
+AD6
+  rotate: false
+  xy: 2, 207
+  size: 203, 212
+  orig: 203, 212
+  offset: 0, 0
+  index: -1
+AD7
+  rotate: true
+  xy: 2, 2
+  size: 203, 212
+  orig: 203, 212
+  offset: 0, 0
+  index: -1
+AD8
+  rotate: true
+  xy: 391, 678
+  size: 202, 213
+  orig: 202, 213
+  offset: 0, 0
+  index: -1
+AG1
+  rotate: false
+  xy: 207, 238
+  size: 202, 213
+  orig: 202, 213
+  offset: 0, 0
+  index: -1
+AG2
+  rotate: false
+  xy: 615, 473
+  size: 182, 226
+  orig: 182, 226
+  offset: 0, 0
+  index: -1
+AG3
+  rotate: true
+  xy: 411, 289
+  size: 173, 241
+  orig: 173, 241
+  offset: 0, 0
+  index: -1
+AG4
+  rotate: false
+  xy: 2, 635
+  size: 182, 245
+  orig: 182, 245
+  offset: 0, 0
+  index: -1
+AG5
+  rotate: true
+  xy: 654, 233
+  size: 238, 170
+  orig: 238, 170
+  offset: 0, 0
+  index: -1
+AG6
+  rotate: false
+  xy: 569, 78
+  size: 260, 153
+  orig: 260, 153
+  offset: 0, 0
+  index: -1
+AG7
+  rotate: true
+  xy: 421, 14
+  size: 273, 146
+  orig: 273, 146
+  offset: 0, 0
+  index: -1
+AG8
+  rotate: false
+  xy: 606, 701
+  size: 235, 179
+  orig: 235, 179
+  offset: 0, 0
+  index: -1

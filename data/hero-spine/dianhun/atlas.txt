@@ -1,0 +1,167 @@
+
+dianhun.png
+size: 591,591
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+FX/Electricity 016 Charge Right_00002
+  rotate: true
+  xy: 446, 7
+  size: 29, 34
+  orig: 88, 88
+  offset: 21, 19
+  index: -1
+FX/Electricity 016 Charge Right_00006
+  rotate: true
+  xy: 310, 299
+  size: 32, 45
+  orig: 88, 88
+  offset: 22, 19
+  index: -1
+FX/Electricity 016 Charge Right_00010
+  rotate: true
+  xy: 51, 14
+  size: 47, 51
+  orig: 88, 88
+  offset: 20, 21
+  index: -1
+FX/Electricity 016 Charge Right_00012
+  rotate: false
+  xy: 59, 63
+  size: 47, 52
+  orig: 88, 88
+  offset: 21, 19
+  index: -1
+FX/Electricity 016 Charge Right_00016
+  rotate: true
+  xy: 2, 69
+  size: 46, 55
+  orig: 88, 88
+  offset: 22, 19
+  index: -1
+FX/Electricity 016 Charge Right_00019
+  rotate: false
+  xy: 2, 15
+  size: 47, 52
+  orig: 88, 88
+  offset: 25, 21
+  index: -1
+FX/Electricity 016 Charge Right_00021
+  rotate: true
+  xy: 262, 291
+  size: 40, 46
+  orig: 88, 88
+  offset: 31, 27
+  index: -1
+FX/Electricity 016 Charge Right_00023
+  rotate: true
+  xy: 357, 301
+  size: 30, 42
+  orig: 88, 88
+  offset: 34, 29
+  index: -1
+a0000
+  rotate: true
+  xy: 262, 333
+  size: 117, 157
+  orig: 358, 358
+  offset: 116, 83
+  index: -1
+a0004
+  rotate: false
+  xy: 2, 429
+  size: 115, 160
+  orig: 358, 358
+  offset: 117, 83
+  index: -1
+a0008
+  rotate: false
+  xy: 312, 138
+  size: 114, 159
+  orig: 358, 358
+  offset: 117, 83
+  index: -1
+a0012
+  rotate: true
+  xy: 128, 41
+  size: 112, 159
+  orig: 358, 358
+  offset: 116, 83
+  index: -1
+a0016
+  rotate: false
+  xy: 446, 38
+  size: 112, 157
+  orig: 358, 358
+  offset: 116, 83
+  index: -1
+a0020
+  rotate: false
+  xy: 428, 197
+  size: 114, 157
+  orig: 358, 358
+  offset: 114, 83
+  index: -1
+a0024
+  rotate: true
+  xy: 273, 473
+  size: 116, 157
+  orig: 358, 358
+  offset: 114, 83
+  index: -1
+a0028
+  rotate: true
+  xy: 432, 473
+  size: 116, 157
+  orig: 358, 358
+  offset: 115, 83
+  index: -1
+a0038
+  rotate: false
+  xy: 2, 117
+  size: 124, 159
+  orig: 358, 358
+  offset: 113, 77
+  index: -1
+a0042
+  rotate: true
+  xy: 421, 356
+  size: 115, 158
+  orig: 358, 358
+  offset: 117, 75
+  index: -1
+a0046
+  rotate: true
+  xy: 154, 155
+  size: 133, 156
+  orig: 358, 358
+  offset: 135, 77
+  index: -1
+a0050
+  rotate: false
+  xy: 2, 278
+  size: 150, 149
+  orig: 358, 358
+  offset: 136, 74
+  index: -1
+a0054
+  rotate: true
+  xy: 119, 452
+  size: 137, 152
+  orig: 358, 358
+  offset: 136, 74
+  index: -1
+a0058
+  rotate: true
+  xy: 289, 20
+  size: 116, 155
+  orig: 358, 358
+  offset: 135, 78
+  index: -1
+a0062
+  rotate: false
+  xy: 154, 290
+  size: 106, 160
+  orig: 358, 358
+  offset: 134, 78
+  index: -1

@@ -1,0 +1,146 @@
+
+huoling.png
+size: 1327,1327
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 664, 145
+  size: 292, 292
+  orig: 426, 321
+  offset: 97, 20
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 1021, 738
+  size: 264, 287
+  orig: 426, 321
+  offset: 99, 20
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 958, 156
+  size: 249, 281
+  orig: 426, 321
+  offset: 99, 20
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 2, 748
+  size: 366, 289
+  orig: 426, 321
+  offset: 43, 20
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 2, 1039
+  size: 372, 286
+  orig: 426, 321
+  offset: 32, 20
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 2, 455
+  size: 363, 291
+  orig: 426, 321
+  offset: 39, 20
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 2, 157
+  size: 338, 296
+  orig: 426, 321
+  offset: 57, 20
+  index: -1
+fxfire_01
+  rotate: false
+  xy: 2, 47
+  size: 322, 108
+  orig: 507, 239
+  offset: 131, 58
+  index: -1
+fxfire_03
+  rotate: false
+  xy: 326, 27
+  size: 381, 115
+  orig: 507, 239
+  offset: 74, 46
+  index: -1
+fxfire_05
+  rotate: false
+  xy: 709, 23
+  size: 375, 120
+  orig: 507, 239
+  offset: 62, 45
+  index: -1
+fxfire_07
+  rotate: true
+  xy: 1209, 388
+  size: 348, 115
+  orig: 507, 239
+  offset: 61, 47
+  index: -1
+fxfire_09
+  rotate: true
+  xy: 1016, 511
+  size: 223, 99
+  orig: 507, 239
+  offset: 71, 57
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 692, 439
+  size: 322, 295
+  orig: 386, 297
+  offset: 41, 0
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 1029, 1004
+  size: 321, 296
+  orig: 386, 297
+  offset: 42, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 342, 144
+  size: 320, 295
+  orig: 386, 297
+  offset: 42, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 696, 736
+  size: 323, 294
+  orig: 386, 297
+  offset: 42, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 703, 1032
+  size: 324, 293
+  orig: 386, 297
+  offset: 42, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 370, 737
+  size: 324, 293
+  orig: 386, 297
+  offset: 42, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 376, 1032
+  size: 325, 293
+  orig: 386, 297
+  offset: 41, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 367, 441
+  size: 323, 294
+  orig: 386, 297
+  offset: 41, 0
+  index: -1

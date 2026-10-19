@@ -1,0 +1,139 @@
+
+gugong.png
+size: 588,588
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+fx/s2/s02_000
+  rotate: false
+  xy: 561, 486
+  size: 17, 100
+  orig: 61, 154
+  offset: 21, 48
+  index: -1
+fx/s2/s02_002
+  rotate: true
+  xy: 350, 42
+  size: 50, 114
+  orig: 61, 154
+  offset: 5, 37
+  index: -1
+fx/s2/s02_004
+  rotate: false
+  xy: 534, 77
+  size: 39, 117
+  orig: 61, 154
+  offset: 13, 27
+  index: -1
+fx/s2/s02_006
+  rotate: true
+  xy: 155, 8
+  size: 35, 134
+  orig: 61, 154
+  offset: 12, 3
+  index: -1
+fx/s2/s02_008
+  rotate: false
+  xy: 552, 307
+  size: 31, 82
+  orig: 61, 154
+  offset: 12, 2
+  index: -1
+images/attack/a0036
+  rotate: true
+  xy: 460, 391
+  size: 93, 98
+  orig: 154, 154
+  offset: 43, 31
+  index: -1
+images/attack/a0039
+  rotate: false
+  xy: 459, 293
+  size: 91, 96
+  orig: 154, 154
+  offset: 43, 34
+  index: -1
+images/attack/a0042
+  rotate: false
+  xy: 459, 196
+  size: 87, 95
+  orig: 154, 154
+  offset: 45, 34
+  index: -1
+images/attack/a0044
+  rotate: false
+  xy: 460, 486
+  size: 99, 100
+  orig: 154, 154
+  offset: 42, 34
+  index: -1
+images/attack/a0048
+  rotate: false
+  xy: 350, 94
+  size: 93, 102
+  orig: 154, 154
+  offset: 37, 34
+  index: -1
+images/attack/a0054
+  rotate: false
+  xy: 445, 100
+  size: 87, 94
+  orig: 154, 154
+  offset: 43, 34
+  index: -1
+images/idle/a0000
+  rotate: false
+  xy: 2, 197
+  size: 151, 193
+  orig: 307, 307
+  offset: 90, 61
+  index: -1
+images/idle/a0004
+  rotate: false
+  xy: 2, 392
+  size: 151, 194
+  orig: 307, 307
+  offset: 89, 61
+  index: -1
+images/idle/a0008
+  rotate: false
+  xy: 155, 392
+  size: 150, 194
+  orig: 307, 307
+  offset: 88, 62
+  index: -1
+images/idle/a0012
+  rotate: true
+  xy: 155, 45
+  size: 149, 193
+  orig: 307, 307
+  offset: 88, 62
+  index: -1
+images/idle/a0016
+  rotate: false
+  xy: 155, 196
+  size: 150, 194
+  orig: 307, 307
+  offset: 87, 61
+  index: -1
+images/idle/a0020
+  rotate: false
+  xy: 307, 198
+  size: 150, 193
+  orig: 307, 307
+  offset: 87, 61
+  index: -1
+images/idle/a0024
+  rotate: false
+  xy: 2, 2
+  size: 151, 193
+  orig: 307, 307
+  offset: 88, 60
+  index: -1
+images/idle/a0028
+  rotate: false
+  xy: 307, 393
+  size: 151, 193
+  orig: 307, 307
+  offset: 89, 61
+  index: -1

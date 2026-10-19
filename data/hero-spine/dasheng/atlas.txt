@@ -1,0 +1,167 @@
+
+qitiandasheng1.png
+size: 870,870
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/a0000
+  rotate: false
+  xy: 240, 26
+  size: 232, 195
+  orig: 640, 480
+  offset: 213, 128
+  index: -1
+images/a0004
+  rotate: true
+  xy: 474, 3
+  size: 230, 196
+  orig: 640, 480
+  offset: 213, 128
+  index: -1
+images/a0008
+  rotate: true
+  xy: 628, 325
+  size: 228, 196
+  orig: 640, 480
+  offset: 212, 128
+  index: -1
+images/a0012
+  rotate: true
+  xy: 434, 235
+  size: 232, 192
+  orig: 640, 480
+  offset: 208, 128
+  index: -1
+images/a0016
+  rotate: true
+  xy: 240, 223
+  size: 234, 192
+  orig: 640, 480
+  offset: 206, 128
+  index: -1
+images/a0020
+  rotate: false
+  xy: 2, 70
+  size: 236, 192
+  orig: 640, 480
+  offset: 206, 128
+  index: -1
+images/a0024
+  rotate: false
+  xy: 2, 264
+  size: 236, 193
+  orig: 640, 480
+  offset: 208, 128
+  index: -1
+images/a0028
+  rotate: false
+  xy: 369, 469
+  size: 233, 193
+  orig: 640, 480
+  offset: 212, 128
+  index: -1
+images/a0039
+  rotate: false
+  xy: 708, 770
+  size: 123, 98
+  orig: 320, 240
+  offset: 100, 63
+  index: -1
+images/a0041
+  rotate: true
+  xy: 708, 555
+  size: 108, 95
+  orig: 320, 240
+  offset: 106, 63
+  index: -1
+images/a0043
+  rotate: true
+  xy: 2, 2
+  size: 66, 99
+  orig: 320, 240
+  offset: 111, 63
+  index: -1
+images/a0045
+  rotate: false
+  xy: 759, 118
+  size: 70, 103
+  orig: 320, 240
+  offset: 106, 63
+  index: -1
+images/a0047
+  rotate: true
+  xy: 103, 7
+  size: 61, 99
+  orig: 320, 240
+  offset: 119, 63
+  index: -1
+images/a0049
+  rotate: true
+  xy: 604, 555
+  size: 107, 98
+  orig: 320, 240
+  offset: 103, 64
+  index: -1
+images/a0052
+  rotate: false
+  xy: 708, 665
+  size: 111, 103
+  orig: 320, 240
+  offset: 100, 63
+  index: -1
+images/a0055
+  rotate: false
+  xy: 751, 13
+  size: 71, 103
+  orig: 320, 240
+  offset: 139, 64
+  index: -1
+images/a0057
+  rotate: false
+  xy: 672, 13
+  size: 77, 104
+  orig: 320, 240
+  offset: 130, 64
+  index: -1
+images/a0059
+  rotate: true
+  xy: 628, 236
+  size: 87, 104
+  orig: 320, 240
+  offset: 119, 64
+  index: -1
+images/a0061
+  rotate: false
+  xy: 672, 119
+  size: 85, 102
+  orig: 320, 240
+  offset: 110, 64
+  index: -1
+images/a0063
+  rotate: false
+  xy: 734, 223
+  size: 92, 100
+  orig: 320, 240
+  offset: 108, 64
+  index: -1
+images/fx/fx2
+  rotate: false
+  xy: 2, 662
+  size: 365, 206
+  orig: 448, 420
+  offset: 25, 96
+  index: -1
+images/fx/fx3
+  rotate: false
+  xy: 2, 459
+  size: 353, 201
+  orig: 448, 420
+  offset: 39, 104
+  index: -1
+images/fx/fx4
+  rotate: false
+  xy: 369, 664
+  size: 337, 204
+  orig: 448, 420
+  offset: 56, 107
+  index: -1
