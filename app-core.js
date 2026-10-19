@@ -17105,6 +17105,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             const activeItems = newsItems.filter(item => {
                 if (item.category === 'welcome') return false; // 🔴 欢迎词不属于公告：只在欢迎弹窗展示，不进跑马灯
                 if (item.category === '功能简介') return false; // 🔴 功能简介：只在出战区简介板展示，不进跑马灯
+                if (item.category === '窗口标题') return false; // 🔴 窗口标题不属于公告：只作用于窗口标题栏，不进跑马灯/公告列表
                 if (item.active_time && new Date(item.active_time) > now) return false;
                 if (item.expire_time && new Date(item.expire_time) <= now) return false;
                 return true;
@@ -17276,6 +17277,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             const now = new Date();
             const activeItems = newsItems.filter(item => {
                 if (item.category === 'welcome') return false; // 🔴 欢迎词不属于公告：公告列表不显示
+                if (item.category === '窗口标题') return false; // 🔴 窗口标题不属于公告：只作用于窗口标题栏，公告列表不显示
                 if (item.active_time && new Date(item.active_time) > now) return false;
                 if (item.expire_time && new Date(item.expire_time) <= now) return false;
                 return true;
@@ -33171,21 +33173,17 @@ ${maSection}
 
         async function adminPublishNews() {
             const category = document.getElementById('adminNewsCategory').value;
-            const name = document.getElementById('adminNewsName').value.trim();
+            let name = document.getElementById('adminNewsName').value.trim();
             const content = document.getElementById('adminNewsContent').value.trim();
             const author = document.getElementById('adminNewsAuthor').value.trim() || '龙行';
             const activeTimeInput = document.getElementById('adminNewsActiveTime').value;
             const expireTimeInput = document.getElementById('adminNewsExpireTime').value;
             const isPermanent = document.getElementById('adminNewsPermanent').checked;
 
-            if (!name) {
-                showAdminStatus('请输入公告标题', 'error');
-                return;
-            }
-            if (!content) {
-                showAdminStatus('请输入公告内容', 'error');
-                return;
-            }
+            // 「窗口标题」分类：窗口标题栏文字填在「内容」框；标题可留空(自动取内容摘要)，且该条不进公告
+            if (category === '窗口标题' && !name) name = (content.slice(0, 16) || '窗口标题');
+            if (!name) { const _m = '请输入公告标题'; showAdminStatus(_m, 'error'); alert('⚠️ ' + _m); return; }
+            if (!content) { const _m = '请输入公告内容'; showAdminStatus(_m, 'error'); alert('⚠️ ' + _m); return; }
 
             try {
                 const newsData = await adminFetchNewsFromGist();
@@ -33222,6 +33220,7 @@ ${maSection}
                 localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(newsItems));
                 localStorage.setItem(NEWS_CACHE_TIME_KEY, new Date().toISOString());
                 initMarquee();
+                if (category === '窗口标题') { try { renderWindowTitle(); } catch (e) {} }
 
                 document.getElementById('adminNewsName').value = '';
                 document.getElementById('adminNewsContent').value = '';
@@ -33231,9 +33230,12 @@ ${maSection}
 
                 renderAdminNewsList(newsData);
                 showAdminStatus('公告发布成功！', 'success');
+                alert('✅ 公告发布成功！' + (category === '窗口标题' ? '\n\n窗口标题栏已更新（该条只作用于标题栏，不会出现在公告里）。' : ''));
             } catch (error) {
                 console.error('发布公告失败:', error);
-                showAdminStatus('发布失败: ' + error.message, 'error');
+                const _m = '发布失败: ' + ((error && error.message) ? error.message : error);
+                showAdminStatus(_m, 'error');
+                alert('❌ ' + _m + '\n\n请检查网络和 Token 是否正常。');
             }
         }
 
