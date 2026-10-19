@@ -17624,6 +17624,8 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                 const w = T && T.window && (T.window.getCurrentWindow ? T.window.getCurrentWindow() : (T.window.getCurrent ? T.window.getCurrent() : null));
                 if (w && typeof w.setTitle === 'function') w.setTitle(title);
             } catch (e2) {}
+            // 把「｜」后的 标签+网址 暴露给阵容图库页头等复用（与标题栏同一份公告内容）
+            try { window.__tfjlSiteUrlText = title.replace(/^塔防精灵助手 - 阵容卡搭配｜/, ''); } catch (e3) {}
         }
         function toggleIntroPanelMin() {
             const panel = document.getElementById('introPanel');

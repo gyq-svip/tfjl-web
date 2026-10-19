@@ -188,7 +188,7 @@
             + '<span style="font-size:1.05rem;font-weight:800;color:#4ecdc4;">📚 阵容图库</span>'
             + '<span style="color:rgba(255,255,255,0.45);font-size:0.72rem;">卡组共享 · 等级/皮肤/融合/战车/笔记 只存本机</span>'
             + '<span style="flex:1;"></span>'
-            + '<span style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-right:6px;white-space:nowrap;font-family:Consolas,monospace;">gyq-svip.github.io/tfjl-web</span>' + '<button onclick="closeLineupLibraryPanel()" title="关闭" style="background:transparent;border:none;color:#fff;font-size:1.5rem;cursor:pointer;line-height:1;padding:2px 12px;border-radius:8px;">×</button>'
+            + '<span id="llSiteUrl" style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-right:6px;white-space:nowrap;font-family:Consolas,monospace;">' + _esc((window.__tfjlSiteUrlText || 'gyq-svip.github.io/tfjl-web')) + '</span>' + '<button onclick="closeLineupLibraryPanel()" title="关闭" style="background:transparent;border:none;color:#fff;font-size:1.5rem;cursor:pointer;line-height:1;padding:2px 12px;border-radius:8px;">×</button>'
             + '</div>'
             + '<div id="llHead" style="padding:10px 14px 6px;"></div>'
             + '<div id="llList" style="padding:0 14px 14px;"></div>';
