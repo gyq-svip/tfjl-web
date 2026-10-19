@@ -1,0 +1,139 @@
+
+guichengxiang01.png
+size: 763,763
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 625, 367
+  size: 100, 126
+  orig: 127, 134
+  offset: 4, 0
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 632, 469
+  size: 106, 127
+  orig: 127, 134
+  offset: 4, 2
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 632, 668
+  size: 93, 129
+  orig: 127, 134
+  offset: 5, 2
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 632, 577
+  size: 89, 128
+  orig: 127, 134
+  offset: 6, 2
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 428, 143
+  size: 123, 124
+  orig: 127, 134
+  offset: 3, 2
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 625, 243
+  size: 125, 122
+  orig: 127, 134
+  offset: 0, 2
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 618, 17
+  size: 114, 122
+  orig: 127, 134
+  offset: 2, 2
+  index: -1
+fx/Liquid 040 Splash Up_00002
+  rotate: true
+  xy: 554, 152
+  size: 89, 116
+  orig: 179, 179
+  offset: 37, 32
+  index: -1
+fx/Liquid 040 Splash Up_00005
+  rotate: false
+  xy: 524, 18
+  size: 92, 123
+  orig: 179, 179
+  offset: 42, 33
+  index: -1
+fx/Liquid 040 Splash Up_00008
+  rotate: false
+  xy: 428, 17
+  size: 94, 124
+  orig: 179, 179
+  offset: 44, 34
+  index: -1
+fx/Liquid 040 Splash Up_00011
+  rotate: false
+  xy: 672, 141
+  size: 88, 100
+  orig: 179, 179
+  offset: 51, 61
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 205, 262
+  size: 203, 247
+  orig: 214, 252
+  offset: 3, 2
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 422, 517
+  size: 208, 244
+  orig: 214, 252
+  offset: 1, 5
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 410, 268
+  size: 213, 245
+  orig: 214, 252
+  offset: 0, 5
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 212, 15
+  size: 214, 245
+  orig: 214, 252
+  offset: 0, 6
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 207, 515
+  size: 213, 246
+  orig: 214, 252
+  offset: 0, 6
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 2, 11
+  size: 208, 247
+  orig: 214, 252
+  offset: 1, 5
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 511
+  size: 203, 250
+  orig: 214, 252
+  offset: 3, 1
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 260
+  size: 201, 249
+  orig: 214, 252
+  offset: 3, 1
+  index: -1

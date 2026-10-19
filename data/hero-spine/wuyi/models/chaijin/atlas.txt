@@ -1,0 +1,146 @@
+
+chaijin.png
+size: 780,780
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 672, 237
+  size: 106, 129
+  orig: 133, 133
+  offset: 5, 2
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 469, 30
+  size: 112, 129
+  orig: 133, 133
+  offset: 5, 2
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 675, 649
+  size: 96, 129
+  orig: 133, 133
+  offset: 5, 2
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 208, 130
+  size: 117, 130
+  orig: 133, 133
+  offset: 5, 2
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 339, 30
+  size: 128, 129
+  orig: 133, 133
+  offset: 5, 2
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 208, 5
+  size: 123, 129
+  orig: 133, 133
+  offset: 5, 2
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 583, 44
+  size: 111, 129
+  orig: 133, 133
+  offset: 5, 2
+  index: -1
+fx/n_jiagong_01
+  rotate: false
+  xy: 675, 527
+  size: 75, 51
+  orig: 120, 120
+  offset: 21, 19
+  index: -1
+fx/n_jiagong_02
+  rotate: true
+  xy: 672, 157
+  size: 78, 84
+  orig: 120, 120
+  offset: 22, 17
+  index: -1
+fx/n_jiagong_03
+  rotate: true
+  xy: 675, 580
+  size: 67, 83
+  orig: 120, 120
+  offset: 33, 19
+  index: -1
+fx/n_jiagong_04
+  rotate: false
+  xy: 327, 179
+  size: 65, 82
+  orig: 120, 120
+  offset: 35, 20
+  index: -1
+fx/n_jiagong_05
+  rotate: false
+  xy: 714, 75
+  size: 64, 80
+  orig: 120, 120
+  offset: 36, 22
+  index: -1
+idle/idle_0
+  rotate: true
+  xy: 416, 368
+  size: 204, 256
+  orig: 206, 257
+  offset: 1, 0
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 415, 161
+  size: 205, 255
+  orig: 206, 257
+  offset: 1, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 209, 522
+  size: 205, 256
+  orig: 206, 257
+  offset: 1, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 2, 521
+  size: 205, 257
+  orig: 206, 257
+  offset: 1, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 262
+  size: 205, 257
+  orig: 206, 257
+  offset: 1, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 2, 3
+  size: 204, 257
+  orig: 206, 257
+  offset: 1, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 209, 263
+  size: 204, 257
+  orig: 206, 257
+  offset: 1, 0
+  index: -1
+idle/idle_7
+  rotate: true
+  xy: 416, 574
+  size: 204, 257
+  orig: 206, 257
+  offset: 1, 0
+  index: -1

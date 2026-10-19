@@ -1,169 +1,374 @@
 {
   "qiqi": {
     "hero": "小野",
+    "model": "qiqi",
     "anims": [
       "attack",
       "attack2",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "小七·小野": "xiaoqi",
+      "万圣甜心·小野": "xiaoyepifu",
+      "紫霞仙子·小野": "zixiaxianzi",
+      "沈璧君·小野": "shenbijun",
+      "万圣女巫·小野": "xiaoyewansheng",
+      "貂蝉·小野": "diaochan",
+      "秋香·小野": "qiuxiang",
+      "十三姨·小野": "shisanyi",
+      "太平乐·小野": "xiaoyetaipingle",
+      "仪琳·小野": "yilin",
+      "苏小妹·小野": "suxiaomei"
+    },
+    "modelPngs": {
+      "xiaoqi": 1,
+      "xiaoyepifu": 1,
+      "zixiaxianzi": 1,
+      "shenbijun": 1,
+      "xiaoyewansheng": 1,
+      "diaochan": 1,
+      "qiuxiang": 1,
+      "shisanyi": 1,
+      "xiaoyetaipingle": 1,
+      "yilin": 1,
+      "suxiaomei": 1,
+      "qiqi": 1
+    },
     "updated": "2026-10-19"
   },
   "aersasi": {
     "hero": "冰骑",
+    "model": "aersasi",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "星陨·冰骑": "bingqipifu"
+    },
+    "modelPngs": {
+      "bingqipifu": 1,
+      "aersasi": 1
+    },
     "updated": "2026-10-19"
   },
   "yilidan": {
     "hero": "恶魔",
+    "model": "yilidan",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "花满楼·恶魔": "huamanlou"
+    },
+    "modelPngs": {
+      "huamanlou": 1,
+      "yilidan": 1
+    },
     "updated": "2026-10-19"
   },
   "huonv": {
     "hero": "火法",
+    "model": "huonv",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {},
+    "modelPngs": {
+      "huonv": 1
+    },
     "updated": "2026-10-19"
   },
   "jiansheng": {
     "hero": "剑客",
+    "model": "jiansheng",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "竖·剑客": "jianshishu",
+      "小白龙·剑客": "xiaobailong"
+    },
+    "modelPngs": {
+      "jianshishu": 1,
+      "xiaobailong": 1,
+      "jiansheng": 1
+    },
     "updated": "2026-10-19"
   },
   "huanci": {
     "hero": "刺客",
+    "model": "huanyingcike",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {},
+    "modelPngs": {
+      "huanyingcike": 1
+    },
     "updated": "2026-10-19"
   },
   "xiaolu": {
     "hero": "小鹿",
+    "model": "xiaolu",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "千年蟠桃·小鹿": "xiaolupifu2",
+      "蟠桃·小鹿": "xiaolupifu"
+    },
+    "modelPngs": {
+      "xiaolupifu2": 1,
+      "xiaolupifu": 1,
+      "xiaolu": 1
+    },
     "updated": "2026-10-19"
   },
   "jianna": {
     "hero": "冰法",
+    "model": "jianna",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "圣诞女郎·冰法": "bingnv_shengdan",
+      "风暴·冰法": "bingnvpifu2"
+    },
+    "modelPngs": {
+      "bingnv_shengdan": 1,
+      "bingnvpifu2": 1,
+      "jianna": 1
+    },
     "updated": "2026-10-19"
   },
   "najia": {
     "hero": "蛇女",
+    "model": "najia",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "丝西娜·蛇女": "najiapifu",
+      "蛇精·蛇女": "jinshejing",
+      "春三十娘·蛇女": "chunsanshiniang",
+      "玉罗刹·蛇女": "baifamonv"
+    },
+    "modelPngs": {
+      "najiapifu": 1,
+      "jinshejing": 1,
+      "chunsanshiniang": 1,
+      "baifamonv": 1,
+      "najia": 1
+    },
     "updated": "2026-10-19"
   },
   "fengxingzhe": {
     "hero": "绿弓",
+    "model": "fengxingzhe",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "万圣猎手·绿弓": "wanshenglieshou"
+    },
+    "modelPngs": {
+      "wanshenglieshou": 1,
+      "fengxingzhe": 1
+    },
     "updated": "2026-10-19"
   },
   "heianyouxia": {
     "hero": "冰弓",
+    "model": "heianyouxia",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "雪莲·冰弓": "binggongpifu"
+    },
+    "modelPngs": {
+      "binggongpifu": 1,
+      "heianyouxia": 1
+    },
     "updated": "2026-10-19"
   },
   "guangfa": {
     "hero": "暗法",
+    "model": "guangfa",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {},
+    "modelPngs": {
+      "guangfa": 1
+    },
     "updated": "2026-10-19"
   },
   "zhousi": {
     "hero": "雷神",
+    "model": "zhousi",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "科学怪人·雷神": "zhousi_pifu",
+      "钢铁·雷神": "gangtiexia01",
+      "暗月·雷神": "gangtiexia02",
+      "华太师·雷神": "huataishi",
+      "深海科学家·雷神": "shenhaikexuejia"
+    },
+    "modelPngs": {
+      "zhousi_pifu": 1,
+      "gangtiexia01": 1,
+      "gangtiexia02": 1,
+      "huataishi": 1,
+      "shenhaikexuejia": 1,
+      "zhousi": 1
+    },
     "updated": "2026-10-19"
   },
   "jumo": {
     "hero": "战将",
+    "model": "jumo",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "虹猫·战将": "hongmao",
+      "刀马·战将": "daoma",
+      "冰雪·战将": "jumopifu",
+      "许仕林·战将": "xushilin",
+      "许仙·战将": "xuxian",
+      "萧十一郎·战将": "xiaoshiyilang",
+      "武松·战将": "wusong",
+      "吕布·战将": "lvbu",
+      "风暴·战将": "fengbao",
+      "黄飞鸿·战将": "huangfeihong",
+      "林平之·战将": "linpingzhi"
+    },
+    "modelPngs": {
+      "hongmao": 1,
+      "daoma": 1,
+      "jumopifu": 1,
+      "xushilin": 1,
+      "xuxian": 1,
+      "xiaoshiyilang": 1,
+      "wusong": 1,
+      "lvbu": 1,
+      "fengbao": 1,
+      "huangfeihong": 1,
+      "linpingzhi": 1,
+      "jumo": 1
+    },
     "updated": "2026-10-19"
   },
   "siwen": {
     "hero": "刀客",
+    "model": "siwen",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "圣诞怪杰·刀客": "daokepifu"
+    },
+    "modelPngs": {
+      "daokepifu": 1,
+      "siwen": 1
+    },
     "updated": "2026-10-19"
   },
   "chaoxi": {
     "hero": "海妖",
+    "model": "chaoxi",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "巨灵神·海妖": "julingshen"
+    },
+    "modelPngs": {
+      "julingshen": 1,
+      "chaoxi": 1
+    },
     "updated": "2026-10-19"
   },
   "dashu": {
     "hero": "大树",
+    "model": "dashu",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {},
+    "modelPngs": {
+      "dashu": 1
+    },
     "updated": "2026-10-19"
   },
   "juntuanshibing": {
     "hero": "铁骑",
+    "model": "juntuanshibing",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "银河之光·铁骑": "tieqipifu",
+      "大娃·铁骑": "tieqi_liwa",
+      "花无缺·铁骑": "huawuque",
+      "林冲·铁骑": "linchong",
+      "祝枝山·铁骑": "zhuzhishan",
+      "方唐镜·铁骑": "fangtangjing",
+      "嵩山掌门·铁骑": "songshanzhangmen"
+    },
+    "modelPngs": {
+      "tieqipifu": 1,
+      "tieqi_liwa": 1,
+      "huawuque": 1,
+      "linchong": 1,
+      "zhuzhishan": 1,
+      "fangtangjing": 1,
+      "songshanzhangmen": 1,
+      "juntuanshibing": 1
+    },
     "updated": "2026-10-19"
   },
   "feiji": {
     "hero": "飞机",
+    "model": "feiji1",
     "anims": [
       "attack",
       "dead",
@@ -171,164 +376,363 @@
       "walk"
     ],
     "pngs": 1,
+    "models": {
+      "UFO·飞机": "feidie",
+      "深海魔鬼·飞机": "shenhaimogui"
+    },
+    "modelPngs": {
+      "feidie": 1,
+      "shenhaimogui": 1,
+      "feiji1": 1
+    },
     "updated": "2026-10-19"
   },
   "xiubujiang": {
     "hero": "炸弹",
+    "model": "xiubujiang",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {},
+    "modelPngs": {
+      "xiubujiang": 1
+    },
     "updated": "2026-10-19"
   },
   "mituan": {
     "hero": "谜云",
+    "model": "mituan",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "黑山老妖·谜云": "heishanlaoyao"
+    },
+    "modelPngs": {
+      "heishanlaoyao": 1,
+      "mituan": 1
+    },
     "updated": "2026-10-19"
   },
   "shenling": {
     "hero": "神龛",
+    "model": "wushi",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {},
+    "modelPngs": {
+      "wushi": 1
+    },
     "updated": "2026-10-19"
   },
   "gugong": {
     "hero": "骨弓",
+    "model": "gugong",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "冰雪·骨弓": "gugong_pifu",
+      "花荣·骨弓": "huarong",
+      "文徵明·骨弓": "wenzhengming",
+      "衡山掌门·骨弓": "modaxiansheng"
+    },
+    "modelPngs": {
+      "gugong_pifu": 1,
+      "huarong": 1,
+      "wenzhengming": 1,
+      "modaxiansheng": 1,
+      "gugong": 1
+    },
     "updated": "2026-10-19"
   },
   "xianzhi": {
     "hero": "祭司",
+    "model": "xianzhi",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {},
+    "modelPngs": {
+      "xianzhi": 1
+    },
     "updated": "2026-10-19"
   },
   "fuwang": {
     "hero": "斧客",
+    "model": "fuwang",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "卷帘大将·斧客": "shaheshang"
+    },
+    "modelPngs": {
+      "shaheshang": 1,
+      "fuwang": 1
+    },
     "updated": "2026-10-19"
   },
   "fashi": {
     "hero": "死神",
+    "model": "fashi",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "万圣节·死神": "sishenpifu",
+      "粉色南瓜·死神": "sishenpifu2",
+      "一指名医·死神": "pingyizhi"
+    },
+    "modelPngs": {
+      "sishenpifu": 1,
+      "sishenpifu2": 1,
+      "pingyizhi": 1,
+      "fashi": 1
+    },
     "updated": "2026-10-19"
   },
   "dianhun": {
     "hero": "电法",
+    "model": "dianhun",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "水娃·电法": "shuiwa",
+      "戴宗·电法": "daizong",
+      "春香·电法": "chunxiang",
+      "华山掌门·电法": "huashanzhangmen"
+    },
+    "modelPngs": {
+      "shuiwa": 1,
+      "daizong": 1,
+      "chunxiang": 1,
+      "huashanzhangmen": 1,
+      "dianhun": 1
+    },
     "updated": "2026-10-19"
   },
   "huoqiang": {
     "hero": "火枪",
+    "model": "huoqiang",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "吉利服·火枪": "huoqiangpifu"
+    },
+    "modelPngs": {
+      "huoqiangpifu": 1,
+      "huoqiang": 1
+    },
     "updated": "2026-10-19"
   },
   "xiaoxiao": {
     "hero": "石头",
+    "model": "xiaoxiao",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "石狮子·石头": "shishizi"
+    },
+    "modelPngs": {
+      "shishizi": 1,
+      "xiaoxiao": 1
+    },
     "updated": "2026-10-19"
   },
   "zhizhu": {
     "hero": "蜘蛛",
+    "model": "zhizhu",
     "anims": [
       "attack",
       "idle",
       "walk"
     ],
     "pngs": 1,
+    "models": {},
+    "modelPngs": {
+      "zhizhu": 1
+    },
     "updated": "2026-10-19"
   },
   "silinglong": {
     "hero": "骨龙",
+    "model": "silinglong",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {},
+    "modelPngs": {
+      "silinglong": 1
+    },
     "updated": "2026-10-19"
   },
   "shengqi": {
     "hero": "圣骑",
+    "model": "shengqishi",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "无头骑士·圣骑": "wutouqishi",
+      "孙权·圣骑": "sunquan",
+      "风暴·圣骑": "fengbaoshengqi"
+    },
+    "modelPngs": {
+      "wutouqishi": 1,
+      "sunquan": 1,
+      "fengbaoshengqi": 1,
+      "shengqishi": 1
+    },
     "updated": "2026-10-19"
   },
   "wuyi": {
     "hero": "巫医",
+    "model": "wuyi",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "七娃·巫医": "qiwa_wuyi",
+      "柴进·巫医": "chaijin",
+      "夏香·巫医": "xiaxiang",
+      "深海刺豚·巫医": "shenhaicitun",
+      "恒山掌门·巫医": "hengshanzhangmen"
+    },
+    "modelPngs": {
+      "qiwa_wuyi": 1,
+      "chaijin": 1,
+      "xiaxiang": 1,
+      "shenhaicitun": 1,
+      "hengshanzhangmen": 1,
+      "wuyi": 1
+    },
     "updated": "2026-10-19"
   },
   "tongkunvwang": {
     "hero": "女王",
+    "model": "nvwang",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "冰雪·女王": "nvwang_bingxue",
+      "虚空兽·女王": "zhizhunvwang",
+      "白娘子·女王": "baisuzhen",
+      "潘金莲·女王": "panjinlian",
+      "如烟·女王": "ruyan",
+      "任盈盈·女王": "renyingying",
+      "如霜·女王": "rushuang"
+    },
+    "modelPngs": {
+      "nvwang_bingxue": 1,
+      "zhizhunvwang": 1,
+      "baisuzhen": 1,
+      "panjinlian": 1,
+      "ruyan": 1,
+      "renyingying": 1,
+      "rushuang": 1,
+      "nvwang": 1
+    },
     "updated": "2026-10-19"
   },
   "jingling": {
     "hero": "魔精灵",
+    "model": "jingling6_1",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "神葫芦·光精灵": "shenhulu_guang",
+      "传国玉玺·光精灵": "chuanguoyuxi",
+      "狮王令牌·光精灵": "shiwanglingpai",
+      "电葫芦·雷精灵": "baohulu_lei",
+      "太平符咒·雷精灵": "taipingfuzhou",
+      "宝葫芦·暗精灵": "baohulu_an",
+      "仙葫芦·木精灵": "shenhulu_mu",
+      "黑葫芦·魔精灵": "mohulu",
+      "星光宝盒·魔精灵": "yueguangbaohe01",
+      "月光宝盒·魔精灵": "yueguangbaohe02",
+      "绝影·魔精灵": "jueying"
+    },
+    "modelPngs": {
+      "shenhulu_guang": 1,
+      "chuanguoyuxi": 1,
+      "shiwanglingpai": 1,
+      "baohulu_lei": 1,
+      "taipingfuzhou": 1,
+      "baohulu_an": 1,
+      "shenhulu_mu": 1,
+      "mohulu": 1,
+      "yueguangbaohe01": 1,
+      "yueguangbaohe02": 1,
+      "jueying": 1,
+      "jingling1": 1,
+      "jingling2": 1,
+      "jingling3": 1,
+      "jingling4": 1,
+      "jingling6_1": 1
+    },
     "updated": "2026-10-19"
   },
   "sunwukong": {
     "hero": "悟空",
+    "model": "sunwukong",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "太平乐·悟空": "sunwukong_xinnian",
+      "二娃·悟空": "wukong_2wa",
+      "暗月·悟空": "jiqihoupifu"
+    },
+    "modelPngs": {
+      "sunwukong_xinnian": 1,
+      "wukong_2wa": 1,
+      "jiqihoupifu": 1,
+      "sunwukong": 1
+    },
     "updated": "2026-10-19"
   },
   "yougui": {
     "hero": "幽鬼",
+    "model": "yougui",
     "anims": [
       "attack",
       "dead",
@@ -336,91 +740,216 @@
       "walk"
     ],
     "pngs": 1,
+    "models": {
+      "二郎真君·幽灵": "erlangshen",
+      "卢俊义·幽灵": "lujunyi"
+    },
+    "modelPngs": {
+      "erlangshen": 1,
+      "lujunyi": 1,
+      "yougui": 1
+    },
     "updated": "2026-10-19"
   },
   "fatiao": {
     "hero": "工匠",
+    "model": "fatiao",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "医疗机甲·工匠": "jiqiren",
+      "包婆婆·工匠": "baopopo",
+      "暗月·工匠": "anyuegongjiang"
+    },
+    "modelPngs": {
+      "jiqiren": 1,
+      "baopopo": 1,
+      "anyuegongjiang": 1,
+      "fatiao": 1
+    },
     "updated": "2026-10-19"
   },
   "jingling1": {
     "hero": "幻精灵",
+    "model": "jingling1",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {},
+    "modelPngs": {
+      "jingling1": 1
+    },
     "updated": "2026-10-19"
   },
   "xiongmao": {
     "hero": "萌萌",
+    "model": "bingdundun2",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "冰雪·萌萌": "xiongmao_shengdan",
+      "唐三藏·萌萌": "tangsanzang",
+      "武大郎·萌萌": "wudalang",
+      "诸葛亮·萌萌": "zhugeliang",
+      "太平乐·萌萌": "mengmengtaipingle",
+      "烈火奶奶·萌萌": "liehuonainai",
+      "花好月圆·萌萌": "mengmengzhongqiupifu"
+    },
+    "modelPngs": {
+      "xiongmao_shengdan": 1,
+      "tangsanzang": 1,
+      "wudalang": 1,
+      "zhugeliang": 1,
+      "mengmengtaipingle": 1,
+      "liehuonainai": 1,
+      "mengmengzhongqiupifu": 1,
+      "bingdundun2": 1
+    },
     "updated": "2026-10-19"
   },
   "tufu": {
     "hero": "恶匪",
+    "model": "tufu",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "金钹法王·恶匪": "jinbofawang"
+    },
+    "modelPngs": {
+      "jinbofawang": 1,
+      "tufu": 1
+    },
     "updated": "2026-10-19"
   },
   "huniu": {
     "hero": "虎弓",
+    "model": "huniu",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "黑小虎·虎弓": "heixiaohu",
+      "嫦娥·虎弓": "change1",
+      "月神·虎弓": "change2",
+      "小乔·虎弓": "xiaoqiao",
+      "风暴·虎弓": "fengbaohugong",
+      "东方不败·虎弓": "dongfangbubai"
+    },
+    "modelPngs": {
+      "heixiaohu": 1,
+      "change1": 1,
+      "change2": 1,
+      "xiaoqiao": 1,
+      "fengbaohugong": 1,
+      "dongfangbubai": 1,
+      "huniu": 1
+    },
     "updated": "2026-10-19"
   },
   "jietoubawang": {
     "hero": "霸王",
+    "model": "jietoubawang",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "龙的传人·霸王": "jietouheiba",
+      "奥特曼赛文·霸王": "Seven_Ultraman",
+      "银河之光·霸王": "yihaoji",
+      "龙年·霸王": "bawangchunjie",
+      "李寻欢·霸王": "lixunhuan",
+      "唐伯虎·霸王": "tangbohu",
+      "常威·霸王": "changwei",
+      "苏乞儿·霸王": "sucan"
+    },
+    "modelPngs": {
+      "jietouheiba": 1,
+      "Seven_Ultraman": 1,
+      "yihaoji": 1,
+      "bawangchunjie": 1,
+      "lixunhuan": 1,
+      "tangbohu": 1,
+      "changwei": 1,
+      "sucan": 1,
+      "jietoubawang": 1
+    },
     "updated": "2026-10-19"
   },
   "dijing": {
     "hero": "地精",
+    "model": "dijing",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "暗月财阀·地精": "dijingpifu"
+    },
+    "modelPngs": {
+      "dijingpifu": 1,
+      "dijing": 1
+    },
     "updated": "2026-10-19"
   },
   "duye": {
     "hero": "毒王",
+    "model": "duye",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "谛听·毒王": "diting",
+      "叶孤城·毒王": "yegucheng",
+      "杨志·毒王": "yangzhi"
+    },
+    "modelPngs": {
+      "diting": 1,
+      "yegucheng": 1,
+      "yangzhi": 1,
+      "duye": 1
+    },
     "updated": "2026-10-19"
   },
   "daize": {
     "hero": "萨满",
+    "model": "daize",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "鸦人·萨满": "samanpifu",
+      "青城掌门·萨满": "qingcheng"
+    },
+    "modelPngs": {
+      "samanpifu": 1,
+      "qingcheng": 1,
+      "daize": 1
+    },
     "updated": "2026-10-19"
   },
   "panglong": {
     "hero": "神龙",
+    "model": "panglong",
     "anims": [
       "attack",
       "dead",
@@ -429,174 +958,411 @@
       "walk"
     ],
     "pngs": 1,
+    "models": {
+      "烈焰·神龙": "shenlongpifu",
+      "武状元·神龙": "wuzhuangyuan"
+    },
+    "modelPngs": {
+      "shenlongpifu": 1,
+      "wuzhuangyuan": 1,
+      "panglong": 1
+    },
     "updated": "2026-10-19"
   },
   "ken": {
     "hero": "狂龙",
+    "model": "ken",
     "anims": [
       "attack",
       "attack2",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "奥特曼艾斯·狂龙": "Ace_Ultraman",
+      "银河之光·狂龙": "erhaoji",
+      "秦明·狂龙": "qinming",
+      "唐天豪·狂龙": "tangtianhao"
+    },
+    "modelPngs": {
+      "Ace_Ultraman": 1,
+      "erhaoji": 1,
+      "qinming": 1,
+      "tangtianhao": 1,
+      "ken": 1
+    },
     "updated": "2026-10-19"
   },
   "niutouguai": {
     "hero": "酋长",
+    "model": "niutouguai",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "奶牛·酋长": "nainiu",
+      "粉色奶牛·酋长": "nainiufen",
+      "七夕·酋长": "qixiqiuzhang"
+    },
+    "modelPngs": {
+      "nainiu": 1,
+      "nainiufen": 1,
+      "qixiqiuzhang": 1,
+      "niutouguai": 1
+    },
     "updated": "2026-10-19"
   },
   "houyi": {
     "hero": "后羿",
+    "model": "houyi",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "阿育娅·后羿": "ayuya",
+      "仙·后羿": "houyipifu1",
+      "真仙·后羿": "houyipifu2",
+      "太平乐·后羿": "taipinglehouyi",
+      "博达尔多·后羿": "bodaerduo"
+    },
+    "modelPngs": {
+      "ayuya": 1,
+      "houyipifu1": 1,
+      "houyipifu2": 1,
+      "taipinglehouyi": 1,
+      "bodaerduo": 1,
+      "houyi": 1
+    },
     "updated": "2026-10-19"
   },
   "songshu": {
     "hero": "松鼠",
+    "model": "songshu",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "兔宝宝·松鼠": "songshupifu"
+    },
+    "modelPngs": {
+      "songshupifu": 1,
+      "songshu": 1
+    },
     "updated": "2026-10-19"
   },
   "kulouwang": {
     "hero": "亡将",
+    "model": "kulouwang",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "法海·亡将": "fahai",
+      "番僧·亡将": "fanseng"
+    },
+    "modelPngs": {
+      "fahai": 1,
+      "fanseng": 1,
+      "kulouwang": 1
+    },
     "updated": "2026-10-19"
   },
   "yanmo": {
     "hero": "炎魔",
+    "model": "yanmo",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "冰霜·炎魔": "yanmopifu",
+      "向左使·炎魔": "xiangzuoshi"
+    },
+    "modelPngs": {
+      "yanmopifu": 1,
+      "xiangzuoshi": 1,
+      "yanmo": 1
+    },
     "updated": "2026-10-19"
   },
   "xiaochou": {
     "hero": "小丑",
+    "model": "xiaochou",
     "anims": [
       "attack",
       "attack1",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "虚空兽·小丑": "xiaochoupifu",
+      "川谱·白·小丑": "chuanjulianpu01",
+      "川谱·金·小丑": "chuanjulianpu02",
+      "如花·小丑": "ruhua",
+      "师爷·小丑": "shiye"
+    },
+    "modelPngs": {
+      "xiaochoupifu": 1,
+      "chuanjulianpu01": 1,
+      "chuanjulianpu02": 1,
+      "ruhua": 1,
+      "shiye": 1,
+      "xiaochou": 1
+    },
     "updated": "2026-10-19"
   },
   "gugu": {
     "hero": "咕咕",
+    "model": "gugu",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "虚空兽·咕咕": "xiaoshoupifu",
+      "老爷爷·咕咕": "yeye",
+      "天机星·咕咕": "tianjixing",
+      "宋江·咕咕": "songjiang",
+      "华佗·咕咕": "huatuo",
+      "华夫人·咕咕": "huafuren",
+      "深海异兽·咕咕": "shenhai",
+      "太平乐·咕咕": "nianshougugu",
+      "少林掌门·咕咕": "fangzhengdashi"
+    },
+    "modelPngs": {
+      "xiaoshoupifu": 1,
+      "yeye": 1,
+      "tianjixing": 1,
+      "songjiang": 1,
+      "huatuo": 1,
+      "huafuren": 1,
+      "shenhai": 1,
+      "nianshougugu": 1,
+      "fangzhengdashi": 1,
+      "gugu": 1
+    },
     "updated": "2026-10-19"
   },
   "jianongpao": {
     "hero": "邪能火炮",
+    "model": "jianongpao",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "龙吼·邪能火炮": "huopaopifu",
+      "小李飞刀·邪能火炮": "xiaolifeidao",
+      "尚方宝剑·邪能火炮": "shangfangbaojian",
+      "打狗棒·邪能火炮": "dagoubang"
+    },
+    "modelPngs": {
+      "huopaopifu": 1,
+      "xiaolifeidao": 1,
+      "shangfangbaojian": 1,
+      "dagoubang": 1,
+      "jianongpao": 1
+    },
     "updated": "2026-10-19"
   },
   "mori": {
     "hero": "领主",
+    "model": "mori",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "宁王·领主": "ningwang",
+      "深海典狱长·领主": "dianyuguan"
+    },
+    "modelPngs": {
+      "ningwang": 1,
+      "dianyuguan": 1,
+      "mori": 1
+    },
     "updated": "2026-10-19"
   },
   "shawang": {
     "hero": "沙皇",
+    "model": "woailuo",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "小青·沙皇": "xiaoqing1",
+      "青蛇·沙皇": "xiaoqing2",
+      "西门庆·沙皇": "ximenqing",
+      "包有为·沙皇": "baoyouwei"
+    },
+    "modelPngs": {
+      "xiaoqing1": 1,
+      "xiaoqing2": 1,
+      "ximenqing": 1,
+      "baoyouwei": 1,
+      "woailuo": 1
+    },
     "updated": "2026-10-19"
   },
   "shangjin": {
     "hero": "孤星",
+    "model": "shangjin",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "和伊玄·孤星": "heyixuan"
+    },
+    "modelPngs": {
+      "heyixuan": 1,
+      "shangjin": 1
+    },
     "updated": "2026-10-19"
   },
   "caijingling": {
     "hero": "彩精灵",
+    "model": "caijingling",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {},
+    "modelPngs": {
+      "caijingling": 1
+    },
     "updated": "2026-10-19"
   },
   "renyu": {
     "hero": "鲛女",
+    "model": "renyu",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "蓝兔·鲛女": "lantu",
+      "碧莲·鲛女": "bilian",
+      "李师师·鲛女": "lishishi",
+      "岳灵珊·鲛女": "yuelingshan"
+    },
+    "modelPngs": {
+      "lantu": 1,
+      "bilian": 1,
+      "lishishi": 1,
+      "yuelingshan": 1,
+      "renyu": 1
+    },
     "updated": "2026-10-19"
   },
   "haidao": {
     "hero": "船长",
+    "model": "haidao",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "幽冥·船长": "haidao_boss",
+      "对穿肠·船长": "duichuanchang",
+      "刑部尚书·船长": "xingbushangshu"
+    },
+    "modelPngs": {
+      "haidao_boss": 1,
+      "duichuanchang": 1,
+      "xingbushangshu": 1,
+      "haidao": 1
+    },
     "updated": "2026-10-19"
   },
   "tujingling": {
     "hero": "土精灵",
+    "model": "tujingling",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "泰坦·土精灵": "tujinglingpifu01",
+      "创世泰坦·土精灵": "tujinglingpifu02"
+    },
+    "modelPngs": {
+      "tujinglingpifu01": 1,
+      "tujinglingpifu02": 1,
+      "tujingling": 1
+    },
     "updated": "2026-10-19"
   },
   "guixianren": {
     "hero": "龟相",
+    "model": "guixiang",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "海象人·龟相": "guixiangpifu",
+      "龙宫·龟相": "guichengxiang01",
+      "东海龙宫·龟相": "guichengxiang02",
+      "包龙星·龟相": "baolongxing",
+      "莫大叔·龟相": "modashu"
+    },
+    "modelPngs": {
+      "guixiangpifu": 1,
+      "guichengxiang01": 1,
+      "guichengxiang02": 1,
+      "baolongxing": 1,
+      "modashu": 1,
+      "guixiang": 1
+    },
     "updated": "2026-10-19"
   },
   "longwang": {
     "hero": "龙王",
+    "model": "longwang",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "杨广·龙王": "yangguang",
+      "太平乐·龙王": "longwangpifu",
+      "玉帝·龙王": "yudi",
+      "张角·龙王": "zhangjiao"
+    },
+    "modelPngs": {
+      "yangguang": 1,
+      "longwangpifu": 1,
+      "yudi": 1,
+      "zhangjiao": 1,
+      "longwang": 1
+    },
     "updated": "2026-10-19"
   },
   "kuangjiang": {
     "hero": "狂将",
+    "model": "kuangjiang",
     "anims": [
       "attack",
       "attack2",
@@ -604,10 +1370,20 @@
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "黑旋风·狂将": "kuangjiang_likui",
+      "李逵·狂将": "likui"
+    },
+    "modelPngs": {
+      "kuangjiang_likui": 1,
+      "likui": 1,
+      "kuangjiang": 1
+    },
     "updated": "2026-10-19"
   },
   "aishen": {
     "hero": "爱神",
+    "model": "aishen",
     "anims": [
       "attack",
       "attack1",
@@ -615,10 +1391,20 @@
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "燕青·爱神": "yanqing",
+      "永恒之心·爱神": "aishenpifu"
+    },
+    "modelPngs": {
+      "yanqing": 1,
+      "aishenpifu": 1,
+      "aishen": 1
+    },
     "updated": "2026-10-19"
   },
   "ying": {
     "hero": "影",
+    "model": "ying",
     "anims": [
       "attack",
       "attack2",
@@ -626,128 +1412,290 @@
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "知世郎·影": "zhishilang",
+      "太上老君·影": "taishanglaojun"
+    },
+    "modelPngs": {
+      "zhishilang": 1,
+      "taishanglaojun": 1,
+      "ying": 1
+    },
     "updated": "2026-10-19"
   },
   "qiuwang": {
     "hero": "阿翼",
+    "model": "qiuwang",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "哪吒·阿翼": "nezha"
+    },
+    "modelPngs": {
+      "nezha": 1,
+      "qiuwang": 1
+    },
     "updated": "2026-10-19"
   },
   "gangquan": {
     "hero": "龙拳",
+    "model": "gangquan",
     "anims": [
       "attack",
       "attack2",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "银河之光·龙拳": "sanhaoji",
+      "鲁智深·龙拳": "luzhishen",
+      "鬼脚七·龙拳": "guijiaoqi"
+    },
+    "modelPngs": {
+      "sanhaoji": 1,
+      "luzhishen": 1,
+      "guijiaoqi": 1,
+      "gangquan": 1
+    },
     "updated": "2026-10-19"
   },
   "gangbei": {
     "hero": "钢鬃",
+    "model": "gangbei",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "冰雪·钢鬃": "gangbeipifu",
+      "天蓬元帅·钢鬃": "zhubajie"
+    },
+    "modelPngs": {
+      "gangbeipifu": 1,
+      "zhubajie": 1,
+      "gangbei": 1
+    },
     "updated": "2026-10-19"
   },
   "nvyao": {
     "hero": "女妖",
+    "model": "nvyao",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "白晶晶·女妖": "baijingjing",
+      "深海幽影·女妖": "shuimu"
+    },
+    "modelPngs": {
+      "baijingjing": 1,
+      "shuimu": 1,
+      "nvyao": 1
+    },
     "updated": "2026-10-19"
   },
   "maomi": {
     "hero": "猫咪",
+    "model": "maomi",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "招财·猫咪": "maopifu",
+      "暗月·猫咪": "jiqimaomi"
+    },
+    "modelPngs": {
+      "maopifu": 1,
+      "jiqimaomi": 1,
+      "maomi": 1
+    },
     "updated": "2026-10-19"
   },
   "yemo": {
     "hero": "魇",
+    "model": "yemo",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "虚空兽·魇": "yemopifu",
+      "牛魔王·魇": "niumowang",
+      "高俅·魇": "gaoqiu",
+      "曹操·魇": "caocao",
+      "雷豹·魇": "leibao",
+      "魔教教主·魇": "renwoxing"
+    },
+    "modelPngs": {
+      "yemopifu": 1,
+      "niumowang": 1,
+      "gaoqiu": 1,
+      "caocao": 1,
+      "leibao": 1,
+      "renwoxing": 1,
+      "yemo": 1
+    },
     "updated": "2026-10-19"
   },
   "shan": {
     "hero": "闪",
+    "model": "shan",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "隐身娃·闪": "liuwa",
+      "菩提老祖·闪": "putilaozu",
+      "呼延灼·闪": "huyanzhuo",
+      "冬香·闪": "dongxiang",
+      "莫再讲·闪": "mozaijiang",
+      "泰山掌门·闪": "taishanzhangmen"
+    },
+    "modelPngs": {
+      "liuwa": 1,
+      "putilaozu": 1,
+      "huyanzhuo": 1,
+      "dongxiang": 1,
+      "mozaijiang": 1,
+      "taishanzhangmen": 1,
+      "shan": 1
+    },
     "updated": "2026-10-19"
   },
   "kui": {
     "hero": "葵",
+    "model": "kui",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "冰雪·葵": "kuipifu",
+      "深海公主·葵": "shenhaigongzhu",
+      "莫再提·葵": "mozaiti"
+    },
+    "modelPngs": {
+      "kuipifu": 1,
+      "shenhaigongzhu": 1,
+      "mozaiti": 1,
+      "kui": 1
+    },
     "updated": "2026-10-19"
   },
   "baoxiangui": {
     "hero": "地精宝库",
+    "model": "baoxiangui",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "金刚石·地精宝库": "baokupifu01",
+      "暗月·地精宝库": "baokupifu02"
+    },
+    "modelPngs": {
+      "baokupifu01": 1,
+      "baokupifu02": 1,
+      "baoxiangui": 1
+    },
     "updated": "2026-10-19"
   },
   "zhurushexian": {
     "hero": "侏儒射线",
+    "model": "zhurushexian",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "雷峰塔·侏儒射线": "leifengta",
+      "剑冢·侏儒射线": "jianzhong",
+      "日晷·侏儒射线": "rigui"
+    },
+    "modelPngs": {
+      "leifengta": 1,
+      "jianzhong": 1,
+      "rigui": 1,
+      "zhurushexian": 1
+    },
     "updated": "2026-10-19"
   },
   "jingling7": {
     "hero": "魂精灵",
+    "model": "jingling7",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "还魂丹·魂精灵": "hunjinglingpifu"
+    },
+    "modelPngs": {
+      "hunjinglingpifu": 1,
+      "jingling7": 1
+    },
     "updated": "2026-10-19"
   },
   "daocaoren": {
     "hero": "傀",
+    "model": "daocaoren",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "蜈蚣精·傀": "wugongjing",
+      "铁扇公主·傀": "tieshangongzhu",
+      "左慈·傀": "zuoci",
+      "石榴姐·傀": "shiliujie",
+      "李公公·傀": "ligonggong"
+    },
+    "modelPngs": {
+      "wugongjing": 1,
+      "tieshangongzhu": 1,
+      "zuoci": 1,
+      "shiliujie": 1,
+      "ligonggong": 1,
+      "daocaoren": 1
+    },
     "updated": "2026-10-19"
   },
   "hongkai": {
     "hero": "火神",
+    "model": "hongkai",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "王子·火神": "huoshenpifu"
+    },
+    "modelPngs": {
+      "huoshenpifu": 1,
+      "hongkai": 1
+    },
     "updated": "2026-10-19"
   },
   "xie": {
     "hero": "邪",
+    "model": "xie",
     "anims": [
       "attack",
       "attack2",
@@ -759,28 +1707,66 @@
       "idle5"
     ],
     "pngs": 1,
+    "models": {
+      "蝎子精·邪": "xiezijingpifu",
+      "西门吹雪·邪": "ximenchuixue",
+      "夺命书生·邪": "duomingshusheng",
+      "赵无极·邪": "zhaowuji"
+    },
+    "modelPngs": {
+      "xiezijingpifu": 1,
+      "ximenchuixue": 1,
+      "duomingshusheng": 1,
+      "zhaowuji": 1,
+      "xie": 1
+    },
     "updated": "2026-10-19"
   },
   "dasheng": {
     "hero": "大圣",
+    "model": "qitiandasheng1",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "美猴王·大圣": "qitiandasheng2",
+      "齐天·大圣": "qitiandasheng3",
+      "至尊宝·大圣": "zhizunbao",
+      "太平乐·大圣": "dashengtaipingle"
+    },
+    "modelPngs": {
+      "qitiandasheng2": 1,
+      "qitiandasheng3": 1,
+      "zhizunbao": 1,
+      "dashengtaipingle": 1,
+      "qitiandasheng1": 1
+    },
     "updated": "2026-10-19"
   },
   "dazui": {
     "hero": "咬人娃娃",
+    "model": "yaorenwawa",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "炼丹炉·咬人娃娃": "liandanlu",
+      "触须·咬人娃娃": "chushouguai"
+    },
+    "modelPngs": {
+      "liandanlu": 1,
+      "chushouguai": 1,
+      "yaorenwawa": 1
+    },
     "updated": "2026-10-19"
   },
   "yuhuofenghuang": {
     "hero": "凤凰",
+    "model": "fenghuang",
     "anims": [
       "attack",
       "idle",
@@ -790,110 +1776,243 @@
       "idle4"
     ],
     "pngs": 1,
+    "models": {
+      "陆小凤·凤凰": "luxiaofeng",
+      "周瑜·凤凰": "zhouyu",
+      "五毒教主·凤凰": "wudujiaozhu"
+    },
+    "modelPngs": {
+      "luxiaofeng": 1,
+      "zhouyu": 1,
+      "wudujiaozhu": 1,
+      "fenghuang": 1
+    },
     "updated": "2026-10-19"
   },
   "xiaoyuren": {
     "hero": "鱼人",
+    "model": "xiaoyuren",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "小鱼儿·鱼人": "xiaoyuer",
+      "张顺·鱼人": "zhangshun",
+      "甘宁·鱼人": "ganning",
+      "梁宽·鱼人": "liangkuan",
+      "田伯光·鱼人": "tianboguang"
+    },
+    "modelPngs": {
+      "xiaoyuer": 1,
+      "zhangshun": 1,
+      "ganning": 1,
+      "liangkuan": 1,
+      "tianboguang": 1,
+      "xiaoyuren": 1
+    },
     "updated": "2026-10-19"
   },
   "bingjingling": {
     "hero": "冰精灵",
+    "model": "bingjingling",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "雪莲·冰精灵": "lanlianhua",
+      "寒冰真气·冰精灵": "hanbingzhenqi"
+    },
+    "modelPngs": {
+      "lanlianhua": 1,
+      "hanbingzhenqi": 1,
+      "bingjingling": 1
+    },
     "updated": "2026-10-19"
   },
   "tuling": {
     "hero": "土灵",
+    "model": "tuling",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "武圣·土灵": "guangong",
+      "关羽·土灵": "guanyu",
+      "太平乐·土灵": "tulingtaipingle"
+    },
+    "modelPngs": {
+      "guangong": 1,
+      "guanyu": 1,
+      "tulingtaipingle": 1,
+      "tuling": 1
+    },
     "updated": "2026-10-19"
   },
   "shuimao": {
     "hero": "水灵",
+    "model": "shuimao",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "潮汐·水灵": "shuimaopifu",
+      "刘备·水灵": "liubei",
+      "太平乐·水灵": "taipingleshuiling"
+    },
+    "modelPngs": {
+      "shuimaopifu": 1,
+      "liubei": 1,
+      "taipingleshuiling": 1,
+      "shuimao": 1
+    },
     "updated": "2026-10-19"
   },
   "huoling": {
     "hero": "火灵",
+    "model": "huoling",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "谢晓峰·火灵": "xiexiaofeng",
+      "张飞·火灵": "zhangfei",
+      "太平乐·火灵": "zhaotianba",
+      "令狐冲·火灵": "linghuchong"
+    },
+    "modelPngs": {
+      "xiexiaofeng": 1,
+      "zhangfei": 1,
+      "zhaotianba": 1,
+      "linghuchong": 1,
+      "huoling": 1
+    },
     "updated": "2026-10-19"
   },
   "zhongkui": {
     "hero": "钟馗",
+    "model": "zhongkui",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "智多星·吴用·钟馗": "wuyong",
+      "风暴·钟馗": "fengbaozhongkui"
+    },
+    "modelPngs": {
+      "wuyong": 1,
+      "fengbaozhongkui": 1,
+      "zhongkui": 1
+    },
     "updated": "2026-10-19"
   },
   "kuangtu": {
     "hero": "小炮",
+    "model": "kuangtu",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "司令官·小炮": "kuangtupifu",
+      "风暴·小炮": "fengbaoxiaopao",
+      "水师提督·小炮": "changkun"
+    },
+    "modelPngs": {
+      "kuangtupifu": 1,
+      "fengbaoxiaopao": 1,
+      "changkun": 1,
+      "kuangtu": 1
+    },
     "updated": "2026-10-19"
   },
   "tianshi": {
     "hero": "天使",
+    "model": "tianshi",
     "anims": [
       "attack",
       "attack2",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "神炎·天使": "tianshipifu",
+      "戚秦氏·天使": "qiqinshi",
+      "风清扬·天使": "fengqingyang"
+    },
+    "modelPngs": {
+      "tianshipifu": 1,
+      "qiqinshi": 1,
+      "fengqingyang": 1,
+      "tianshi": 1
+    },
     "updated": "2026-10-19"
   },
   "qianting": {
     "hero": "微型潜艇",
+    "model": "qianshuiting",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "鲨鱼号·微型潜艇": "qianshuitingpifu"
+    },
+    "modelPngs": {
+      "qianshuitingpifu": 1,
+      "qianshuiting": 1
+    },
     "updated": "2026-10-19"
   },
   "fengling": {
     "hero": "风灵",
+    "model": "fengling",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {
+      "太平乐·风灵": "taipinglefengling",
+      "苏老爹·风灵": "sulaodie"
+    },
+    "modelPngs": {
+      "taipinglefengling": 1,
+      "sulaodie": 1,
+      "fengling": 1
+    },
     "updated": "2026-10-19"
   },
   "bingniao": {
     "hero": "冰鸟",
+    "model": "bingniao",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {},
+    "modelPngs": {
+      "bingniao": 1
+    },
     "updated": "2026-10-19"
   },
   "shuiren": {
     "hero": "水人",
+    "model": "shuiyuansu",
     "anims": [
       "attack",
       "deadk",
@@ -901,15 +2020,24 @@
       "walk"
     ],
     "pngs": 1,
+    "models": {},
+    "modelPngs": {
+      "shuiyuansu": 1
+    },
     "updated": "2026-10-19"
   },
   "xuemo": {
     "hero": "血魔",
+    "model": "xuemo",
     "anims": [
       "attack",
       "idle"
     ],
     "pngs": 1,
+    "models": {},
+    "modelPngs": {
+      "xuemo": 1
+    },
     "updated": "2026-10-19"
   }
 }

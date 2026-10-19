@@ -1,0 +1,160 @@
+
+huarong.png
+size: 717,717
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 584, 202
+  size: 115, 102
+  orig: 130, 103
+  offset: 2, 0
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 455, 209
+  size: 127, 98
+  orig: 130, 103
+  offset: 3, 0
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 455, 107
+  size: 110, 100
+  orig: 130, 103
+  offset: 4, 0
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 619, 306
+  size: 91, 101
+  orig: 130, 103
+  offset: 5, 0
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 619, 409
+  size: 95, 103
+  orig: 130, 103
+  offset: 0, 0
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 455, 2
+  size: 97, 103
+  orig: 130, 103
+  offset: 0, 0
+  index: -1
+fx/bao/11_001
+  rotate: true
+  xy: 630, 28
+  size: 96, 74
+  orig: 102, 102
+  offset: 6, 12
+  index: -1
+fx/bao/11_002
+  rotate: false
+  xy: 567, 126
+  size: 99, 74
+  orig: 102, 102
+  offset: 3, 16
+  index: -1
+fx/bao/11_003
+  rotate: true
+  xy: 554, 3
+  size: 102, 74
+  orig: 102, 102
+  offset: 0, 19
+  index: -1
+fx/bingyan/bingyan_001
+  rotate: true
+  xy: 162, 4
+  size: 40, 155
+  orig: 82, 205
+  offset: 20, 48
+  index: -1
+fx/bingyan/bingyan_003
+  rotate: true
+  xy: 2, 38
+  size: 54, 158
+  orig: 82, 205
+  offset: 16, 39
+  index: -1
+fx/bingyan/bingyan_005
+  rotate: true
+  xy: 162, 46
+  size: 46, 169
+  orig: 82, 205
+  offset: 22, 8
+  index: -1
+fx/bingyan/bingyan_007
+  rotate: true
+  xy: 319, 8
+  size: 36, 134
+  orig: 82, 205
+  offset: 24, 0
+  index: -1
+fx/bingyan/bingyan_009
+  rotate: false
+  xy: 333, 47
+  size: 35, 47
+  orig: 82, 205
+  offset: 14, 3
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 509
+  size: 206, 206
+  orig: 206, 206
+  offset: 0, 0
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 208, 96
+  size: 203, 206
+  orig: 206, 206
+  offset: 3, 0
+  index: -1
+idle/idle_2
+  rotate: true
+  xy: 455, 514
+  size: 201, 205
+  orig: 206, 206
+  offset: 5, 0
+  index: -1
+idle/idle_3
+  rotate: true
+  xy: 210, 513
+  size: 202, 203
+  orig: 206, 206
+  offset: 4, 0
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 210, 310
+  size: 201, 202
+  orig: 206, 206
+  offset: 4, 0
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 415, 309
+  size: 203, 202
+  orig: 206, 206
+  offset: 1, 0
+  index: -1
+idle/idle_6
+  rotate: true
+  xy: 2, 94
+  size: 205, 204
+  orig: 206, 206
+  offset: 0, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 301
+  size: 206, 206
+  orig: 206, 206
+  offset: 0, 0
+  index: -1

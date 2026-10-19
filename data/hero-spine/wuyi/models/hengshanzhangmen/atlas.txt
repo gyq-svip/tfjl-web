@@ -1,0 +1,188 @@
+
+hengshanzhangmen.png
+size: 875,875
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 2, 3
+  size: 108, 127
+  orig: 200, 200
+  offset: 60, 34
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 191, 4
+  size: 106, 127
+  orig: 200, 200
+  offset: 66, 34
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 728, 215
+  size: 115, 126
+  orig: 200, 200
+  offset: 64, 34
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 585, 168
+  size: 127, 126
+  orig: 200, 200
+  offset: 61, 34
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 728, 332
+  size: 134, 126
+  orig: 200, 200
+  offset: 58, 34
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 441, 179
+  size: 142, 126
+  orig: 200, 200
+  offset: 48, 34
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 720, 97
+  size: 116, 126
+  orig: 200, 200
+  offset: 52, 34
+  index: -1
+fx/caocao_06
+  rotate: false
+  xy: 429, 66
+  size: 124, 43
+  orig: 146, 73
+  offset: 21, 0
+  index: -1
+fx/caocao_07
+  rotate: false
+  xy: 582, 106
+  size: 136, 60
+  orig: 146, 73
+  offset: 6, 0
+  index: -1
+fx/caocao_08
+  rotate: false
+  xy: 441, 111
+  size: 139, 66
+  orig: 146, 73
+  offset: 1, 0
+  index: -1
+fx/caocao_09
+  rotate: true
+  xy: 131, 2
+  size: 109, 58
+  orig: 146, 73
+  offset: 0, 12
+  index: -1
+fx/caocao_10
+  rotate: false
+  xy: 320, 52
+  size: 107, 58
+  orig: 146, 73
+  offset: 1, 12
+  index: -1
+fx/caocao_11
+  rotate: false
+  xy: 320, 2
+  size: 80, 48
+  orig: 146, 73
+  offset: 0, 24
+  index: -1
+fx/fengyitianxiang_27
+  rotate: false
+  xy: 707, 603
+  size: 153, 133
+  orig: 155, 143
+  offset: 0, 9
+  index: -1
+fx/fengyitianxiang_28
+  rotate: false
+  xy: 706, 468
+  size: 152, 133
+  orig: 155, 143
+  offset: 2, 9
+  index: -1
+fx/fengyitianxiang_29
+  rotate: false
+  xy: 707, 738
+  size: 155, 135
+  orig: 155, 143
+  offset: 0, 8
+  index: -1
+fx/fengyitianxiang_30
+  rotate: false
+  xy: 448, 307
+  size: 152, 132
+  orig: 155, 143
+  offset: 2, 8
+  index: -1
+fx/fengyitianxiang_31
+  rotate: true
+  xy: 602, 296
+  size: 143, 124
+  orig: 155, 143
+  offset: 7, 13
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 621
+  size: 225, 252
+  orig: 400, 400
+  offset: 110, 68
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 367
+  size: 223, 252
+  orig: 400, 400
+  offset: 113, 68
+  index: -1
+idle/idle_2
+  rotate: true
+  xy: 452, 441
+  size: 214, 252
+  orig: 400, 400
+  offset: 115, 68
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 224, 112
+  size: 215, 253
+  orig: 400, 400
+  offset: 112, 68
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 452, 657
+  size: 216, 253
+  orig: 400, 400
+  offset: 109, 68
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 227, 367
+  size: 219, 252
+  orig: 400, 400
+  offset: 107, 68
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 229, 621
+  size: 221, 252
+  orig: 400, 400
+  offset: 107, 68
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 113
+  size: 220, 252
+  orig: 400, 400
+  offset: 108, 68
+  index: -1

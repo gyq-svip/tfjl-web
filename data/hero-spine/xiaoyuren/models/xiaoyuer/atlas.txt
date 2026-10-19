@@ -1,0 +1,111 @@
+
+xiaoyuer.png
+size: 1101,1101
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 431, 239
+  size: 215, 283
+  orig: 238, 287
+  offset: 5, 0
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 443, 533
+  size: 210, 279
+  orig: 238, 287
+  offset: 12, 0
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 565, 14
+  size: 223, 274
+  orig: 238, 287
+  offset: 0, 0
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 2, 2
+  size: 230, 274
+  orig: 238, 287
+  offset: 8, 0
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 655, 538
+  size: 207, 274
+  orig: 238, 287
+  offset: 27, 0
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 666, 826
+  size: 211, 273
+  orig: 238, 287
+  offset: 27, 0
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 648, 252
+  size: 198, 279
+  orig: 238, 287
+  offset: 27, 0
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 217, 234
+  size: 212, 287
+  orig: 223, 287
+  offset: 6, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 234
+  size: 213, 287
+  orig: 223, 287
+  offset: 6, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 812
+  size: 216, 287
+  orig: 223, 287
+  offset: 4, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 219, 524
+  size: 222, 286
+  orig: 223, 287
+  offset: 1, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 441, 814
+  size: 223, 285
+  orig: 223, 287
+  offset: 0, 0
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 278, 9
+  size: 223, 285
+  orig: 223, 287
+  offset: 0, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 220, 813
+  size: 219, 286
+  orig: 223, 287
+  offset: 2, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 523
+  size: 215, 287
+  orig: 223, 287
+  offset: 4, 0
+  index: -1

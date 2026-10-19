@@ -1,0 +1,111 @@
+
+huopaopifu.png
+size: 673,673
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+FX/bb/1_007
+  rotate: false
+  xy: 2, 2
+  size: 214, 179
+  orig: 266, 252
+  offset: 29, 19
+  index: -1
+FX/bb/1_010
+  rotate: true
+  xy: 2, 183
+  size: 201, 183
+  orig: 266, 252
+  offset: 33, 27
+  index: -1
+FX/bb/1_013
+  rotate: true
+  xy: 309, 250
+  size: 194, 188
+  orig: 266, 252
+  offset: 22, 40
+  index: -1
+FX/bb/1_016
+  rotate: false
+  xy: 307, 67
+  size: 202, 181
+  orig: 266, 252
+  offset: 23, 55
+  index: -1
+FX/bb/1_020
+  rotate: true
+  xy: 187, 227
+  size: 157, 118
+  orig: 266, 252
+  offset: 71, 66
+  index: -1
+FX/yinxian1
+  rotate: false
+  xy: 511, 100
+  size: 35, 34
+  orig: 38, 37
+  offset: 3, 3
+  index: -1
+FX/yinxian2
+  rotate: false
+  xy: 232, 188
+  size: 40, 37
+  orig: 47, 42
+  offset: 7, 5
+  index: -1
+FX/yinxian3
+  rotate: false
+  xy: 187, 185
+  size: 43, 40
+  orig: 48, 44
+  offset: 5, 4
+  index: -1
+huopao01
+  rotate: true
+  xy: 506, 516
+  size: 155, 149
+  orig: 155, 149
+  offset: 0, 0
+  index: -1
+huopao02
+  rotate: true
+  xy: 511, 136
+  size: 150, 148
+  orig: 150, 148
+  offset: 0, 0
+  index: -1
+huopao03
+  rotate: false
+  xy: 2, 386
+  size: 305, 285
+  orig: 305, 285
+  offset: 0, 0
+  index: -1
+huopao03a
+  rotate: false
+  xy: 218, 48
+  size: 60, 60
+  orig: 305, 285
+  offset: 160, 171
+  index: -1
+huopao03b
+  rotate: true
+  xy: 309, 446
+  size: 225, 195
+  orig: 305, 285
+  offset: 60, 90
+  index: -1
+huopao03c
+  rotate: false
+  xy: 218, 110
+  size: 72, 73
+  orig: 323, 301
+  offset: 249, 155
+  index: -1
+huopao04
+  rotate: true
+  xy: 499, 288
+  size: 156, 150
+  orig: 156, 150
+  offset: 0, 0
+  index: -1

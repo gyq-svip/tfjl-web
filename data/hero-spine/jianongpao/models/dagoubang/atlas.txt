@@ -1,0 +1,139 @@
+
+dagoubang.png
+size: 771,771
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 394, 423
+  size: 68, 130
+  orig: 200, 200
+  offset: 68, 30
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 293, 159
+  size: 78, 126
+  orig: 200, 200
+  offset: 61, 38
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 341, 555
+  size: 95, 130
+  orig: 200, 200
+  offset: 45, 34
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 293, 37
+  size: 120, 120
+  orig: 200, 200
+  offset: 72, 35
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 415, 9
+  size: 122, 108
+  orig: 200, 200
+  offset: 66, 28
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 415, 119
+  size: 111, 119
+  orig: 200, 200
+  offset: 64, 22
+  index: -1
+fx/Energy 030 Slash Right_00002
+  rotate: false
+  xy: 2, 538
+  size: 173, 231
+  orig: 240, 240
+  offset: 21, 0
+  index: -1
+fx/Energy 030 Slash Right_00004
+  rotate: false
+  xy: 2, 51
+  size: 162, 217
+  orig: 240, 240
+  offset: 34, 0
+  index: -1
+fx/Energy 030 Slash Right_00006
+  rotate: false
+  xy: 177, 555
+  size: 162, 214
+  orig: 240, 240
+  offset: 35, 0
+  index: -1
+fx/Energy 030 Slash Right_00008
+  rotate: true
+  xy: 394, 232
+  size: 150, 196
+  orig: 240, 240
+  offset: 47, 0
+  index: -1
+fx/Energy 030 Slash Right_00010
+  rotate: false
+  xy: 592, 45
+  size: 143, 188
+  orig: 240, 240
+  offset: 51, 0
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 275, 287
+  size: 117, 266
+  orig: 400, 400
+  offset: 150, 51
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 341, 652
+  size: 117, 266
+  orig: 400, 400
+  offset: 150, 51
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 609, 503
+  size: 117, 266
+  orig: 400, 400
+  offset: 150, 51
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 473, 384
+  size: 117, 266
+  orig: 400, 400
+  offset: 150, 51
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 592, 235
+  size: 117, 266
+  orig: 400, 400
+  offset: 150, 51
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 166, 2
+  size: 125, 266
+  orig: 400, 400
+  offset: 150, 51
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 270
+  size: 138, 266
+  orig: 400, 400
+  offset: 150, 51
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 142, 270
+  size: 131, 266
+  orig: 400, 400
+  offset: 150, 51
+  index: -1

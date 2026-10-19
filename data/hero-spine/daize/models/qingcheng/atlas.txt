@@ -1,0 +1,146 @@
+
+qingcheng.png
+size: 975,975
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 234, 463
+  size: 194, 254
+  orig: 400, 400
+  offset: 116, 78
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 201, 203
+  size: 190, 256
+  orig: 400, 400
+  offset: 118, 78
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 2, 201
+  size: 197, 258
+  orig: 400, 400
+  offset: 116, 78
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 2, 461
+  size: 230, 256
+  orig: 400, 400
+  offset: 109, 78
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 2, 719
+  size: 240, 254
+  orig: 400, 400
+  offset: 108, 78
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 244, 719
+  size: 205, 254
+  orig: 400, 400
+  offset: 108, 78
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 2, 2
+  size: 197, 254
+  orig: 400, 400
+  offset: 112, 78
+  index: -1
+fx/fengyitianxiang_27
+  rotate: false
+  xy: 788, 174
+  size: 153, 133
+  orig: 155, 143
+  offset: 0, 9
+  index: -1
+fx/fengyitianxiang_28
+  rotate: false
+  xy: 765, 39
+  size: 152, 133
+  orig: 155, 143
+  offset: 2, 9
+  index: -1
+fx/fengyitianxiang_29
+  rotate: true
+  xy: 788, 309
+  size: 155, 135
+  orig: 155, 143
+  offset: 0, 8
+  index: -1
+fx/fengyitianxiang_30
+  rotate: true
+  xy: 824, 566
+  size: 152, 132
+  orig: 155, 143
+  offset: 2, 8
+  index: -1
+fx/fengyitianxiang_31
+  rotate: true
+  xy: 845, 830
+  size: 143, 124
+  orig: 155, 143
+  offset: 7, 13
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 648, 720
+  size: 195, 253
+  orig: 400, 400
+  offset: 115, 78
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 430, 463
+  size: 194, 254
+  orig: 400, 400
+  offset: 115, 78
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 451, 719
+  size: 195, 254
+  orig: 400, 400
+  offset: 114, 78
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 393, 208
+  size: 195, 253
+  orig: 400, 400
+  offset: 114, 78
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 258, 5
+  size: 196, 252
+  orig: 400, 400
+  offset: 115, 78
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 626, 466
+  size: 196, 251
+  orig: 400, 400
+  offset: 116, 78
+  index: -1
+idle/idle_6
+  rotate: true
+  xy: 512, 10
+  size: 196, 251
+  orig: 400, 400
+  offset: 116, 78
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 590, 209
+  size: 196, 252
+  orig: 400, 400
+  offset: 116, 78
+  index: -1

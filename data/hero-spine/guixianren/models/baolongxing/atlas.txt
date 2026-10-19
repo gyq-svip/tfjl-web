@@ -1,0 +1,160 @@
+
+baolongxing.png
+size: 782,782
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 640, 108
+  size: 96, 131
+  orig: 240, 240
+  offset: 68, 37
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 597, 7
+  size: 99, 131
+  orig: 240, 240
+  offset: 67, 37
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 529, 108
+  size: 109, 131
+  orig: 240, 240
+  offset: 67, 37
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 597, 476
+  size: 117, 132
+  orig: 240, 240
+  offset: 67, 37
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 597, 241
+  size: 122, 131
+  orig: 240, 240
+  offset: 68, 37
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 597, 365
+  size: 109, 132
+  orig: 240, 240
+  offset: 68, 37
+  index: -1
+fx/1/idle_0
+  rotate: true
+  xy: 597, 642
+  size: 46, 147
+  orig: 480, 480
+  offset: 273, 110
+  index: -1
+fx/1/idle_1
+  rotate: true
+  xy: 597, 736
+  size: 44, 148
+  orig: 480, 480
+  offset: 275, 111
+  index: -1
+fx/1/idle_2
+  rotate: true
+  xy: 597, 690
+  size: 44, 148
+  orig: 480, 480
+  offset: 275, 112
+  index: -1
+fx/1/idle_3
+  rotate: true
+  xy: 597, 595
+  size: 45, 147
+  orig: 480, 480
+  offset: 274, 112
+  index: -1
+fx/1/idle_4
+  rotate: true
+  xy: 300, 7
+  size: 47, 147
+  orig: 480, 480
+  offset: 272, 111
+  index: -1
+fx/1/idle_5
+  rotate: true
+  xy: 151, 4
+  size: 48, 147
+  orig: 480, 480
+  offset: 271, 110
+  index: -1
+fx/1/idle_6
+  rotate: true
+  xy: 2, 2
+  size: 50, 147
+  orig: 480, 480
+  offset: 269, 109
+  index: -1
+fx/1/idle_7
+  rotate: true
+  xy: 449, 7
+  size: 47, 146
+  orig: 480, 480
+  offset: 272, 110
+  index: -1
+idle/idle_0
+  rotate: true
+  xy: 266, 56
+  size: 195, 261
+  orig: 480, 480
+  offset: 124, 76
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 397, 519
+  size: 194, 261
+  orig: 480, 480
+  offset: 125, 76
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 396, 254
+  size: 194, 262
+  orig: 480, 480
+  offset: 125, 76
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 199, 253
+  size: 195, 262
+  orig: 480, 480
+  offset: 124, 76
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 252
+  size: 195, 263
+  orig: 480, 480
+  offset: 124, 76
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 2, 517
+  size: 196, 263
+  orig: 480, 480
+  offset: 123, 76
+  index: -1
+idle/idle_6
+  rotate: true
+  xy: 2, 54
+  size: 196, 262
+  orig: 480, 480
+  offset: 123, 76
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 200, 518
+  size: 195, 262
+  orig: 480, 480
+  offset: 124, 76
+  index: -1

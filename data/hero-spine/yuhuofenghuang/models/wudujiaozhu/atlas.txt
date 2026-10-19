@@ -1,0 +1,111 @@
+
+wudujiaozhu.png
+size: 733,733
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+fx/a_xian_0027
+  rotate: false
+  xy: 177, 112
+  size: 143, 44
+  orig: 165, 61
+  offset: 15, 5
+  index: -1
+fx/a_xian_0028
+  rotate: false
+  xy: 177, 66
+  size: 143, 44
+  orig: 165, 61
+  offset: 16, 5
+  index: -1
+fx/a_xian_0029
+  rotate: false
+  xy: 322, 111
+  size: 135, 45
+  orig: 165, 61
+  offset: 23, 4
+  index: -1
+fx/a_xian_0030
+  rotate: false
+  xy: 322, 64
+  size: 125, 45
+  orig: 165, 61
+  offset: 25, 4
+  index: -1
+fx/a_xian_0031
+  rotate: false
+  xy: 177, 19
+  size: 106, 45
+  orig: 165, 61
+  offset: 25, 4
+  index: -1
+fx/xing1
+  rotate: false
+  xy: 459, 126
+  size: 30, 30
+  orig: 30, 30
+  offset: 0, 0
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 183, 158
+  size: 178, 286
+  orig: 181, 287
+  offset: 0, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 363, 158
+  size: 177, 287
+  orig: 181, 287
+  offset: 0, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 542, 157
+  size: 177, 287
+  orig: 181, 287
+  offset: 0, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 2, 158
+  size: 179, 286
+  orig: 181, 287
+  offset: 0, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 446
+  size: 181, 285
+  orig: 181, 287
+  offset: 0, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 185, 447
+  size: 181, 284
+  orig: 181, 287
+  offset: 0, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 368, 447
+  size: 181, 284
+  orig: 181, 287
+  offset: 0, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 551, 446
+  size: 180, 285
+  orig: 181, 287
+  offset: 0, 0
+  index: -1
+jiutan
+  rotate: true
+  xy: 2, 26
+  size: 130, 173
+  orig: 166, 193
+  offset: 18, 10
+  index: -1

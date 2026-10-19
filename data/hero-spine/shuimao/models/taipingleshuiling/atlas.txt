@@ -1,0 +1,195 @@
+
+taipingleshuiling.png
+size: 988,988
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 838, 716
+  size: 127, 148
+  orig: 161, 154
+  offset: 17, 0
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 838, 605
+  size: 109, 147
+  orig: 161, 154
+  offset: 14, 0
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 715, 23
+  size: 105, 143
+  orig: 161, 154
+  offset: 12, 0
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 828, 198
+  size: 156, 146
+  orig: 161, 154
+  offset: 0, 1
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 519, 183
+  size: 161, 145
+  orig: 161, 154
+  offset: 0, 2
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 835, 346
+  size: 150, 145
+  orig: 161, 154
+  offset: 4, 2
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 838, 845
+  size: 141, 148
+  orig: 161, 154
+  offset: 4, 0
+  index: -1
+fx/1_009
+  rotate: true
+  xy: 571, 3
+  size: 125, 91
+  orig: 173, 133
+  offset: 19, 12
+  index: -1
+fx/1_011
+  rotate: false
+  xy: 666, 130
+  size: 146, 102
+  orig: 173, 133
+  offset: 10, 10
+  index: -1
+fx/1_013
+  rotate: false
+  xy: 835, 493
+  size: 151, 110
+  orig: 173, 133
+  offset: 8, 9
+  index: -1
+fx/1_015
+  rotate: false
+  xy: 2, 5
+  size: 157, 84
+  orig: 173, 133
+  offset: 6, 25
+  index: -1
+fx/Liquid 024 Splash Slash Right_00001
+  rotate: true
+  xy: 405, 35
+  size: 54, 39
+  orig: 156, 156
+  offset: 24, 53
+  index: -1
+fx/Liquid 024 Splash Slash Right_00003
+  rotate: false
+  xy: 550, 347
+  size: 106, 45
+  orig: 156, 156
+  offset: 20, 46
+  index: -1
+fx/Liquid 024 Splash Slash Right_00005
+  rotate: false
+  xy: 519, 130
+  size: 110, 51
+  orig: 156, 156
+  offset: 19, 36
+  index: -1
+fx/Liquid 024 Splash Slash Right_00007
+  rotate: false
+  xy: 283, 35
+  size: 120, 54
+  orig: 156, 156
+  offset: 19, 32
+  index: -1
+fx/Liquid 024 Splash Slash Right_00009
+  rotate: true
+  xy: 664, 7
+  size: 121, 49
+  orig: 156, 156
+  offset: 20, 28
+  index: -1
+fx/Liquid 024 Splash Slash Right_00011
+  rotate: false
+  xy: 161, 27
+  size: 120, 62
+  orig: 156, 156
+  offset: 20, 25
+  index: -1
+fx/Liquid 024 Splash Slash Right_00013
+  rotate: false
+  xy: 446, 36
+  size: 123, 53
+  orig: 156, 156
+  offset: 22, 23
+  index: -1
+fx/glow2_00004
+  rotate: true
+  xy: 666, 234
+  size: 158, 160
+  orig: 179, 184
+  offset: 10, 12
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 91
+  size: 258, 297
+  orig: 289, 304
+  offset: 19, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 262, 91
+  size: 255, 297
+  orig: 289, 304
+  offset: 16, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 390
+  size: 263, 297
+  orig: 289, 304
+  offset: 9, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 273, 690
+  size: 274, 296
+  orig: 289, 304
+  offset: 3, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 550, 394
+  size: 283, 295
+  orig: 289, 304
+  offset: 0, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 549, 691
+  size: 287, 295
+  orig: 289, 304
+  offset: 1, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 267, 391
+  size: 281, 296
+  orig: 289, 304
+  offset: 7, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 689
+  size: 269, 297
+  orig: 289, 304
+  offset: 15, 0
+  index: -1

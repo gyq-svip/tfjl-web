@@ -1,0 +1,146 @@
+
+zhuzhishan.png
+size: 836,836
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 618, 416
+  size: 93, 138
+  orig: 169, 138
+  offset: 16, 0
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 618, 276
+  size: 91, 138
+  orig: 169, 138
+  offset: 22, 0
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 713, 416
+  size: 86, 138
+  orig: 169, 138
+  offset: 28, 0
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 626, 556
+  size: 140, 138
+  orig: 169, 138
+  offset: 15, 0
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 410, 140
+  size: 151, 138
+  orig: 169, 138
+  offset: 4, 0
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 626, 696
+  size: 153, 138
+  orig: 169, 138
+  offset: 0, 0
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 410, 5
+  size: 133, 138
+  orig: 169, 138
+  offset: 3, 0
+  index: -1
+fx/daoguang0003
+  rotate: true
+  xy: 655, 175
+  size: 99, 75
+  orig: 128, 87
+  offset: 9, 0
+  index: -1
+fx/daoguang0004
+  rotate: true
+  xy: 711, 318
+  size: 96, 79
+  orig: 128, 87
+  offset: 9, 0
+  index: -1
+fx/daoguang0005
+  rotate: false
+  xy: 563, 105
+  size: 89, 82
+  orig: 128, 87
+  offset: 7, 0
+  index: -1
+fx/daoguang0006
+  rotate: false
+  xy: 563, 189
+  size: 90, 85
+  orig: 128, 87
+  offset: 5, 0
+  index: -1
+fx/daoguang0008
+  rotate: true
+  xy: 654, 110
+  size: 63, 79
+  orig: 128, 87
+  offset: 3, 7
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 558
+  size: 210, 276
+  orig: 214, 276
+  offset: 1, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 280
+  size: 209, 276
+  orig: 214, 276
+  offset: 4, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 2
+  size: 204, 276
+  orig: 214, 276
+  offset: 8, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 424, 558
+  size: 200, 276
+  orig: 214, 276
+  offset: 8, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 418, 280
+  size: 198, 276
+  orig: 214, 276
+  offset: 6, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 208, 2
+  size: 200, 276
+  orig: 214, 276
+  offset: 2, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 213, 280
+  size: 203, 276
+  orig: 214, 276
+  offset: 0, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 214, 558
+  size: 208, 276
+  orig: 214, 276
+  offset: 0, 0
+  index: -1

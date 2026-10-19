@@ -1,0 +1,146 @@
+
+renyingying.png
+size: 986,986
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 875, 848
+  size: 109, 136
+  orig: 200, 200
+  offset: 52, 28
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 373, 7
+  size: 110, 134
+  orig: 200, 200
+  offset: 55, 26
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 652, 2
+  size: 106, 134
+  orig: 200, 200
+  offset: 54, 28
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 509, 3
+  size: 116, 141
+  orig: 200, 200
+  offset: 46, 21
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 230, 2
+  size: 115, 141
+  orig: 200, 200
+  offset: 48, 20
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 782, 110
+  size: 118, 136
+  orig: 200, 200
+  offset: 51, 28
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 782, 230
+  size: 128, 137
+  orig: 200, 200
+  offset: 51, 28
+  index: -1
+fx/s1_dg_00027
+  rotate: false
+  xy: 2, 778
+  size: 317, 206
+  orig: 342, 236
+  offset: 22, 14
+  index: -1
+fx/s1_dg_00030
+  rotate: false
+  xy: 2, 573
+  size: 300, 203
+  orig: 342, 236
+  offset: 34, 18
+  index: -1
+fx/s1_dg_00033
+  rotate: false
+  xy: 304, 568
+  size: 284, 193
+  orig: 342, 236
+  offset: 44, 22
+  index: -1
+fx/s1_dg_00036
+  rotate: false
+  xy: 598, 580
+  size: 262, 182
+  orig: 342, 236
+  offset: 60, 30
+  index: -1
+fx/s1_dg_00039
+  rotate: true
+  xy: 781, 369
+  size: 209, 165
+  orig: 342, 236
+  offset: 97, 41
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 21
+  size: 226, 274
+  orig: 400, 400
+  offset: 102, 56
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 321, 763
+  size: 221, 275
+  orig: 400, 400
+  offset: 104, 56
+  index: -1
+idle/idle_2
+  rotate: true
+  xy: 598, 764
+  size: 220, 275
+  orig: 400, 400
+  offset: 104, 56
+  index: -1
+idle/idle_3
+  rotate: true
+  xy: 231, 119
+  size: 219, 274
+  orig: 400, 400
+  offset: 105, 56
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 507, 121
+  size: 220, 273
+  orig: 400, 400
+  offset: 104, 56
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 506, 343
+  size: 223, 273
+  orig: 400, 400
+  offset: 102, 56
+  index: -1
+idle/idle_6
+  rotate: true
+  xy: 231, 340
+  size: 226, 273
+  orig: 400, 400
+  offset: 100, 56
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 297
+  size: 227, 274
+  orig: 400, 400
+  offset: 101, 56
+  index: -1

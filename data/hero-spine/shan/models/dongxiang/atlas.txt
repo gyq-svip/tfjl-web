@@ -1,0 +1,139 @@
+
+dongxiang.png
+size: 730,730
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 624, 61
+  size: 104, 130
+  orig: 121, 131
+  offset: 8, 0
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 636, 381
+  size: 77, 130
+  orig: 121, 131
+  offset: 12, 0
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 494, 7
+  size: 71, 127
+  orig: 121, 131
+  offset: 12, 0
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 631, 243
+  size: 70, 127
+  orig: 121, 131
+  offset: 12, 0
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 266, 75
+  size: 93, 128
+  orig: 121, 131
+  offset: 12, 0
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 361, 73
+  size: 118, 131
+  orig: 121, 131
+  offset: 0, 0
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 494, 80
+  size: 111, 128
+  orig: 121, 131
+  offset: 0, 0
+  index: -1
+fx/diwangshenbing_07
+  rotate: true
+  xy: 637, 553
+  size: 175, 52
+  orig: 178, 54
+  offset: 2, 0
+  index: -1
+fx/diwangshenbing_08
+  rotate: true
+  xy: 691, 513
+  size: 215, 32
+  orig: 218, 34
+  offset: 2, 1
+  index: -1
+fx/diwangshenbing_09
+  rotate: false
+  xy: 2, 2
+  size: 168, 24
+  orig: 170, 26
+  offset: 1, 1
+  index: -1
+fx/diwangshenbing_10
+  rotate: false
+  xy: 266, 35
+  size: 115, 36
+  orig: 118, 38
+  offset: 0, 0
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 205
+  size: 184, 260
+  orig: 186, 262
+  offset: 0, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 467
+  size: 184, 261
+  orig: 186, 262
+  offset: 0, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 188, 467
+  size: 183, 261
+  orig: 186, 262
+  offset: 1, 0
+  index: -1
+idle/idle_3
+  rotate: true
+  xy: 373, 549
+  size: 179, 262
+  orig: 186, 262
+  offset: 4, 0
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 2, 28
+  size: 175, 262
+  orig: 186, 262
+  offset: 7, 0
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 373, 372
+  size: 175, 261
+  orig: 186, 262
+  offset: 7, 0
+  index: -1
+idle/idle_6
+  rotate: true
+  xy: 369, 193
+  size: 177, 260
+  orig: 186, 262
+  offset: 5, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 188, 205
+  size: 179, 260
+  orig: 186, 262
+  offset: 3, 0
+  index: -1

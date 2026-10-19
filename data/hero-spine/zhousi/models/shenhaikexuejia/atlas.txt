@@ -1,0 +1,202 @@
+
+shenhaikexuejia.png
+size: 986,986
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 806, 298
+  size: 147, 128
+  orig: 183, 155
+  offset: 9, 0
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 672, 70
+  size: 125, 126
+  orig: 183, 155
+  offset: 18, 0
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 674, 343
+  size: 129, 130
+  orig: 183, 155
+  offset: 27, 0
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 519, 347
+  size: 125, 153
+  orig: 183, 155
+  offset: 56, 0
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 519, 71
+  size: 122, 140
+  orig: 183, 155
+  offset: 56, 0
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 800, 18
+  size: 134, 138
+  orig: 183, 155
+  offset: 37, 0
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 672, 197
+  size: 144, 129
+  orig: 183, 155
+  offset: 24, 0
+  index: -1
+fx/Energy 090 Ray Right_00002
+  rotate: true
+  xy: 350, 75
+  size: 43, 95
+  orig: 180, 180
+  offset: 8, 46
+  index: -1
+fx/Energy 090 Ray Right_00004
+  rotate: true
+  xy: 217, 23
+  size: 44, 93
+  orig: 180, 180
+  offset: 27, 47
+  index: -1
+fx/Energy 090 Ray Right_00006
+  rotate: true
+  xy: 258, 74
+  size: 44, 90
+  orig: 180, 180
+  offset: 47, 48
+  index: -1
+fx/Energy 090 Ray Right_00008
+  rotate: true
+  xy: 354, 30
+  size: 43, 84
+  orig: 180, 180
+  offset: 66, 51
+  index: -1
+fx/Energy 090 Ray Right_00010
+  rotate: true
+  xy: 440, 31
+  size: 42, 77
+  orig: 180, 180
+  offset: 83, 55
+  index: -1
+fx/Energy 090 Ray Right_00012
+  rotate: false
+  xy: 312, 2
+  size: 40, 70
+  orig: 180, 180
+  offset: 99, 58
+  index: -1
+fx/Energy 090 Ray Right_00014
+  rotate: false
+  xy: 2, 3
+  size: 37, 64
+  orig: 180, 180
+  offset: 112, 61
+  index: -1
+fx/Energy 090 Ray Right_00016
+  rotate: false
+  xy: 41, 10
+  size: 35, 57
+  orig: 180, 180
+  offset: 121, 65
+  index: -1
+fx/b7_001
+  rotate: true
+  xy: 803, 158
+  size: 138, 145
+  orig: 198, 198
+  offset: 21, 36
+  index: -1
+fx/b7_002
+  rotate: true
+  xy: 519, 195
+  size: 150, 151
+  orig: 198, 198
+  offset: 13, 33
+  index: -1
+fx/b7_003
+  rotate: true
+  xy: 807, 576
+  size: 152, 156
+  orig: 198, 198
+  offset: 10, 33
+  index: -1
+fx/b7_004
+  rotate: true
+  xy: 807, 428
+  size: 146, 156
+  orig: 198, 198
+  offset: 9, 33
+  index: -1
+fx/b7_005
+  rotate: true
+  xy: 78, 21
+  size: 46, 137
+  orig: 198, 198
+  offset: 39, 41
+  index: -1
+idle/idle_0
+  rotate: true
+  xy: 2, 69
+  size: 327, 254
+  orig: 356, 254
+  offset: 11, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 347, 730
+  size: 338, 254
+  orig: 356, 254
+  offset: 7, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 730
+  size: 343, 254
+  orig: 356, 254
+  offset: 9, 0
+  index: -1
+idle/idle_3
+  rotate: true
+  xy: 2, 398
+  size: 330, 254
+  orig: 356, 254
+  offset: 19, 0
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 258, 120
+  size: 301, 254
+  orig: 356, 254
+  offset: 36, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 519, 474
+  size: 286, 254
+  orig: 356, 254
+  offset: 43, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 687, 730
+  size: 287, 254
+  orig: 356, 254
+  offset: 39, 0
+  index: -1
+idle/idle_7
+  rotate: true
+  xy: 258, 423
+  size: 305, 254
+  orig: 356, 254
+  offset: 24, 0
+  index: -1

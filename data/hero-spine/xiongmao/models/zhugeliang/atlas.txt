@@ -1,0 +1,146 @@
+
+zhugeliang.png
+size: 692,692
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 232, 230
+  size: 79, 114
+  orig: 144, 116
+  offset: 12, 0
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 397, 17
+  size: 76, 115
+  orig: 144, 116
+  offset: 14, 0
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 280, 44
+  size: 88, 115
+  orig: 144, 116
+  offset: 5, 0
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 163, 10
+  size: 141, 115
+  orig: 144, 116
+  offset: 0, 0
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 543, 161
+  size: 135, 116
+  orig: 144, 116
+  offset: 0, 0
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 543, 39
+  size: 120, 115
+  orig: 144, 116
+  offset: 2, 0
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 232, 346
+  size: 86, 114
+  orig: 144, 116
+  offset: 7, 0
+  index: -1
+fx/bingyan_000
+  rotate: true
+  xy: 644, 409
+  size: 118, 46
+  orig: 230, 92
+  offset: 67, 20
+  index: -1
+fx/bingyan_002
+  rotate: true
+  xy: 163, 153
+  size: 138, 64
+  orig: 230, 92
+  offset: 47, 4
+  index: -1
+fx/bingyan_004
+  rotate: true
+  xy: 631, 529
+  size: 161, 57
+  orig: 230, 92
+  offset: 20, 9
+  index: -1
+fx/bingyan_006
+  rotate: false
+  xy: 171, 462
+  size: 147, 60
+  orig: 230, 92
+  offset: 28, 11
+  index: -1
+fx/bingyan_008
+  rotate: false
+  xy: 2, 3
+  size: 86, 58
+  orig: 230, 92
+  offset: 45, 13
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 63
+  size: 159, 228
+  orig: 167, 228
+  offset: 5, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 320, 294
+  size: 164, 228
+  orig: 167, 228
+  offset: 2, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 462
+  size: 167, 228
+  orig: 167, 228
+  offset: 0, 0
+  index: -1
+idle/idle_3
+  rotate: true
+  xy: 2, 293
+  size: 167, 228
+  orig: 167, 228
+  offset: 0, 0
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 171, 524
+  size: 166, 228
+  orig: 167, 228
+  offset: 1, 0
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 401, 528
+  size: 162, 228
+  orig: 167, 228
+  offset: 3, 0
+  index: -1
+idle/idle_6
+  rotate: true
+  xy: 313, 134
+  size: 158, 228
+  orig: 167, 228
+  offset: 6, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 486, 298
+  size: 156, 228
+  orig: 167, 228
+  offset: 7, 0
+  index: -1

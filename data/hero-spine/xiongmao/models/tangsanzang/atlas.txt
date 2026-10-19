@@ -1,0 +1,146 @@
+
+tangsanzang.png
+size: 931,931
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 772, 397
+  size: 118, 176
+  orig: 126, 207
+  offset: 0, 30
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 771, 219
+  size: 124, 176
+  orig: 126, 207
+  offset: 0, 29
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 487, 42
+  size: 126, 174
+  orig: 126, 207
+  offset: 0, 30
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 359, 41
+  size: 126, 175
+  orig: 126, 207
+  offset: 0, 29
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 644, 398
+  size: 126, 175
+  orig: 126, 207
+  offset: 0, 29
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 644, 220
+  size: 125, 176
+  orig: 126, 207
+  offset: 0, 29
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 615, 39
+  size: 121, 177
+  orig: 126, 207
+  offset: 0, 29
+  index: -1
+attack/atk_8
+  rotate: false
+  xy: 738, 40
+  size: 113, 177
+  orig: 126, 207
+  offset: 0, 30
+  index: -1
+fx/huan
+  rotate: false
+  xy: 738, 2
+  size: 36, 36
+  orig: 38, 38
+  offset: 1, 1
+  index: -1
+fx/xiaobingjianfa_09
+  rotate: false
+  xy: 776, 2
+  size: 16, 36
+  orig: 17, 38
+  offset: 0, 1
+  index: -1
+fx/xiaobingjianfa_10
+  rotate: false
+  xy: 858, 872
+  size: 35, 57
+  orig: 36, 59
+  offset: 0, 1
+  index: -1
+fx/xiaobingjianfa_11
+  rotate: true
+  xy: 359, 13
+  size: 26, 59
+  orig: 27, 61
+  offset: 0, 1
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 433, 575
+  size: 211, 354
+  orig: 215, 415
+  offset: 2, 60
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 218, 575
+  size: 213, 354
+  orig: 215, 415
+  offset: 1, 60
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 218
+  size: 214, 354
+  orig: 215, 415
+  offset: 1, 60
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 2, 574
+  size: 214, 355
+  orig: 215, 415
+  offset: 1, 60
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 218, 218
+  size: 212, 355
+  orig: 215, 415
+  offset: 2, 60
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 2, 5
+  size: 211, 355
+  orig: 215, 415
+  offset: 3, 60
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 432, 218
+  size: 210, 355
+  orig: 215, 415
+  offset: 3, 60
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 646, 575
+  size: 210, 354
+  orig: 215, 415
+  offset: 3, 60
+  index: -1

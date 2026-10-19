@@ -1,0 +1,153 @@
+
+mengmengtaipingle.png
+size: 897,897
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 719, 97
+  size: 126, 131
+  orig: 270, 270
+  offset: 53, 44
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 269, 2
+  size: 123, 130
+  orig: 270, 270
+  offset: 57, 44
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 2, 10
+  size: 110, 135
+  orig: 270, 270
+  offset: 59, 36
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 139, 16
+  size: 104, 128
+  orig: 270, 270
+  offset: 57, 44
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 508, 255
+  size: 127, 129
+  orig: 270, 270
+  offset: 53, 44
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 550, 96
+  size: 167, 127
+  orig: 270, 270
+  offset: 40, 44
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 759, 397
+  size: 195, 127
+  orig: 270, 270
+  offset: 42, 44
+  index: -1
+attack/atk_8
+  rotate: true
+  xy: 759, 225
+  size: 170, 127
+  orig: 270, 270
+  offset: 45, 44
+  index: -1
+fx/bingyan/bingyan_000
+  rotate: false
+  xy: 401, 17
+  size: 118, 46
+  orig: 230, 92
+  offset: 67, 20
+  index: -1
+fx/bingyan/bingyan_002
+  rotate: true
+  xy: 795, 594
+  size: 138, 64
+  orig: 230, 92
+  offset: 47, 4
+  index: -1
+fx/bingyan/bingyan_004
+  rotate: true
+  xy: 795, 734
+  size: 161, 57
+  orig: 230, 92
+  offset: 20, 9
+  index: -1
+fx/bingyan/bingyan_006
+  rotate: false
+  xy: 401, 65
+  size: 147, 60
+  orig: 230, 92
+  offset: 28, 11
+  index: -1
+fx/bingyan/bingyan_008
+  rotate: false
+  xy: 521, 5
+  size: 86, 58
+  orig: 230, 92
+  offset: 45, 13
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 643
+  size: 263, 252
+  orig: 540, 540
+  offset: 98, 89
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 267, 643
+  size: 263, 252
+  orig: 540, 540
+  offset: 98, 89
+  index: -1
+idle/idle_2
+  rotate: true
+  xy: 2, 382
+  size: 259, 251
+  orig: 540, 540
+  offset: 103, 89
+  index: -1
+idle/idle_3
+  rotate: true
+  xy: 2, 122
+  size: 258, 251
+  orig: 540, 540
+  offset: 107, 89
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 255, 384
+  size: 257, 250
+  orig: 540, 540
+  offset: 109, 89
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 507, 386
+  size: 255, 250
+  orig: 540, 540
+  offset: 110, 89
+  index: -1
+idle/idle_6
+  rotate: true
+  xy: 255, 127
+  size: 255, 251
+  orig: 540, 540
+  offset: 108, 89
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 532, 643
+  size: 261, 252
+  orig: 540, 540
+  offset: 101, 89
+  index: -1

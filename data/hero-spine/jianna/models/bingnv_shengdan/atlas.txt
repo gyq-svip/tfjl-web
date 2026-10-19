@@ -1,0 +1,146 @@
+
+bingnv_shengdan.png
+size: 1454,1454
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/a0000
+  rotate: false
+  xy: 2, 354
+  size: 346, 279
+  orig: 800, 600
+  offset: 265, 154
+  index: -1
+images/a0004
+  rotate: false
+  xy: 637, 633
+  size: 348, 277
+  orig: 800, 600
+  offset: 270, 157
+  index: -1
+images/a0008
+  rotate: false
+  xy: 1049, 903
+  size: 340, 274
+  orig: 800, 600
+  offset: 282, 160
+  index: -1
+images/a0012
+  rotate: false
+  xy: 319, 916
+  size: 324, 276
+  orig: 800, 600
+  offset: 293, 157
+  index: -1
+images/a0016
+  rotate: false
+  xy: 2, 923
+  size: 315, 277
+  orig: 800, 600
+  offset: 294, 155
+  index: -1
+images/a0020
+  rotate: false
+  xy: 2, 643
+  size: 312, 278
+  orig: 800, 600
+  offset: 292, 153
+  index: -1
+images/a0024
+  rotate: false
+  xy: 316, 635
+  size: 319, 279
+  orig: 800, 600
+  offset: 283, 152
+  index: -1
+images/a0028
+  rotate: false
+  xy: 987, 623
+  size: 332, 278
+  orig: 800, 600
+  offset: 273, 153
+  index: -1
+images/a0039
+  rotate: true
+  xy: 325, 1194
+  size: 258, 331
+  orig: 800, 600
+  offset: 252, 146
+  index: -1
+images/a0041
+  rotate: true
+  xy: 2, 1202
+  size: 250, 321
+  orig: 800, 600
+  offset: 245, 145
+  index: -1
+images/a0043
+  rotate: true
+  xy: 1069, 1179
+  size: 273, 309
+  orig: 800, 600
+  offset: 237, 143
+  index: -1
+images/a0045
+  rotate: false
+  xy: 665, 344
+  size: 299, 287
+  orig: 800, 600
+  offset: 232, 143
+  index: -1
+images/a0047
+  rotate: false
+  xy: 350, 351
+  size: 313, 280
+  orig: 800, 600
+  offset: 262, 154
+  index: -1
+images/a0049
+  rotate: false
+  xy: 347, 31
+  size: 313, 318
+  orig: 800, 600
+  offset: 268, 155
+  index: -1
+images/a0052
+  rotate: true
+  xy: 658, 1186
+  size: 266, 409
+  orig: 800, 600
+  offset: 271, 154
+  index: -1
+images/a0055
+  rotate: true
+  xy: 645, 912
+  size: 272, 402
+  orig: 800, 600
+  offset: 267, 154
+  index: -1
+images/a0057
+  rotate: true
+  xy: 966, 330
+  size: 291, 384
+  orig: 800, 600
+  offset: 264, 153
+  index: -1
+images/a0059
+  rotate: true
+  xy: 662, 16
+  size: 312, 358
+  orig: 800, 600
+  offset: 264, 153
+  index: -1
+images/a0061
+  rotate: false
+  xy: 1022, 2
+  size: 330, 326
+  orig: 800, 600
+  offset: 265, 153
+  index: -1
+images/a0063
+  rotate: false
+  xy: 2, 55
+  size: 343, 297
+  orig: 800, 600
+  offset: 265, 154
+  index: -1

@@ -1,0 +1,202 @@
+
+daizong.png
+size: 766,766
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 592, 456
+  size: 103, 102
+  orig: 103, 114
+  offset: 0, 0
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 158, 71
+  size: 103, 106
+  orig: 103, 114
+  offset: 0, 4
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 394, 176
+  size: 91, 112
+  orig: 103, 114
+  offset: 2, 2
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 472, 93
+  size: 78, 102
+  orig: 103, 114
+  offset: 9, 0
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 508, 173
+  size: 99, 96
+  orig: 103, 114
+  offset: 4, 1
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 609, 173
+  size: 98, 98
+  orig: 103, 114
+  offset: 0, 0
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 371, 76
+  size: 99, 98
+  orig: 103, 114
+  offset: 0, 1
+  index: -1
+fx/Ele_00000
+  rotate: false
+  xy: 158, 13
+  size: 84, 56
+  orig: 160, 160
+  offset: 38, 25
+  index: -1
+fx/Ele_00002
+  rotate: false
+  xy: 592, 374
+  size: 85, 80
+  orig: 160, 160
+  offset: 41, 27
+  index: -1
+fx/Ele_00004
+  rotate: false
+  xy: 472, 2
+  size: 89, 89
+  orig: 160, 160
+  offset: 41, 34
+  index: -1
+fx/Ele_00006
+  rotate: false
+  xy: 576, 89
+  size: 82, 82
+  orig: 160, 160
+  offset: 43, 49
+  index: -1
+fx/Ele_00008
+  rotate: false
+  xy: 563, 24
+  size: 82, 63
+  orig: 160, 160
+  offset: 42, 72
+  index: -1
+fx/Ele_00010
+  rotate: false
+  xy: 371, 2
+  size: 64, 72
+  orig: 160, 160
+  offset: 50, 64
+  index: -1
+fx/Electricity 034 Charge Radial_00006
+  rotate: false
+  xy: 608, 273
+  size: 97, 99
+  orig: 160, 160
+  offset: 28, 31
+  index: -1
+fx/Electricity 034 Charge Radial_00009
+  rotate: true
+  xy: 506, 271
+  size: 101, 100
+  orig: 160, 160
+  offset: 28, 30
+  index: -1
+fx/Electricity 034 Charge Radial_00012
+  rotate: false
+  xy: 263, 75
+  size: 106, 102
+  orig: 160, 160
+  offset: 24, 29
+  index: -1
+fx/Electricity 034 Charge Radial_00015
+  rotate: false
+  xy: 394, 269
+  size: 110, 103
+  orig: 160, 160
+  offset: 22, 30
+  index: -1
+fx/Electricity 034 Charge Radial_00020
+  rotate: false
+  xy: 595, 657
+  size: 114, 107
+  orig: 160, 160
+  offset: 19, 30
+  index: -1
+fx/Electricity 034 Charge Radial_00024
+  rotate: true
+  xy: 595, 560
+  size: 95, 108
+  orig: 160, 160
+  offset: 42, 31
+  index: -1
+fx/buzi
+  rotate: false
+  xy: 2, 23
+  size: 154, 154
+  orig: 160, 160
+  offset: 2, 4
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 402, 570
+  size: 191, 194
+  orig: 200, 194
+  offset: 8, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 203, 374
+  size: 194, 194
+  orig: 200, 194
+  offset: 4, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 203, 570
+  size: 197, 194
+  orig: 200, 194
+  offset: 1, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 2, 570
+  size: 199, 194
+  orig: 200, 194
+  offset: 0, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 374
+  size: 199, 194
+  orig: 200, 194
+  offset: 1, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 2, 179
+  size: 196, 193
+  orig: 200, 194
+  offset: 4, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 200, 179
+  size: 192, 193
+  orig: 200, 194
+  offset: 8, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 399, 374
+  size: 191, 194
+  orig: 200, 194
+  offset: 9, 0
+  index: -1

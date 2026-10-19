@@ -1,0 +1,160 @@
+
+modaxiansheng.png
+size: 882,882
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 709, 336
+  size: 130, 144
+  orig: 225, 225
+  offset: 66, 38
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 709, 210
+  size: 124, 142
+  orig: 225, 225
+  offset: 66, 38
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 601, 67
+  size: 121, 141
+  orig: 225, 225
+  offset: 66, 38
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 475, 67
+  size: 124, 141
+  orig: 225, 225
+  offset: 69, 38
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 716, 468
+  size: 132, 147
+  orig: 225, 225
+  offset: 66, 38
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 716, 744
+  size: 136, 149
+  orig: 225, 225
+  offset: 63, 38
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 716, 602
+  size: 140, 147
+  orig: 225, 225
+  offset: 65, 38
+  index: -1
+fx/s1/s01_001
+  rotate: false
+  xy: 475, 2
+  size: 46, 63
+  orig: 115, 115
+  offset: 32, 7
+  index: -1
+fx/s1/s01_002
+  rotate: false
+  xy: 475, 211
+  size: 54, 91
+  orig: 115, 115
+  offset: 32, 7
+  index: -1
+fx/s1/s01_003
+  rotate: true
+  xy: 724, 136
+  size: 72, 94
+  orig: 115, 115
+  offset: 27, 9
+  index: -1
+fx/s1/s01_004
+  rotate: true
+  xy: 584, 224
+  size: 78, 94
+  orig: 115, 115
+  offset: 23, 11
+  index: -1
+fx/s1/s01_005
+  rotate: false
+  xy: 531, 220
+  size: 51, 82
+  orig: 115, 115
+  offset: 22, 23
+  index: -1
+fx/s1/s01_006
+  rotate: true
+  xy: 575, 8
+  size: 57, 81
+  orig: 115, 115
+  offset: 16, 25
+  index: -1
+fx/s1/s01_007
+  rotate: true
+  xy: 523, 4
+  size: 61, 50
+  orig: 115, 115
+  offset: 11, 56
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 590
+  size: 235, 290
+  orig: 450, 450
+  offset: 134, 77
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 298
+  size: 233, 290
+  orig: 450, 450
+  offset: 135, 77
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 6
+  size: 231, 290
+  orig: 450, 450
+  offset: 136, 77
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 237, 300
+  size: 231, 288
+  orig: 450, 450
+  offset: 136, 77
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 480, 593
+  size: 234, 287
+  orig: 450, 450
+  offset: 135, 77
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 470, 304
+  size: 237, 287
+  orig: 450, 450
+  offset: 134, 77
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 239, 593
+  size: 239, 287
+  orig: 450, 450
+  offset: 133, 77
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 235, 7
+  size: 238, 289
+  orig: 450, 450
+  offset: 133, 77
+  index: -1

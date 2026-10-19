@@ -1,0 +1,195 @@
+
+sunwukong_xinnian.png
+size: 989,989
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/attack/b0003
+  rotate: false
+  xy: 389, 761
+  size: 190, 226
+  orig: 512, 512
+  offset: 153, 123
+  index: -1
+images/attack/b0007
+  rotate: false
+  xy: 581, 780
+  size: 206, 207
+  orig: 512, 512
+  offset: 158, 118
+  index: -1
+images/attack/b0013
+  rotate: false
+  xy: 2, 721
+  size: 191, 266
+  orig: 512, 512
+  offset: 139, 175
+  index: -1
+images/attack/b0015
+  rotate: false
+  xy: 789, 802
+  size: 183, 185
+  orig: 512, 512
+  offset: 158, 218
+  index: -1
+images/attack/b0018
+  rotate: true
+  xy: 618, 256
+  size: 244, 141
+  orig: 512, 512
+  offset: 149, 246
+  index: -1
+images/attack/b0021
+  rotate: false
+  xy: 2, 439
+  size: 162, 280
+  orig: 512, 512
+  offset: 158, 162
+  index: -1
+images/attack/b0027
+  rotate: false
+  xy: 195, 758
+  size: 192, 229
+  orig: 512, 512
+  offset: 155, 122
+  index: -1
+images/fx/f03/f3_000
+  rotate: false
+  xy: 259, 8
+  size: 110, 177
+  orig: 120, 239
+  offset: 3, 5
+  index: -1
+images/fx/f03/f3_001
+  rotate: false
+  xy: 714, 75
+  size: 114, 179
+  orig: 120, 239
+  offset: 2, 18
+  index: -1
+images/fx/f03/f3_002
+  rotate: false
+  xy: 371, 17
+  size: 115, 189
+  orig: 120, 239
+  offset: 2, 23
+  index: -1
+images/fx/f03/f3_003
+  rotate: false
+  xy: 874, 354
+  size: 113, 192
+  orig: 120, 239
+  offset: 1, 24
+  index: -1
+images/fx/f03/f3_004
+  rotate: false
+  xy: 761, 320
+  size: 111, 202
+  orig: 120, 239
+  offset: 3, 23
+  index: -1
+images/fx/f03/f3_005
+  rotate: false
+  xy: 488, 56
+  size: 112, 189
+  orig: 120, 239
+  offset: 5, 39
+  index: -1
+images/fx/f03/f3_006
+  rotate: false
+  xy: 602, 63
+  size: 110, 182
+  orig: 120, 239
+  offset: 6, 50
+  index: -1
+images/fx/f03/f3_007
+  rotate: false
+  xy: 874, 196
+  size: 107, 156
+  orig: 120, 239
+  offset: 11, 71
+  index: -1
+images/fx/f03/f3_008
+  rotate: true
+  xy: 830, 93
+  size: 101, 144
+  orig: 120, 239
+  offset: 14, 82
+  index: -1
+images/idle/a0000
+  rotate: true
+  xy: 2, 21
+  size: 154, 255
+  orig: 512, 512
+  offset: 184, 123
+  index: -1
+images/idle/a0004
+  rotate: false
+  xy: 322, 498
+  size: 154, 258
+  orig: 512, 512
+  offset: 184, 123
+  index: -1
+images/idle/a0008
+  rotate: false
+  xy: 2, 177
+  size: 153, 260
+  orig: 512, 512
+  offset: 184, 123
+  index: -1
+images/idle/a0012
+  rotate: false
+  xy: 166, 460
+  size: 154, 259
+  orig: 512, 512
+  offset: 184, 123
+  index: -1
+images/idle/a0016
+  rotate: false
+  xy: 478, 502
+  size: 154, 257
+  orig: 512, 512
+  offset: 184, 123
+  index: -1
+images/idle/a0020
+  rotate: false
+  xy: 634, 524
+  size: 154, 254
+  orig: 512, 512
+  offset: 184, 123
+  index: -1
+images/idle/a0024
+  rotate: false
+  xy: 157, 187
+  size: 152, 250
+  orig: 512, 512
+  offset: 184, 123
+  index: -1
+images/idle/a0028
+  rotate: false
+  xy: 464, 247
+  size: 152, 249
+  orig: 512, 512
+  offset: 184, 123
+  index: -1
+images/idle/a0032
+  rotate: false
+  xy: 311, 208
+  size: 151, 250
+  orig: 512, 512
+  offset: 184, 123
+  index: -1
+images/idle/a0036
+  rotate: false
+  xy: 790, 548
+  size: 153, 252
+  orig: 512, 512
+  offset: 184, 123
+  index: -1
+images/idle/weiba2
+  rotate: false
+  xy: 945, 642
+  size: 31, 158
+  orig: 31, 158
+  offset: 0, 0
+  index: -1

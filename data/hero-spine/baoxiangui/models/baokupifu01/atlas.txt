@@ -1,0 +1,97 @@
+
+baokupifu01.png
+size: 457,457
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+baokupifu01
+  rotate: false
+  xy: 302, 130
+  size: 48, 45
+  orig: 48, 45
+  offset: 0, 0
+  index: -1
+baokupifu01b
+  rotate: false
+  xy: 352, 140
+  size: 35, 35
+  orig: 48, 45
+  offset: 3, 6
+  index: -1
+baokupifu04
+  rotate: false
+  xy: 2, 277
+  size: 198, 178
+  orig: 198, 178
+  offset: 0, 0
+  index: -1
+baokupifu04a
+  rotate: false
+  xy: 2, 97
+  size: 198, 178
+  orig: 198, 178
+  offset: 0, 0
+  index: -1
+baokupifu04b
+  rotate: false
+  xy: 202, 318
+  size: 135, 137
+  orig: 198, 178
+  offset: 25, 27
+  index: -1
+fx/chilun_0
+  rotate: false
+  xy: 339, 270
+  size: 96, 90
+  orig: 118, 118
+  offset: 16, 16
+  index: -1
+fx/chilun_1
+  rotate: false
+  xy: 202, 128
+  size: 98, 93
+  orig: 118, 118
+  offset: 15, 15
+  index: -1
+fx/chilun_2
+  rotate: false
+  xy: 2, 2
+  size: 100, 93
+  orig: 118, 118
+  offset: 14, 15
+  index: -1
+fx/chilun_3
+  rotate: false
+  xy: 104, 2
+  size: 98, 93
+  orig: 118, 118
+  offset: 15, 15
+  index: -1
+fx/chilun_4
+  rotate: false
+  xy: 304, 177
+  size: 96, 91
+  orig: 118, 118
+  offset: 16, 16
+  index: -1
+fx/chilun_5
+  rotate: true
+  xy: 204, 28
+  size: 98, 93
+  orig: 118, 118
+  offset: 15, 15
+  index: -1
+fx/chilun_6
+  rotate: false
+  xy: 202, 223
+  size: 100, 93
+  orig: 118, 118
+  offset: 14, 15
+  index: -1
+fx/chilun_7
+  rotate: false
+  xy: 339, 362
+  size: 99, 93
+  orig: 118, 118
+  offset: 15, 15
+  index: -1

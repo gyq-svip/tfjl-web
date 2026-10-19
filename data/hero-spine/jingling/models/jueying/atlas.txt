@@ -1,0 +1,237 @@
+
+jueying.png
+size: 761,761
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+fx/1/Liquid 026 Slash Up_00002
+  rotate: false
+  xy: 593, 341
+  size: 22, 52
+  orig: 113, 113
+  offset: 58, 13
+  index: -1
+fx/1/Liquid 026 Slash Up_00004
+  rotate: false
+  xy: 738, 554
+  size: 20, 70
+  orig: 113, 113
+  offset: 62, 18
+  index: -1
+fx/1/Liquid 026 Slash Up_00006
+  rotate: false
+  xy: 736, 431
+  size: 23, 67
+  orig: 113, 113
+  offset: 59, 25
+  index: -1
+fx/1/Liquid 026 Slash Up_00008
+  rotate: false
+  xy: 636, 369
+  size: 22, 63
+  orig: 113, 113
+  offset: 58, 30
+  index: -1
+fx/1/Liquid 026 Slash Up_00010
+  rotate: false
+  xy: 710, 386
+  size: 23, 62
+  orig: 113, 113
+  offset: 55, 33
+  index: -1
+fx/1/Liquid 026 Slash Up_00012
+  rotate: false
+  xy: 735, 370
+  size: 24, 59
+  orig: 113, 113
+  offset: 55, 36
+  index: -1
+fx/1/Liquid 026 Slash Up_00014
+  rotate: false
+  xy: 745, 748
+  size: 14, 11
+  orig: 113, 113
+  offset: 55, 85
+  index: -1
+fx/1/Liquid 026 Slash Up_00016
+  rotate: false
+  xy: 745, 741
+  size: 6, 5
+  orig: 113, 113
+  offset: 55, 91
+  index: -1
+fx/1/Liquid 026 Slash Up_00017
+  rotate: false
+  xy: 753, 742
+  size: 5, 4
+  orig: 113, 113
+  offset: 55, 92
+  index: -1
+fx/1/Liquid 026 Slash Up_00018
+  rotate: false
+  xy: 753, 737
+  size: 3, 3
+  orig: 113, 113
+  offset: 55, 94
+  index: -1
+fx/2/Liquid 026 Slash Up_00002
+  rotate: false
+  xy: 678, 388
+  size: 30, 60
+  orig: 113, 113
+  offset: 54, 9
+  index: -1
+fx/2/Liquid 026 Slash Up_00004
+  rotate: true
+  xy: 593, 434
+  size: 31, 83
+  orig: 113, 113
+  offset: 56, 11
+  index: -1
+fx/2/Liquid 026 Slash Up_00006
+  rotate: true
+  xy: 593, 467
+  size: 34, 83
+  orig: 113, 113
+  offset: 53, 15
+  index: -1
+fx/2/Liquid 026 Slash Up_00008
+  rotate: true
+  xy: 593, 503
+  size: 35, 84
+  orig: 113, 113
+  offset: 51, 16
+  index: -1
+fx/2/Liquid 026 Slash Up_00010
+  rotate: true
+  xy: 602, 540
+  size: 39, 84
+  orig: 113, 113
+  offset: 49, 17
+  index: -1
+fx/2/Liquid 026 Slash Up_00012
+  rotate: true
+  xy: 602, 581
+  size: 43, 87
+  orig: 113, 113
+  offset: 47, 16
+  index: -1
+fx/2/Liquid 026 Slash Up_00014
+  rotate: false
+  xy: 691, 549
+  size: 45, 75
+  orig: 113, 113
+  offset: 45, 30
+  index: -1
+fx/2/Liquid 026 Slash Up_00016
+  rotate: true
+  xy: 688, 500
+  size: 47, 64
+  orig: 113, 113
+  offset: 43, 43
+  index: -1
+fx/2/Liquid 026 Slash Up_00017
+  rotate: true
+  xy: 678, 450
+  size: 48, 56
+  orig: 113, 113
+  offset: 41, 53
+  index: -1
+fx/2/Liquid 026 Slash Up_00018
+  rotate: true
+  xy: 593, 395
+  size: 37, 41
+  orig: 113, 113
+  offset: 40, 69
+  index: -1
+fx/a_00
+  rotate: true
+  xy: 602, 626
+  size: 133, 141
+  orig: 220, 202
+  offset: 2, 35
+  index: -1
+idle/a_00
+  rotate: false
+  xy: 403, 572
+  size: 197, 187
+  orig: 227, 208
+  offset: 11, 10
+  index: -1
+idle/a_01
+  rotate: false
+  xy: 2, 572
+  size: 198, 187
+  orig: 227, 208
+  offset: 10, 10
+  index: -1
+idle/a_02
+  rotate: false
+  xy: 202, 573
+  size: 199, 186
+  orig: 227, 208
+  offset: 10, 10
+  index: -1
+idle/a_03
+  rotate: false
+  xy: 573, 155
+  size: 185, 184
+  orig: 227, 208
+  offset: 9, 10
+  index: -1
+idle/a_04
+  rotate: false
+  xy: 2, 9
+  size: 185, 185
+  orig: 227, 208
+  offset: 9, 10
+  index: -1
+idle/a_05
+  rotate: true
+  xy: 386, 11
+  size: 184, 185
+  orig: 227, 208
+  offset: 10, 10
+  index: -1
+idle/a_06
+  rotate: false
+  xy: 386, 197
+  size: 185, 185
+  orig: 227, 208
+  offset: 10, 10
+  index: -1
+idle/a_07
+  rotate: false
+  xy: 2, 196
+  size: 186, 185
+  orig: 227, 208
+  offset: 11, 10
+  index: -1
+idle/a_08
+  rotate: true
+  xy: 198, 193
+  size: 189, 186
+  orig: 227, 208
+  offset: 11, 10
+  index: -1
+idle/a_09
+  rotate: false
+  xy: 399, 384
+  size: 192, 186
+  orig: 227, 208
+  offset: 11, 10
+  index: -1
+idle/a_10
+  rotate: false
+  xy: 2, 383
+  size: 194, 187
+  orig: 227, 208
+  offset: 11, 10
+  index: -1
+idle/a_11
+  rotate: false
+  xy: 202, 384
+  size: 195, 187
+  orig: 227, 208
+  offset: 11, 10
+  index: -1

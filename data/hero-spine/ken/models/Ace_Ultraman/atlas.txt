@@ -1,0 +1,244 @@
+
+Ace_Ultraman.png
+size: 972,972
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack1/atk1_1
+  rotate: false
+  xy: 183, 39
+  size: 176, 230
+  orig: 191, 237
+  offset: 11, 0
+  index: -1
+attack1/atk1_2
+  rotate: false
+  xy: 499, 43
+  size: 152, 226
+  orig: 191, 237
+  offset: 11, 0
+  index: -1
+attack1/atk1_3
+  rotate: true
+  xy: 696, 343
+  size: 155, 229
+  orig: 191, 237
+  offset: 11, 0
+  index: -1
+attack1/atk1_4
+  rotate: true
+  xy: 726, 643
+  size: 154, 233
+  orig: 191, 237
+  offset: 0, 0
+  index: -1
+attack1/atk1_5
+  rotate: false
+  xy: 545, 504
+  size: 159, 233
+  orig: 191, 237
+  offset: 11, 0
+  index: -1
+attack1/atk1_6
+  rotate: true
+  xy: 726, 799
+  size: 171, 233
+  orig: 191, 237
+  offset: 11, 0
+  index: -1
+attack2/atk2_1
+  rotate: false
+  xy: 364, 272
+  size: 169, 231
+  orig: 179, 233
+  offset: 0, 0
+  index: -1
+attack2/atk2_2
+  rotate: true
+  xy: 696, 197
+  size: 144, 229
+  orig: 179, 233
+  offset: 0, 0
+  index: -1
+attack2/atk2_3
+  rotate: true
+  xy: 653, 45
+  size: 150, 227
+  orig: 179, 233
+  offset: 0, 0
+  index: -1
+attack2/atk2_4
+  rotate: false
+  xy: 361, 40
+  size: 136, 229
+  orig: 179, 233
+  offset: 0, 0
+  index: -1
+attack2/atk2_5
+  rotate: false
+  xy: 361, 40
+  size: 136, 229
+  orig: 179, 233
+  offset: 0, 0
+  index: -1
+attack2/atk2_6
+  rotate: true
+  xy: 706, 500
+  size: 141, 230
+  orig: 179, 233
+  offset: 0, 0
+  index: -1
+attack2/atk2_7
+  rotate: false
+  xy: 535, 271
+  size: 159, 231
+  orig: 179, 233
+  offset: 0, 0
+  index: -1
+fx/1/idle_00
+  rotate: false
+  xy: 882, 40
+  size: 53, 28
+  orig: 179, 232
+  offset: 64, 151
+  index: -1
+fx/1/idle_01
+  rotate: true
+  xy: 938, 588
+  size: 53, 28
+  orig: 179, 232
+  offset: 63, 151
+  index: -1
+fx/1/idle_02
+  rotate: false
+  xy: 2, 5
+  size: 54, 29
+  orig: 179, 232
+  offset: 63, 150
+  index: -1
+fx/1/idle_03
+  rotate: true
+  xy: 938, 533
+  size: 53, 28
+  orig: 179, 232
+  offset: 65, 150
+  index: -1
+fx/1/idle_04
+  rotate: true
+  xy: 653, 215
+  size: 54, 29
+  orig: 179, 232
+  offset: 65, 149
+  index: -1
+fx/1/idle_05
+  rotate: true
+  xy: 927, 446
+  size: 52, 29
+  orig: 179, 232
+  offset: 67, 149
+  index: -1
+fx/1/idle_06
+  rotate: true
+  xy: 927, 392
+  size: 52, 29
+  orig: 179, 232
+  offset: 67, 149
+  index: -1
+fx/1/idle_07
+  rotate: true
+  xy: 927, 338
+  size: 52, 29
+  orig: 179, 232
+  offset: 67, 149
+  index: -1
+fx/1/idle_08
+  rotate: false
+  xy: 58, 5
+  size: 54, 29
+  orig: 179, 232
+  offset: 65, 150
+  index: -1
+fx/1/idle_09
+  rotate: false
+  xy: 114, 5
+  size: 53, 29
+  orig: 179, 232
+  offset: 65, 150
+  index: -1
+fx/dd
+  rotate: false
+  xy: 882, 70
+  size: 88, 125
+  orig: 89, 125
+  offset: 0, 0
+  index: -1
+idle/idle_00
+  rotate: false
+  xy: 2, 738
+  size: 179, 232
+  orig: 179, 232
+  offset: 0, 0
+  index: -1
+idle/idle_01
+  rotate: false
+  xy: 2, 504
+  size: 179, 232
+  orig: 179, 232
+  offset: 0, 0
+  index: -1
+idle/idle_02
+  rotate: false
+  xy: 183, 738
+  size: 179, 232
+  orig: 179, 232
+  offset: 0, 0
+  index: -1
+idle/idle_03
+  rotate: false
+  xy: 2, 270
+  size: 179, 232
+  orig: 179, 232
+  offset: 0, 0
+  index: -1
+idle/idle_04
+  rotate: false
+  xy: 183, 271
+  size: 179, 231
+  orig: 179, 232
+  offset: 0, 0
+  index: -1
+idle/idle_05
+  rotate: false
+  xy: 364, 505
+  size: 179, 231
+  orig: 179, 232
+  offset: 0, 0
+  index: -1
+idle/idle_06
+  rotate: false
+  xy: 545, 739
+  size: 179, 231
+  orig: 179, 232
+  offset: 0, 0
+  index: -1
+idle/idle_07
+  rotate: false
+  xy: 183, 504
+  size: 179, 232
+  orig: 179, 232
+  offset: 0, 0
+  index: -1
+idle/idle_08
+  rotate: false
+  xy: 364, 738
+  size: 179, 232
+  orig: 179, 232
+  offset: 0, 0
+  index: -1
+idle/idle_09
+  rotate: false
+  xy: 2, 36
+  size: 179, 232
+  orig: 179, 232
+  offset: 0, 0
+  index: -1

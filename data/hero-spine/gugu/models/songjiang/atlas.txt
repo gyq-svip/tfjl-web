@@ -1,0 +1,202 @@
+
+songjiang.png
+size: 891,891
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 755, 773
+  size: 116, 134
+  orig: 135, 146
+  offset: 0, 0
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 755, 530
+  size: 116, 131
+  orig: 135, 146
+  offset: 0, 0
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 755, 295
+  size: 113, 135
+  orig: 135, 146
+  offset: 0, 0
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 665, 11
+  size: 107, 144
+  orig: 135, 146
+  offset: 1, 0
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 522, 239
+  size: 106, 146
+  orig: 135, 146
+  offset: 2, 0
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 517, 134
+  size: 103, 146
+  orig: 135, 146
+  offset: 2, 0
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 754, 157
+  size: 135, 136
+  orig: 135, 146
+  offset: 0, 0
+  index: -1
+fx/2/atk_4
+  rotate: true
+  xy: 262, 46
+  size: 22, 20
+  orig: 135, 146
+  offset: 79, 85
+  index: -1
+fx/2/atk_5
+  rotate: true
+  xy: 262, 22
+  size: 22, 20
+  orig: 135, 146
+  offset: 78, 86
+  index: -1
+fx/2/atk_6
+  rotate: true
+  xy: 284, 46
+  size: 22, 20
+  orig: 135, 146
+  offset: 77, 87
+  index: -1
+fx/Electricity 002 Shot Ray Up_00001
+  rotate: true
+  xy: 755, 648
+  size: 42, 132
+  orig: 160, 160
+  offset: 63, 5
+  index: -1
+fx/Electricity 002 Shot Ray Up_00003
+  rotate: true
+  xy: 2, 5
+  size: 62, 140
+  orig: 160, 160
+  offset: 56, 17
+  index: -1
+fx/Electricity 002 Shot Ray Up_00005
+  rotate: true
+  xy: 517, 57
+  size: 75, 138
+  orig: 160, 160
+  offset: 50, 18
+  index: -1
+fx/Electricity 002 Shot Ray Up_00007
+  rotate: true
+  xy: 755, 692
+  size: 79, 132
+  orig: 160, 160
+  offset: 48, 26
+  index: -1
+fx/Electricity 002 Shot Ray Up_00009
+  rotate: true
+  xy: 755, 445
+  size: 83, 126
+  orig: 160, 160
+  offset: 49, 31
+  index: -1
+fx/Electricity 002 Shot Ray Up_00011
+  rotate: false
+  xy: 670, 165
+  size: 79, 97
+  orig: 160, 160
+  offset: 54, 37
+  index: -1
+fx/glow2_00004
+  rotate: true
+  xy: 670, 264
+  size: 81, 82
+  orig: 92, 94
+  offset: 5, 6
+  index: -1
+fx/xing
+  rotate: false
+  xy: 144, 9
+  size: 58, 58
+  orig: 58, 58
+  offset: 0, 0
+  index: -1
+fx/xing1
+  rotate: false
+  xy: 204, 11
+  size: 56, 56
+  orig: 58, 58
+  offset: 1, 1
+  index: -1
+fx/xing2
+  rotate: true
+  xy: 755, 432
+  size: 11, 118
+  orig: 11, 118
+  offset: 0, 0
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 522, 347
+  size: 231, 270
+  orig: 271, 272
+  offset: 2, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 269, 618
+  size: 233, 271
+  orig: 271, 272
+  offset: 1, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 69
+  size: 240, 272
+  orig: 271, 272
+  offset: 0, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 2, 343
+  size: 251, 272
+  orig: 271, 272
+  offset: 0, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 617
+  size: 265, 272
+  orig: 271, 272
+  offset: 0, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 244, 70
+  size: 271, 271
+  orig: 271, 272
+  offset: 0, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 255, 344
+  size: 265, 271
+  orig: 271, 272
+  offset: 1, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 504, 619
+  size: 249, 270
+  orig: 271, 272
+  offset: 2, 0
+  index: -1

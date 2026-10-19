@@ -1,0 +1,181 @@
+
+shuiwa.png
+size: 771,771
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack1/atk_1
+  rotate: false
+  xy: 530, 118
+  size: 86, 112
+  orig: 94, 120
+  offset: 8, 0
+  index: -1
+attack1/atk_2
+  rotate: true
+  xy: 613, 387
+  size: 90, 109
+  orig: 94, 120
+  offset: 4, 0
+  index: -1
+attack1/atk_3
+  rotate: false
+  xy: 276, 6
+  size: 81, 111
+  orig: 94, 120
+  offset: 10, 0
+  index: -1
+attack1/atk_4
+  rotate: false
+  xy: 618, 161
+  size: 84, 110
+  orig: 94, 120
+  offset: 4, 0
+  index: -1
+attack1/atk_5
+  rotate: true
+  xy: 530, 31
+  size: 85, 108
+  orig: 94, 120
+  offset: 4, 0
+  index: -1
+attack1/atk_6
+  rotate: false
+  xy: 607, 273
+  size: 84, 112
+  orig: 94, 120
+  offset: 4, 0
+  index: -1
+attack1/atk_7
+  rotate: false
+  xy: 185, 2
+  size: 89, 115
+  orig: 94, 120
+  offset: 4, 0
+  index: -1
+fx/Liquid 006 Impact Ray Up_00006
+  rotate: true
+  xy: 724, 484
+  size: 108, 44
+  orig: 160, 160
+  offset: 24, 44
+  index: -1
+fx/Liquid 006 Impact Ray Up_00008
+  rotate: true
+  xy: 704, 155
+  size: 118, 48
+  orig: 160, 160
+  offset: 18, 44
+  index: -1
+fx/Liquid 006 Impact Ray Up_00010
+  rotate: true
+  xy: 640, 42
+  size: 117, 49
+  orig: 160, 160
+  offset: 16, 44
+  index: -1
+fx/Liquid 006 Impact Ray Up_00012
+  rotate: false
+  xy: 2, 12
+  size: 119, 50
+  orig: 160, 160
+  offset: 16, 44
+  index: -1
+fx/Liquid 006 Impact Ray Up_00014
+  rotate: false
+  xy: 359, 21
+  size: 117, 50
+  orig: 160, 160
+  offset: 16, 44
+  index: -1
+fx/Liquid 006 Impact Ray Up_00016
+  rotate: true
+  xy: 693, 275
+  size: 110, 51
+  orig: 160, 160
+  offset: 23, 44
+  index: -1
+fx/Liquid 047 Shot Impact Splash Right MIX_00001
+  rotate: false
+  xy: 613, 479
+  size: 109, 113
+  orig: 240, 240
+  offset: 16, 65
+  index: -1
+fx/Liquid 047 Shot Impact Splash Right MIX_00005
+  rotate: false
+  xy: 360, 73
+  size: 168, 157
+  orig: 240, 240
+  offset: 12, 45
+  index: -1
+fx/Liquid 047 Shot Impact Splash Right MIX_00009
+  rotate: true
+  xy: 185, 119
+  size: 179, 173
+  orig: 240, 240
+  offset: 7, 38
+  index: -1
+fx/Liquid 047 Shot Impact Splash Right MIX_00013
+  rotate: false
+  xy: 613, 594
+  size: 146, 175
+  orig: 240, 240
+  offset: 6, 37
+  index: -1
+idle/idle_0
+  rotate: true
+  xy: 377, 591
+  size: 178, 234
+  orig: 186, 234
+  offset: 4, 0
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 377, 412
+  size: 177, 234
+  orig: 186, 234
+  offset: 4, 0
+  index: -1
+idle/idle_2
+  rotate: true
+  xy: 372, 232
+  size: 178, 233
+  orig: 186, 234
+  offset: 4, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 189, 301
+  size: 181, 233
+  orig: 186, 234
+  offset: 3, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 190, 536
+  size: 185, 233
+  orig: 186, 234
+  offset: 1, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 2, 536
+  size: 186, 233
+  orig: 186, 234
+  offset: 0, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 300
+  size: 185, 234
+  orig: 186, 234
+  offset: 0, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 64
+  size: 181, 234
+  orig: 186, 234
+  offset: 2, 0
+  index: -1

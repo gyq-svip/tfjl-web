@@ -1,0 +1,209 @@
+
+songshupifu.png
+size: 999,999
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/fx/bao (2)
+  rotate: false
+  xy: 449, 74
+  size: 102, 106
+  orig: 171, 128
+  offset: 42, 16
+  index: -1
+images/fx/bao (3)
+  rotate: true
+  xy: 641, 132
+  size: 77, 84
+  orig: 171, 128
+  offset: 42, 25
+  index: -1
+images/fx/bao (4)
+  rotate: true
+  xy: 825, 107
+  size: 61, 85
+  orig: 170, 128
+  offset: 59, 26
+  index: -1
+images/fx/bao (5)
+  rotate: true
+  xy: 535, 2
+  size: 54, 83
+  orig: 171, 128
+  offset: 63, 28
+  index: -1
+images/fx/baoh_03
+  rotate: false
+  xy: 651, 58
+  size: 78, 72
+  orig: 100, 100
+  offset: 5, 11
+  index: -1
+images/fx/baoh_05
+  rotate: false
+  xy: 553, 132
+  size: 86, 77
+  orig: 100, 100
+  offset: 8, 17
+  index: -1
+images/fx/baoh_07
+  rotate: false
+  xy: 449, 2
+  size: 84, 70
+  orig: 100, 100
+  offset: 13, 27
+  index: -1
+images/fx/baoh_09
+  rotate: true
+  xy: 958, 318
+  size: 47, 29
+  orig: 100, 100
+  offset: 49, 35
+  index: -1
+images/fx/tx_yanwuchongci03
+  rotate: false
+  xy: 731, 63
+  size: 65, 42
+  orig: 150, 75
+  offset: 8, 0
+  index: -1
+images/fx/tx_yanwuchongci07
+  rotate: false
+  xy: 731, 107
+  size: 92, 61
+  orig: 150, 75
+  offset: 24, 0
+  index: -1
+images/fx/tx_yanwuchongci11
+  rotate: false
+  xy: 553, 66
+  size: 96, 64
+  orig: 150, 75
+  offset: 33, 0
+  index: -1
+images/fx/tx_yanwuchongci15
+  rotate: false
+  xy: 2, 3
+  size: 73, 40
+  orig: 150, 75
+  offset: 56, 0
+  index: -1
+images/idle/a0000
+  rotate: true
+  xy: 266, 783
+  size: 214, 254
+  orig: 512, 512
+  offset: 130, 169
+  index: -1
+images/idle/a0004
+  rotate: true
+  xy: 522, 788
+  size: 209, 255
+  orig: 512, 512
+  offset: 130, 168
+  index: -1
+images/idle/a0008
+  rotate: true
+  xy: 266, 579
+  size: 202, 254
+  orig: 512, 512
+  offset: 131, 169
+  index: -1
+images/idle/a0012
+  rotate: true
+  xy: 522, 590
+  size: 196, 250
+  orig: 512, 512
+  offset: 133, 174
+  index: -1
+images/idle/a0016
+  rotate: true
+  xy: 261, 384
+  size: 193, 244
+  orig: 512, 512
+  offset: 135, 180
+  index: -1
+images/idle/a0020
+  rotate: true
+  xy: 238, 182
+  size: 200, 244
+  orig: 512, 512
+  offset: 132, 181
+  index: -1
+images/idle/a0024
+  rotate: false
+  xy: 779, 751
+  size: 209, 246
+  orig: 512, 512
+  offset: 130, 179
+  index: -1
+images/idle/a0028
+  rotate: false
+  xy: 2, 45
+  size: 215, 250
+  orig: 512, 512
+  offset: 130, 174
+  index: -1
+images/idle/a0037
+  rotate: true
+  xy: 522, 403
+  size: 185, 241
+  orig: 512, 512
+  offset: 166, 175
+  index: -1
+images/idle/a0039
+  rotate: true
+  xy: 219, 2
+  size: 178, 228
+  orig: 512, 512
+  offset: 176, 180
+  index: -1
+images/idle/a0041
+  rotate: true
+  xy: 765, 367
+  size: 198, 231
+  orig: 512, 512
+  offset: 179, 177
+  index: -1
+images/idle/a0043
+  rotate: false
+  xy: 2, 297
+  size: 234, 232
+  orig: 512, 512
+  offset: 181, 177
+  index: -1
+images/idle/a0045
+  rotate: false
+  xy: 2, 531
+  size: 257, 233
+  orig: 512, 512
+  offset: 181, 179
+  index: -1
+images/idle/a0047
+  rotate: false
+  xy: 2, 766
+  size: 262, 231
+  orig: 512, 512
+  offset: 180, 180
+  index: -1
+images/idle/a0051
+  rotate: false
+  xy: 746, 170
+  size: 210, 195
+  orig: 512, 512
+  offset: 172, 183
+  index: -1
+images/idle/a0056
+  rotate: true
+  xy: 774, 567
+  size: 182, 223
+  orig: 512, 512
+  offset: 174, 181
+  index: -1
+images/idle/a0061
+  rotate: true
+  xy: 507, 211
+  size: 190, 237
+  orig: 512, 512
+  offset: 172, 173
+  index: -1

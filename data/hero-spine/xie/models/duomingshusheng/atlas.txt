@@ -1,0 +1,146 @@
+
+duomingshusheng.png
+size: 989,989
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 449, 63
+  size: 126, 148
+  orig: 227, 151
+  offset: 16, 0
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 604, 94
+  size: 138, 143
+  orig: 227, 151
+  offset: 0, 0
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 678, 535
+  size: 217, 147
+  orig: 227, 151
+  offset: 10, 0
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 449, 470
+  size: 211, 146
+  orig: 227, 151
+  offset: 5, 0
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 660, 239
+  size: 193, 145
+  orig: 227, 151
+  offset: 0, 0
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 662, 386
+  size: 204, 147
+  orig: 227, 151
+  offset: 3, 0
+  index: -1
+attack/atk_8
+  rotate: false
+  xy: 855, 132
+  size: 130, 151
+  orig: 227, 151
+  offset: 13, 0
+  index: -1
+fx/dadaoguang_00012
+  rotate: false
+  xy: 449, 618
+  size: 227, 148
+  orig: 246, 167
+  offset: 8, 11
+  index: -1
+fx/dadaoguang_00013
+  rotate: false
+  xy: 449, 332
+  size: 209, 136
+  orig: 246, 167
+  offset: 30, 12
+  index: -1
+fx/dadaoguang_00014
+  rotate: false
+  xy: 449, 191
+  size: 153, 139
+  orig: 246, 167
+  offset: 81, 9
+  index: -1
+fx/dadaoguang_00015
+  rotate: false
+  xy: 868, 401
+  size: 119, 132
+  orig: 246, 167
+  offset: 107, 9
+  index: -1
+fx/dadaoguang_00016
+  rotate: false
+  xy: 868, 285
+  size: 116, 114
+  orig: 246, 167
+  offset: 108, 11
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 227, 379
+  size: 220, 303
+  orig: 224, 303
+  offset: 0, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 754, 684
+  size: 218, 303
+  orig: 224, 303
+  offset: 0, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 228, 684
+  size: 219, 303
+  orig: 224, 303
+  offset: 0, 0
+  index: -1
+idle/idle_3
+  rotate: true
+  xy: 449, 768
+  size: 219, 303
+  orig: 224, 303
+  offset: 0, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 226, 74
+  size: 221, 303
+  orig: 224, 303
+  offset: 0, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 2, 684
+  size: 224, 303
+  orig: 224, 303
+  offset: 0, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 379
+  size: 223, 303
+  orig: 224, 303
+  offset: 1, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 74
+  size: 222, 303
+  orig: 224, 303
+  offset: 1, 0
+  index: -1
