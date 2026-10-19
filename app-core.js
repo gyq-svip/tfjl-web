@@ -17612,12 +17612,12 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                 if (ta >= tb) latest = it;
             }
             if (!latest) return;
-            const PREFIX = '塔防精灵助手 - 阵容卡搭配｜本站网址：';
+            const APP_PREFIX = '塔防精灵助手 - 阵容卡搭配｜';
             let title = String(latest.content).trim();
-            // 兼容「只改网址」：内容形如网址(链接/域名)且不含软件名/“本站网址”时，自动拼上固定软件名前缀
-            //   → 软件名标题不动、只替换网址；若内容已是完整标题(含软件名/中文标题)则整串使用
-            const _looksLikeUrl = !/塔防精灵|本站网址/.test(title) && /^(https?:\/\/|[\w-]+(\.[\w-]+)+\/?\S*)$/i.test(title);
-            if (_looksLikeUrl) title = PREFIX + title;
+            // 软件名「塔防精灵助手 - 阵容卡搭配」固定写死；其后「标签+网址」整段跟公告变
+            //   （content 写“本站网址:https://xxx”/“官网:https://xxx”/纯网址均可）；
+            //   若 content 已含“塔防精灵”→ 视为完整标题，整串使用（完全自定义）
+            if (!/塔防精灵/.test(title)) title = APP_PREFIX + title;
             try { document.title = title; } catch (e) {}
             try {
                 const T = window.__TAURI__;
@@ -33235,7 +33235,7 @@ ${maSection}
 
                 renderAdminNewsList(newsData);
                 showAdminStatus('公告发布成功！', 'success');
-                alert('✅ 公告发布成功！' + (category === '窗口标题' ? '\n\n窗口标题栏已更新：内容框填【网址】即可，软件名“塔防精灵助手 - 阵容卡搭配”会自动带上（只作用于标题栏，不进公告）。' : ''));
+                alert('✅ 公告发布成功！' + (category === '窗口标题' ? '\n\n窗口标题栏已更新：软件名“塔防精灵助手 - 阵容卡搭配”固定不变，内容框填「标签+网址」（如：本站网址:https://xxx）即可（只作用于标题栏，不进公告）。' : ''));
             } catch (error) {
                 console.error('发布公告失败:', error);
                 const _m = '发布失败: ' + ((error && error.message) ? error.message : error);
