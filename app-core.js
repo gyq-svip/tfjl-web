@@ -10787,7 +10787,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             panel.appendChild(tabs)
             const body = document.createElement('div')
             body.style.cssText = 'padding:8px 10px 10px;overflow-y:auto;min-height:0;flex:1;'
-            panel.appendChild(body)
 
             const tabDefs = [{ k: 'detail', t: '属性详情' }, { k: 'upgrade', t: '升级预览' }]
             const tabBtns = {}
@@ -10807,6 +10806,90 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     b.style.color = on ? '#3d2600' : '#cfe6ff'
                 })
             }
+
+            // 等级拖拉条 + 进度条：放在面板右下角（官方版式：等级框 + 进度 + 下一档）
+            const lvRow = document.createElement('div')
+            lvRow.style.cssText = 'flex:none;display:flex;align-items:center;gap:7px;padding:8px 10px 4px;border-top:1px solid rgba(120,190,255,0.25);'
+            lvRow.innerHTML = '<span style="font-size:clamp(10px,1.05vw,13px);color:#9fc7ff;font-weight:800;">等级</span>'
+            const lvVal = document.createElement('span')
+            lvVal.style.cssText = 'font-size:clamp(13px,1.5vw,18px);font-weight:900;color:#ffd75e;min-width:2.4ch;text-align:center;text-shadow:0 2px 0 #000;'
+            lvRow.appendChild(lvVal)
+            const lvBar = document.createElement('div')
+            lvBar.id = 'hdLvBar'
+            lvBar.style.cssText = 'flex:1;min-width:50px;height:9px;border-radius:5px;background:rgba(0,0,0,0.45);border:1px solid rgba(120,190,255,0.35);overflow:hidden;'
+            const lvBarFill = document.createElement('div')
+            lvBarFill.id = 'hdLvFill'
+            lvBarFill.style.cssText = 'height:100%;width:0%;background:linear-gradient(90deg,#ffd75e,#e8891c);transition:width .15s;'
+            lvBar.appendChild(lvBarFill)
+            lvRow.appendChild(lvBar)
+            const lvNext = document.createElement('span')
+            lvNext.style.cssText = 'font-size:clamp(9px,0.95vw,11px);color:#8fb4e8;font-weight:800;white-space:nowrap;'
+            lvRow.appendChild(lvNext)
+            const lvSlider = document.createElement('input')
+            lvSlider.type = 'range'
+            lvSlider.min = '0'
+            lvSlider.max = String(Math.max(0, levels.length - 1))
+            lvSlider.step = '1'
+            lvSlider.style.cssText = 'flex:1;min-width:60px;accent-color:#e8a91c;cursor:pointer;'
+            lvRow.appendChild(lvSlider)
+            // 快捷档位（官方 tier 等级）
+            const lvChips = document.createElement('div')
+            lvChips.style.cssText = 'flex:none;display:flex;flex-wrap:wrap;gap:4px;padding:0 10px 8px;'
+            // 等级 + 进度条放在面板右下角（官方版式：等级框 + 进度 + 下一档）
+            panel.appendChild(body)
+            panel.appendChild(lvRow)
+            panel.appendChild(lvChips)
+            function paintLevel() {
+                lvVal.textContent = String(curLevel)
+                lvSlider.value = String(Math.max(0, levels.indexOf(curLevel)))
+                shieldNum.textContent = String(curLevel)
+                // 进度条：当前等级 → 下一档（tier 里程碑）；满级则满格
+                const tiersLv = ((meta && meta.tiers) || []).map((t) => Number(t.level)).filter((n) => n > 1)
+                const next = tiersLv.find((n) => n > Number(curLevel))
+                const prev = tiersLv.filter((n) => n <= Number(curLevel)).pop() || 1
+                const span = (next || Number(levels[levels.length - 1]) || 1) - prev
+                const pct = span > 0 ? Math.max(0, Math.min(100, ((Number(curLevel) - prev) / span) * 100)) : 100
+                lvBarFill.style.width = pct.toFixed(1) + '%'
+                lvNext.textContent = next ? ('下一档 ' + next) : '已满级'
+                if (lvChips.dataset.built !== String(levels.length)) {
+                    lvChips.innerHTML = ''
+                    quickLevels().forEach((lv) => {
+                        const b = document.createElement('button')
+                        b.textContent = String(lv)
+                        b.dataset.lv = String(lv)
+                        b.style.cssText = 'padding:2px 7px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:800;'
+                        b.onclick = () => applyLevel(lv)
+                        lvChips.appendChild(b)
+                    })
+                    lvChips.dataset.built = String(levels.length)
+                }
+                lvChips.querySelectorAll('button').forEach((b) => {
+                    const on = Number(b.dataset.lv) === Number(curLevel)
+                    b.style.border = '1px solid ' + (on ? '#ffd75e' : 'rgba(255,255,255,0.22)')
+                    b.style.background = on ? 'rgba(255,215,94,0.22)' : 'transparent'
+                    b.style.color = on ? '#ffd75e' : '#cfe6ff'
+                })
+            }
+            // 应用等级：写存储 + 重铺角标 + 刷新本弹窗的盾牌/属性/被动
+            function applyLevel(lv) {
+                if (lv == null) return
+                curLevel = lv
+                setCardLevel(cardId, curLevel, cardType, handType)
+                if (libSlot && typeof window._llReapplySlot === 'function') { try { window._llReapplySlot(libSlot) } catch (e) {} }
+                else { try { updateAllCardLevelBadges() } catch (e) {} }
+                paintLevel()
+                renderBody()
+                paintAll()
+            }
+            lvSlider.oninput = () => {
+                const lv = levels[Number(lvSlider.value)]
+                if (lv == null) return
+                curLevel = lv
+                paintLevel()
+                renderBody()
+                paintAll()
+            }
+            lvSlider.onchange = () => applyLevel(curLevel)
 
             function statRowsHtml() {
                 const row = hdRowAt(meta && meta.stats, curLevel) || {}
@@ -10965,6 +11048,218 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 }))
             }
 
+            // ---------- 子系统子弹窗（官方版式：皮肤 / 魔化 / 融合） ----------
+            // 取皮肤立绘（复用皮肤组件解析；拿不到返回空串，由调用方显示占位）
+            function hdPortraitUrl(heroName, skinName) {
+                return new Promise((resolve) => {
+                    if (typeof window.resolveHeroSkinInfo !== 'function') return resolve('')
+                    window.resolveHeroSkinInfo(heroName, skinName).then((info) => resolve(info && info.url ? info.url : '')).catch(() => resolve(''))
+                })
+            }
+            // 建一个子弹窗骨架：标题栏（标题 + 红✕）+ 内容区；返回关闭函数
+            function hdSubShell(title, borderColor, bgGradient) {
+                const ov = document.createElement('div')
+                ov.style.cssText = 'position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);border-radius:18px;'
+                const box = document.createElement('div')
+                box.style.cssText = 'position:relative;width:min(760px,94%);height:min(560px,92%);border-radius:14px;overflow:hidden;border:3px solid ' + borderColor + ';background:' + bgGradient + ';box-shadow:0 14px 44px rgba(0,0,0,0.66);display:flex;flex-direction:column;'
+                ov.appendChild(box)
+                const bar = document.createElement('div')
+                bar.style.cssText = 'flex:none;height:52px;display:flex;align-items:center;justify-content:center;position:relative;background:linear-gradient(180deg,#3f7fd0,#1c4f96);border-bottom:2px solid rgba(0,0,0,0.35);'
+                bar.innerHTML = '<span style="font-size:20px;font-weight:900;color:#fff;letter-spacing:0.1em;text-shadow:0 2px 0 #0b2c56;">' + esc(title) + '</span>'
+                const close = document.createElement('button')
+                close.textContent = '✕'
+                close.style.cssText = 'position:absolute;right:10px;top:9px;width:34px;height:34px;border-radius:8px;border:0;background:#e0483c;color:#fff;font-weight:900;font-size:16px;cursor:pointer;'
+                close.onclick = () => ov.remove()
+                bar.appendChild(close)
+                box.appendChild(bar)
+                const body = document.createElement('div')
+                body.style.cssText = 'flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center;'
+                box.appendChild(body)
+                card.appendChild(ov)
+                return { ov, box, body }
+            }
+            // 底部皮肤缩略图条（选中：金框 + 绿勾）
+            function hdThumbStrip(body, heroName, skins, current, onPick) {
+                const strip = document.createElement('div')
+                strip.style.cssText = 'position:absolute;left:0;right:0;bottom:0;display:flex;gap:8px;padding:10px 12px;overflow-x:auto;background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,0.45));'
+                body.appendChild(strip)
+                skins.forEach((sk) => {
+                    const label = typeof sk === 'string' ? sk : sk.note
+                    const b = document.createElement('button')
+                    b.dataset.skin = label
+                    b.style.cssText = 'position:relative;flex:none;width:64px;height:64px;border-radius:8px;border:2px solid ' + (label === current ? '#ffd75e' : 'rgba(255,255,255,0.28)') + ';background:rgba(0,0,0,0.35);cursor:pointer;padding:0;overflow:hidden;'
+                    const img = document.createElement('img')
+                    img.style.cssText = 'width:100%;height:100%;object-fit:cover;'
+                    b.appendChild(img)
+                    const tick = document.createElement('span')
+                    tick.textContent = '✓'
+                    tick.style.cssText = 'position:absolute;right:2px;bottom:0;font-size:13px;font-weight:900;color:#4ade80;display:' + (label === current ? 'block' : 'none') + ';text-shadow:0 0 3px #000;'
+                    b.appendChild(tick)
+                    b.onclick = () => {
+                        strip.querySelectorAll('button').forEach((x) => {
+                            const on = x.dataset.skin === label
+                            x.style.borderColor = on ? '#ffd75e' : 'rgba(255,255,255,0.28)'
+                            const t = x.querySelector('span')
+                            if (t) t.style.display = on ? 'block' : 'none'
+                        })
+                        onPick(label)
+                    }
+                    strip.appendChild(b)
+                    hdPortraitUrl(heroName, label === '默认' ? heroName : label).then((u) => { if (u) img.src = u })
+                })
+                return strip
+            }
+
+            // ① 皮肤（官方版式：大立绘 + 名称/额外被动 + 底部缩略图）
+            actions.children[0] && (actions.children[0].onclick = null)
+            const skinBtn = actions.children[0]
+            if (skinBtn) {
+                skinBtn.onclick = () => {
+                    if (card.querySelector('.hd-sub-skin')) { card.querySelector('.hd-sub-skin').remove(); return }
+                    const sh = hdSubShell('皮肤', '#5aa2ff', 'linear-gradient(160deg,#122a4e,#0a1a33)')
+                    sh.ov.className = 'hd-sub-skin'
+                    // 皮肤列表：优先应用层现有切皮序列（保证切完有图）；为空时回退官方 heroes.json 的 skins（最全）
+                    const meta = (window.heroesOfficialMap || {})[mainName] || {}
+                    let skinList = getAvailableSkins(cardName)
+                    if (!skinList || !skinList.length) skinList = ['默认'].concat((meta.skins || []).map((s) => s.note).filter(Boolean))
+                    const info = document.createElement('div')
+                    info.style.cssText = 'position:absolute;right:12px;top:10px;width:190px;text-align:left;color:#fff;'
+                    const big = document.createElement('img')
+                    big.style.cssText = 'max-height:78%;max-width:56%;object-fit:contain;filter:drop-shadow(0 10px 18px rgba(0,0,0,0.5));'
+                    sh.body.appendChild(big)
+                    sh.body.appendChild(info)
+                    const skinRows = (meta.skins || []).filter((s) => skinList.indexOf(s.note) >= 0)
+                    function paintSkin(name) {
+                        const row = (meta.skins || []).find((s) => s.note === name)
+                        info.innerHTML =
+                            '<div style="font-size:15px;font-weight:900;color:#ffd75e;margin-bottom:6px;text-shadow:0 2px 0 #000;">' + esc(name) + '</div>' +
+                            (row && row.describe ? '<div style="font-size:11px;line-height:1.5;color:#cfe0ff;">' + esc(row.describe) + '</div>' : '') +
+                            (row && row.extraParam ? '<div style="font-size:10px;line-height:1.4;color:#8fa7c4;margin-top:6px;">获取：' + esc(row.extraParam) + '</div>' : '')
+                        hdPortraitUrl(mainName, name === '默认' ? mainName : name).then((u) => { if (u) big.src = u })
+                    }
+                    paintSkin(curSkin)
+                    hdThumbStrip(sh.body, mainName, skinList, curSkin, (name) => {
+                        curSkin = name
+                        paintSkin(name)
+                        // 应用皮肤（与旧弹窗同逻辑：图库槽位写个人覆盖；其余写卡槽/全局默认）
+                        if (libSlot && typeof window._llSet === 'function') {
+                            const lt = libSlot.getAttribute('data-tab'), ll = libSlot.getAttribute('data-lid'), lsd = libSlot.getAttribute('data-side') || 'my'
+                            const baseName = (window.getFusionParts && window.getFusionParts(cardName)) ? window.getFusionParts(cardName)[0] : cardName
+                            window._llSet(lt, ll, 'skin', (baseName || cardName) + '#' + lsd, name)
+                            if (typeof window._llReapplySlot === 'function') window._llReapplySlot(libSlot)
+                        } else if (typeof setCardSkin === 'function') {
+                            Promise.resolve(setCardSkin(cardId, name, handType)).then(() => {
+                                setTimeout(() => { try { updateAllCardLevelBadges() } catch (e) {} }, 0)
+                            })
+                        }
+                    })
+                }
+            }
+
+            // ② 魔化（官方版式：左原形态 / 右魔化形态 + 被动预览 + 底部切换）
+            const mohuaBtn = actions.children[1]
+            if (mohuaBtn) {
+                mohuaBtn.onclick = () => {
+                    if (card.querySelector('.hd-sub-mohua')) { card.querySelector('.hd-sub-mohua').remove(); return }
+                    const sh = hdSubShell('魔化', '#ff6b5e', 'linear-gradient(160deg,#4a1220,#240a12)')
+                    sh.ov.className = 'hd-sub-mohua'
+                    const on = getCardMoHua(cardId, handType)
+                    const left = document.createElement('div')
+                    const right = document.createElement('div')
+                    ;[left, right].forEach((el) => {
+                        el.style.cssText = 'width:150px;height:150px;border-radius:50%;overflow:hidden;border:4px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;'
+                    })
+                    right.style.borderColor = on ? '#ff5f4d' : 'rgba(255,255,255,0.25)'
+                    const row = document.createElement('div')
+                    row.style.cssText = 'display:flex;align-items:center;gap:26px;'
+                    row.appendChild(left)
+                    row.appendChild(right)
+                    sh.body.appendChild(row)
+                    const cap = document.createElement('div')
+                    cap.style.cssText = 'position:absolute;left:0;right:0;top:12px;text-align:center;color:#ffd7d0;font-size:12px;font-weight:800;line-height:1.6;padding:0 20px;'
+                    let mhDesc = ''
+                    try {
+                        const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[mainName]
+                        const t = d && d.talents ? Object.values(d.talents).map((x) => x.mohuaPassive).filter(Boolean).pop() : null
+                        mhDesc = (t && t.desc) || ''
+                    } catch (e) {}
+                    cap.innerHTML = '<div style="color:#ff8f7f;font-size:14px;font-weight:900;">魔化预览</div>' +
+                        '<div style="margin-top:4px;">最高星级提升至 <span style="color:#ffd75e;">★★</span></div>' +
+                        (mhDesc ? '<div style="margin-top:4px;">魔化被动：' + esc(mhDesc) + '</div>' : '')
+                    sh.body.appendChild(cap)
+                    Promise.all([
+                        hdPortraitUrl(mainName, curSkin === '默认' ? mainName : curSkin),
+                        hdPortraitUrl(mainName, curSkin === '默认' ? mainName : curSkin)
+                    ]).then(([u1]) => {
+                        if (u1) {
+                            const a = document.createElement('img'); a.src = u1; a.style.cssText = 'width:100%;height:100%;object-fit:cover;'; left.appendChild(a)
+                            const b2 = document.createElement('img'); b2.src = u1; b2.style.cssText = 'width:100%;height:100%;object-fit:cover;filter:saturate(1.5) hue-rotate(-14deg) brightness(0.92);'; right.appendChild(b2)
+                        }
+                    })
+                    hdThumbStrip(sh.body, mainName, ['原形态', '魔化形态'], on ? '魔化形态' : '原形态', async (name) => {
+                        const want = name === '魔化形态'
+                        if (want !== getCardMoHua(cardId, handType)) {
+                            setCardMoHua(cardId, want, handType)
+                            if (libSlot && typeof window._llReapplySlot === 'function') { try { await window._llReapplySlot(libSlot) } catch (e) {} }
+                            else { try { updateAllCardLevelBadges() } catch (e) {} }
+                        }
+                        right.style.borderColor = want ? '#ff5f4d' : 'rgba(255,255,255,0.25)'
+                    })
+                }
+            }
+
+            // ③ 融合（官方版式：左副卡 / 右主卡 + 底部变体切换）
+            const fuseBtn = actions.children[2]
+            if (fuseBtn) {
+                fuseBtn.onclick = () => {
+                    if (card.querySelector('.hd-sub-fuse')) { card.querySelector('.hd-sub-fuse').remove(); return }
+                    const sh = hdSubShell('融合', '#c99a5b', 'linear-gradient(160deg,#4b3418,#241a0d)')
+                    sh.ov.className = 'hd-sub-fuse'
+                    const parts = (typeof getFusionParts === 'function') ? getFusionParts(cardName) : null
+                    const mainPart = (parts && parts.length >= 2) ? parts[0] : baseHero
+                    const subPart = (parts && parts.length >= 2) ? parts[1] : ''
+                    const left = document.createElement('div')
+                    const right = document.createElement('div')
+                    ;[left, right].forEach((el) => {
+                        el.style.cssText = 'width:150px;height:150px;border-radius:50%;overflow:hidden;border:4px solid rgba(255,220,150,0.4);background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;'
+                    })
+                    const row = document.createElement('div')
+                    row.style.cssText = 'display:flex;align-items:center;gap:26px;'
+                    row.appendChild(left)
+                    row.appendChild(right)
+                    sh.body.appendChild(row)
+                    const paintPart = (el, hero) => {
+                        el.innerHTML = ''
+                        if (!hero) { el.innerHTML = '<span style="color:#8a7a5c;font-size:12px;">未选择</span>'; return }
+                        hdPortraitUrl(hero, hero).then((u) => {
+                            if (!u) { el.innerHTML = '<span style="color:#8a7a5c;font-size:12px;">' + esc(hero) + '</span>'; return }
+                            const im = document.createElement('img')
+                            im.src = u
+                            im.style.cssText = 'width:100%;height:100%;object-fit:cover;'
+                            el.appendChild(im)
+                        })
+                    }
+                    paintPart(left, subPart)
+                    paintPart(right, mainPart)
+                    const variants = (typeof getFusionVariantsForBase === 'function') ? getFusionVariantsForBase(baseHero) : []
+                    hdThumbStrip(sh.body, baseHero, [baseHero].concat(variants), cardName, async (opt) => {
+                        const slotEl = badge && badge.closest ? badge.closest('.battle-slot') : null
+                        if (slotEl && typeof upgradeCardToFusion === 'function') {
+                            try { await upgradeCardToFusion(slotEl, opt) } catch (e) {}
+                        } else {
+                            const handArr = (handType === 'my') ? myHandCards : teammateHandCards
+                            const hc = handArr && handArr.find((c) => c.id === cardId)
+                            if (hc) hc.name = opt
+                            const handCard = badge && badge.closest ? badge.closest('.selected-card.card-item') : null
+                            if (handCard) handCard.dataset.name = opt
+                            if (typeof reapplySingleHandCard === 'function' && handCard) { try { await reapplySingleHandCard(handCard, cardId, handType) } catch (e) {} }
+                            if (typeof autoSaveProject === 'function') autoSaveProject()
+                        }
+                        try { updateAllCardLevelBadges() } catch (e) {}
+                    })
+                }
+            }
+
             // 挂到 DOM
             document.body.appendChild(root)
 
@@ -10977,55 +11272,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             shieldNum.textContent = String(curLevel)
             renderBody()
 
-            // 等级设置面板（点盾牌/名字）
-            let editOpen = false
-            const edit = document.createElement('div')
-            edit.style.cssText = 'display:none;position:absolute;left:0;top:100%;margin-top:8px;width:100%;background:rgba(6,26,56,0.97);border:2px solid ' + color + ';border-radius:10px;padding:10px;z-index:10;pointer-events:auto;'
-            plate.appendChild(edit)
-            function paintEdit() {
-                edit.innerHTML =
-                    '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#9fc7ff;font-weight:800;margin-bottom:6px;">等级 <span style="color:#fff;font-size:15px;">' + curLevel + '</span></div>' +
-                    '<input type="range" min="0" max="' + Math.max(0, levels.length - 1) + '" step="1" value="' + Math.max(0, levels.indexOf(curLevel)) + '" style="width:100%;" class="hd-lv-slider">' +
-                    '<div style="display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 8px;" class="hd-lv-quick"></div>' +
-                    '<div style="display:flex;gap:8px;justify-content:flex-end;"><button class="hd-lv-cancel" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(255,255,255,0.3);background:transparent;color:#cfe6ff;font-size:12px;cursor:pointer;">取消</button><button class="hd-lv-ok" style="padding:5px 12px;border-radius:7px;border:0;background:linear-gradient(180deg,#ffd75e,#e8a91c);color:#3d2600;font-weight:900;font-size:12px;cursor:pointer;">完成</button></div>'
-                const slider = edit.querySelector('.hd-lv-slider')
-                const quick = edit.querySelector('.hd-lv-quick')
-                quickLevels().forEach((lv) => {
-                    const b = document.createElement('button')
-                    b.textContent = lv
-                    b.style.cssText = 'padding:3px 8px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid ' + (lv === curLevel ? color : 'rgba(255,255,255,0.25)') + ';background:' + (lv === curLevel ? color + '33' : 'transparent') + ';color:#eaf4ff;'
-                    b.onclick = () => { curLevel = lv; slider.value = String(levels.indexOf(lv)); paintEdit() }
-                    quick.appendChild(b)
-                })
-                edit.querySelector('.hd-lv-cancel').onclick = () => { editOpen = false; edit.style.display = 'none'; paintAll() }
-                edit.querySelector('.hd-lv-ok').onclick = () => {
-                    setCardLevel(cardId, curLevel, cardType, handType)
-                    if (libSlot && typeof window._llReapplySlot === 'function') { try { window._llReapplySlot(libSlot) } catch (e) {} }
-                    else { try { updateAllCardLevelBadges() } catch (e) {} }
-                    editOpen = false; edit.style.display = 'none'
-                    paintAll()
-                }
-                slider.oninput = () => {
-                    const lv = levels[Number(slider.value)]
-                    if (lv == null) return
-                    curLevel = lv
-                    paintEdit()
-                    shieldNum.textContent = String(curLevel)
-                    renderBody()
-                }
-            }
-            function quickLevels() {
-                return ((meta && meta.tiers) || []).map((t) => Number(t.level)).filter((n) => levels.indexOf(n) >= 0)
-            }
-            function toggleEdit() {
-                editOpen = !editOpen
-                if (editOpen) paintEdit()
-                edit.style.display = editOpen ? 'block' : 'none'
-            }
-            shield.onclick = (e) => { e.stopPropagation(); toggleEdit() }
-            nameEl.style.cursor = 'pointer'
-            nameEl.onclick = (e) => { e.stopPropagation(); toggleEdit() }
-
             function paintAll() {
                 if (!meta) return
                 nameEl.textContent = meta.name
@@ -11034,7 +11280,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     '<span style="display:inline-flex;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.3);align-items:center;justify-content:center;font-size:10px;">◈</span>' +
                     '<span>' + esc(occ) + '</span>' +
                     (meta.positioning ? '<span style="opacity:0.85;font-weight:700;margin-left:4px;">定位：' + esc(meta.positioning) + '</span>' : '')
-                const skDesc = meta.skillDesc || ((meta.tiers && meta.tiers[0] && meta.tiers[0].skillDesc) || '')
+                // 技能 / 被动按当前等级取档（与官方一致： tiers 里每条 level 对应一档文案）
+                const curTier = (meta.tiers || []).filter((t) => Number(t.level) <= Number(curLevel)).pop() || (meta.tiers || [])[0] || {}
+                const skDesc = (curTier.skillDesc && String(curTier.skillDesc).trim()) || meta.skillDesc || ''
                 if (skDesc) {
                     skillCard.style.display = ''
                     skillCard.innerHTML = '<span style="color:#ffd75e;font-weight:900;">技能：</span>' + esc(skDesc)
@@ -11042,11 +11290,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     skillCard.style.display = 'none'
                 }
                 let ph = ''
-                if (meta.passiveDesc) ph += '<div style="display:flex;gap:6px;align-items:flex-start;"><img src="hero-ui/star-initial.png" alt="" style="width:14px;height:14px;margin-top:2px;"><span><b style="color:#8ef58a;">初始被动</b> ' + esc(String(meta.passiveDesc).replace(/^(初始被动|满星被动)\s*/, '')) + '</span></div>'
-                if (meta.passiveDesc2) ph += '<div style="display:flex;gap:6px;align-items:flex-start;margin-top:4px;"><img src="hero-ui/star-full.png" alt="" style="width:14px;height:14px;margin-top:2px;"><span><b style="color:#ffd75e;">满星被动</b> ' + esc(String(meta.passiveDesc2).replace(/^(初始被动|满星被动)\s*/, '')) + '</span></div>'
+                const pInit = (curTier.passiveInitial && String(curTier.passiveInitial).trim()) || String(meta.passiveDesc || '').replace(/^(初始被动|满星被动)\s*/, '')
+                const pFull = (curTier.passiveFull && String(curTier.passiveFull).trim()) || String(meta.passiveDesc2 || '').replace(/^(初始被动|满星被动)\s*/, '')
+                if (pInit) ph += '<div style="display:flex;gap:6px;align-items:flex-start;"><img src="hero-ui/star-initial.png" alt="" style="width:14px;height:14px;margin-top:2px;"><span><b style="color:#8ef58a;">初始被动</b> ' + esc(pInit) + '</span></div>'
+                if (pFull) ph += '<div style="display:flex;gap:6px;align-items:flex-start;margin-top:4px;"><img src="hero-ui/star-full.png" alt="" style="width:14px;height:14px;margin-top:2px;"><span><b style="color:#ffd75e;">满星被动</b> ' + esc(pFull) + '</span></div>'
                 passiveCard.innerHTML = ph || '—'
                 shieldNum.textContent = String(curLevel)
                 shieldBg.style.background = color
+                paintLevel()
                 renderBody()
             }
 
