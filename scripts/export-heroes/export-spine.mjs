@@ -358,6 +358,21 @@ function parseCocosSkeleton(text) {
   fs.writeFileSync(path.join(outDir, 'skeleton.json'), JSON.stringify(skeletonJson))
   fs.writeFileSync(path.join(outDir, 'atlas.txt'), atlasText)
   pngs.forEach((b, i) => fs.writeFileSync(path.join(outDir, `p${i}.png`), b))
+  // 维护资源清单 index.json：前端图鉴只对清单内（即已导出）的英雄播放动画，
+  // 避免 123 个英雄逐个 fetch 404。完整资源集后续可托管到 Gitee，前端换 base 即可。
+  const indexPath = path.join(OUT_DIR, 'index.json')
+  let indexJson = {}
+  try {
+    indexJson = JSON.parse(fs.readFileSync(indexPath, 'utf8'))
+  } catch {}
+  indexJson[folder] = {
+    hero: HERO,
+    anims: Object.keys(skeletonJson.animations || {}),
+    pngs: pngs.length,
+    updated: new Date().toISOString().slice(0, 10)
+  }
+  fs.writeFileSync(indexPath, JSON.stringify(indexJson, null, 2))
   const totalKB = Math.round(pngs.reduce((a, b) => a + b.length, 0) / 1024)
   console.log(`✅ ${HERO} -> ${outDir}  skeleton.json + atlas.txt + ${pngs.length} png（贴图共 ${totalKB}KB）`)
+  console.log(`📇 已登记 index.json: ${folder}`)
 })()

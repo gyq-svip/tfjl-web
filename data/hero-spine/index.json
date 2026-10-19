@@ -1,0 +1,12 @@
+{
+  "qiqi": {
+    "hero": "小野",
+    "anims": [
+      "attack",
+      "attack2",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-20"
+  }
+}

@@ -28308,6 +28308,58 @@ ${maSection}
 
         // ==================== 英雄图鉴（官方配置表自动导出 data/heroes.json）====================
         // 数据由 scripts/export-heroes/export-heroes.mjs 从官方 CDN 拉取生成；游戏大版本更新后重跑脚本即可
+        // spine 动画：data/hero-spine/<h.spine 目录>/，资源清单 index.json 由 export-spine.mjs 维护；
+        //   仅对「清单内已导出」的英雄建动画舞台（其余 100+ 英雄暂未导出，不建舞台避免 404 风暴）。
+        //   完整资源集后续托管 Gitee 后，设 window.__HERO_SPINE_BASE 指远端 + 同步清单即可全量播放。
+
+        // 重渲染/切页前：停掉所有在播动画 + 断开观察器（否则 canvas 已移除但 raf 仍空转烧 CPU）
+        function stopAllHeroCodexSpine() {
+            const body = document.getElementById('heroCodexBody');
+            if (body && window.spineHero && window.spineHero.stop) {
+                body.querySelectorAll('canvas').forEach(function (cv) { window.spineHero.stop(cv); });
+            }
+            if (window.__heroCodexIO) { try { window.__heroCodexIO.disconnect(); } catch (e) {} window.__heroCodexIO = null; }
+        }
+
+        // 对舞台建 IntersectionObserver：可见(≥25%)才播，离屏即停；root 绑图鉴滚动容器
+        function setupHeroCodexSpine(body) {
+            const stages = body.querySelectorAll('.codex-spine-stage');
+            if (!stages.length) return;
+            if (!window.spineHero || !window.spineHero.play) {
+                stages.forEach(function (st) {
+                    const s = st.querySelector('.codex-spine-status');
+                    if (s) s.textContent = '动画组件未加载';
+                });
+                return;
+            }
+            const playing = new WeakSet(); // 正在播的 canvas，避免 IO 重复触发双 raf
+            const io = new IntersectionObserver(function (entries) {
+                entries.forEach(function (en) {
+                    const stage = en.target;
+                    const cv = stage.querySelector('canvas');
+                    if (!cv) return;
+                    if (en.isIntersecting && en.intersectionRatio >= 0.25) {
+                        if (playing.has(cv)) return;
+                        playing.add(cv);
+                        window.spineHero.play(cv, stage.getAttribute('data-spine'), {
+                            fitPadding: 0.92,
+                            pngs: (window.__heroSpineIndex && window.__heroSpineIndex[stage.getAttribute('data-spine')] || {}).pngs || 0,
+                            onStatus: function (s) {
+                                const el = stage.querySelector('.codex-spine-status');
+                                if (el) el.textContent = s || '';
+                                if (s) playing.delete(cv); // 失败态允许下次可见时重试
+                            }
+                        });
+                    } else {
+                        playing.delete(cv);
+                        window.spineHero.stop(cv);
+                    }
+                });
+            }, { root: body, threshold: [0, 0.25] });
+            stages.forEach(function (st) { io.observe(st); });
+            window.__heroCodexIO = io;
+        }
+
         window.bindHeroCodex = function () {
             if (window.__heroCodexBound) return;
             window.__heroCodexBound = true;
@@ -28319,6 +28371,10 @@ ${maSection}
         window.renderHeroCodex = async function () {
             const body = document.getElementById('heroCodexBody');
             if (!body) return;
+            // 渲染序列防护：搜索框连续输入时旧渲染可能后完成，完成后整段作废
+            const seq = (window.__heroCodexRenderSeq = (window.__heroCodexRenderSeq || 0) + 1);
+            // 重渲染前先停掉上一批动画 + 断观察器
+            stopAllHeroCodexSpine();
             const search = document.getElementById('heroCodexSearch');
             const filter = document.getElementById('heroCodexFilter');
             if (!window.__heroCodexCache) {
@@ -28332,7 +28388,21 @@ ${maSection}
                     body.innerHTML = '<div style="color:#f87171;padding:20px;">加载失败：' + (e.message || e) + '</div>';
                     return;
                 }
+                if (seq !== window.__heroCodexRenderSeq) return;
             }
+            // spine 资源清单：只有清单内（已导出动画）的英雄才建舞台
+            if (!window.__heroSpineIndex) {
+                try {
+                    const p2 = location.pathname;
+                    const base2 = p2.endsWith('/') ? p2 : (p2.lastIndexOf('/') >= 0 ? p2.slice(0, p2.lastIndexOf('/') + 1) : '/');
+                    const res2 = await fetch(base2 + 'data/hero-spine/index.json');
+                    window.__heroSpineIndex = await res2.json();
+                } catch (e) {
+                    window.__heroSpineIndex = {};
+                }
+                if (seq !== window.__heroCodexRenderSeq) return;
+            }
+            const spineIndex = window.__heroSpineIndex || {};
             const heroes = window.__heroCodexCache || [];
             const kw = (search ? search.value : '').trim().toLowerCase();
             const occ = filter ? filter.value : '';
@@ -28356,6 +28426,14 @@ ${maSection}
                 html += '<span style="font-size:1.05rem;font-weight:700;color:' + c + ';">' + _esc(h.name) + '</span>';
                 html += '<span style="font-size:0.62rem;padding:2px 6px;border-radius:6px;background:' + c + '22;color:' + c + ';">' + (colorName[h.heroColor] || h.heroColor) + '</span>';
                 html += '</div>';
+                // spine 动画舞台：仅清单内已导出的英雄；canvas 由 setupHeroCodexSpine 按可见性懒播放
+                const spineFolder = (h.spine && spineIndex[h.spine]) ? h.spine : '';
+                if (spineFolder) {
+                    html += '<div class="codex-spine-stage" data-spine="' + _esc(spineFolder) + '" style="position:relative;height:150px;margin:2px 0 8px;border-radius:8px;overflow:hidden;background:linear-gradient(160deg,rgba(20,26,50,0.55),rgba(13,27,42,0.55));border:1px solid ' + c + '33;">';
+                    html += '<canvas style="position:absolute;inset:0;width:100%;height:100%;"></canvas>';
+                    html += '<div class="codex-spine-status" style="position:absolute;left:50%;bottom:5px;transform:translateX(-50%);font-size:0.6rem;color:rgba(255,255,255,0.5);pointer-events:none;white-space:nowrap;"></div>';
+                    html += '</div>';
+                }
                 html += '<div style="font-size:0.7rem;color:rgba(255,255,255,0.6);margin-bottom:6px;">职业：' + (occName[h.occupation] || h.occupation) + '</div>';
                 if (h.heroDesc) html += '<div style="font-size:0.72rem;color:rgba(255,255,255,0.8);margin-bottom:6px;">' + _esc(h.heroDesc) + '</div>';
                 if (h.passiveName) html += '<div style="font-size:0.72rem;margin-bottom:4px;"><b style="color:#fbbf24;">' + _esc(h.passiveName) + '</b></div>';
@@ -28385,6 +28463,7 @@ ${maSection}
             });
             html += '</div>';
             body.innerHTML = html;
+            setupHeroCodexSpine(body);
         };
 
         // ==================== 皮肤图鉴（官方配置表自动导出 data/heroes.json 的 skins 字段）====================

@@ -86,6 +86,7 @@
         "talentDesc": "光环：纯粹减免+10%"
       }
     ],
+    "spine": "aersasi",
     "skins": [
       {
         "id": "173",
@@ -210,6 +211,7 @@
         "talentDesc": "光环：暴伤+1000%"
       }
     ],
+    "spine": "yilidan",
     "skins": [
       {
         "id": "220",
@@ -298,6 +300,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "huonv",
     "skins": []
   },
   {
@@ -387,6 +390,7 @@
         "talentDesc": "战斗开始时必定出现在初始卡牌中"
       }
     ],
+    "spine": "jiansheng",
     "skins": [
       {
         "id": "126",
@@ -500,6 +504,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "huanci",
     "skins": []
   },
   {
@@ -571,6 +576,7 @@
         "talentDesc": "出售获得70银币"
       }
     ],
+    "spine": "xiaolu",
     "skins": [
       {
         "id": "165",
@@ -693,6 +699,7 @@
         "talentDesc": "出售获得50银币"
       }
     ],
+    "spine": "jianna",
     "skins": [
       {
         "id": "103",
@@ -833,6 +840,7 @@
         "talentDesc": "触发时提高全体猎人120%命中"
       }
     ],
+    "spine": "najia",
     "skins": [
       {
         "id": "122",
@@ -978,6 +986,7 @@
         "talentDesc": "光环：攻速+150%"
       }
     ],
+    "spine": "fengxingzhe",
     "skins": [
       {
         "id": "236",
@@ -1066,6 +1075,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "heianyouxia",
     "skins": [
       {
         "id": "343",
@@ -1163,6 +1173,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "guangfa",
     "skins": []
   },
   {
@@ -1270,6 +1281,7 @@
         "talentDesc": "提高4%战车生命上限攻击"
       }
     ],
+    "spine": "zhousi",
     "skins": [
       {
         "id": "113",
@@ -1458,6 +1470,7 @@
         "talentDesc": "每击杀一个目标攻速+15%"
       }
     ],
+    "spine": "jumo",
     "skins": [
       {
         "id": "104",
@@ -1742,6 +1755,7 @@
         "talentDesc": "光环：攻击+240%"
       }
     ],
+    "spine": "siwen",
     "skins": [
       {
         "id": "152",
@@ -1848,6 +1862,7 @@
         "talentDesc": "光环：魔抗+50%"
       }
     ],
+    "spine": "chaoxi",
     "skins": [
       {
         "id": "166",
@@ -1945,6 +1960,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "dashu",
     "skins": []
   },
   {
@@ -2034,6 +2050,7 @@
         "talentDesc": "敌方纯粹减免-80%"
       }
     ],
+    "spine": "juntuanshibing",
     "skins": [
       {
         "id": "130",
@@ -2236,6 +2253,7 @@
         "talentDesc": "技能强化为2连击"
       }
     ],
+    "spine": "feiji",
     "skins": [
       {
         "id": "108",
@@ -2376,6 +2394,7 @@
         "talentDesc": "攻击+399999"
       }
     ],
+    "spine": "xiubujiang",
     "skins": []
   },
   {
@@ -2483,6 +2502,7 @@
         "talentDesc": "己方其他英雄星级每+1，则谜云自身攻击+180%"
       }
     ],
+    "spine": "mituan",
     "skins": [
       {
         "id": "210",
@@ -2571,6 +2591,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "shenling",
     "skins": []
   },
   {
@@ -2660,6 +2681,7 @@
         "talentDesc": "敌方护甲-60"
       }
     ],
+    "spine": "gugong",
     "skins": [
       {
         "id": "111",
@@ -2796,6 +2818,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "xianzhi",
     "skins": []
   },
   {
@@ -2885,6 +2908,7 @@
         "talentDesc": "技能附带减疗效果(治疗效果-180%)"
       }
     ],
+    "spine": "fuwang",
     "skins": [
       {
         "id": "190",
@@ -2991,6 +3015,7 @@
         "talentDesc": "基础生命+80000（无需上场）"
       }
     ],
+    "spine": "fashi",
     "skins": [
       {
         "id": "140",
@@ -3129,6 +3154,7 @@
         "talentDesc": "敌方魔抗-45"
       }
     ],
+    "spine": "dianhun",
     "skins": [
       {
         "id": "147",
@@ -3283,6 +3309,7 @@
         "talentDesc": "攻速提升为1.5秒/次"
       }
     ],
+    "spine": "huoqiang",
     "skins": [
       {
         "id": "204",
@@ -3371,6 +3398,7 @@
         "talentDesc": "光环：敌方纯粹减免-70%"
       }
     ],
+    "spine": "xiaoxiao",
     "skins": [
       {
         "id": "336",
@@ -3468,6 +3496,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "zhizhu",
     "skins": []
   },
   {
@@ -3548,6 +3577,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "silinglong",
     "skins": []
   },
   {
@@ -3655,6 +3685,7 @@
         "talentDesc": "治疗回复12%生命"
       }
     ],
+    "spine": "shengqi",
     "skins": [
       {
         "id": "142",
@@ -3793,6 +3824,7 @@
         "talentDesc": "牧师治疗效果+150%"
       }
     ],
+    "spine": "wuyi",
     "skins": [
       {
         "id": "163",
@@ -3981,6 +4013,7 @@
         "talentDesc": "暴伤+500%"
       }
     ],
+    "spine": "tongkunvwang",
     "skins": [
       {
         "id": "101",
@@ -4201,6 +4234,7 @@
         "talentDesc": "刷新概率提高120%"
       }
     ],
+    "spine": "jingling",
     "skins": [
       {
         "id": "146",
@@ -4339,6 +4373,7 @@
         "talentDesc": "造成40%当前生命伤害"
       }
     ],
+    "spine": "jingling",
     "skins": [
       {
         "id": "159",
@@ -4461,6 +4496,7 @@
         "talentDesc": "召唤宝箱概率提升至25%"
       }
     ],
+    "spine": "sunwukong",
     "skins": [
       {
         "id": "107",
@@ -4617,6 +4653,7 @@
         "talentDesc": "召唤出的鬼影基础攻速+100%"
       }
     ],
+    "spine": "yougui",
     "skins": [
       {
         "id": "185",
@@ -4739,6 +4776,7 @@
         "talentDesc": "敌方暴伤-500%"
       }
     ],
+    "spine": "fatiao",
     "skins": [
       {
         "id": "112",
@@ -4895,6 +4933,7 @@
         "talentDesc": "按固定顺序改变装备"
       }
     ],
+    "spine": "jingling1",
     "skins": [
       {
         "id": "212",
@@ -5017,6 +5056,7 @@
         "talentDesc": "基础生命+80000（无需上场）"
       }
     ],
+    "spine": "jingling",
     "skins": [
       {
         "id": "145",
@@ -5285,6 +5325,7 @@
         "talentDesc": "己方该英雄的伤害和治疗x15"
       }
     ],
+    "spine": "xiongmao",
     "skins": [
       {
         "id": "102",
@@ -5487,6 +5528,7 @@
         "talentDesc": "战车伤害减免+20%"
       }
     ],
+    "spine": "tufu",
     "skins": [
       {
         "id": "172",
@@ -5611,6 +5653,7 @@
         "talentDesc": "伤害递增(1+28%*猎人数量)倍"
       }
     ],
+    "spine": "huniu",
     "skins": [
       {
         "id": "105",
@@ -5815,6 +5858,7 @@
         "talentDesc": "回复战车生命上限40%的生命"
       }
     ],
+    "spine": "jingling",
     "skins": [
       {
         "id": "158",
@@ -5939,6 +5983,7 @@
         "talentDesc": "战车生命每-1%，则霸王自身攻击+16%、攻速+16%"
       }
     ],
+    "spine": "jietoubawang",
     "skins": [
       {
         "id": "110",
@@ -6157,6 +6202,7 @@
         "talentDesc": "攻击+99999"
       }
     ],
+    "spine": "dijing",
     "skins": [
       {
         "id": "189",
@@ -6281,6 +6327,7 @@
         "talentDesc": "吞噬后攻速+50%"
       }
     ],
+    "spine": "duye",
     "skins": [
       {
         "id": "124",
@@ -6419,6 +6466,7 @@
         "talentDesc": "光环：攻击+2000"
       }
     ],
+    "spine": "daize",
     "skins": [
       {
         "id": "114",
@@ -6559,6 +6607,7 @@
         "talentDesc": "使用精灵时，有60%概率再次施放"
       }
     ],
+    "spine": "panglong",
     "skins": [
       {
         "id": "115",
@@ -6699,6 +6748,7 @@
         "talentDesc": "攻速+275%"
       }
     ],
+    "spine": "jingling",
     "skins": [
       {
         "id": "155",
@@ -6871,6 +6921,7 @@
         "talentDesc": "自身获得斩杀效果，目标生命每-1%，自身攻击+7%"
       }
     ],
+    "spine": "ken",
     "skins": [
       {
         "id": "131",
@@ -7025,6 +7076,7 @@
         "talentDesc": "光环：伤害减免+80%(唯一)"
       }
     ],
+    "spine": "niutouguai",
     "skins": [
       {
         "id": "109",
@@ -7181,6 +7233,7 @@
         "talentDesc": "触发几率提升至50%"
       }
     ],
+    "spine": "houyi",
     "skins": [
       {
         "id": "119",
@@ -7351,6 +7404,7 @@
         "talentDesc": "出售获得40银币"
       }
     ],
+    "spine": "songshu",
     "skins": [
       {
         "id": "117",
@@ -7475,6 +7529,7 @@
         "talentDesc": "光环：吸血+50%，受治疗效果+50%"
       }
     ],
+    "spine": "kulouwang",
     "skins": [
       {
         "id": "177",
@@ -7597,6 +7652,7 @@
         "talentDesc": "光环：敌方魔抗-120%"
       }
     ],
+    "spine": "yanmo",
     "skins": [
       {
         "id": "153",
@@ -7737,6 +7793,7 @@
         "talentDesc": "变烟花概率提升为100%"
       }
     ],
+    "spine": "xiaochou",
     "skins": [
       {
         "id": "136",
@@ -7925,6 +7982,7 @@
         "talentDesc": "己方每上阵一个职业核心，战车护甲、魔抗、纯粹减免+8%"
       }
     ],
+    "spine": "gugu",
     "skins": [
       {
         "id": "137",
@@ -8177,6 +8235,7 @@
         "talentDesc": "每次攻击后增加1%攻速"
       }
     ],
+    "spine": "jianongpao",
     "skins": [
       {
         "id": "129",
@@ -8349,6 +8408,7 @@
         "talentDesc": "技能附带禁疗效果(无法获得治疗)"
       }
     ],
+    "spine": "mori",
     "skins": [
       {
         "id": "288",
@@ -8489,6 +8549,7 @@
         "talentDesc": "真实伤害加成+40%"
       }
     ],
+    "spine": "shawang",
     "skins": [
       {
         "id": "170",
@@ -8661,6 +8722,7 @@
         "talentDesc": "每上阵1个英雄自身攻击+300%"
       }
     ],
+    "spine": "shangjin",
     "skins": [
       {
         "id": "123",
@@ -8785,6 +8847,7 @@
         "talentDesc": "随机施放一个24级精灵"
       }
     ],
+    "spine": "caijingling",
     "skins": []
   },
   {
@@ -8892,6 +8955,7 @@
         "talentDesc": "可鼓舞攻击最高的2个英雄"
       }
     ],
+    "spine": "renyu",
     "skins": [
       {
         "id": "106",
@@ -9064,6 +9128,7 @@
         "talentDesc": "诅咒敌方战车(花费银币时受到0.4%*花费数量生命上限伤害)"
       }
     ],
+    "spine": "haidao",
     "skins": [
       {
         "id": "116",
@@ -9220,6 +9285,7 @@
         "talentDesc": "概率提升至90%"
       }
     ],
+    "spine": "tujingling",
     "skins": [
       {
         "id": "206",
@@ -9360,6 +9426,7 @@
         "talentDesc": "技能伤害提升至500%"
       }
     ],
+    "spine": "guixianren",
     "skins": [
       {
         "id": "141",
@@ -9548,6 +9615,7 @@
         "talentDesc": "光环：召唤物移速+200%，攻速+400%"
       }
     ],
+    "spine": "longwang",
     "skins": [
       {
         "id": "125",
@@ -9720,6 +9788,7 @@
         "talentDesc": "回旋斧必定命中"
       }
     ],
+    "spine": "kuangjiang",
     "skins": [
       {
         "id": "127",
@@ -9860,6 +9929,7 @@
         "talentDesc": "光环：敌方护甲-140%"
       }
     ],
+    "spine": "aishen",
     "skins": [
       {
         "id": "258",
@@ -10000,6 +10070,7 @@
         "talentDesc": "复制的技能造成的伤害和治疗x12"
       }
     ],
+    "spine": "ying",
     "skins": [
       {
         "id": "118",
@@ -10140,6 +10211,7 @@
         "talentDesc": "无敌时间延长为8秒"
       }
     ],
+    "spine": "qiqi",
     "skins": [
       {
         "id": "121",
@@ -10424,6 +10496,7 @@
         "talentDesc": "场上每存活1个敌方目标攻击+10000"
       }
     ],
+    "spine": "qiuwang",
     "skins": [
       {
         "id": "182",
@@ -10548,6 +10621,7 @@
         "talentDesc": "所有技能附带目标4%生命上限伤害"
       }
     ],
+    "spine": "gangquan",
     "skins": [
       {
         "id": "135",
@@ -10686,6 +10760,7 @@
         "talentDesc": "光环：护甲+50%"
       }
     ],
+    "spine": "gangbei",
     "skins": [
       {
         "id": "156",
@@ -10826,6 +10901,7 @@
         "talentDesc": "全体己方英雄吸血+15%"
       }
     ],
+    "spine": "nvyao",
     "skins": [
       {
         "id": "208",
@@ -10948,6 +11024,7 @@
         "talentDesc": "光环：命中额外+10%"
       }
     ],
+    "spine": "maomi",
     "skins": [
       {
         "id": "160",
@@ -11088,6 +11165,7 @@
         "talentDesc": "诅咒同时使出售收益失效"
       }
     ],
+    "spine": "yemo",
     "skins": [
       {
         "id": "134",
@@ -11274,6 +11352,7 @@
         "talentDesc": "全体被控-100%，真实伤害加成+10%"
       }
     ],
+    "spine": "shan",
     "skins": [
       {
         "id": "148",
@@ -11478,6 +11557,7 @@
         "talentDesc": "获得术士数量*9的银币"
       }
     ],
+    "spine": "kui",
     "skins": [
       {
         "id": "238",
@@ -11634,6 +11714,7 @@
         "talentDesc": "提供3%*银币数量的银币"
       }
     ],
+    "spine": "baoxiangui",
     "skins": [
       {
         "id": "213",
@@ -11774,6 +11855,7 @@
         "talentDesc": "光环：真实伤害减免+85%（唯一）"
       }
     ],
+    "spine": "zhurushexian",
     "skins": [
       {
         "id": "176",
@@ -11930,6 +12012,7 @@
         "talentDesc": "基础生命+80000（无需上场）"
       }
     ],
+    "spine": "jingling7",
     "skins": [
       {
         "id": "318",
@@ -12054,6 +12137,7 @@
         "talentDesc": "技能附带禁疗效果(无法获得治疗)"
       }
     ],
+    "spine": "daocaoren",
     "skins": [
       {
         "id": "154",
@@ -12242,6 +12326,7 @@
         "talentDesc": "对点燃目标造成20倍伤害"
       }
     ],
+    "spine": "hongkai",
     "skins": [
       {
         "id": "128",
@@ -12366,6 +12451,7 @@
         "talentDesc": "己方其他英雄星级每+1，则自身攻速+80%"
       }
     ],
+    "spine": "xie",
     "skins": [
       {
         "id": "144",
@@ -12538,6 +12624,7 @@
         "talentDesc": "技能变为2连击（全屏技能变为攻击额外造成一次伤害）"
       }
     ],
+    "spine": "dasheng",
     "skins": [
       {
         "id": "178",
@@ -12710,6 +12797,7 @@
         "talentDesc": "自身攻速+400%"
       }
     ],
+    "spine": "dazui",
     "skins": [
       {
         "id": "215",
@@ -12850,6 +12938,7 @@
         "talentDesc": "每秒攻速+20%"
       }
     ],
+    "spine": "yuhuofenghuang",
     "skins": [
       {
         "id": "217",
@@ -13006,6 +13095,7 @@
         "talentDesc": "攻击造成目标0.6%生命上限伤害"
       }
     ],
+    "spine": "xiaoyuren",
     "skins": [
       {
         "id": "223",
@@ -13176,6 +13266,7 @@
         "talentDesc": "基础生命+80000（无需上场）"
       }
     ],
+    "spine": "bingjingling",
     "skins": [
       {
         "id": "278",
@@ -13298,6 +13389,7 @@
         "talentDesc": "光环：元素减免+80%(唯一)"
       }
     ],
+    "spine": "tuling",
     "skins": [
       {
         "id": "230",
@@ -13454,6 +13546,7 @@
         "talentDesc": "全体伤害加成+120%"
       }
     ],
+    "spine": "shuimao",
     "skins": [
       {
         "id": "227",
@@ -13610,6 +13703,7 @@
         "talentDesc": "每上阵1个熊猫，自身伤害x5"
       }
     ],
+    "spine": "huoling",
     "skins": [
       {
         "id": "228",
@@ -13782,6 +13876,7 @@
         "talentDesc": "光环：召唤物基础攻速+100%"
       }
     ],
+    "spine": "zhongkui",
     "skins": [
       {
         "id": "237",
@@ -13922,6 +14017,7 @@
         "talentDesc": "每上阵1个猎人，所有猎人攻速+80%"
       }
     ],
+    "spine": "kuangtu",
     "skins": [
       {
         "id": "265",
@@ -14078,6 +14174,7 @@
         "talentDesc": "每上阵1个牧师，自身基础攻速-1.5秒"
       }
     ],
+    "spine": "tianshi",
     "skins": [
       {
         "id": "295",
@@ -14234,6 +14331,7 @@
         "talentDesc": "光环：百分比伤害减免+70%（唯一）"
       }
     ],
+    "spine": "qianting",
     "skins": [
       {
         "id": "308",
@@ -14358,6 +14456,7 @@
         "talentDesc": "每上阵1个熊猫，全体攻速+80%"
       }
     ],
+    "spine": "fengling",
     "skins": [
       {
         "id": "315",
@@ -14498,6 +14597,7 @@
         "talentDesc": "每次攻击附带12层冻伤"
       }
     ],
+    "spine": "bingniao",
     "skins": []
   },
   {
@@ -14605,6 +14705,7 @@
         "talentDesc": "每上阵1个召唤，全体召唤物附加伤害+30%"
       }
     ],
+    "spine": "shuiren",
     "skins": []
   },
   {
@@ -14712,6 +14813,7 @@
         "talentDesc": "撕裂可以叠加180层"
       }
     ],
+    "spine": "xuemo",
     "skins": []
   },
   {
@@ -14747,6 +14849,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "xiongmao",
     "skins": []
   },
   {
@@ -14782,6 +14885,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "gugu",
     "skins": []
   },
   {
@@ -14817,6 +14921,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "aersasi",
     "skins": []
   },
   {
@@ -14852,6 +14957,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "sunwukong",
     "skins": []
   },
   {
@@ -14887,6 +14993,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "juntuanshibing",
     "skins": []
   },
   {
@@ -14922,6 +15029,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "jumo",
     "skins": []
   },
   {
@@ -14957,6 +15065,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "longwang",
     "skins": []
   },
   {
@@ -14992,6 +15101,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "yanmo",
     "skins": []
   },
   {
@@ -15027,6 +15137,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "wuyi",
     "skins": []
   },
   {
@@ -15062,6 +15173,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "yougui",
     "skins": []
   },
   {
@@ -15097,6 +15209,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "jietoubawang",
     "skins": []
   },
   {
@@ -15132,6 +15245,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "tufu",
     "skins": []
   },
   {
@@ -15167,6 +15281,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "tongkunvwang",
     "skins": []
   },
   {
@@ -15202,6 +15317,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "shengqi",
     "skins": []
   },
   {
@@ -15237,6 +15353,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "xiaochou",
     "skins": []
   },
   {
@@ -15272,6 +15389,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "zhousi",
     "skins": []
   },
   {
@@ -15307,6 +15425,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "huniu",
     "skins": []
   },
   {
@@ -15342,6 +15461,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "yilidan",
     "skins": []
   },
   {
@@ -15369,6 +15489,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "",
     "skins": []
   },
   {
@@ -15396,6 +15517,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "",
     "skins": []
   },
   {
@@ -15423,6 +15545,7 @@
         "talentDesc": ""
       }
     ],
+    "spine": "",
     "skins": []
   }
 ]
