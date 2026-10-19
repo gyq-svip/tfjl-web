@@ -10775,6 +10775,42 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             title.innerHTML = '<span>⚙️ ' + (cardName || cardId) + '</span><span style="cursor:pointer;opacity:0.6;padding:0 4px;" onclick="this.closest(\'.card-settings-popup-root\').remove()">✕</span>';
             box.appendChild(title);
 
+            // 🔴 英雄 Spine 动画（与英雄图鉴同源资产 data/hero-spine/）：顶部播 idle，弹窗关闭即停
+            if (window.spineHero && window.spineHero.play) {
+                const csStage = document.createElement('div');
+                csStage.style.cssText = 'position:relative;height:160px;margin:0 0 12px;border-radius:10px;overflow:hidden;background:linear-gradient(160deg,rgba(20,26,50,0.6),rgba(13,27,42,0.6));border:1px solid rgba(79,155,255,0.25);';
+                const csCanvas = document.createElement('canvas');
+                csCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;';
+                csStage.appendChild(csCanvas);
+                box.appendChild(csStage);
+                // 关闭弹窗时停掉 raf（✕ / 点遮罩 / 打开新弹窗前的清理 都走 root.remove）
+                const _csOrigRemove = root.remove.bind(root);
+                root.remove = function () {
+                    try { window.spineHero.stop(csCanvas); } catch (e) {}
+                    return _csOrigRemove();
+                };
+                // 异步起播：需要官方英雄数据（拿 spine 目录）+ 资产清单（确认已导出）
+                (async function () {
+                    try {
+                        await ensureOfficialHeroes();
+                        if (!csCanvas.isConnected) return;
+                        const oh = window.heroesOfficialMap && window.heroesOfficialMap[mainName];
+                        const folder = (oh && oh.spine) || '';
+                        if (!folder) { csStage.style.display = 'none'; return; }
+                        if (!window.__heroSpineIndex) {
+                            try {
+                                const _p = location.pathname;
+                                const _b = _p.endsWith('/') ? _p : (_p.lastIndexOf('/') >= 0 ? _p.slice(0, _p.lastIndexOf('/') + 1) : '/');
+                                window.__heroSpineIndex = await (await fetch(_b + 'data/hero-spine/index.json')).json();
+                            } catch (e) { window.__heroSpineIndex = {}; }
+                        }
+                        const man = window.__heroSpineIndex && window.__heroSpineIndex[folder];
+                        if (!man || !csCanvas.isConnected) { csStage.style.display = 'none'; return; }
+                        window.spineHero.play(csCanvas, folder, { fitPadding: 0.9, pngs: man.pngs || 0 });
+                    } catch (e) { csStage.style.display = 'none'; }
+                })();
+            }
+
             // 等级选择 + 当前等级属性（简洁文本）
             function _getPassiveAtLevel(heroName, level, field) {
                 try {
@@ -28506,19 +28542,59 @@ ${maSection}
                     || (x.skin.extraParam || '').toLowerCase().indexOf(kw) >= 0
                     || String(x.skin.id || '').indexOf(kw) >= 0;
             });
-            let html = '<div style="color:rgba(255,255,255,0.6);font-size:0.78rem;margin-bottom:10px;">共 ' + list.length + ' 个皮肤（官方配置表自动导出）</div>';
+            let html = '<div style="color:rgba(255,255,255,0.6);font-size:0.78rem;margin-bottom:10px;">共 ' + list.length + ' 个皮肤（官方配置表自动导出 · 图片本地素材库）</div>';
             html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;">';
             list.forEach(function (x) {
                 const sk = x.skin;
                 const name = sk.note || ('皮肤' + sk.id);
-                html += '<div style="background:rgba(255,255,255,0.05);border:1px solid rgba(96,165,250,0.35);border-radius:10px;padding:12px;">';
+                html += '<div class="skin-gallery-card" data-hero="' + _esc(x.heroName) + '" data-skin="' + _esc(name) + '" style="background:rgba(255,255,255,0.05);border:1px solid rgba(96,165,250,0.35);border-radius:10px;padding:12px;">';
+                // 图片区：先占位，进入视野才取图（277 张全量预加载会打满带宽/IndexedDB）
+                html += '<div style="position:relative;height:150px;margin-bottom:8px;border-radius:8px;overflow:hidden;background:linear-gradient(160deg,rgba(20,26,50,0.55),rgba(13,27,42,0.55));display:flex;align-items:center;justify-content:center;">';
+                html += '<img class="skin-gallery-img" alt="" decoding="async" style="max-width:100%;max-height:100%;opacity:0;transition:opacity .2s;">';
+                html += '<span class="skin-gallery-tip" style="position:absolute;bottom:5px;left:50%;transform:translateX(-50%);font-size:0.6rem;color:rgba(255,255,255,0.45);white-space:nowrap;">加载中…</span>';
+                html += '</div>';
                 html += '<div style="font-size:1.02rem;font-weight:700;color:#60a5fa;margin-bottom:4px;">🎨 ' + _esc(name) + '</div>';
                 html += '<div style="font-size:0.72rem;color:#fbbf24;margin-bottom:6px;">所属英雄：' + _esc(x.heroName) + '</div>';
                 html += '</div>';
             });
             html += '</div>';
             body.innerHTML = html;
+            setupSkinsGallery(body);
         };
+
+        // 皮肤图鉴图片懒加载：卡片进入视野才解析皮肤图；名字对不上本地素材库时显示"待补"，
+        // 避免 resolveHeroSkinInfo 回退成英雄默认皮导致「显示的是错图」
+        function setupSkinsGallery(body) {
+            if (window.__skinsGalleryIO) { try { window.__skinsGalleryIO.disconnect(); } catch (e) {} window.__skinsGalleryIO = null; }
+            const cards = body.querySelectorAll('.skin-gallery-card');
+            if (!cards.length) return;
+            const loaded = new WeakSet();
+            const io = new IntersectionObserver(function (entries) {
+                entries.forEach(function (en) {
+                    if (!en.isIntersecting || en.intersectionRatio < 0.15) return;
+                    const card = en.target;
+                    if (loaded.has(card)) return;
+                    loaded.add(card);
+                    const img = card.querySelector('.skin-gallery-img');
+                    const tip = card.querySelector('.skin-gallery-tip');
+                    if (!img) return;
+                    const heroName = card.getAttribute('data-hero') || '';
+                    const skinName = card.getAttribute('data-skin') || '';
+                    const done = function (text) { if (tip) tip.textContent = text; };
+                    if (typeof window.resolveHeroSkinInfo !== 'function') { done('皮肤组件未加载'); return; }
+                    window.resolveHeroSkinInfo(heroName, skinName).then(function (info) {
+                        if (!img.isConnected) return;
+                        // info.name 与请求的皮肤名不一致 = 素材库没有这张，走了默认皮回退 → 不显示，避免错图
+                        if (!info || !info.url || info.name !== skinName) { done('暂无素材'); return; }
+                        img.onload = function () { img.style.opacity = '1'; done(''); };
+                        img.onerror = function () { img.style.opacity = '0'; done('图片加载失败'); };
+                        img.src = info.url;
+                    }).catch(function () { done('暂无素材'); });
+                });
+            }, { root: body, threshold: [0, 0.15] });
+            cards.forEach(function (c) { io.observe(c); });
+            window.__skinsGalleryIO = io;
+        }
 
         // ==================== 管理员工具箱（定向指令 Gist 编辑）====================
         const TOOLBOX_GIST_ID = 'a45529be1fcb5f32a96dc49feaa422a0';
