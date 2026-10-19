@@ -28256,7 +28256,21 @@ ${maSection}
                 if (a.damageType) html += '伤害类型 ' + a.damageType + '<br>';
                 if (a.pureDamageDesc) html += '纯粹 ' + _esc(a.pureDamageDesc) + '<br>';
                 if (a.trueDamageDesc) html += '真伤 ' + _esc(a.trueDamageDesc);
-                html += '</div></div>';
+                html += '</div>';
+                const tiers = h.tiers || [];
+                if (tiers.length) {
+                  html += '<details style="margin-top:6px;font-size:0.68rem;"><summary style="cursor:pointer;color:#60a5fa;">⤴ 升级档位 (' + tiers.length + ' 档)</summary>';
+                  tiers.forEach(function (t) {
+                    html += '<div style="margin:6px 0;padding:6px 8px;background:rgba(0,0,0,0.25);border-radius:6px;border-left:2px solid #60a5fa;">';
+                    html += '<div style="color:#fde047;font-weight:600;">' + (t.level || 1) + ' 级' + (t.talentName ? ' · ' + _esc(t.talentName) : '') + '</div>';
+                    if (t.talentDesc) html += '<div style="color:rgba(255,255,255,0.85);line-height:1.4;">' + _esc(t.talentDesc) + '</div>';
+                    if (t.passiveInitial) html += '<div style="color:rgba(255,255,255,0.6);line-height:1.35;">初始被动：' + _esc(t.passiveInitial) + '</div>';
+                    if (t.passiveFull) html += '<div style="color:rgba(255,255,255,0.6);line-height:1.35;">满星被动：' + _esc(t.passiveFull) + '</div>';
+                    html += '</div>';
+                  });
+                  html += '</details>';
+                }
+                html += '</div>';
             });
             html += '</div>';
             body.innerHTML = html;
