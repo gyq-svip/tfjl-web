@@ -28331,9 +28331,6 @@ ${maSection}
                 html += '<div style="background:rgba(255,255,255,0.05);border:1px solid rgba(96,165,250,0.35);border-radius:10px;padding:12px;">';
                 html += '<div style="font-size:1.02rem;font-weight:700;color:#60a5fa;margin-bottom:4px;">🎨 ' + _esc(name) + '</div>';
                 html += '<div style="font-size:0.72rem;color:#fbbf24;margin-bottom:6px;">所属英雄：' + _esc(x.heroName) + '</div>';
-                if (sk.describe) html += '<div style="font-size:0.7rem;color:rgba(255,255,255,0.8);line-height:1.4;margin-bottom:4px;">额外被动：' + _esc(sk.describe) + '</div>';
-                if (sk.heroSkinHp) html += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.6);">基础血量 +' + _esc(sk.heroSkinHp) + '</div>';
-                if (sk.extraParam) html += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.55);line-height:1.4;margin-top:4px;">获取：' + _esc(sk.extraParam) + '</div>';
                 html += '</div>';
             });
             html += '</div>';
