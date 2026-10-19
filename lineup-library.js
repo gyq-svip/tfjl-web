@@ -171,18 +171,12 @@
         _llTrack('阵容图库');
         ov = document.createElement('div');
         ov.id = 'lineupLibWin';
-        // 🔴 2026-09-23 用户要求：默认窗口改小（原 min(1180px,96vw)×min(86vh,900px) 太大，右下角缩放手柄/关闭按钮都难点到）
-        //    默认 940×620，并随视口自适应（底部永远留出余量，不贴边）；用户自己拉大后记住尺寸，下次沿用（仍限制在视口内）
-        let _llWinW = Math.min(940, Math.round(window.innerWidth * 0.92));
-        let _llWinH = Math.min(620, Math.round(window.innerHeight * 0.70));
-        try {
-            const _llSv = JSON.parse(localStorage.getItem('tdjl_llWinSize') || 'null');
-            if (_llSv && _llSv.w > 0 && _llSv.h > 0) {
-                _llWinW = Math.min(_llSv.w, window.innerWidth - 32);
-                _llWinH = Math.min(_llSv.h, window.innerHeight - 110);
-            }
-        } catch (e) {}
-        ov.style.cssText = 'position:fixed;top:64px;right:16px;width:' + _llWinW + 'px;height:' + _llWinH + 'px;min-width:min(620px,90vw);min-height:280px;z-index:99996;display:flex;flex-direction:column;background:linear-gradient(160deg,#141a33,#0d1b2a);border:1px solid rgba(78,205,196,0.4);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.6);overflow:auto;resize:both;';
+        // 🔴 2026-10-20 用户要求：打开固定 1072×726，并显示在窗口正中间（可拖动/缩放，但不记忆，每次打开都重置到此尺寸+居中）
+        const _llWinW = Math.min(1072, window.innerWidth - 16);
+        const _llWinH = Math.min(726, window.innerHeight - 16);
+        const _llLeft = Math.max(8, Math.round((window.innerWidth - _llWinW) / 2));
+        const _llTop = Math.max(8, Math.round((window.innerHeight - _llWinH) / 2));
+        ov.style.cssText = 'position:fixed;left:' + _llLeft + 'px;top:' + _llTop + 'px;width:' + _llWinW + 'px;height:' + _llWinH + 'px;min-width:min(620px,90vw);min-height:280px;z-index:99996;display:flex;flex-direction:column;background:linear-gradient(160deg,#141a33,#0d1b2a);border:1px solid rgba(78,205,196,0.4);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.6);overflow:auto;resize:both;';
         ov.innerHTML =
             '<div id="llDrag" style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:linear-gradient(135deg,#0f3d3a,#123c5c);border-radius:12px 12px 0 0;cursor:move;user-select:none;">'
             + '<span style="font-size:1.05rem;font-weight:800;color:#4ecdc4;">📚 阵容图库</span>'
