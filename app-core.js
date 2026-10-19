@@ -28185,8 +28185,82 @@ ${maSection}
                     pageEl.style.display = 'block';
                     if (typeof window.adminLoadHubManager === 'function') window.adminLoadHubManager();
                 }
+            } else if (page === 'heroCodex') {
+                const pageEl = document.getElementById('adminPageHeroCodex');
+                if (pageEl) {
+                    pageEl.style.display = 'block';
+                    if (typeof window.bindHeroCodex === 'function') window.bindHeroCodex();
+                    if (typeof window.renderHeroCodex === 'function') window.renderHeroCodex();
+                }
             }
         }
+
+        // ==================== 英雄图鉴（官方配置表自动导出 data/heroes.json）====================
+        // 数据由 scripts/export-heroes/export-heroes.mjs 从官方 CDN 拉取生成；游戏大版本更新后重跑脚本即可
+        window.bindHeroCodex = function () {
+            if (window.__heroCodexBound) return;
+            window.__heroCodexBound = true;
+            const s = document.getElementById('heroCodexSearch');
+            const f = document.getElementById('heroCodexFilter');
+            if (s) s.addEventListener('input', function () { if (window.renderHeroCodex) window.renderHeroCodex(); });
+            if (f) f.addEventListener('change', function () { if (window.renderHeroCodex) window.renderHeroCodex(); });
+        };
+        window.renderHeroCodex = async function () {
+            const body = document.getElementById('heroCodexBody');
+            if (!body) return;
+            const search = document.getElementById('heroCodexSearch');
+            const filter = document.getElementById('heroCodexFilter');
+            if (!window.__heroCodexCache) {
+                body.innerHTML = '<div style="color:rgba(255,255,255,0.6);padding:20px;">⏳ 加载英雄数据…</div>';
+                try {
+                    const p = location.pathname;
+                    const base = p.endsWith('/') ? p : (p.lastIndexOf('/') >= 0 ? p.slice(0, p.lastIndexOf('/') + 1) : '/');
+                    const res = await fetch(base + 'data/heroes.json');
+                    window.__heroCodexCache = await res.json();
+                } catch (e) {
+                    body.innerHTML = '<div style="color:#f87171;padding:20px;">加载失败：' + (e.message || e) + '</div>';
+                    return;
+                }
+            }
+            const heroes = window.__heroCodexCache || [];
+            const kw = (search ? search.value : '').trim().toLowerCase();
+            const occ = filter ? filter.value : '';
+            const list = heroes.filter(function (h) {
+                if (occ && String(h.occupation) !== occ) return false;
+                if (!kw) return true;
+                return (h.name || '').toLowerCase().indexOf(kw) >= 0
+                    || (h.passiveName || '').toLowerCase().indexOf(kw) >= 0
+                    || (h.heroDesc || '').toLowerCase().indexOf(kw) >= 0;
+            });
+            const colorMap = { 1: '#cbd5e1', 2: '#4ade80', 3: '#60a5fa', 4: '#c084fc', 5: '#fbbf24' };
+            const colorName = { 1: '白', 2: '绿', 3: '蓝', 4: '紫', 5: '橙' };
+            const occName = { 1: '战士', 2: '猎人', 3: '法师', 4: '牧师', 5: '辅助' };
+            let html = '<div style="color:rgba(255,255,255,0.6);font-size:0.78rem;margin-bottom:10px;">共 ' + list.length + ' 个英雄（官方配置表自动导出）</div>';
+            html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;">';
+            list.forEach(function (h) {
+                const c = colorMap[h.heroColor] || '#fff';
+                const a = h.attrs || {};
+                html += '<div style="background:rgba(255,255,255,0.05);border:1px solid ' + c + '44;border-radius:10px;padding:12px;">';
+                html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
+                html += '<span style="font-size:1.05rem;font-weight:700;color:' + c + ';">' + _esc(h.name) + '</span>';
+                html += '<span style="font-size:0.62rem;padding:2px 6px;border-radius:6px;background:' + c + '22;color:' + c + ';">' + (colorName[h.heroColor] || h.heroColor) + '</span>';
+                html += '</div>';
+                html += '<div style="font-size:0.7rem;color:rgba(255,255,255,0.6);margin-bottom:6px;">职业：' + (occName[h.occupation] || h.occupation) + '</div>';
+                if (h.heroDesc) html += '<div style="font-size:0.72rem;color:rgba(255,255,255,0.8);margin-bottom:6px;">' + _esc(h.heroDesc) + '</div>';
+                if (h.passiveName) html += '<div style="font-size:0.72rem;margin-bottom:4px;"><b style="color:#fbbf24;">' + _esc(h.passiveName) + '</b></div>';
+                if (h.passiveDesc) html += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.7);line-height:1.4;margin-bottom:6px;">' + _esc(h.passiveDesc) + '</div>';
+                html += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.55);line-height:1.5;">';
+                if (a.attack) html += '攻击 ' + a.attack + '<br>';
+                if (a.hp) html += '生命 ' + a.hp + '<br>';
+                if (a.attackSpeed) html += '攻速 ' + a.attackSpeed + '<br>';
+                if (a.damageType) html += '伤害类型 ' + a.damageType + '<br>';
+                if (a.pureDamageDesc) html += '纯粹 ' + _esc(a.pureDamageDesc) + '<br>';
+                if (a.trueDamageDesc) html += '真伤 ' + _esc(a.trueDamageDesc);
+                html += '</div></div>';
+            });
+            html += '</div>';
+            body.innerHTML = html;
+        };
 
         // ==================== 管理员工具箱（定向指令 Gist 编辑）====================
         const TOOLBOX_GIST_ID = 'a45529be1fcb5f32a96dc49feaa422a0';
