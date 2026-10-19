@@ -10476,18 +10476,25 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             for (const t of tiers) if (t.level <= lv) tier = t;
             const lines = [];
             if (hero.occupation) lines.push('职业：' + hero.occupation);
-            if (hero.passiveName || hero.passiveDesc) {
-                lines.push('【被动】' + (hero.passiveName ? hero.passiveName + '：' : '') + (hero.passiveDesc || ''));
-            }
             if (tier) {
-                if (tier.skillName || tier.skillDesc) {
-                    lines.push('【技能】' + (tier.skillName ? tier.skillName + '：' : '') + (tier.skillDesc || ''));
+                // 有档位数据：被动只显示档位有效值（基础 passiveDesc 是 1 级值，高等级下会误导，如图鉴 18 级应为 +2% 而非基础 +1%）
+                // 技能仅在确有描述时显示（部分档位技能名如「技能+2」无描述，单独显示是噪音）
+                if (tier.skillDesc) {
+                    lines.push('【技能】' + (tier.skillName ? tier.skillName + '：' : '') + tier.skillDesc);
                 }
                 if (tier.talentName || tier.talentDesc) {
                     lines.push('【' + (tier.talentName || '天赋') + '】' + (tier.talentDesc || ''));
                 }
                 if (tier.passiveInitial) lines.push('【初始被动】' + tier.passiveInitial);
                 if (tier.passiveFull) lines.push('【满星被动】' + tier.passiveFull);
+            } else {
+                // 无档位数据：兜底显示英雄基础技能/被动
+                if (hero.skillName || hero.skillDesc) {
+                    lines.push('【技能】' + (hero.skillName ? hero.skillName + '：' : '') + (hero.skillDesc || ''));
+                }
+                if (hero.passiveName || hero.passiveDesc) {
+                    lines.push('【被动】' + (hero.passiveName ? hero.passiveName + '：' : '') + (hero.passiveDesc || ''));
+                }
             }
             lines.push('当前等级：' + lv + (tier ? '（' + tier.level + '级档位）' : ''));
             return lines.join('\n');
