@@ -1739,6 +1739,10 @@
                         <span class="mi-emoji">🏆</span>
                         <div class="mi-text"><div class="mi-title">活动阵容</div><div class="mi-sub">7日A/B轮转(云端下发)</div></div>
                     </div>
+                    <div class="admin-menu-item" data-key="heroCodex" onclick="adminShowPage('heroCodex')">
+                        <span class="mi-emoji">📖</span>
+                        <div class="mi-text"><div class="mi-title">英雄图鉴</div><div class="mi-sub">官方数据(内测)</div></div>
+                    </div>
 
                 </div>
                 <div id="adminSortEditBtn" style="display:flex;gap:8px;margin-top:8px;">
@@ -1749,6 +1753,25 @@
                     <button class="admin-btn admin-btn-secondary" onclick="adminMenuResetOrder()" style="flex:1;font-size:0.8rem;">↺ 重置</button>
                 </div>
                 <button class="admin-btn" onclick="logoutToLogin()" style="width:100%;margin-top:10px;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;">🔙 退出登录</button>
+            </div>
+
+            <div id="adminPageHeroCodex" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">📖 英雄图鉴（官方数据 · 内测）</h3>
+                </div>
+                <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+                    <input id="heroCodexSearch" placeholder="搜索英雄名 / 被动…" style="flex:1;min-width:180px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:8px 10px;font-size:0.85rem;">
+                    <select id="heroCodexFilter" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:8px 10px;font-size:0.85rem;">
+                        <option value="">全部职业</option>
+                        <option value="1">战士</option>
+                        <option value="2">猎人</option>
+                        <option value="3">法师</option>
+                        <option value="4">牧师</option>
+                        <option value="5">辅助</option>
+                    </select>
+                </div>
+                <div id="heroCodexBody" style="max-height:64vh;overflow-y:auto;"></div>
             </div>
 
             <div id="adminPageToolbox" style="display:none;">
