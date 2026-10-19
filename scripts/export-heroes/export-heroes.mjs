@@ -240,7 +240,157 @@ async function fetchTable(index, uuid, name) {
     txt = JSON.stringify(arr[packed.index])
   }
   const ta = extractTextAssets(txt).find((t) => t.name === name)
-  return ta ? parseCsv(ta.text) : null
+  return ta ? parseCocosTable(ta.text) : null
+}
+
+// 官方配置表 CSV 解析（忠实移植自 toolbox electron/main/csvParse.ts）。
+// 游戏表为「字段名 / 类型 / 中文描述」三段元数据 + 数据行，且三段顺序不固定；
+// 该实现靠分类+打分自动定位表头/类型/说明行，比按行号硬猜稳健得多。
+function csvParseRows(text) {
+  const src = String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const rows = []
+  let row = []
+  let cur = ''
+  let inQ = false
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i]
+    if (inQ) {
+      if (ch === '"') {
+        if (src[i + 1] === '"') { cur += '"'; i++ } else inQ = false
+      } else cur += ch
+    } else if (ch === '"') inQ = true
+    else if (ch === ',') { row.push(cur); cur = '' }
+    else if (ch === '\n') { row.push(cur); rows.push(row); row = []; cur = '' }
+    else cur += ch
+  }
+  if (cur !== '' || row.length) { row.push(cur); rows.push(row) }
+  return rows
+}
+const CSV_KNOWN_TYPE = /^(NUMBER|STRING|BOOL|INT|FLOAT|LONG|INTEGER|TEXT|DOUBLE|DECIMAL|S|STR)$/i
+const CSV_TYPE_LIKE = /^[a-z]+(<.*>)$/i
+const CSV_CHINESE = /[一-龥]/
+const csvIsTypeToken = (c) => {
+  const s = String(c == null ? '' : c).trim()
+  return !!s && (CSV_KNOWN_TYPE.test(s) || CSV_TYPE_LIKE.test(s))
+}
+function csvIsTypeRow(row) {
+  if (!row || row.length < 2) return false
+  let nonEmpty = 0
+  let hits = 0
+  for (const c of row) {
+    const s = String(c == null ? '' : c).trim()
+    if (!s) continue
+    nonEmpty++
+    if (csvIsTypeToken(s)) hits++
+  }
+  return nonEmpty >= 2 && hits >= Math.max(2, Math.ceil(nonEmpty / 2))
+}
+function csvIsHeaderRow(row) {
+  if (!row || row.length < 2) return false
+  let nonEmpty = 0
+  for (const c of row) {
+    const s = String(c == null ? '' : c).trim()
+    if (!s) continue
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(s)) return false
+    nonEmpty++
+  }
+  return nonEmpty >= 2
+}
+const csvIsDescRow = (row) => !!row && row.some((c) => CSV_CHINESE.test(String(c == null ? '' : c)))
+function csvIsHeaderLike(row) {
+  if (!row || row.length < 2) return false
+  let nonEmpty = 0
+  let hits = 0
+  for (const c of row) {
+    const s = String(c == null ? '' : c).trim()
+    if (!s) continue
+    nonEmpty++
+    if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(s)) hits++
+  }
+  return nonEmpty >= 2 && hits >= 2 && hits >= Math.ceil(nonEmpty / 2)
+}
+function csvClassifyRow(row) {
+  if (csvIsTypeRow(row)) return 'type'
+  if (csvIsDescRow(row)) return 'desc'
+  if (csvIsHeaderRow(row)) return 'header'
+  return 'unknown'
+}
+function csvScoreBlock(rows, classes, k) {
+  let tCount = 0
+  let hStrict = 0
+  let hLike = 0
+  let dCount = 0
+  for (let i = 0; i < k; i++) {
+    const c = classes[i]
+    if (c === 'type') tCount++
+    else if (c === 'header') hStrict++
+    else if (c === 'desc') { if (csvIsHeaderLike(rows[i])) hLike++; else dCount++ }
+  }
+  if (tCount < 1) return -Infinity
+  let score = 3
+  score += hStrict ? 3 : hLike ? 2 : 0
+  if (dCount === 1) score += 2
+  const lastIsDescLike = classes[k - 1] !== 'header' && classes[k - 1] !== 'type'
+  if (dCount > 1 && lastIsDescLike) score -= 4 * (dCount - 1)
+  if (tCount > 1) score -= 3 * (tCount - 1)
+  if (hStrict + hLike > 2) score -= 3 * (hStrict + hLike - 2)
+  if (classes[k] === 'header' || classes[k] === 'type') score -= 5
+  score -= k * 0.1
+  return score
+}
+function parseCocosCsv(text) {
+  const rows = csvParseRows(text)
+  if (!rows.length) return null
+  const classes = []
+  for (let i = 0; i < Math.min(rows.length, 12); i++) classes.push(csvClassifyRow(rows[i]))
+  if (!classes.includes('type')) {
+    return { headers: rows[0] || [], rows: rows.slice(1) }
+  }
+  let bestK = -1
+  let bestScore = -Infinity
+  const maxK = Math.min(11, rows.length - 1)
+  for (let k = 1; k <= maxK; k++) {
+    const s = csvScoreBlock(rows, classes, k)
+    if (s > bestScore) { bestScore = s; bestK = k }
+  }
+  if (bestK < 1) return { headers: rows[0] || [], rows: rows.slice(1) }
+  let headers = null
+  let hIdx = -1
+  for (let i = 0; i < bestK; i++) {
+    if (classes[i] === 'header') { headers = rows[i]; hIdx = i; break }
+  }
+  if (headers === null) {
+    for (let i = 0; i < bestK; i++) {
+      if (classes[i] !== 'type' && csvIsHeaderLike(rows[i])) { headers = rows[i]; hIdx = i; break }
+    }
+  }
+  if (headers === null) { headers = rows[0]; hIdx = 0 }
+  let types = []
+  for (let i = 0; i < bestK; i++) {
+    if (classes[i] === 'type') { types = rows[i]; break }
+  }
+  const numericFirstCol = /^(NUMBER|INT|INTEGER|LONG|FLOAT|DOUBLE|DECIMAL)$/i.test(String((types[0] || '')).trim())
+  if (numericFirstCol) {
+    let guard = 0
+    while (bestK < rows.length - 1 && guard < 20) {
+      const first = String((rows[bestK] && rows[bestK][0] != null ? rows[bestK][0] : '')).trim()
+      if (first === '' || /^-?\d+(\.\d+)?$/.test(first)) break
+      bestK++
+      guard++
+    }
+  }
+  const dataRows = rows.slice(bestK)
+  return { headers, rows: dataRows }
+}
+function parseCocosTable(text) {
+  const parsed = parseCocosCsv(text)
+  if (!parsed || !parsed.headers || parsed.headers.length < 2) return []
+  const headers = parsed.headers
+  return parsed.rows.map((row) => {
+    const obj = {}
+    headers.forEach((h, i) => { if (h) obj[h] = row[i] === undefined ? '' : row[i] })
+    return obj
+  })
 }
 
 function stripSkillPrefix(s) {
@@ -273,6 +423,15 @@ function buildIndexMaps(skillRows, npcRows, talentRows) {
     arr.push(r)
     npcRowsById.set(key, arr)
   }
+  // 技能名 → 多行（老英雄同名技能分散在多个 id 上，按此回退找有描述的那条）
+  const skillByNameAll = new Map()
+  for (const r of skillRows || []) {
+    const nm = String(r.name || '').trim()
+    if (!nm) continue
+    const arr = skillByNameAll.get(nm) || []
+    arr.push(r)
+    skillByNameAll.set(nm, arr)
+  }
   for (const arr of npcRowsById.values()) arr.sort((a, b) => Number(a.level) - Number(b.level))
   const talentsByHero = new Map()
   for (const t of talentRows || []) {
@@ -283,7 +442,7 @@ function buildIndexMaps(skillRows, npcRows, talentRows) {
     talentsByHero.set(hid, arr)
   }
   for (const arr of talentsByHero.values()) arr.sort((a, b) => Number(a.level) - Number(b.level))
-  return { skillById, skillByName, npcRowsById, talentsByHero }
+  return { skillById, skillByName, skillByNameAll, npcRowsById, talentsByHero }
 }
 
 // 按等级属性（官方面板数值源，移植自 TDS heroData.ts getHeroBaseStats / getHeroSkillCd）：
@@ -348,11 +507,27 @@ function heroLevelNodes(skillNodes, talentsByHero, heroId, npcId) {
   return [...set].sort((a, b) => a - b)
 }
 function buildTiers(maps, hid, npcId, heroSkillName, heroSkillDesc, heroPassiveInitial, heroPassiveFull) {
-  const { skillById, npcRowsById, talentsByHero } = maps
+  const { skillById, skillByNameAll, npcRowsById, talentsByHero } = maps
   const skills = npcSkillNodes(npcRowsById, npcId)
   const skillNodes = heroSkillNodes(skills, talentsByHero, hid, npcId)
   const levels = heroLevelNodes(skillNodes, talentsByHero, hid, npcId)
   const talents = talentsByHero.get(String(hid)) || []
+  // 老英雄的 npc.skill_id 指向的技能行 skill_desc 为空，但同名技能在低 id 行有描述
+  // （如 战将：npc→30106 空，同名 id=13 有「对单个目标造成100%攻击伤害」）。
+  // 缓存「同名行里 id 最小且有描述」的那条，供整条 tier 链回退。
+  const namedDescCache = new Map()
+  const descByName = (skill) => {
+    const own = stripSkillPrefix(skill && skill.skill_desc)
+    if (own) return own
+    const nm = String((skill && skill.name) || '').trim()
+    if (!nm) return ''
+    if (namedDescCache.has(nm)) return namedDescCache.get(nm)
+    const cands = (skillByNameAll.get(nm) || []).filter((r) => stripSkillPrefix(r.skill_desc))
+    cands.sort((a, b) => Number(a.id) - Number(b.id))
+    const hit = cands.length ? stripSkillPrefix(cands[0].skill_desc) : ''
+    namedDescCache.set(nm, hit)
+    return hit
+  }
   const tiers = []
   for (const lv of levels) {
     let skillId = skillNodes.length ? skillNodes[0].skillId : String(hid)
@@ -364,7 +539,7 @@ function buildTiers(maps, hid, npcId, heroSkillName, heroSkillDesc, heroPassiveI
     tiers.push({
       level: lv,
       skillName: String(s?.name || '').trim() || prev?.skillName || heroSkillName,
-      skillDesc: stripSkillPrefix(s?.skill_desc) || prev?.skillDesc || heroSkillDesc,
+      skillDesc: descByName(s) || prev?.skillDesc || heroSkillDesc,
       passiveInitial:
         stripPassivePrefix(talent?.passiveSkilldesc) ||
         prev?.passiveInitial ||
@@ -411,7 +586,10 @@ function buildTiers(maps, hid, npcId, heroSkillName, heroSkillDesc, heroPassiveI
     arr.push(s)
     skinsByHero.set(hid, arr)
   }
-  const heroes = (heroRows || []).map((h) => {
+  // 跳过脏行（英雄表 CSV 末尾偶发空 id/name 行，会让前端多出无名英雄卡）
+  const heroes = (heroRows || [])
+    .filter((h) => String(h.id || '').trim() && String(h.name || '').trim())
+    .map((h) => {
     const npc = npcById.get(String(h.npc_id)) || {}
     const baseSkill = maps.skillById.get(String(h.id))
     const skillNameRaw = String(h.skill_name || '').trim()
@@ -461,6 +639,25 @@ function buildTiers(maps, hid, npcId, heroSkillName, heroSkillDesc, heroPassiveI
       skins: skinsByHero.get(String(h.id)) || []
     }
   })
+  // 官方表里同一英雄常有两条 id（低 id 正式行 + 高 id 重复行），重复行的技能文案可能缺失：
+  // 用同名的有文案行按 tier 索引补齐（两条行数一致时逐档补）
+  const hdByName = new Map()
+  for (const h of heroes) {
+    const arr = hdByName.get(h.name) || []
+    arr.push(h)
+    hdByName.set(h.name, arr)
+  }
+  for (const arr of hdByName.values()) {
+    if (arr.length < 2) continue
+    const donor = arr.find((h) => (h.tiers || []).some((t) => String(t.skillDesc || '').trim()))
+    if (!donor) continue
+    for (const h of arr) {
+      if (h === donor) continue
+      donor.tiers.forEach((dt, i) => {
+        if (h.tiers[i] && !String(h.tiers[i].skillDesc || '').trim()) h.tiers[i].skillDesc = dt.skillDesc
+      })
+    }
+  }
   fs.mkdirSync(path.dirname(OUT), { recursive: true })
   fs.writeFileSync(OUT, JSON.stringify(heroes, null, 2))
   console.log(`✅ 写入 ${heroes.length} 个英雄 -> ${OUT}`)
