@@ -2332,14 +2332,16 @@
                     <div class="admin-form-row">
                         <div>
                             <label>分类</label>
-                            <select id="adminNewsCategory">
-                                <option value="公告">公告</option>
-                                <option value="活动">活动</option>
-                                <option value="更新">更新</option>
-                                <option value="通知">通知</option>
-                                <option value="其他">其他</option>
-                                <option value="功能简介">功能简介（出战区简介板）</option>
-                            </select>
+                            <input id="adminNewsCategory" list="newsCategoryList" placeholder="选择或输入分类" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:#fff;font-size:0.9rem;box-sizing:border-box;">
+                            <datalist id="newsCategoryList">
+                                <option value="公告">
+                                <option value="活动">
+                                <option value="更新">
+                                <option value="通知">
+                                <option value="其他">
+                                <option value="功能简介">
+                                <option value="窗口标题">
+                            </datalist>
                         </div>
                         <div>
                             <label>标题</label>
