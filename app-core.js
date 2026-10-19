@@ -10439,26 +10439,31 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         // 🔴 2026-10-19 官方英雄数据（data/heroes.json，由官方配置表自动导出）按英雄名索引；
         //    卡牌悬停优先展示这里的信息（职业/被动/当前等级档位强化），官方没有的英雄回落旧 heroAttrsData。
         let __officialLoading = false;
+        let __officialLoadingPromise = null;
         function ensureOfficialHeroes() {
-            if (window.heroesOfficialMap) return;
+            if (window.heroesOfficialMap) return Promise.resolve();
             // 若图鉴已加载过，直接复用其缓存
             if (window.__heroCodexCache) {
                 const m = {};
                 window.__heroCodexCache.forEach(function (h) { if (h.name && !m[h.name]) m[h.name] = h; });
                 window.heroesOfficialMap = m;
-                return;
+                return Promise.resolve();
             }
-            if (__officialLoading) return;
+            if (__officialLoading && __officialLoadingPromise) return __officialLoadingPromise;
             __officialLoading = true;
-            try {
-                const p = location.pathname;
-                const base = p.endsWith('/') ? p : (p.lastIndexOf('/') >= 0 ? p.slice(0, p.lastIndexOf('/') + 1) : '/');
-                fetch(base + 'data/heroes.json').then(function (r) { return r.json(); }).then(function (arr) {
-                    const m = {};
-                    (arr || []).forEach(function (h) { if (h.name && !m[h.name]) m[h.name] = h; });
-                    window.heroesOfficialMap = m;
-                }).catch(function () {});
-            } catch (e) {}
+            __officialLoadingPromise = new Promise(function (resolve) {
+                try {
+                    const p = location.pathname;
+                    const base = p.endsWith('/') ? p : (p.lastIndexOf('/') >= 0 ? p.slice(0, p.lastIndexOf('/') + 1) : '/');
+                    fetch(base + 'data/heroes.json').then(function (r) { return r.json(); }).then(function (arr) {
+                        const m = {};
+                        (arr || []).forEach(function (h) { if (h.name && !m[h.name]) m[h.name] = h; });
+                        window.heroesOfficialMap = m;
+                        resolve();
+                    }).catch(function () { resolve(); });
+                } catch (e) { resolve(); }
+            });
+            return __officialLoadingPromise;
         }
         // 取官方数据里「当前等级对应的档位」：tiers 已按 level 升序，取 <= level 的最高档
         function getOfficialHeroTip(heroName, level) {
@@ -10790,6 +10795,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             slider.value = String(Math.max(0, levels.indexOf(currentLevel)));
             slider.style.cssText = 'width:100%;';
             function _renderLevelInfo(curLv) {
+                // 🔴 2026-10-19 优先官方 heroes.json：按当前等级取对应档位（技能/被动/天赋强化），去冗余只留主要
+                const off = (typeof getOfficialHeroTip === 'function') ? getOfficialHeroTip(mainName, curLv) : null;
+                if (off) {
+                    const esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); };
+                    const lines = off.split('\n').filter(function (l) { return !l.startsWith('职业：') && !l.startsWith('当前等级：'); });
+                    let html = '<div style="color:#4ecdc4;font-weight:600;margin-bottom:4px;">等级：' + curLv + '</div>';
+                    lines.forEach(function (l) { if (l) html += '<div>' + esc(l) + '</div>'; });
+                    lvInfo.innerHTML = html;
+                    return;
+                }
                 const initial = _getPassiveAtLevel(mainName, curLv, 'initialPassive');
                 const fullStar = _getPassiveAtLevel(mainName, curLv, 'fullStarPassive');
                 let html = '<div style="color:#4ecdc4;font-weight:600;margin-bottom:4px;">等级：' + curLv + '</div>';
@@ -10817,6 +10832,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             lvWrap.appendChild(lvInfo);
             box.appendChild(lvWrap);
             _renderLevelInfo(currentLevel);
+            // 官方数据可能首次尚未加载完：加载完成后重渲染一次，切到官方参数
+            try { ensureOfficialHeroes().then(function () { try { _renderLevelInfo(currentLevel); } catch (e) {} }); } catch (e) {}
 
             // 皮肤
             const skinTitle = document.createElement('div');
