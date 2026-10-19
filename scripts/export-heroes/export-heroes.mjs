@@ -224,7 +224,8 @@ const TABLE_UUIDS = {
   SkillTableData: '25abd541-ec2c-4c55-8e45-da1ae5e2c41c',
   PassiveSkillTableData: 'a8b456ad-5e83-40a1-a382-481d69ab27ef',
   HeroTalentTableData: 'e6547958-e595-41d0-93a8-32b81d5921af',
-  HeroSkinTableData: '20c425ab-4282-4ba6-9df6-76f91271bf18'
+  HeroSkinTableData: '20c425ab-4282-4ba6-9df6-76f91271bf18',
+  ResTableData: 'f8b5ebbd-27f4-422a-b95f-fe6ed2da0d70'
 }
 
 async function fetchTable(index, uuid, name) {
@@ -369,10 +370,12 @@ function buildTiers(maps, hid, npcId, heroSkillName, heroSkillDesc, heroPassiveI
   const passiveRows = await fetchTable(index, TABLE_UUIDS.PassiveSkillTableData, 'PassiveSkillTableData')
   const talentRows = await fetchTable(index, TABLE_UUIDS.HeroTalentTableData, 'HeroTalentTableData')
   const skinRows = await fetchTable(index, TABLE_UUIDS.HeroSkinTableData, 'HeroSkinTableData')
+  const resRows = await fetchTable(index, TABLE_UUIDS.ResTableData, 'ResTableData')
   console.log(
-    `表行数 hero=${heroRows?.length} npc=${npcRows?.length} skill=${skillRows?.length} passive=${passiveRows?.length} talent=${talentRows?.length} skin=${skinRows?.length}`
+    `表行数 hero=${heroRows?.length} npc=${npcRows?.length} skill=${skillRows?.length} passive=${passiveRows?.length} talent=${talentRows?.length} skin=${skinRows?.length} res=${resRows?.length}`
   )
   const npcById = new Map((npcRows || []).map((r) => [String(r.id), r]))
+  const resById = new Map((resRows || []).map((r) => [String(r.id), r]))
   const maps = buildIndexMaps(skillRows, npcRows, talentRows)
   const skinsByHero = new Map()
   for (const s of skinRows || []) {
@@ -391,6 +394,11 @@ function buildTiers(maps, hid, npcId, heroSkillName, heroSkillDesc, heroPassiveI
         ? String(baseSkill.name).trim()
         : skillNameRaw
     const heroSkillDesc = stripSkillPrefix(baseSkill?.skill_desc || h.skill_desc || '')
+    // spine 动画目录：npc.res_id → ResTableData.animation（形如 combat/animation/hero/qiqi/...）
+    // 只认 hero 动画；目录名与 data/hero-spine/<folder> 对应，前端图鉴据此播放（与 export-spine.mjs 同源）
+    const res = resById.get(String(npc.res_id ?? '')) || {}
+    const anim = String(res.animation || '')
+    const spine = anim.startsWith('combat/animation/hero/') ? anim.split('/')[3] : ''
     return {
       id: h.id,
       name: h.name,
@@ -422,6 +430,7 @@ function buildTiers(maps, hid, npcId, heroSkillName, heroSkillDesc, heroPassiveI
         h.passive_desc,
         h.passive_desc2
       ),
+      spine,
       skins: skinsByHero.get(String(h.id)) || []
     }
   })

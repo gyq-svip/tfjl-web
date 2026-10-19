@@ -1,13 +1,21 @@
 // ============================================================
-// 英雄 Spine 动画播放器（PoC）
+// 英雄 Spine 动画播放器
 //   官方 Spine 3.8 Canvas 运行时（vendor/spine-core.js + spine-canvas.js）
 //   资源：data/hero-spine/<folder>/ skeleton.json + atlas.txt + p*.png
+//         （目录清单见 data/hero-spine/index.json，由 export-spine.mjs 维护；
+//           完整资源集后续可托管 Gitee，届时设 window.__HERO_SPINE_BASE 指向远端即可）
 //   核心能力：资源加载 + 包围盒居中 + idle 循环（基于 Spine 官方运行时实现）
-// 用法：spineHero.play(canvas, 'qiqi', { fitPadding: 0.9 })
+// 用法：spineHero.play(canvas, 'qiqi', { fitPadding: 0.9, onStatus: fn })
+//       spineHero.stop(canvas)   // 离屏/重渲染前必须调用，停 raf + 解监听
 // ============================================================
 ;(function () {
   let spinePromise = null
+  const assetCache = {} // folder -> { skData, atlas }（骨架/图集跨卡片共享，避免重复 fetch+解析）
+  let playTokenSeq = 0  // 同一 canvas 连续 play 时，仅最后一次生效（按画布各自计时）
+
   function baseUrl() {
+    // 资源 base 可被整体切换到远端（如 Gitee 托管的完整资源集）
+    if (window.__HERO_SPINE_BASE) return window.__HERO_SPINE_BASE
     const p = location.pathname
     return p.endsWith('/') ? p : p.slice(0, p.lastIndexOf('/') + 1)
   }
@@ -62,13 +70,42 @@
     return { off: new spine.Vector2(minX, minY), size: new spine.Vector2(maxX - minX, maxY - minY) }
   }
 
+  // 加载并解析 folder 的骨架资源（带缓存；失败返回 null，由调用方展示状态）
+  // pngCount：清单登记的贴图页数（p0..pN-1）；不传则逐个试到失败为止
+  async function loadAssets(folder, pngCount) {
+    if (assetCache[folder]) return assetCache[folder]
+    const base = baseUrl() + 'data/hero-spine/' + folder + '/'
+    let skeletonJson, atlasText
+    skeletonJson = await (await fetch(base + 'skeleton.json')).json()
+    atlasText = await (await fetch(base + 'atlas.txt')).text()
+    // 贴图按页序加载（p0..p8，逐个试直到失败）
+    const imgs = []
+    const maxPages = pngCount > 0 ? pngCount : 9
+    for (let i = 0; i < maxPages; i++) {
+      try { imgs.push(await loadImage(base + 'p' + i + '.png')) } catch (e) { break }
+    }
+    if (!imgs.length) throw new Error('无贴图')
+    let pi = 0
+    const atlas = new spine.TextureAtlas(atlasText, function () {
+      const img = imgs[pi++] || imgs[0]
+      return new spine.canvas.CanvasTexture(img)
+    })
+    const skData = new spine.SkeletonJson(new spine.AtlasAttachmentLoader(atlas)).readSkeletonData(skeletonJson)
+    const entry = { skData: skData, atlas: atlas }
+    assetCache[folder] = entry
+    return entry
+  }
+
   async function play(canvas, folder, opts) {
     opts = opts || {}
     const st = (canvas._spineSt = canvas._spineSt || {})
     st.playing = false
+    if (st.raf) { cancelAnimationFrame(st.raf); st.raf = null }
+    if (st._onResize) { window.removeEventListener('resize', st._onResize); st._onResize = null }
+    const token = (st.token = ++playTokenSeq)
     const statusCb = opts.onStatus || function () {}
     try {
-      statusCb('加载 Spine 运行时…')
+      if (!window.spine) statusCb('加载 Spine 运行时…')
       await ensureSpine()
     } catch (e) {
       statusCb('Spine 运行时加载失败')
@@ -76,28 +113,16 @@
     }
     const spine = window.spine
     if (!spine) { statusCb('Spine 运行时缺失'); return }
-    const base = baseUrl() + 'data/hero-spine/' + folder + '/'
-    let skeletonJson, atlasText
+    let assets
     try {
-      skeletonJson = await (await fetch(base + 'skeleton.json')).json()
-      atlasText = await (await fetch(base + 'atlas.txt')).text()
+      assets = await loadAssets(folder, opts.pngs)
     } catch (e) {
       statusCb('读取骨骼资源失败: ' + folder)
       return
     }
-    // 贴图按页序加载（p0..p8，逐个试直到失败）
-    const imgs = []
-    for (let i = 0; i < 9; i++) {
-      try { imgs.push(await loadImage(base + 'p' + i + '.png')) } catch (e) { break }
-    }
-    if (!imgs.length) { statusCb('无贴图'); return }
+    if (token !== st.token) return // 已被后续 play 抢占，避免双 raf
     try {
-      let pi = 0
-      const atlas = new spine.TextureAtlas(atlasText, function () {
-        const img = imgs[pi++] || imgs[0]
-        return new spine.canvas.CanvasTexture(img)
-      })
-      const skData = new spine.SkeletonJson(new spine.AtlasAttachmentLoader(atlas)).readSkeletonData(skeletonJson)
+      const skData = assets.skData
       const skeleton = new spine.Skeleton(skData)
       skeleton.setToSetupPose()
       const state = new spine.AnimationState(new spine.AnimationStateData(skData))
@@ -120,6 +145,7 @@
       }
       fit()
       window.addEventListener('resize', fit)
+      st._onResize = fit
 
       statusCb('')
       st.playing = true
@@ -154,8 +180,10 @@
 
   function stop(canvas) {
     if (canvas && canvas._spineSt) {
-      canvas._spineSt.playing = false
-      if (canvas._spineSt.raf) cancelAnimationFrame(canvas._spineSt.raf)
+      const st = canvas._spineSt
+      st.playing = false
+      if (st.raf) { cancelAnimationFrame(st.raf); st.raf = null }
+      if (st._onResize) { window.removeEventListener('resize', st._onResize); st._onResize = null }
     }
   }
 
