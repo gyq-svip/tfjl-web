@@ -177,7 +177,23 @@ function parseCsvRow(line) {
   return out
 }
 function parseCsv(text) {
-  const lines = text.split(/\r?\n/)
+  // CSV 允许引号字段内换行（如 HeroSkinTableData 中文描述行），先把引号内的 \r\n 合并，避免行号错位吞列
+  let merged = ''
+  let inQ = false
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]
+    if (c === '"') {
+      inQ = !inQ
+      merged += c
+    } else if (inQ && c === '\n') {
+      merged += ' '
+    } else if (inQ && c === '\r') {
+      // 丢弃 \r，避免 \r\n 变成空格+换行
+    } else {
+      merged += c
+    }
+  }
+  const lines = merged.split(/\r?\n/)
   while (lines.length && lines[lines.length - 1].trim() === '') lines.pop()
   if (lines.length < 4) return []
   // Cocos 表：3 行元数据 + 数据。字段名所在行分两种：
@@ -406,10 +422,7 @@ function buildTiers(maps, hid, npcId, heroSkillName, heroSkillDesc, heroPassiveI
         h.passive_desc,
         h.passive_desc2
       ),
-      skins: (skinsByHero.get(String(h.id)) || []).map((s) => {
-        const { heroItemId, ...rest } = s
-        return rest
-      })
+      skins: skinsByHero.get(String(h.id)) || []
     }
   })
   fs.mkdirSync(path.dirname(OUT), { recursive: true })

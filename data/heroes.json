@@ -90,6 +90,7 @@
       {
         "id": "173",
         "itemId": "317301",
+        "heroItemId": "1",
         "level": "1",
         "describe": "额外被动：光环：纯粹减免+10%",
         "skillIdList": "317301",
@@ -213,6 +214,7 @@
       {
         "id": "220",
         "itemId": "322002",
+        "heroItemId": "2",
         "level": "1",
         "describe": "额外被动：光环：命中+25%",
         "skillIdList": "322002",
@@ -389,6 +391,7 @@
       {
         "id": "126",
         "itemId": "312604",
+        "heroItemId": "4",
         "level": "1",
         "describe": "额外被动：自身攻击+500，且击杀额外获得35%银币",
         "skillIdList": "312604|854",
@@ -404,6 +407,7 @@
       {
         "id": "211",
         "itemId": "321104",
+        "heroItemId": "4",
         "level": "1",
         "describe": "额外被动：己方上阵唐三藏、卷帘大将、天蓬元帅皮肤和大圣时，如来佛显圣每秒对全场造成5%生命纯粹伤害",
         "skillIdList": "321104|100401",
@@ -571,6 +575,7 @@
       {
         "id": "165",
         "itemId": "316506",
+        "heroItemId": "6",
         "level": "1",
         "describe": "额外被动：出售回复战车生命上限25%的生命",
         "skillIdList": "",
@@ -586,6 +591,7 @@
       {
         "id": "167",
         "itemId": "316706",
+        "heroItemId": "6",
         "level": "1",
         "describe": "额外被动：出售回复战车生命上限15%的生命",
         "skillIdList": "",
@@ -691,6 +697,7 @@
       {
         "id": "103",
         "itemId": "310307",
+        "heroItemId": "7",
         "level": "1",
         "describe": "额外被动：每秒获得1银币",
         "skillIdList": "310307",
@@ -706,6 +713,7 @@
       {
         "id": "299",
         "itemId": "329907",
+        "heroItemId": "7",
         "level": "1",
         "describe": "额外被动：每次售卖额外获得10银币",
         "skillIdList": "",
@@ -829,6 +837,7 @@
       {
         "id": "122",
         "itemId": "312208",
+        "heroItemId": "8",
         "level": "1",
         "describe": "额外被动：自身暴击+75%",
         "skillIdList": "312208",
@@ -844,6 +853,7 @@
       {
         "id": "151",
         "itemId": "315108",
+        "heroItemId": "8",
         "level": "1",
         "describe": "额外被动：满星后，所在战车的同层英雄基础攻速-0.7秒",
         "skillIdList": "",
@@ -859,6 +869,7 @@
       {
         "id": "195",
         "itemId": "319508",
+        "heroItemId": "8",
         "level": "1",
         "describe": "额外被动：满星后，所在战车的同层英雄基础攻速-0.7秒",
         "skillIdList": "",
@@ -874,6 +885,7 @@
       {
         "id": "233",
         "itemId": "323308",
+        "heroItemId": "8",
         "level": "1",
         "describe": "额外被动：满星后，所在战车的同层英雄基础攻速-0.7秒",
         "skillIdList": "",
@@ -970,6 +982,7 @@
       {
         "id": "236",
         "itemId": "323609",
+        "heroItemId": "9",
         "level": "1",
         "describe": "额外被动：光环：攻速+30%",
         "skillIdList": "323609",
@@ -1057,6 +1070,7 @@
       {
         "id": "343",
         "itemId": "334310",
+        "heroItemId": "10",
         "level": "1",
         "describe": "额外被动：光环：PVE附加伤害+40000",
         "skillIdList": "334310",
@@ -1260,6 +1274,7 @@
       {
         "id": "113",
         "itemId": "311312",
+        "heroItemId": "12",
         "level": "1",
         "describe": "额外被动：光环：敌方魔抗-20%，敌方魔抗-10",
         "skillIdList": "311312",
@@ -1275,6 +1290,7 @@
       {
         "id": "202",
         "itemId": "320212",
+        "heroItemId": "12",
         "level": "1",
         "describe": "额外被动：光环：生命+15%",
         "skillIdList": "320212",
@@ -1290,6 +1306,7 @@
       {
         "id": "203",
         "itemId": "320312",
+        "heroItemId": "12",
         "level": "1",
         "describe": "额外被动：光环：生命+15%，且自身伤害类型转化为真实伤害",
         "skillIdList": "320312",
@@ -1305,6 +1322,7 @@
       {
         "id": "294",
         "itemId": "329412",
+        "heroItemId": "12",
         "level": "1",
         "describe": "额外被动：自身造成的伤害无视敌方魔抗",
         "skillIdList": "",
@@ -1320,6 +1338,7 @@
       {
         "id": "309",
         "itemId": "330912",
+        "heroItemId": "12",
         "level": "1",
         "describe": "额外被动：战斗中，同时视为法师和牧师职业",
         "skillIdList": "",
@@ -1443,6 +1462,7 @@
       {
         "id": "104",
         "itemId": "310413",
+        "heroItemId": "13",
         "level": "1",
         "describe": "技能强化：攻击时额外投掷1个斧子",
         "skillIdList": "",
@@ -1458,6 +1478,7 @@
       {
         "id": "120",
         "itemId": "312013",
+        "heroItemId": "13",
         "level": "1",
         "describe": "额外被动：基础攻速+30%",
         "skillIdList": "",
@@ -1473,6 +1494,7 @@
       {
         "id": "157",
         "itemId": "315713",
+        "heroItemId": "13",
         "level": "1",
         "describe": "额外被动：自身攻击+999",
         "skillIdList": "315713",
@@ -1488,6 +1510,7 @@
       {
         "id": "174",
         "itemId": "317413",
+        "heroItemId": "13",
         "level": "1",
         "describe": "额外被动：伤害加成+15%，己方上阵白娘子时伤害加成额外+15%",
         "skillIdList": "317413|845",
@@ -1503,6 +1526,7 @@
       {
         "id": "175",
         "itemId": "317513",
+        "heroItemId": "13",
         "level": "1",
         "describe": "额外被动：伤害加成+25%，己方上阵白娘子时伤害加成额外+25%",
         "skillIdList": "317513|846",
@@ -1518,6 +1542,7 @@
       {
         "id": "225",
         "itemId": "322513",
+        "heroItemId": "13",
         "level": "1",
         "describe": "额外被动：敌人死亡时都会视为由萧十一郎击杀，己方上阵沈璧君时伤害加成+50%",
         "skillIdList": "322513",
@@ -1533,6 +1558,7 @@
       {
         "id": "246",
         "itemId": "324613",
+        "heroItemId": "13",
         "level": "1",
         "describe": "额外被动：敌人死亡时都会视为由武松击杀，己方上阵武大郎时伤害加成+50%",
         "skillIdList": "324613",
@@ -1548,6 +1574,7 @@
       {
         "id": "267",
         "itemId": "326713",
+        "heroItemId": "13",
         "level": "1",
         "describe": "技能强化：攻击时额外投掷2个斧子",
         "skillIdList": "",
@@ -1563,6 +1590,7 @@
       {
         "id": "296",
         "itemId": "329613",
+        "heroItemId": "13",
         "level": "1",
         "describe": "额外被动：初始上阵时即可生效满星被动，且每击杀一个目标自身伤害加成+2%",
         "skillIdList": "",
@@ -1578,6 +1606,7 @@
       {
         "id": "311",
         "itemId": "331113",
+        "heroItemId": "13",
         "level": "1",
         "describe": "技能强化：攻击时额外投掷2个斧子",
         "skillIdList": "",
@@ -1593,6 +1622,7 @@
       {
         "id": "350",
         "itemId": "335013",
+        "heroItemId": "13",
         "level": "1",
         "describe": "技能强化：攻击时额外投掷2个斧子",
         "skillIdList": "335013",
@@ -1716,6 +1746,7 @@
       {
         "id": "152",
         "itemId": "315214",
+        "heroItemId": "14",
         "level": "1",
         "describe": "额外被动：光环：攻击+30%",
         "skillIdList": "315214",
@@ -1821,6 +1852,7 @@
       {
         "id": "166",
         "itemId": "316615",
+        "heroItemId": "15",
         "level": "1",
         "describe": "额外被动：光环：魔抗+20%",
         "skillIdList": "316615",
@@ -2006,6 +2038,7 @@
       {
         "id": "130",
         "itemId": "313017",
+        "heroItemId": "17",
         "level": "1",
         "describe": "额外被动：上阵3战士时，战车免疫持续伤害、诅咒、减(攻)速效果",
         "skillIdList": "313017",
@@ -2021,6 +2054,7 @@
       {
         "id": "162",
         "itemId": "316217",
+        "heroItemId": "17",
         "level": "1",
         "describe": "额外被动：上阵3战士时，战车反伤减免+40%",
         "skillIdList": "316217",
@@ -2036,6 +2070,7 @@
       {
         "id": "224",
         "itemId": "322417",
+        "heroItemId": "17",
         "level": "1",
         "describe": "额外被动：上阵5战士时，全体PVE战斗中无视冰盾效果",
         "skillIdList": "322417",
@@ -2051,6 +2086,7 @@
       {
         "id": "240",
         "itemId": "324017",
+        "heroItemId": "17",
         "level": "1",
         "describe": "额外被动：上阵3战士时，全体攻击+3000",
         "skillIdList": "324017",
@@ -2066,6 +2102,7 @@
       {
         "id": "282",
         "itemId": "328217",
+        "heroItemId": "17",
         "level": "1",
         "describe": "额外被动：己方击杀目标时，额外获得当前上阵战士数量的银币",
         "skillIdList": "328217",
@@ -2081,6 +2118,7 @@
       {
         "id": "339",
         "itemId": "333917",
+        "heroItemId": "17",
         "level": "1",
         "describe": "额外被动：上阵5战士时，全体PVE战斗中无视冰盾效果",
         "skillIdList": "333917",
@@ -2096,6 +2134,7 @@
       {
         "id": "348",
         "itemId": "334817",
+        "heroItemId": "17",
         "level": "1",
         "describe": "额外被动：每上阵1个战士，所有战士PVE附加伤害+40000",
         "skillIdList": "334817",
@@ -2201,6 +2240,7 @@
       {
         "id": "108",
         "itemId": "310818",
+        "heroItemId": "18",
         "level": "1",
         "describe": "额外被动：每100银币攻速+1.5%",
         "skillIdList": "310818",
@@ -2216,6 +2256,7 @@
       {
         "id": "300",
         "itemId": "330018",
+        "heroItemId": "18",
         "level": "1",
         "describe": "额外被动：每100银币攻速+1.5%，且PVE附加伤害+80000",
         "skillIdList": "330018|310818",
@@ -2446,6 +2487,7 @@
       {
         "id": "210",
         "itemId": "321020",
+        "heroItemId": "20",
         "level": "1",
         "describe": "技能强化：技能攻击范围扩大至全屏，且使目标伤害减免-20%，持续10秒",
         "skillIdList": "",
@@ -2622,6 +2664,7 @@
       {
         "id": "111",
         "itemId": "311122",
+        "heroItemId": "22",
         "level": "1",
         "describe": "额外被动：上阵5猎人时，全体PVE战斗中无视冰盾效果",
         "skillIdList": "311122",
@@ -2637,6 +2680,7 @@
       {
         "id": "241",
         "itemId": "324122",
+        "heroItemId": "22",
         "level": "1",
         "describe": "额外被动：光环：攻击+30%",
         "skillIdList": "324122",
@@ -2652,6 +2696,7 @@
       {
         "id": "283",
         "itemId": "328322",
+        "heroItemId": "22",
         "level": "1",
         "describe": "额外被动：光环：附加伤害加成+30%",
         "skillIdList": "328322",
@@ -2667,6 +2712,7 @@
       {
         "id": "364",
         "itemId": "336422",
+        "heroItemId": "22",
         "level": "1",
         "describe": "额外被动：光环：附加伤害加成+30%",
         "skillIdList": "328322",
@@ -2843,6 +2889,7 @@
       {
         "id": "190",
         "itemId": "319024",
+        "heroItemId": "24",
         "level": "1",
         "describe": "技能强化：技能额外附带治疗效果-90%",
         "skillIdList": "",
@@ -2948,6 +2995,7 @@
       {
         "id": "140",
         "itemId": "314025",
+        "heroItemId": "25",
         "level": "1",
         "describe": "额外被动：光环：生命+25%",
         "skillIdList": "314025",
@@ -2963,6 +3011,7 @@
       {
         "id": "334",
         "itemId": "333425",
+        "heroItemId": "25",
         "level": "1",
         "describe": "额外被动：不触发职业被动时，全体护甲+20%、魔抗+20%",
         "skillIdList": "333425|5584",
@@ -2978,6 +3027,7 @@
       {
         "id": "365",
         "itemId": "336525",
+        "heroItemId": "25",
         "level": "1",
         "describe": "额外被动：同时视为牧师和术士职业",
         "skillIdList": "",
@@ -3083,6 +3133,7 @@
       {
         "id": "147",
         "itemId": "314726",
+        "heroItemId": "26",
         "level": "1",
         "describe": "额外被动：光环：攻速+30%",
         "skillIdList": "314726",
@@ -3098,6 +3149,7 @@
       {
         "id": "239",
         "itemId": "323926",
+        "heroItemId": "26",
         "level": "1",
         "describe": "额外被动：光环：敌方魔抗-20%",
         "skillIdList": "323926",
@@ -3113,6 +3165,7 @@
       {
         "id": "280",
         "itemId": "328026",
+        "heroItemId": "26",
         "level": "1",
         "describe": "额外被动：上阵5法师时，全体PVE战斗中无视冰盾效果",
         "skillIdList": "328026",
@@ -3128,6 +3181,7 @@
       {
         "id": "353",
         "itemId": "335326",
+        "heroItemId": "26",
         "level": "1",
         "describe": "额外被动：上阵5法师时，全体PVE战斗中无视冰盾效果",
         "skillIdList": "335326",
@@ -3233,6 +3287,7 @@
       {
         "id": "204",
         "itemId": "320427",
+        "heroItemId": "27",
         "level": "1",
         "describe": "额外被动：满星后，自身基础攻速+60%",
         "skillIdList": "",
@@ -3320,6 +3375,7 @@
       {
         "id": "336",
         "itemId": "333628",
+        "heroItemId": "28",
         "level": "1",
         "describe": "额外被动：光环：敌方纯粹减免-25%",
         "skillIdList": "333628",
@@ -3603,6 +3659,7 @@
       {
         "id": "142",
         "itemId": "314231",
+        "heroItemId": "31",
         "level": "1",
         "describe": "额外被动：光环：敌方治疗效果-50%",
         "skillIdList": "314231",
@@ -3618,6 +3675,7 @@
       {
         "id": "270",
         "itemId": "327031",
+        "heroItemId": "31",
         "level": "1",
         "describe": "额外被动：PVP战斗中，己方战车无视减疗和禁疗效果",
         "skillIdList": "327031",
@@ -3633,6 +3691,7 @@
       {
         "id": "303",
         "itemId": "330331",
+        "heroItemId": "31",
         "level": "1",
         "describe": "额外被动：满星后，己方天使获得祝福，攻速+300%",
         "skillIdList": "",
@@ -3738,6 +3797,7 @@
       {
         "id": "163",
         "itemId": "316332",
+        "heroItemId": "32",
         "level": "1",
         "describe": "额外被动：战车和小兵反弹10%伤害",
         "skillIdList": "316332",
@@ -3753,6 +3813,7 @@
       {
         "id": "243",
         "itemId": "324332",
+        "heroItemId": "32",
         "level": "1",
         "describe": "额外被动：战车和小兵反弹10%伤害",
         "skillIdList": "316332",
@@ -3768,6 +3829,7 @@
       {
         "id": "291",
         "itemId": "329132",
+        "heroItemId": "32",
         "level": "1",
         "describe": "额外被动：战车和小兵反弹10%伤害",
         "skillIdList": "316332",
@@ -3783,6 +3845,7 @@
       {
         "id": "301",
         "itemId": "330132",
+        "heroItemId": "32",
         "level": "1",
         "describe": "额外被动：上阵5牧师时，全体PVE战斗中无视冰盾效果",
         "skillIdList": "330132",
@@ -3798,6 +3861,7 @@
       {
         "id": "361",
         "itemId": "336132",
+        "heroItemId": "32",
         "level": "1",
         "describe": "额外被动：己方每上阵一个牧师，全体真实伤害加成+5%",
         "skillIdList": "336132",
@@ -3921,6 +3985,7 @@
       {
         "id": "101",
         "itemId": "310133",
+        "heroItemId": "33",
         "level": "1",
         "describe": "额外被动：光环：暴击+25%",
         "skillIdList": "310133",
@@ -3936,6 +4001,7 @@
       {
         "id": "133",
         "itemId": "313333",
+        "heroItemId": "33",
         "level": "1",
         "describe": "额外被动：战斗开始时必定出现在初始卡牌中",
         "skillIdList": "",
@@ -3951,6 +4017,7 @@
       {
         "id": "168",
         "itemId": "316833",
+        "heroItemId": "33",
         "level": "1",
         "describe": "额外被动：满星后，所在战车的同层英雄基础攻速+100%",
         "skillIdList": "",
@@ -3966,6 +4033,7 @@
       {
         "id": "254",
         "itemId": "325433",
+        "heroItemId": "33",
         "level": "1",
         "describe": "额外被动：满星后，所在战车的同层英雄基础攻速+100%",
         "skillIdList": "",
@@ -3981,6 +4049,7 @@
       {
         "id": "338",
         "itemId": "333833",
+        "heroItemId": "33",
         "level": "1",
         "describe": "额外被动：满星后，所在战车的同层英雄基础攻速+100%",
         "skillIdList": "",
@@ -3996,6 +4065,7 @@
       {
         "id": "355",
         "itemId": "335533",
+        "heroItemId": "33",
         "level": "1",
         "describe": "额外被动：满星后，所在战车的同层英雄连击+1（仅对连击英雄有效）",
         "skillIdList": "",
@@ -4011,6 +4081,7 @@
       {
         "id": "372",
         "itemId": "337233",
+        "heroItemId": "33",
         "level": "1",
         "describe": "额外被动：光环：暴击+25%，且自身技能附带眩晕效果（持续1秒）",
         "skillIdList": "310133",
@@ -4134,6 +4205,7 @@
       {
         "id": "146",
         "itemId": "314634",
+        "heroItemId": "34",
         "level": "1",
         "describe": "额外被动：被升星的英雄伤害加成+30%（此效果不可叠加）",
         "skillIdList": "",
@@ -4149,6 +4221,7 @@
       {
         "id": "268",
         "itemId": "326834",
+        "heroItemId": "34",
         "level": "1",
         "describe": "额外被动：被升星的英雄攻击+35%（此效果不可叠加）",
         "skillIdList": "",
@@ -4164,6 +4237,7 @@
       {
         "id": "324",
         "itemId": "332434",
+        "heroItemId": "34",
         "level": "1",
         "describe": "额外被动：被升星的英雄基础攻速-0.15秒（此效果不可叠加）",
         "skillIdList": "332434",
@@ -4269,6 +4343,7 @@
       {
         "id": "159",
         "itemId": "315935",
+        "heroItemId": "35",
         "level": "1",
         "describe": "技能强化：降低目标25%伤害减免，持续6秒",
         "skillIdList": "",
@@ -4284,6 +4359,7 @@
       {
         "id": "260",
         "itemId": "326035",
+        "heroItemId": "35",
         "level": "1",
         "describe": "技能强化：技能附带禁疗效果（无法获得治疗），持续6秒",
         "skillIdList": "",
@@ -4389,6 +4465,7 @@
       {
         "id": "107",
         "itemId": "310736",
+        "heroItemId": "36",
         "level": "1",
         "describe": "技能强化：成功召唤时有30%概率额外召唤1个空投宝箱",
         "skillIdList": "310736",
@@ -4404,6 +4481,7 @@
       {
         "id": "149",
         "itemId": "314936",
+        "heroItemId": "36",
         "level": "1",
         "describe": "技能强化：攻速提升至6秒/次",
         "skillIdList": "314936",
@@ -4419,6 +4497,7 @@
       {
         "id": "198",
         "itemId": "319836",
+        "heroItemId": "36",
         "level": "1",
         "describe": "额外被动：PVP技能额外在场中央召唤1只机械猴，且上阵5召唤时，全体PVE战斗中无视冰盾效果",
         "skillIdList": "319836|103600",
@@ -4542,6 +4621,7 @@
       {
         "id": "185",
         "itemId": "318537",
+        "heroItemId": "37",
         "level": "1",
         "describe": "技能强化：召唤哮天犬，技能转为魔法伤害，满星后哮天犬额外造成目标1%生命上限伤害",
         "skillIdList": "",
@@ -4557,6 +4637,7 @@
       {
         "id": "250",
         "itemId": "325037",
+        "heroItemId": "37",
         "level": "1",
         "describe": "技能强化：召唤麒麟，技能转为魔法伤害，满星后麒麟额外造成目标1%生命上限伤害",
         "skillIdList": "",
@@ -4662,6 +4743,7 @@
       {
         "id": "112",
         "itemId": "311238",
+        "heroItemId": "38",
         "level": "1",
         "describe": "额外被动：光环：敌方暴击-20%",
         "skillIdList": "311238",
@@ -4677,6 +4759,7 @@
       {
         "id": "345",
         "itemId": "334538",
+        "heroItemId": "38",
         "level": "1",
         "describe": "额外被动：满星后，己方邪能火炮攻速+300%",
         "skillIdList": "334638",
@@ -4692,6 +4775,7 @@
       {
         "id": "367",
         "itemId": "336738",
+        "heroItemId": "38",
         "level": "1",
         "describe": "额外被动：光环：敌方攻击-20%",
         "skillIdList": "336738",
@@ -4815,6 +4899,7 @@
       {
         "id": "212",
         "itemId": "321239",
+        "heroItemId": "39",
         "level": "1",
         "describe": "额外被动：改变自身装备时，可将橙色品质装备强化为红色品质",
         "skillIdList": "",
@@ -4830,6 +4915,7 @@
       {
         "id": "277",
         "itemId": "327739",
+        "heroItemId": "39",
         "level": "1",
         "describe": "额外被动：改变自身装备时，可将橙色品质装备强化为红色品质",
         "skillIdList": "",
@@ -4935,6 +5021,7 @@
       {
         "id": "145",
         "itemId": "314540",
+        "heroItemId": "40",
         "level": "1",
         "describe": "额外被动：被降低星级的英雄伤害加成-30%（此效果不可叠加）",
         "skillIdList": "",
@@ -5202,6 +5289,7 @@
       {
         "id": "102",
         "itemId": "310241",
+        "heroItemId": "41",
         "level": "1",
         "describe": "额外被动：场上有相同英雄时，己方相同的英雄的伤害和治疗额外增加2倍",
         "skillIdList": "310241",
@@ -5217,6 +5305,7 @@
       {
         "id": "209",
         "itemId": "320941",
+        "heroItemId": "41",
         "level": "1",
         "describe": "额外被动：无视敌方萌萌被动，且满星后场上同样英雄攻击+120%",
         "skillIdList": "",
@@ -5232,6 +5321,7 @@
       {
         "id": "248",
         "itemId": "324841",
+        "heroItemId": "41",
         "level": "1",
         "describe": "额外被动：无视敌方萌萌被动，且满星后场上同样英雄攻击+120%",
         "skillIdList": "",
@@ -5247,6 +5337,7 @@
       {
         "id": "264",
         "itemId": "326441",
+        "heroItemId": "41",
         "level": "1",
         "describe": "额外被动：无视敌方萌萌被动，且施放技能时额外附带1个目标为随机英雄的泡泡",
         "skillIdList": "",
@@ -5262,6 +5353,7 @@
       {
         "id": "316",
         "itemId": "331641",
+        "heroItemId": "41",
         "level": "1",
         "describe": "额外被动：无视敌方萌萌被动，且满星后场上同样英雄攻击+120%",
         "skillIdList": "",
@@ -5277,6 +5369,7 @@
       {
         "id": "342",
         "itemId": "334241",
+        "heroItemId": "41",
         "level": "1",
         "describe": "额外被动：无视敌方萌萌被动，且满星后场上同样英雄附加伤害加成+100%",
         "skillIdList": "",
@@ -5292,6 +5385,7 @@
       {
         "id": "375",
         "itemId": "337541",
+        "heroItemId": "41",
         "level": "1",
         "describe": "额外被动：泡泡命中敌方战车时，对战车造成6%生命上限伤害",
         "skillIdList": "337541|337641",
@@ -5397,6 +5491,7 @@
       {
         "id": "172",
         "itemId": "317242",
+        "heroItemId": "42",
         "level": "1",
         "describe": "额外被动：战车伤害减免+10%",
         "skillIdList": "317242",
@@ -5520,6 +5615,7 @@
       {
         "id": "105",
         "itemId": "310543",
+        "heroItemId": "43",
         "level": "1",
         "describe": "额外被动：自身攻击+999",
         "skillIdList": "310543",
@@ -5535,6 +5631,7 @@
       {
         "id": "187",
         "itemId": "318743",
+        "heroItemId": "43",
         "level": "1",
         "describe": "额外被动：满星后，全体攻速+30%",
         "skillIdList": "",
@@ -5550,6 +5647,7 @@
       {
         "id": "188",
         "itemId": "318843",
+        "heroItemId": "43",
         "level": "1",
         "describe": "额外被动：满星后，全体攻速+60%",
         "skillIdList": "",
@@ -5565,6 +5663,7 @@
       {
         "id": "272",
         "itemId": "327243",
+        "heroItemId": "43",
         "level": "1",
         "describe": "额外被动：自身PVE附加伤害+320000",
         "skillIdList": "327243",
@@ -5580,6 +5679,7 @@
       {
         "id": "302",
         "itemId": "330243",
+        "heroItemId": "43",
         "level": "1",
         "describe": "额外被动：基础攻速+25%",
         "skillIdList": "",
@@ -5595,6 +5695,7 @@
       {
         "id": "359",
         "itemId": "335943",
+        "heroItemId": "43",
         "level": "1",
         "describe": "技能强化：攻击不再分裂，变为对目标造成2连击",
         "skillIdList": "",
@@ -5718,6 +5819,7 @@
       {
         "id": "158",
         "itemId": "315844",
+        "heroItemId": "44",
         "level": "1",
         "describe": "技能强化：生效时提高战车25%伤害减免，持续6秒",
         "skillIdList": "",
@@ -5841,6 +5943,7 @@
       {
         "id": "110",
         "itemId": "311045",
+        "heroItemId": "45",
         "level": "1",
         "describe": "额外被动：战车生命每-1%，自身命中+0.8%，且刷新概率提高30%",
         "skillIdList": "311045|862",
@@ -5856,6 +5959,7 @@
       {
         "id": "132",
         "itemId": "313245",
+        "heroItemId": "45",
         "level": "1",
         "describe": "额外被动：战车生命每-1%，则战车伤害减免+0.6%",
         "skillIdList": "313245",
@@ -5871,6 +5975,7 @@
       {
         "id": "139",
         "itemId": "313945",
+        "heroItemId": "45",
         "level": "1",
         "describe": "额外被动：战车生命每-1%，则战车伤害减免+0.6%",
         "skillIdList": "313245",
@@ -5886,6 +5991,7 @@
       {
         "id": "164",
         "itemId": "316445",
+        "heroItemId": "45",
         "level": "1",
         "describe": "额外被动：战车生命每-1%，则自身伤害加成+0.8%",
         "skillIdList": "316445",
@@ -5901,6 +6007,7 @@
       {
         "id": "234",
         "itemId": "323445",
+        "heroItemId": "45",
         "level": "1",
         "describe": "额外被动：战车生命每-1%，则自身吸血+0.8%，且己方上阵小李飞刀时伤害加成+50%",
         "skillIdList": "323445|4045",
@@ -5916,6 +6023,7 @@
       {
         "id": "285",
         "itemId": "328545",
+        "heroItemId": "45",
         "level": "1",
         "describe": "额外被动：攻击附带目标3%生命上限伤害",
         "skillIdList": "328545",
@@ -5931,6 +6039,7 @@
       {
         "id": "331",
         "itemId": "333145",
+        "heroItemId": "45",
         "level": "2",
         "describe": "额外被动：初始上阵时自动升为蓝星，且刷新概率提高30%",
         "skillIdList": "311045",
@@ -5946,6 +6055,7 @@
       {
         "id": "369",
         "itemId": "336945",
+        "heroItemId": "45",
         "level": "1",
         "describe": "额外被动：攻击有10%概率施放亢龙有悔，对全屏造成600%攻击伤害",
         "skillIdList": "",
@@ -6051,6 +6161,7 @@
       {
         "id": "189",
         "itemId": "318946",
+        "heroItemId": "46",
         "level": "1",
         "describe": "额外被动：对手或队友获得银币时额外获得10%收益，且暗月岛中将己方全体视为哥布林",
         "skillIdList": "",
@@ -6174,6 +6285,7 @@
       {
         "id": "124",
         "itemId": "312447",
+        "heroItemId": "47",
         "level": "1",
         "describe": "额外被动：基础攻速+25%",
         "skillIdList": "",
@@ -6189,6 +6301,7 @@
       {
         "id": "219",
         "itemId": "321947",
+        "heroItemId": "47",
         "level": "1",
         "describe": "额外被动：基础攻速+25%",
         "skillIdList": "",
@@ -6204,6 +6317,7 @@
       {
         "id": "247",
         "itemId": "324747",
+        "heroItemId": "47",
         "level": "1",
         "describe": "额外被动：满星后，额外吞噬自身击杀的目标",
         "skillIdList": "",
@@ -6309,6 +6423,7 @@
       {
         "id": "114",
         "itemId": "311448",
+        "heroItemId": "48",
         "level": "1",
         "describe": "额外被动：光环：伤害加成+15%",
         "skillIdList": "311448",
@@ -6324,6 +6439,7 @@
       {
         "id": "356",
         "itemId": "335648",
+        "heroItemId": "48",
         "level": "1",
         "describe": "额外被动：光环：真实伤害加成+10%",
         "skillIdList": "335648",
@@ -6447,6 +6563,7 @@
       {
         "id": "115",
         "itemId": "311549",
+        "heroItemId": "49",
         "level": "1",
         "describe": "额外被动：可召唤烈焰神龙，攻击点燃目标(每秒造成3%生命上限真实伤害，持续10秒)",
         "skillIdList": "",
@@ -6462,6 +6579,7 @@
       {
         "id": "292",
         "itemId": "329249",
+        "heroItemId": "49",
         "level": "1",
         "describe": "额外被动：触发自身技能效果再次施放精灵时，有相同概率再次施放",
         "skillIdList": "",
@@ -6585,6 +6703,7 @@
       {
         "id": "155",
         "itemId": "315550",
+        "heroItemId": "50",
         "level": "1",
         "describe": "技能强化：生效期间额外提高全体英雄25%攻速",
         "skillIdList": "",
@@ -6600,6 +6719,7 @@
       {
         "id": "191",
         "itemId": "319150",
+        "heroItemId": "50",
         "level": "1",
         "describe": "技能强化：使用时消耗生命降低为12%当前生命",
         "skillIdList": "",
@@ -6615,6 +6735,7 @@
       {
         "id": "192",
         "itemId": "319250",
+        "heroItemId": "50",
         "level": "1",
         "describe": "技能强化：使用时不再消耗生命",
         "skillIdList": "",
@@ -6630,6 +6751,7 @@
       {
         "id": "325",
         "itemId": "332550",
+        "heroItemId": "50",
         "level": "1",
         "describe": "技能强化：消耗战车50%当前生命，生效期间额外提高全体英雄50%伤害加成",
         "skillIdList": "",
@@ -6753,6 +6875,7 @@
       {
         "id": "131",
         "itemId": "313151",
+        "heroItemId": "51",
         "level": "1",
         "describe": "额外被动：满星后，自身伤害加成+80%",
         "skillIdList": "",
@@ -6768,6 +6891,7 @@
       {
         "id": "138",
         "itemId": "313851",
+        "heroItemId": "51",
         "level": "1",
         "describe": "额外被动：满星后，自身伤害加成+80%",
         "skillIdList": "",
@@ -6783,6 +6907,7 @@
       {
         "id": "249",
         "itemId": "324951",
+        "heroItemId": "51",
         "level": "1",
         "describe": "额外被动：触发无敌期间，每次被击回复战车生命上限1.5%的生命",
         "skillIdList": "324951",
@@ -6798,6 +6923,7 @@
       {
         "id": "293",
         "itemId": "329351",
+        "heroItemId": "51",
         "level": "1",
         "describe": "额外被动：触发无敌期间，每次被击回复战车生命上限1.5%的生命",
         "skillIdList": "324951",
@@ -6903,6 +7029,7 @@
       {
         "id": "109",
         "itemId": "310952",
+        "heroItemId": "52",
         "level": "1",
         "describe": "额外被动：光环：伤害减免+10%",
         "skillIdList": "310952",
@@ -6918,6 +7045,7 @@
       {
         "id": "317",
         "itemId": "331752",
+        "heroItemId": "52",
         "level": "1",
         "describe": "额外被动：不触发职业被动时，全体伤害减免+25%",
         "skillIdList": "331752",
@@ -6933,6 +7061,7 @@
       {
         "id": "368",
         "itemId": "336852",
+        "heroItemId": "52",
         "level": "1",
         "describe": "额外被动：光环：PVE附加伤害+77000",
         "skillIdList": "336852",
@@ -7056,6 +7185,7 @@
       {
         "id": "119",
         "itemId": "311953",
+        "heroItemId": "53",
         "level": "1",
         "describe": "额外被动：触发攻速增益期间全体猎人伤害加成+50%",
         "skillIdList": "",
@@ -7071,6 +7201,7 @@
       {
         "id": "183",
         "itemId": "318353",
+        "heroItemId": "53",
         "level": "1",
         "describe": "被动强化：被动触发时猎人攻速增益提升至600%",
         "skillIdList": "",
@@ -7086,6 +7217,7 @@
       {
         "id": "184",
         "itemId": "318453",
+        "heroItemId": "53",
         "level": "1",
         "describe": "被动强化：被动触发时猎人攻速增益提升至750%",
         "skillIdList": "",
@@ -7101,6 +7233,7 @@
       {
         "id": "313",
         "itemId": "331353",
+        "heroItemId": "53",
         "level": "1",
         "describe": "额外被动：自身提高猎人500%攻速的触发几率翻倍",
         "skillIdList": "",
@@ -7116,6 +7249,7 @@
       {
         "id": "374",
         "itemId": "337453",
+        "heroItemId": "53",
         "level": "1",
         "describe": "额外被动：触发攻速增益期间全体猎人附加伤害加成+100%",
         "skillIdList": "",
@@ -7221,6 +7355,7 @@
       {
         "id": "117",
         "itemId": "311754",
+        "heroItemId": "54",
         "level": "1",
         "describe": "额外被动：每击杀1个目标自身攻击+200",
         "skillIdList": "311754",
@@ -7344,6 +7479,7 @@
       {
         "id": "177",
         "itemId": "317755",
+        "heroItemId": "55",
         "level": "1",
         "describe": "额外被动：全体反伤减免+20%，被控-50%",
         "skillIdList": "317755|844",
@@ -7359,6 +7495,7 @@
       {
         "id": "232",
         "itemId": "323255",
+        "heroItemId": "55",
         "level": "1",
         "describe": "额外被动：全体反伤减免+20%，被控-50%",
         "skillIdList": "317755|844",
@@ -7464,6 +7601,7 @@
       {
         "id": "153",
         "itemId": "315356",
+        "heroItemId": "56",
         "level": "1",
         "describe": "额外被动：光环：敌方魔抗-20%",
         "skillIdList": "315356",
@@ -7479,6 +7617,7 @@
       {
         "id": "358",
         "itemId": "335856",
+        "heroItemId": "56",
         "level": "1",
         "describe": "技能强化：点燃目标时，点燃持续伤害翻倍",
         "skillIdList": "",
@@ -7602,6 +7741,7 @@
       {
         "id": "136",
         "itemId": "313657",
+        "heroItemId": "57",
         "level": "1",
         "describe": "额外被动：每次变出烟花时，为己方战车回复生命上限35%的生命",
         "skillIdList": "313657",
@@ -7617,6 +7757,7 @@
       {
         "id": "221",
         "itemId": "322157",
+        "heroItemId": "57",
         "level": "1",
         "describe": "额外被动：变出烟花时，随机打出1-5筒麻将，对敌方战车造成点数*10%当前生命伤害",
         "skillIdList": "322157",
@@ -7632,6 +7773,7 @@
       {
         "id": "222",
         "itemId": "322257",
+        "heroItemId": "57",
         "level": "1",
         "describe": "额外被动：变出烟花时，随机打出1-9筒麻将，对敌方战车造成点数*10%当前生命伤害",
         "skillIdList": "322257",
@@ -7647,6 +7789,7 @@
       {
         "id": "279",
         "itemId": "327957",
+        "heroItemId": "57",
         "level": "1",
         "describe": "额外被动：复制敌方战车使用的精灵（按自身精灵效果复制）",
         "skillIdList": "327957",
@@ -7662,6 +7805,7 @@
       {
         "id": "371",
         "itemId": "337157",
+        "heroItemId": "57",
         "level": "1",
         "describe": "额外被动：战斗开始时必定出现在初始卡牌中",
         "skillIdList": "",
@@ -7785,6 +7929,7 @@
       {
         "id": "137",
         "itemId": "313758",
+        "heroItemId": "58",
         "level": "1",
         "describe": "额外被动：己方每上阵一个职业核心，所有英雄伤害加成+15%",
         "skillIdList": "313758",
@@ -7800,6 +7945,7 @@
       {
         "id": "150",
         "itemId": "315058",
+        "heroItemId": "58",
         "level": "1",
         "describe": "额外被动：己方每上阵一个职业核心，战车伤害减免+10%",
         "skillIdList": "315058",
@@ -7815,6 +7961,7 @@
       {
         "id": "229",
         "itemId": "322958",
+        "heroItemId": "58",
         "level": "1",
         "describe": "额外被动：己方每上阵一个职业核心，战车伤害减免+10%",
         "skillIdList": "322958",
@@ -7830,6 +7977,7 @@
       {
         "id": "244",
         "itemId": "324458",
+        "heroItemId": "58",
         "level": "1",
         "describe": "额外被动：己方每上阵一个职业核心，战车生命+15%",
         "skillIdList": "324458",
@@ -7845,6 +7993,7 @@
       {
         "id": "275",
         "itemId": "327558",
+        "heroItemId": "58",
         "level": "1",
         "describe": "额外被动：己方每上阵一个职业核心，战车伤害减免+10%",
         "skillIdList": "322958",
@@ -7860,6 +8009,7 @@
       {
         "id": "290",
         "itemId": "329058",
+        "heroItemId": "58",
         "level": "1",
         "describe": "额外被动：己方每上阵一个职业核心，战车生命+15%",
         "skillIdList": "324458",
@@ -7875,6 +8025,7 @@
       {
         "id": "297",
         "itemId": "329758",
+        "heroItemId": "58",
         "level": "1",
         "describe": "额外被动：诅咒敌方战车，使敌方出售收益失效",
         "skillIdList": "329758",
@@ -7890,6 +8041,7 @@
       {
         "id": "326",
         "itemId": "332658",
+        "heroItemId": "58",
         "level": "1",
         "describe": "额外被动：不触发职业被动时，全体附加伤害加成+50%",
         "skillIdList": "332658",
@@ -7905,6 +8057,7 @@
       {
         "id": "362",
         "itemId": "336258",
+        "heroItemId": "58",
         "level": "1",
         "describe": "额外被动：己方每上阵一个职业核心，全体附加伤害加成+30%",
         "skillIdList": "336258|336158",
@@ -8028,6 +8181,7 @@
       {
         "id": "129",
         "itemId": "312959",
+        "heroItemId": "59",
         "level": "1",
         "describe": "额外被动：基础攻速+25%",
         "skillIdList": "",
@@ -8043,6 +8197,7 @@
       {
         "id": "216",
         "itemId": "321659",
+        "heroItemId": "59",
         "level": "1",
         "describe": "额外被动：战斗中每秒自身伤害加成+0.8%，且攻击必定命中",
         "skillIdList": "321659|105901",
@@ -8058,6 +8213,7 @@
       {
         "id": "346",
         "itemId": "334659",
+        "heroItemId": "59",
         "level": "1",
         "describe": "额外被动：真实伤害+40%，己方上阵包婆婆时基础攻速-0.5秒",
         "skillIdList": "334659",
@@ -8073,6 +8229,7 @@
       {
         "id": "378",
         "itemId": "337859",
+        "heroItemId": "59",
         "level": "1",
         "describe": "额外被动：战斗中同时视为工程和法师职业，己方上阵莫大叔时自身真实伤害+40%",
         "skillIdList": "337859",
@@ -8196,6 +8353,7 @@
       {
         "id": "288",
         "itemId": "328860",
+        "heroItemId": "60",
         "level": "1",
         "describe": "额外被动：光环：敌方基础攻速+1秒",
         "skillIdList": "328860",
@@ -8211,6 +8369,7 @@
       {
         "id": "307",
         "itemId": "330760",
+        "heroItemId": "60",
         "level": "1",
         "describe": "额外被动：满星后，全体PVP战斗中无视冰盾效果",
         "skillIdList": "",
@@ -8334,6 +8493,7 @@
       {
         "id": "170",
         "itemId": "317061",
+        "heroItemId": "61",
         "level": "1",
         "describe": "额外被动：不触发职业被动时，全体暴击+25%",
         "skillIdList": "317061",
@@ -8349,6 +8509,7 @@
       {
         "id": "171",
         "itemId": "317161",
+        "heroItemId": "61",
         "level": "1",
         "describe": "额外被动：不触发职业被动时，全体暴击+25%，且PVE战斗中无视冰盾效果",
         "skillIdList": "317161|847",
@@ -8364,6 +8525,7 @@
       {
         "id": "255",
         "itemId": "325561",
+        "heroItemId": "61",
         "level": "1",
         "describe": "额外被动：不触发职业被动时，全体暴击+25%，且PVE战斗中无视冰盾效果",
         "skillIdList": "317161|847",
@@ -8379,6 +8541,7 @@
       {
         "id": "330",
         "itemId": "333061",
+        "heroItemId": "61",
         "level": "1",
         "describe": "额外被动：不触发职业被动时，全体附加伤害+50%，且PVE战斗中无视冰盾效果",
         "skillIdList": "333061|4261|4267",
@@ -8502,6 +8665,7 @@
       {
         "id": "123",
         "itemId": "312362",
+        "heroItemId": "62",
         "level": "1",
         "describe": "额外被动：敌方战车每上阵一个英雄，自身攻速+20%",
         "skillIdList": "312362",
@@ -8732,6 +8896,7 @@
       {
         "id": "106",
         "itemId": "310664",
+        "heroItemId": "64",
         "level": "1",
         "describe": "额外被动：敌方暴击-25%",
         "skillIdList": "310664",
@@ -8747,6 +8912,7 @@
       {
         "id": "169",
         "itemId": "316964",
+        "heroItemId": "64",
         "level": "1",
         "describe": "额外被动：己方所有牧师攻速+100%",
         "skillIdList": "316964",
@@ -8762,6 +8928,7 @@
       {
         "id": "256",
         "itemId": "325664",
+        "heroItemId": "64",
         "level": "1",
         "describe": "额外被动：己方所有牧师攻速+100%",
         "skillIdList": "316964",
@@ -8777,6 +8944,7 @@
       {
         "id": "351",
         "itemId": "335164",
+        "heroItemId": "64",
         "level": "1",
         "describe": "额外被动：己方所有牧师攻速+100%，与林平之出战时，魔化·林平之·战将连击+1",
         "skillIdList": "316964",
@@ -8900,6 +9068,7 @@
       {
         "id": "116",
         "itemId": "311665",
+        "heroItemId": "65",
         "level": "1",
         "describe": "额外被动：攻击有5%概率召唤幽灵船，对全屏目标造成2000%伤害",
         "skillIdList": "",
@@ -8915,6 +9084,7 @@
       {
         "id": "286",
         "itemId": "328665",
+        "heroItemId": "65",
         "level": "1",
         "describe": "额外被动：自身诅咒伤害+60%",
         "skillIdList": "",
@@ -8930,6 +9100,7 @@
       {
         "id": "340",
         "itemId": "334065",
+        "heroItemId": "65",
         "level": "1",
         "describe": "额外被动：每上阵1个猎人，所有猎人PVE附加伤害+40000",
         "skillIdList": "334065",
@@ -9053,6 +9224,7 @@
       {
         "id": "206",
         "itemId": "320666",
+        "heroItemId": "66",
         "level": "1",
         "describe": "技能强化：升级战车概率+5%",
         "skillIdList": "320666",
@@ -9068,6 +9240,7 @@
       {
         "id": "207",
         "itemId": "320766",
+        "heroItemId": "66",
         "level": "1",
         "describe": "技能强化：升级战车概率+10%",
         "skillIdList": "320766",
@@ -9191,6 +9364,7 @@
       {
         "id": "141",
         "itemId": "314167",
+        "heroItemId": "67",
         "level": "1",
         "describe": "额外被动：战斗中，自身职业替换为猎人",
         "skillIdList": "",
@@ -9206,6 +9380,7 @@
       {
         "id": "196",
         "itemId": "319667",
+        "heroItemId": "67",
         "level": "1",
         "describe": "额外被动：自身攻击+1500",
         "skillIdList": "319667",
@@ -9221,6 +9396,7 @@
       {
         "id": "197",
         "itemId": "319767",
+        "heroItemId": "67",
         "level": "1",
         "describe": "额外被动：满星后，自身伤害加成+80%",
         "skillIdList": "",
@@ -9236,6 +9412,7 @@
       {
         "id": "329",
         "itemId": "332967",
+        "heroItemId": "67",
         "level": "1",
         "describe": "额外被动：自身PVE附加伤害+320000，己方上阵包有为时附加伤害额外+320000",
         "skillIdList": "332967",
@@ -9251,6 +9428,7 @@
       {
         "id": "373",
         "itemId": "337367",
+        "heroItemId": "67",
         "level": "1",
         "describe": "额外被动：战斗中，同时视为法师和战士职业",
         "skillIdList": "",
@@ -9374,6 +9552,7 @@
       {
         "id": "125",
         "itemId": "312568",
+        "heroItemId": "68",
         "level": "1",
         "describe": "额外被动：召唤后赋予本次召唤的雷云无敌，持续3秒",
         "skillIdList": "",
@@ -9389,6 +9568,7 @@
       {
         "id": "161",
         "itemId": "316168",
+        "heroItemId": "68",
         "level": "1",
         "describe": "技能强化：在远端召唤静止的祥云，且技能攻击范围+50%",
         "skillIdList": "",
@@ -9404,6 +9584,7 @@
       {
         "id": "186",
         "itemId": "318668",
+        "heroItemId": "68",
         "level": "1",
         "describe": "额外被动：召唤后赋予本次召唤的雷云无敌，持续3秒",
         "skillIdList": "",
@@ -9419,6 +9600,7 @@
       {
         "id": "259",
         "itemId": "325968",
+        "heroItemId": "68",
         "level": "1",
         "describe": "额外被动：满星后，自身召唤的雷云基础攻速+100%",
         "skillIdList": "",
@@ -9542,6 +9724,7 @@
       {
         "id": "127",
         "itemId": "312769",
+        "heroItemId": "69",
         "level": "1",
         "describe": "额外被动：每上阵1个战士，所有战士伤害加成+15%",
         "skillIdList": "312769",
@@ -9557,6 +9740,7 @@
       {
         "id": "252",
         "itemId": "325269",
+        "heroItemId": "69",
         "level": "1",
         "describe": "额外被动：每上阵1个战士，所有战士伤害加成+15%",
         "skillIdList": "312769",
@@ -9680,6 +9864,7 @@
       {
         "id": "258",
         "itemId": "325870",
+        "heroItemId": "70",
         "level": "1",
         "describe": "技能强化：技能额外附带治疗效果-180%",
         "skillIdList": "",
@@ -9695,6 +9880,7 @@
       {
         "id": "327",
         "itemId": "332770",
+        "heroItemId": "70",
         "level": "1",
         "describe": "额外被动：光环：敌方护甲-40%",
         "skillIdList": "332770",
@@ -9818,6 +10004,7 @@
       {
         "id": "118",
         "itemId": "311871",
+        "heroItemId": "71",
         "level": "1",
         "describe": "额外被动：每复制1次技能自身攻速+2%",
         "skillIdList": "311871",
@@ -9833,6 +10020,7 @@
       {
         "id": "181",
         "itemId": "318171",
+        "heroItemId": "71",
         "level": "1",
         "describe": "额外被动：每复制1次技能自身攻速+2%",
         "skillIdList": "318171",
@@ -9956,6 +10144,7 @@
       {
         "id": "121",
         "itemId": "312172",
+        "heroItemId": "72",
         "level": "1",
         "describe": "额外被动：战斗中，自身职业替换为法师",
         "skillIdList": "",
@@ -9971,6 +10160,7 @@
       {
         "id": "143",
         "itemId": "314372",
+        "heroItemId": "72",
         "level": "1",
         "describe": "额外被动：战斗中，自身职业替换为法师",
         "skillIdList": "",
@@ -9986,6 +10176,7 @@
       {
         "id": "194",
         "itemId": "319472",
+        "heroItemId": "72",
         "level": "1",
         "describe": "额外被动：战斗中，自身职业替换为猎人",
         "skillIdList": "",
@@ -10001,6 +10192,7 @@
       {
         "id": "226",
         "itemId": "322672",
+        "heroItemId": "72",
         "level": "1",
         "describe": "额外被动：每次治疗后使所在战车攻击最高的英雄PVE附加伤害+240000（优先连击英雄），持续6秒",
         "skillIdList": "",
@@ -10016,6 +10208,7 @@
       {
         "id": "235",
         "itemId": "323572",
+        "heroItemId": "72",
         "level": "1",
         "describe": "额外被动：战斗中，自身职业替换为术士",
         "skillIdList": "",
@@ -10031,6 +10224,7 @@
       {
         "id": "266",
         "itemId": "326672",
+        "heroItemId": "72",
         "level": "1",
         "describe": "额外被动：战斗中，自身职业替换为猎人",
         "skillIdList": "",
@@ -10046,6 +10240,7 @@
       {
         "id": "289",
         "itemId": "328972",
+        "heroItemId": "72",
         "level": "1",
         "describe": "额外被动：全体PVE附加伤害+100000，且触发无敌时间延长3秒",
         "skillIdList": "328972",
@@ -10061,6 +10256,7 @@
       {
         "id": "310",
         "itemId": "331072",
+        "heroItemId": "72",
         "level": "1",
         "describe": "额外被动：全体真实伤害加成+10%，与黄飞鸿出战时，魔化·黄飞鸿·战将连击+1",
         "skillIdList": "331072",
@@ -10076,6 +10272,7 @@
       {
         "id": "319",
         "itemId": "331972",
+        "heroItemId": "72",
         "level": "1",
         "describe": "额外被动：战斗中，自身职业替换为熊猫",
         "skillIdList": "",
@@ -10091,6 +10288,7 @@
       {
         "id": "347",
         "itemId": "334772",
+        "heroItemId": "72",
         "level": "1",
         "describe": "额外被动：触发无敌时间+100%，不触发职业被动时自身基础攻速+100%",
         "skillIdList": "335372",
@@ -10106,6 +10304,7 @@
       {
         "id": "379",
         "itemId": "337972",
+        "heroItemId": "72",
         "level": "1",
         "describe": "额外被动：每上阵1个战士，自身攻速+60%",
         "skillIdList": "337972|338072",
@@ -10229,6 +10428,7 @@
       {
         "id": "182",
         "itemId": "318273",
+        "heroItemId": "73",
         "level": "1",
         "describe": "额外被动：每击杀1个目标自身攻速+3%",
         "skillIdList": "318273",
@@ -10352,6 +10552,7 @@
       {
         "id": "135",
         "itemId": "313574",
+        "heroItemId": "74",
         "level": "1",
         "describe": "额外被动：己方上阵霸王和狂龙时，攻击有5%概率施放机甲合体技对全屏造成巨量伤害",
         "skillIdList": "",
@@ -10367,6 +10568,7 @@
       {
         "id": "245",
         "itemId": "324574",
+        "heroItemId": "74",
         "level": "1",
         "describe": "额外被动：每击杀一个目标自身伤害加成+2%",
         "skillIdList": "324574",
@@ -10382,6 +10584,7 @@
       {
         "id": "314",
         "itemId": "331474",
+        "heroItemId": "74",
         "level": "1",
         "describe": "技能强化：己方上阵霸王和狂龙时，释放技能有50%概率降低对方英雄星级，对1星和满星英雄无效",
         "skillIdList": "",
@@ -10487,6 +10690,7 @@
       {
         "id": "156",
         "itemId": "315675",
+        "heroItemId": "75",
         "level": "1",
         "describe": "额外被动：光环：护甲+10",
         "skillIdList": "315675",
@@ -10502,6 +10706,7 @@
       {
         "id": "180",
         "itemId": "318075",
+        "heroItemId": "75",
         "level": "1",
         "describe": "额外被动：光环：护甲+20%",
         "skillIdList": "318075",
@@ -10625,6 +10830,7 @@
       {
         "id": "208",
         "itemId": "320876",
+        "heroItemId": "76",
         "level": "1",
         "describe": "技能强化：使目标伤害减免-30%，持续10秒",
         "skillIdList": "",
@@ -10640,6 +10846,7 @@
       {
         "id": "304",
         "itemId": "330476",
+        "heroItemId": "76",
         "level": "1",
         "describe": "额外被动：光环：敌方牧师英雄攻击-60%",
         "skillIdList": "330476",
@@ -10745,6 +10952,7 @@
       {
         "id": "160",
         "itemId": "316077",
+        "heroItemId": "77",
         "level": "1",
         "describe": "额外被动：光环：命中+10%，且每2秒获得1银币",
         "skillIdList": "316077|107700",
@@ -10760,6 +10968,7 @@
       {
         "id": "199",
         "itemId": "319977",
+        "heroItemId": "77",
         "level": "1",
         "describe": "额外被动：光环：命中+10%，且战车受治疗效果+25%",
         "skillIdList": "319977|107701",
@@ -10883,6 +11092,7 @@
       {
         "id": "134",
         "itemId": "313478",
+        "heroItemId": "78",
         "level": "1",
         "describe": "额外被动：基础攻速+20%",
         "skillIdList": "",
@@ -10898,6 +11108,7 @@
       {
         "id": "201",
         "itemId": "320178",
+        "heroItemId": "78",
         "level": "1",
         "describe": "额外被动：战车每次触发闪避时，自身伤害加成+0.2%",
         "skillIdList": "320178",
@@ -10913,6 +11124,7 @@
       {
         "id": "251",
         "itemId": "325178",
+        "heroItemId": "78",
         "level": "1",
         "describe": "额外被动：战车每次触发闪避时，自身伤害加成+0.2%",
         "skillIdList": "320178",
@@ -10928,6 +11140,7 @@
       {
         "id": "274",
         "itemId": "327478",
+        "heroItemId": "78",
         "level": "1",
         "describe": "额外被动：战斗开始时必定出现在初始卡牌中",
         "skillIdList": "",
@@ -10943,6 +11156,7 @@
       {
         "id": "328",
         "itemId": "332878",
+        "heroItemId": "78",
         "level": "1",
         "describe": "额外被动：自身无视冰甲+50%",
         "skillIdList": "332878",
@@ -10958,6 +11172,7 @@
       {
         "id": "360",
         "itemId": "336078",
+        "heroItemId": "78",
         "level": "1",
         "describe": "额外被动：自身吸血+50%",
         "skillIdList": "336078",
@@ -11063,6 +11278,7 @@
       {
         "id": "148",
         "itemId": "314879",
+        "heroItemId": "79",
         "level": "1",
         "describe": "额外被动：光环：闪避+10%",
         "skillIdList": "314879",
@@ -11078,6 +11294,7 @@
       {
         "id": "205",
         "itemId": "320579",
+        "heroItemId": "79",
         "level": "1",
         "describe": "额外被动：上阵5术士时，全体PVE战斗中无视冰盾效果",
         "skillIdList": "320579",
@@ -11093,6 +11310,7 @@
       {
         "id": "242",
         "itemId": "324279",
+        "heroItemId": "79",
         "level": "1",
         "describe": "额外被动：上阵5术士时，全体PVE战斗中无视冰盾效果",
         "skillIdList": "320579",
@@ -11108,6 +11326,7 @@
       {
         "id": "281",
         "itemId": "328179",
+        "heroItemId": "79",
         "level": "1",
         "describe": "额外被动：光环：闪避+10%",
         "skillIdList": "314879",
@@ -11123,6 +11342,7 @@
       {
         "id": "333",
         "itemId": "333379",
+        "heroItemId": "79",
         "level": "1",
         "describe": "额外被动：上阵5术士时，全体PVE战斗中无视冰盾效果",
         "skillIdList": "320579",
@@ -11138,6 +11358,7 @@
       {
         "id": "363",
         "itemId": "336379",
+        "heroItemId": "79",
         "level": "1",
         "describe": "额外被动：光环：闪避+10%",
         "skillIdList": "314879",
@@ -11261,6 +11482,7 @@
       {
         "id": "238",
         "itemId": "323880",
+        "heroItemId": "80",
         "level": "1",
         "describe": "额外被动：每上阵1个术士，战车伤害减免+5%",
         "skillIdList": "323880",
@@ -11276,6 +11498,7 @@
       {
         "id": "306",
         "itemId": "330680",
+        "heroItemId": "80",
         "level": "1",
         "describe": "额外被动：战斗中，同时视为术士和牧师职业",
         "skillIdList": "",
@@ -11291,6 +11514,7 @@
       {
         "id": "332",
         "itemId": "333280",
+        "heroItemId": "80",
         "level": "1",
         "describe": "技能强化：每次攻击后使所在战车攻击最高的英雄连击次数+1(仅对连击英雄有效，且优先连击英雄)，持续6秒",
         "skillIdList": "",
@@ -11414,6 +11638,7 @@
       {
         "id": "213",
         "itemId": "321381",
+        "heroItemId": "81",
         "level": "1",
         "describe": "额外被动：每100银币战车伤害减免+0.01%",
         "skillIdList": "321381",
@@ -11429,6 +11654,7 @@
       {
         "id": "214",
         "itemId": "321481",
+        "heroItemId": "81",
         "level": "1",
         "describe": "额外被动：每100银币战车伤害减免+0.02%",
         "skillIdList": "321481",
@@ -11552,6 +11778,7 @@
       {
         "id": "176",
         "itemId": "317682",
+        "heroItemId": "82",
         "level": "1",
         "describe": "额外被动：光环：真实伤害减免+5%，且附加伤害减免+25%",
         "skillIdList": "317682",
@@ -11567,6 +11794,7 @@
       {
         "id": "231",
         "itemId": "323182",
+        "heroItemId": "82",
         "level": "1",
         "describe": "额外被动：光环：真实伤害减免+5%，且附加伤害减免+25%",
         "skillIdList": "317682",
@@ -11582,6 +11810,7 @@
       {
         "id": "276",
         "itemId": "327682",
+        "heroItemId": "82",
         "level": "1",
         "describe": "额外被动：将敌方战车上攻击最高的英雄技能百分比变为50%",
         "skillIdList": "327682",
@@ -11705,6 +11934,7 @@
       {
         "id": "318",
         "itemId": "331883",
+        "heroItemId": "83",
         "level": "1",
         "describe": "额外被动：立即生效，且吸血效果持续时间+4秒",
         "skillIdList": "",
@@ -11828,6 +12058,7 @@
       {
         "id": "154",
         "itemId": "315484",
+        "heroItemId": "84",
         "level": "1",
         "describe": "技能强化：技能伤害降低为100%攻击，范围提升至全屏",
         "skillIdList": "",
@@ -11843,6 +12074,7 @@
       {
         "id": "200",
         "itemId": "320084",
+        "heroItemId": "84",
         "level": "1",
         "describe": "额外被动：战斗中，同时视为术士和法师职业，且对战车伤害间隔-1秒",
         "skillIdList": "",
@@ -11858,6 +12090,7 @@
       {
         "id": "269",
         "itemId": "326984",
+        "heroItemId": "84",
         "level": "1",
         "describe": "技能强化：技能伤害降低为100%攻击，范围提升至全屏",
         "skillIdList": "",
@@ -11873,6 +12106,7 @@
       {
         "id": "284",
         "itemId": "328484",
+        "heroItemId": "84",
         "level": "1",
         "describe": "额外被动：对自身造成伤害-80%，且间隔-2秒",
         "skillIdList": "",
@@ -11888,6 +12122,7 @@
       {
         "id": "337",
         "itemId": "333784",
+        "heroItemId": "84",
         "level": "1",
         "describe": "额外被动：自身PVE附加伤害+320000",
         "skillIdList": "333784",
@@ -12011,6 +12246,7 @@
       {
         "id": "128",
         "itemId": "312885",
+        "heroItemId": "85",
         "level": "1",
         "describe": "额外被动：自身暴伤+100%，且被动不再需要点燃效果触发",
         "skillIdList": "312885",
@@ -12134,6 +12370,7 @@
       {
         "id": "144",
         "itemId": "314486",
+        "heroItemId": "86",
         "level": "1",
         "describe": "额外被动：自身伤害加成+30%",
         "skillIdList": "314486",
@@ -12149,6 +12386,7 @@
       {
         "id": "218",
         "itemId": "321886",
+        "heroItemId": "86",
         "level": "1",
         "describe": "额外被动：满星后，自身基础攻速+80%",
         "skillIdList": "",
@@ -12164,6 +12402,7 @@
       {
         "id": "287",
         "itemId": "328786",
+        "heroItemId": "86",
         "level": "1",
         "describe": "额外被动：战车每次触发闪避时，自身攻击+8%",
         "skillIdList": "328786",
@@ -12179,6 +12418,7 @@
       {
         "id": "376",
         "itemId": "337686",
+        "heroItemId": "86",
         "level": "1",
         "describe": "额外被动：初始上阵时即可生效满星被动",
         "skillIdList": "",
@@ -12302,6 +12542,7 @@
       {
         "id": "178",
         "itemId": "317887",
+        "heroItemId": "87",
         "level": "1",
         "describe": "额外被动：伤害加成+20%",
         "skillIdList": "317887",
@@ -12317,6 +12558,7 @@
       {
         "id": "179",
         "itemId": "317987",
+        "heroItemId": "87",
         "level": "1",
         "describe": "额外被动：伤害加成+25%，且所在战车的同层英雄伤害加成+25%",
         "skillIdList": "317987|108700",
@@ -12332,6 +12574,7 @@
       {
         "id": "193",
         "itemId": "319387",
+        "heroItemId": "87",
         "level": "1",
         "describe": "额外被动：满星后，技能范围变为全屏且攻击+60%，己方上阵紫霞仙子时攻击额外+20%",
         "skillIdList": "",
@@ -12347,6 +12590,7 @@
       {
         "id": "322",
         "itemId": "332287",
+        "heroItemId": "87",
         "level": "1",
         "describe": "技能强化：自身连击次数+1",
         "skillIdList": "",
@@ -12470,6 +12714,7 @@
       {
         "id": "215",
         "itemId": "321588",
+        "heroItemId": "88",
         "level": "1",
         "describe": "额外被动：吞噬成功获得10银币",
         "skillIdList": "321588",
@@ -12485,6 +12730,7 @@
       {
         "id": "253",
         "itemId": "325388",
+        "heroItemId": "88",
         "level": "1",
         "describe": "额外被动：光环：魔抗+20，攻击+500",
         "skillIdList": "325388",
@@ -12608,6 +12854,7 @@
       {
         "id": "217",
         "itemId": "321789",
+        "heroItemId": "89",
         "level": "1",
         "describe": "额外被动：破壳时保护战车，使战车无敌6秒（每场战斗只能触发一次）",
         "skillIdList": "",
@@ -12623,6 +12870,7 @@
       {
         "id": "271",
         "itemId": "327189",
+        "heroItemId": "89",
         "level": "1",
         "describe": "额外被动：满星后，继续属性成长",
         "skillIdList": "",
@@ -12638,6 +12886,7 @@
       {
         "id": "357",
         "itemId": "335789",
+        "heroItemId": "89",
         "level": "1",
         "describe": "额外被动：破壳时保护战车，使战车无敌6秒（每场战斗只能触发一次）",
         "skillIdList": "",
@@ -12761,6 +13010,7 @@
       {
         "id": "223",
         "itemId": "322390",
+        "heroItemId": "90",
         "level": "1",
         "describe": "额外被动：战斗中，同时视为战士和法师职业，且PVE附加伤害+80000",
         "skillIdList": "322390",
@@ -12776,6 +13026,7 @@
       {
         "id": "257",
         "itemId": "325790",
+        "heroItemId": "90",
         "level": "1",
         "describe": "额外被动：战斗中，自身基础攻速-0.2秒，且PVE附加伤害+160000",
         "skillIdList": "109000|325790",
@@ -12791,6 +13042,7 @@
       {
         "id": "273",
         "itemId": "327390",
+        "heroItemId": "90",
         "level": "1",
         "describe": "额外被动：满星后，转换目标保留当前攻速，且PVE附加伤害+80000",
         "skillIdList": "",
@@ -12806,6 +13058,7 @@
       {
         "id": "312",
         "itemId": "331290",
+        "heroItemId": "90",
         "level": "1",
         "describe": "额外被动：战斗中，同时视为战士和术士职业，且PVE附加伤害+80000",
         "skillIdList": "331290",
@@ -12821,6 +13074,7 @@
       {
         "id": "354",
         "itemId": "335490",
+        "heroItemId": "90",
         "level": "1",
         "describe": "额外被动：战斗中，同时视为战士和熊猫职业，且PVE附加伤害+80000",
         "skillIdList": "322390",
@@ -12926,6 +13180,7 @@
       {
         "id": "278",
         "itemId": "327891",
+        "heroItemId": "91",
         "level": "1",
         "describe": "额外被动：立即生效且不受小丑影响，冰冻期间战车护甲+20，魔抗+20",
         "skillIdList": "",
@@ -12941,6 +13196,7 @@
       {
         "id": "352",
         "itemId": "335291",
+        "heroItemId": "91",
         "level": "1",
         "describe": "额外被动：立即生效且不受小丑影响，冰冻会作用于己方召唤物",
         "skillIdList": "",
@@ -13046,6 +13302,7 @@
       {
         "id": "230",
         "itemId": "323092",
+        "heroItemId": "92",
         "level": "1",
         "describe": "额外被动：光环：元素减免+10%",
         "skillIdList": "323092",
@@ -13061,6 +13318,7 @@
       {
         "id": "262",
         "itemId": "326292",
+        "heroItemId": "92",
         "level": "1",
         "describe": "额外被动：光环：元素减免+10%",
         "skillIdList": "323092",
@@ -13076,6 +13334,7 @@
       {
         "id": "323",
         "itemId": "332392",
+        "heroItemId": "92",
         "level": "1",
         "describe": "额外被动：每上阵1个熊猫，所有熊猫PVE附加伤害+20000",
         "skillIdList": "332392",
@@ -13199,6 +13458,7 @@
       {
         "id": "227",
         "itemId": "322793",
+        "heroItemId": "93",
         "level": "1",
         "describe": "额外被动：上阵5熊猫时，全体PVE战斗中无视冰盾效果",
         "skillIdList": "322793",
@@ -13214,6 +13474,7 @@
       {
         "id": "261",
         "itemId": "326193",
+        "heroItemId": "93",
         "level": "1",
         "describe": "额外被动：战斗中，同时视为熊猫和法师职业",
         "skillIdList": "",
@@ -13229,6 +13490,7 @@
       {
         "id": "320",
         "itemId": "332093",
+        "heroItemId": "93",
         "level": "1",
         "describe": "额外被动：光环：附加伤害加成+50%",
         "skillIdList": "332093",
@@ -13352,6 +13614,7 @@
       {
         "id": "228",
         "itemId": "322894",
+        "heroItemId": "94",
         "level": "1",
         "describe": "额外被动：基础攻速-0.3秒",
         "skillIdList": "",
@@ -13367,6 +13630,7 @@
       {
         "id": "263",
         "itemId": "326394",
+        "heroItemId": "94",
         "level": "1",
         "describe": "额外被动：基础攻速-0.3秒",
         "skillIdList": "",
@@ -13382,6 +13646,7 @@
       {
         "id": "321",
         "itemId": "332194",
+        "heroItemId": "94",
         "level": "1",
         "describe": "额外被动：自身PVE附加伤害+320000",
         "skillIdList": "332194",
@@ -13397,6 +13662,7 @@
       {
         "id": "349",
         "itemId": "334994",
+        "heroItemId": "94",
         "level": "1",
         "describe": "额外被动：攻击同一个目标时，有1%概率发现敌方破绽，无视冰甲+3%，最高可叠33层",
         "skillIdList": "334994",
@@ -13520,6 +13786,7 @@
       {
         "id": "237",
         "itemId": "323795",
+        "heroItemId": "95",
         "level": "1",
         "describe": "额外被动：光环：元素减免+10%，召唤物基础攻速+25%",
         "skillIdList": "323795|129501",
@@ -13535,6 +13802,7 @@
       {
         "id": "298",
         "itemId": "329895",
+        "heroItemId": "95",
         "level": "1",
         "describe": "额外被动：光环：召唤物PVE附加伤害+160000",
         "skillIdList": "329895",
@@ -13658,6 +13926,7 @@
       {
         "id": "265",
         "itemId": "326596",
+        "heroItemId": "96",
         "level": "1",
         "describe": "额外被动：自身造成的伤害无视敌方护甲",
         "skillIdList": "",
@@ -13673,6 +13942,7 @@
       {
         "id": "305",
         "itemId": "330596",
+        "heroItemId": "96",
         "level": "1",
         "describe": "额外被动：攻击必定命中",
         "skillIdList": "330596",
@@ -13688,6 +13958,7 @@
       {
         "id": "341",
         "itemId": "334196",
+        "heroItemId": "96",
         "level": "1",
         "describe": "技能强化：满星后，自身连击次数+1",
         "skillIdList": "",
@@ -13811,6 +14082,7 @@
       {
         "id": "295",
         "itemId": "329597",
+        "heroItemId": "97",
         "level": "1",
         "describe": "额外被动：自身攻击+1500、真实伤害加成+30%",
         "skillIdList": "329597",
@@ -13826,6 +14098,7 @@
       {
         "id": "335",
         "itemId": "333597",
+        "heroItemId": "97",
         "level": "1",
         "describe": "额外被动：不触发职业被动时，自身攻击额外造成一次伤害",
         "skillIdList": "",
@@ -13841,6 +14114,7 @@
       {
         "id": "366",
         "itemId": "336697",
+        "heroItemId": "97",
         "level": "1",
         "describe": "额外被动：己方每上阵一个牧师，自身无视冰甲+15%",
         "skillIdList": "336697",
@@ -13964,6 +14238,7 @@
       {
         "id": "308",
         "itemId": "330898",
+        "heroItemId": "98",
         "level": "1",
         "describe": "额外被动：光环：百分比伤害减免+10%",
         "skillIdList": "330898",
@@ -14087,6 +14362,7 @@
       {
         "id": "315",
         "itemId": "331599",
+        "heroItemId": "99",
         "level": "1",
         "describe": "额外被动：自身PVE附加伤害+320000",
         "skillIdList": "331599",
@@ -14102,6 +14378,7 @@
       {
         "id": "370",
         "itemId": "337099",
+        "heroItemId": "99",
         "level": "1",
         "describe": "额外被动：己方熊猫基础攻速-0.1秒",
         "skillIdList": "337099",

@@ -10436,12 +10436,81 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             return { desc: descParts.join('\n\n') || '无特殊属性' };
         }
 
+        // 🔴 2026-10-19 官方英雄数据（data/heroes.json，由官方配置表自动导出）按英雄名索引；
+        //    卡牌悬停优先展示这里的信息（职业/被动/当前等级档位强化），官方没有的英雄回落旧 heroAttrsData。
+        let __officialLoading = false;
+        function ensureOfficialHeroes() {
+            if (window.heroesOfficialMap) return;
+            // 若图鉴已加载过，直接复用其缓存
+            if (window.__heroCodexCache) {
+                const m = {};
+                window.__heroCodexCache.forEach(function (h) { if (h.name && !m[h.name]) m[h.name] = h; });
+                window.heroesOfficialMap = m;
+                return;
+            }
+            if (__officialLoading) return;
+            __officialLoading = true;
+            try {
+                const p = location.pathname;
+                const base = p.endsWith('/') ? p : (p.lastIndexOf('/') >= 0 ? p.slice(0, p.lastIndexOf('/') + 1) : '/');
+                fetch(base + 'data/heroes.json').then(function (r) { return r.json(); }).then(function (arr) {
+                    const m = {};
+                    (arr || []).forEach(function (h) { if (h.name && !m[h.name]) m[h.name] = h; });
+                    window.heroesOfficialMap = m;
+                }).catch(function () {});
+            } catch (e) {}
+        }
+        // 取官方数据里「当前等级对应的档位」：tiers 已按 level 升序，取 <= level 的最高档
+        function getOfficialHeroTip(heroName, level) {
+            const map = window.heroesOfficialMap;
+            if (!map || !map[heroName]) return null;
+            const hero = map[heroName];
+            const lv = Number(level) || 1;
+            const tiers = hero.tiers || [];
+            let tier = null;
+            for (const t of tiers) if (t.level <= lv) tier = t;
+            const lines = [];
+            if (hero.occupation) lines.push('职业：' + hero.occupation);
+            if (hero.passiveName || hero.passiveDesc) {
+                lines.push('【被动】' + (hero.passiveName ? hero.passiveName + '：' : '') + (hero.passiveDesc || ''));
+            }
+            if (tier) {
+                if (tier.skillName || tier.skillDesc) {
+                    lines.push('【技能】' + (tier.skillName ? tier.skillName + '：' : '') + (tier.skillDesc || ''));
+                }
+                if (tier.talentName || tier.talentDesc) {
+                    lines.push('【' + (tier.talentName || '天赋') + '】' + (tier.talentDesc || ''));
+                }
+                if (tier.passiveInitial) lines.push('【初始被动】' + tier.passiveInitial);
+                if (tier.passiveFull) lines.push('【满星被动】' + tier.passiveFull);
+            }
+            lines.push('当前等级：' + lv + (tier ? '（' + tier.level + '级档位）' : ''));
+            return lines.join('\n');
+        }
+
         // 🔴 2026-09-29 从 CSV/HTML 数据按等级/皮肤/魔化组装动态属性文本；无数据返回 null，调用处回落旧静态描述
+        //    2026-10-19 改为：优先官方 heroes.json（按等级档位），官方没有才用旧 heroAttrsData
         function getHeroAttrText(heroName, opts) {
-            const data = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[heroName];
-            if (!data) return null;
+            ensureOfficialHeroes();
             const level = Number(opts && opts.level) || 1;
             const skinName = (opts && opts.skinName) || '默认';
+            const _off = getOfficialHeroTip(heroName, level);
+            if (_off) {
+                // 官方数据不含皮肤额外被动，指定皮肤时从旧 heroAttrsData 补回，避免回归
+                if (skinName && skinName !== '默认') {
+                    const od = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[heroName];
+                    if (od && od.skins && od.skins[skinName]) {
+                        const sk = od.skins[skinName];
+                        const extra = [];
+                        if (sk.extraPassive) extra.push('【皮肤额外被动】' + sk.extraPassive);
+                        if (sk.hp) extra.push('【皮肤加血】' + sk.hp);
+                        if (extra.length) return _off + '\n' + extra.join('\n');
+                    }
+                }
+                return _off;
+            }
+            const data = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[heroName];
+            if (!data) return null;
             const hasMohua = !!(opts && opts.hasMohua);
             const talents = data.talents || {};
             const levels = Object.keys(talents).map(Number).sort(function (a, b) { return a - b; });
@@ -10503,6 +10572,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             return lines.join('\n');
         }
         try { window.getHeroAttrText = getHeroAttrText; } catch (e) {}
+        // 页面初始化即预加载官方英雄数据（后台 fetch），确保首次悬停就能用到
+        try { ensureOfficialHeroes(); } catch (e) {}
 
         // ==================== 卡牌等级管理 ====================
         // 根据卡牌类型获取可选等级
