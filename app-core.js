@@ -17612,7 +17612,12 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                 if (ta >= tb) latest = it;
             }
             if (!latest) return;
-            const title = String(latest.content).trim();
+            const PREFIX = '塔防精灵助手 - 阵容卡搭配｜本站网址：';
+            let title = String(latest.content).trim();
+            // 兼容「只改网址」：内容形如网址(链接/域名)且不含软件名/“本站网址”时，自动拼上固定软件名前缀
+            //   → 软件名标题不动、只替换网址；若内容已是完整标题(含软件名/中文标题)则整串使用
+            const _looksLikeUrl = !/塔防精灵|本站网址/.test(title) && /^(https?:\/\/|[\w-]+(\.[\w-]+)+\/?\S*)$/i.test(title);
+            if (_looksLikeUrl) title = PREFIX + title;
             try { document.title = title; } catch (e) {}
             try {
                 const T = window.__TAURI__;
@@ -33230,7 +33235,7 @@ ${maSection}
 
                 renderAdminNewsList(newsData);
                 showAdminStatus('公告发布成功！', 'success');
-                alert('✅ 公告发布成功！' + (category === '窗口标题' ? '\n\n窗口标题栏已更新（该条只作用于标题栏，不会出现在公告里）。' : ''));
+                alert('✅ 公告发布成功！' + (category === '窗口标题' ? '\n\n窗口标题栏已更新：内容框填【网址】即可，软件名“塔防精灵助手 - 阵容卡搭配”会自动带上（只作用于标题栏，不进公告）。' : ''));
             } catch (error) {
                 console.error('发布公告失败:', error);
                 const _m = '发布失败: ' + ((error && error.message) ? error.message : error);
