@@ -192,12 +192,13 @@ function parseCsv(text) {
   return rows
 }
 
-// 核心表 uuid（标准 36 位）——属性/技能/被动来自这些表，升级档位后续扩展
+// 核心表 uuid（标准 36 位）
 const TABLE_UUIDS = {
   HeroTableData: '7d112ecd-1e55-4365-99e5-f1738efa66cf',
   NpcTemplateTableData: 'ada85cac-652d-440b-ae96-2a12339dd920',
   SkillTableData: '25abd541-ec2c-4c55-8e45-da1ae5e2c41c',
-  PassiveSkillTableData: 'a8b456ad-5e83-40a1-a382-481d69ab27ef'
+  PassiveSkillTableData: 'a8b456ad-5e83-40a1-a382-481d69ab27ef',
+  HeroTalentTableData: 'e6547958-e595-41d0-93a8-32b81d5921af'
 }
 
 async function fetchTable(index, uuid, name) {
@@ -215,6 +216,117 @@ async function fetchTable(index, uuid, name) {
   return ta ? parseCsv(ta.text) : null
 }
 
+function stripSkillPrefix(s) {
+  return String(s || '')
+    .trim()
+    .replace(/^技能[:：]\s*/, '')
+    .trim()
+}
+function stripPassivePrefix(s) {
+  return String(s || '')
+    .trim()
+    .replace(/^(初始被动|满星被动)\s*/, '')
+    .trim()
+}
+
+// ============ 升级档位推导（按星级/等级线性插值）============
+function buildIndexMaps(skillRows, npcRows, talentRows) {
+  const skillById = new Map()
+  const skillByName = new Map()
+  for (const r of skillRows || []) {
+    skillById.set(String(r.id), r)
+    const nm = String(r.name || '').trim()
+    if (nm && !skillByName.has(nm)) skillByName.set(nm, r)
+  }
+  const npcRowsById = new Map()
+  for (const r of npcRows || []) {
+    const key = String(r.id ?? '')
+    if (!key) continue
+    const arr = npcRowsById.get(key) || []
+    arr.push(r)
+    npcRowsById.set(key, arr)
+  }
+  for (const arr of npcRowsById.values()) arr.sort((a, b) => Number(a.level) - Number(b.level))
+  const talentsByHero = new Map()
+  for (const t of talentRows || []) {
+    const hid = String(t.heroId ?? '')
+    if (!hid) continue
+    const arr = talentsByHero.get(hid) || []
+    arr.push(t)
+    talentsByHero.set(hid, arr)
+  }
+  for (const arr of talentsByHero.values()) arr.sort((a, b) => Number(a.level) - Number(b.level))
+  return { skillById, skillByName, npcRowsById, talentsByHero }
+}
+
+function npcSkillNodes(npcRowsById, npcId) {
+  const rows = npcRowsById.get(String(npcId)) || []
+  const out = []
+  let prev = ''
+  for (const r of rows) {
+    const sid = String(r.skill_id ?? '')
+    if (!sid || sid === '0') continue
+    if (sid === prev) continue
+    prev = sid
+    out.push({ level: Number(r.level) || 1, skillId: sid })
+  }
+  return out
+}
+function heroSkillNodes(skillNodes, talentsByHero, heroId, npcId) {
+  if (skillNodes.length) return skillNodes
+  const hid = Number(heroId) || 0
+  const fallback = [{ level: 1, skillId: String(hid) }]
+  let ups = 0
+  for (const t of talentsByHero.get(String(heroId)) || []) {
+    const lv = Number(t.level) || 0
+    if (!lv) continue
+    if (String(t.name || '').trim() === '技能强化') ups++
+    fallback.push({ level: lv, skillId: String(hid + 100 * ups) })
+  }
+  return fallback
+}
+function heroLevelNodes(skillNodes, talentsByHero, heroId, npcId) {
+  const set = new Set([1])
+  for (const n of skillNodes) if (n.level >= 1) set.add(n.level)
+  for (const t of talentsByHero.get(String(heroId)) || []) {
+    const lv = Number(t.level) || 0
+    if (lv >= 1) set.add(lv)
+  }
+  return [...set].sort((a, b) => a - b)
+}
+function buildTiers(maps, hid, npcId, heroSkillName, heroSkillDesc, heroPassiveInitial, heroPassiveFull) {
+  const { skillById, npcRowsById, talentsByHero } = maps
+  const skills = npcSkillNodes(npcRowsById, npcId)
+  const skillNodes = heroSkillNodes(skills, talentsByHero, hid, npcId)
+  const levels = heroLevelNodes(skillNodes, talentsByHero, hid, npcId)
+  const talents = talentsByHero.get(String(hid)) || []
+  const tiers = []
+  for (const lv of levels) {
+    let skillId = skillNodes.length ? skillNodes[0].skillId : String(hid)
+    for (const n of skillNodes) if (lv >= n.level) skillId = n.skillId
+    const s = skillById.get(skillId)
+    let talent = null
+    for (const t of talents) if (lv >= (Number(t.level) || 0)) talent = t
+    const prev = tiers[tiers.length - 1]
+    tiers.push({
+      level: lv,
+      skillName: String(s?.name || '').trim() || prev?.skillName || heroSkillName,
+      skillDesc: stripSkillPrefix(s?.skill_desc) || prev?.skillDesc || heroSkillDesc,
+      passiveInitial:
+        stripPassivePrefix(talent?.passiveSkilldesc) ||
+        prev?.passiveInitial ||
+        stripPassivePrefix(heroPassiveInitial),
+      passiveFull:
+        stripPassivePrefix(talent?.maxPassiveSkilldesc) ||
+        prev?.passiveFull ||
+        stripPassivePrefix(heroPassiveFull),
+      talentName: String(talent?.name || '').trim(),
+      talentDesc: String(talent?.describe || '').trim()
+    })
+  }
+  return tiers
+}
+
 ;(async () => {
   const html = await fetchText(`${CDN}/index.html`)
   const m = html.match(/src\/settings\.([a-f0-9]+)\.js/)
@@ -229,10 +341,21 @@ async function fetchTable(index, uuid, name) {
   const npcRows = await fetchTable(index, TABLE_UUIDS.NpcTemplateTableData, 'NpcTemplateTableData')
   const skillRows = await fetchTable(index, TABLE_UUIDS.SkillTableData, 'SkillTableData')
   const passiveRows = await fetchTable(index, TABLE_UUIDS.PassiveSkillTableData, 'PassiveSkillTableData')
-  console.log(`表行数 hero=${heroRows?.length} npc=${npcRows?.length} skill=${skillRows?.length} passive=${passiveRows?.length}`)
+  const talentRows = await fetchTable(index, TABLE_UUIDS.HeroTalentTableData, 'HeroTalentTableData')
+  console.log(
+    `表行数 hero=${heroRows?.length} npc=${npcRows?.length} skill=${skillRows?.length} passive=${passiveRows?.length} talent=${talentRows?.length}`
+  )
   const npcById = new Map((npcRows || []).map((r) => [String(r.id), r]))
+  const maps = buildIndexMaps(skillRows, npcRows, talentRows)
   const heroes = (heroRows || []).map((h) => {
     const npc = npcById.get(String(h.npc_id)) || {}
+    const baseSkill = maps.skillById.get(String(h.id))
+    const skillNameRaw = String(h.skill_name || '').trim()
+    const heroSkillName =
+      baseSkill && /^技能\d*$/.test(skillNameRaw) && String(baseSkill.name || '').trim()
+        ? String(baseSkill.name).trim()
+        : skillNameRaw
+    const heroSkillDesc = stripSkillPrefix(baseSkill?.skill_desc || h.skill_desc || '')
     return {
       id: h.id,
       name: h.name,
@@ -240,10 +363,11 @@ async function fetchTable(index, uuid, name) {
       positioning: h.hero_positioning,
       heroColor: Number(h.hero_color),
       heroDesc: h.hero_desc,
-      skillName: h.skill_name,
-      skillDesc: h.skill_desc,
+      skillName: heroSkillName,
+      skillDesc: heroSkillDesc,
       passiveName: h.passive_name,
       passiveDesc: h.passive_desc,
+      passiveDesc2: h.passive_desc2,
       image: h.image,
       attrs: {
         attack: npc.attack,
@@ -253,7 +377,16 @@ async function fetchTable(index, uuid, name) {
         pureDamageDesc: npc.pureDamage_desc,
         trueDamageDesc: npc.trueDamage_desc,
         critical: npc.critical
-      }
+      },
+      tiers: buildTiers(
+        maps,
+        h.id,
+        String(h.npc_id ?? ''),
+        heroSkillName,
+        heroSkillDesc,
+        h.passive_desc,
+        h.passive_desc2
+      )
     }
   })
   fs.mkdirSync(path.dirname(OUT), { recursive: true })
