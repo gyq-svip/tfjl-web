@@ -1,0 +1,160 @@
+
+hunjinglingpifu.png
+size: 627,627
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+a1/a_00
+  rotate: false
+  xy: 393, 510
+  size: 115, 115
+  orig: 115, 115
+  offset: 0, 0
+  index: -1
+a1/a_01
+  rotate: false
+  xy: 510, 510
+  size: 115, 115
+  orig: 115, 115
+  offset: 0, 0
+  index: -1
+a1/a_02
+  rotate: false
+  xy: 393, 393
+  size: 115, 115
+  orig: 115, 115
+  offset: 0, 0
+  index: -1
+a1/a_03
+  rotate: false
+  xy: 510, 393
+  size: 115, 115
+  orig: 115, 115
+  offset: 0, 0
+  index: -1
+a1/a_04
+  rotate: false
+  xy: 376, 276
+  size: 115, 115
+  orig: 115, 115
+  offset: 0, 0
+  index: -1
+a1/a_05
+  rotate: false
+  xy: 493, 276
+  size: 115, 115
+  orig: 115, 115
+  offset: 0, 0
+  index: -1
+a1/a_06
+  rotate: false
+  xy: 371, 159
+  size: 115, 115
+  orig: 115, 115
+  offset: 0, 0
+  index: -1
+a1/a_07
+  rotate: false
+  xy: 488, 159
+  size: 115, 115
+  orig: 115, 115
+  offset: 0, 0
+  index: -1
+a1/a_08
+  rotate: false
+  xy: 371, 42
+  size: 115, 115
+  orig: 115, 115
+  offset: 0, 0
+  index: -1
+a1/a_09
+  rotate: false
+  xy: 488, 42
+  size: 115, 115
+  orig: 115, 115
+  offset: 0, 0
+  index: -1
+b2/b_00
+  rotate: true
+  xy: 95, 240
+  size: 177, 92
+  orig: 180, 95
+  offset: 2, 3
+  index: -1
+b2/b_01
+  rotate: true
+  xy: 2, 239
+  size: 178, 91
+  orig: 180, 95
+  offset: 1, 4
+  index: -1
+b2/b_02
+  rotate: true
+  xy: 2, 59
+  size: 178, 91
+  orig: 180, 95
+  offset: 1, 4
+  index: -1
+b2/b_03
+  rotate: true
+  xy: 95, 61
+  size: 177, 90
+  orig: 180, 95
+  offset: 2, 5
+  index: -1
+b2/b_04
+  rotate: true
+  xy: 187, 62
+  size: 176, 90
+  orig: 180, 95
+  offset: 2, 5
+  index: -1
+b2/b_05
+  rotate: true
+  xy: 279, 66
+  size: 174, 90
+  orig: 180, 95
+  offset: 3, 5
+  index: -1
+b2/b_06
+  rotate: true
+  xy: 300, 453
+  size: 172, 91
+  orig: 180, 95
+  offset: 4, 4
+  index: -1
+b2/b_07
+  rotate: true
+  xy: 283, 276
+  size: 173, 91
+  orig: 180, 95
+  offset: 4, 4
+  index: -1
+b2/b_08
+  rotate: true
+  xy: 206, 451
+  size: 174, 92
+  orig: 180, 95
+  offset: 3, 3
+  index: -1
+b2/b_09
+  rotate: true
+  xy: 189, 242
+  size: 175, 92
+  orig: 180, 95
+  offset: 3, 3
+  index: -1
+fx/glow2_00004
+  rotate: false
+  xy: 2, 419
+  size: 202, 206
+  orig: 229, 236
+  offset: 13, 15
+  index: -1
+fx/lizi
+  rotate: false
+  xy: 2, 36
+  size: 21, 21
+  orig: 25, 25
+  offset: 2, 2
+  index: -1

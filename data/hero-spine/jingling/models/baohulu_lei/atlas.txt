@@ -1,0 +1,188 @@
+
+baohulu_lei.png
+size: 587,587
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+1
+  rotate: false
+  xy: 2, 82
+  size: 114, 175
+  orig: 114, 178
+  offset: 0, 2
+  index: -1
+fx/Sparks 084 Charge Radial_00004
+  rotate: false
+  xy: 330, 483
+  size: 105, 102
+  orig: 112, 112
+  offset: 1, 5
+  index: -1
+fx/Sparks 084 Charge Radial_00006
+  rotate: false
+  xy: 224, 159
+  size: 110, 98
+  orig: 112, 112
+  offset: 2, 7
+  index: -1
+fx/Sparks 084 Charge Radial_00008
+  rotate: true
+  xy: 330, 375
+  size: 106, 99
+  orig: 112, 112
+  offset: 6, 5
+  index: -1
+fx/Sparks 084 Charge Radial_00010
+  rotate: false
+  xy: 118, 150
+  size: 104, 107
+  orig: 112, 112
+  offset: 6, 4
+  index: -1
+fx/Sparks 084 Charge Radial_00012
+  rotate: true
+  xy: 368, 6
+  size: 96, 101
+  orig: 112, 112
+  offset: 8, 7
+  index: -1
+fx/Sparks 084 Charge Radial_00014
+  rotate: false
+  xy: 286, 2
+  size: 80, 84
+  orig: 112, 112
+  offset: 21, 17
+  index: -1
+fx/Sparks 084 Charge Radial_00016
+  rotate: false
+  xy: 272, 88
+  size: 67, 69
+  orig: 112, 112
+  offset: 26, 23
+  index: -1
+fx/Sparks 084 Charge Radial_00018
+  rotate: false
+  xy: 526, 235
+  size: 40, 38
+  orig: 112, 112
+  offset: 38, 38
+  index: -1
+fx/d02_000
+  rotate: true
+  xy: 194, 90
+  size: 58, 76
+  orig: 102, 102
+  offset: 2, 26
+  index: -1
+fx/d02_001
+  rotate: true
+  xy: 397, 115
+  size: 50, 63
+  orig: 102, 102
+  offset: 2, 38
+  index: -1
+fx/d02_002
+  rotate: false
+  xy: 462, 120
+  size: 45, 52
+  orig: 102, 102
+  offset: 6, 48
+  index: -1
+fx/d02_003
+  rotate: false
+  xy: 433, 275
+  size: 96, 102
+  orig: 102, 102
+  offset: 6, 0
+  index: -1
+fx/d02_004
+  rotate: false
+  xy: 437, 485
+  size: 99, 100
+  orig: 102, 102
+  offset: 3, 0
+  index: -1
+fx/d02_005
+  rotate: false
+  xy: 2, 7
+  size: 95, 73
+  orig: 102, 102
+  offset: 0, 1
+  index: -1
+fx/d02_006
+  rotate: true
+  xy: 341, 104
+  size: 61, 54
+  orig: 102, 102
+  offset: 13, 9
+  index: -1
+fx/d02_007
+  rotate: false
+  xy: 431, 379
+  size: 99, 102
+  orig: 102, 102
+  offset: 3, 0
+  index: -1
+fx/d02_008
+  rotate: true
+  xy: 182, 2
+  size: 81, 102
+  orig: 102, 102
+  offset: 5, 0
+  index: -1
+fx/d02_009
+  rotate: true
+  xy: 118, 85
+  size: 63, 74
+  orig: 102, 102
+  offset: 7, 0
+  index: -1
+fx/d02_010
+  rotate: false
+  xy: 336, 167
+  size: 97, 102
+  orig: 102, 102
+  offset: 5, 0
+  index: -1
+fx/d02_011
+  rotate: false
+  xy: 471, 32
+  size: 102, 86
+  orig: 102, 102
+  offset: 0, 16
+  index: -1
+fx/d02_012
+  rotate: true
+  xy: 99, 14
+  size: 66, 81
+  orig: 102, 102
+  offset: 36, 21
+  index: -1
+fx/d02_013
+  rotate: false
+  xy: 330, 271
+  size: 101, 102
+  orig: 102, 102
+  offset: 0, 0
+  index: -1
+fx/d02_014
+  rotate: false
+  xy: 435, 174
+  size: 89, 99
+  orig: 102, 102
+  offset: 3, 3
+  index: -1
+fx/d02_015
+  rotate: true
+  xy: 509, 129
+  size: 43, 42
+  orig: 102, 102
+  offset: 5, 6
+  index: -1
+fx/guang2
+  rotate: false
+  xy: 2, 259
+  size: 326, 326
+  orig: 338, 338
+  offset: 6, 6
+  index: -1

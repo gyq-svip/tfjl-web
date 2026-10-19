@@ -1,0 +1,153 @@
+
+huamanlou.png
+size: 807,807
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 633, 26
+  size: 103, 134
+  orig: 134, 142
+  offset: 1, 0
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 650, 504
+  size: 100, 134
+  orig: 134, 142
+  offset: 5, 0
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 554, 131
+  size: 100, 140
+  orig: 134, 142
+  offset: 6, 0
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 650, 281
+  size: 85, 134
+  orig: 134, 142
+  offset: 47, 0
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 606, 368
+  size: 88, 134
+  orig: 134, 142
+  offset: 45, 0
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 417, 5
+  size: 81, 134
+  orig: 134, 142
+  offset: 41, 0
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 685, 671
+  size: 90, 134
+  orig: 134, 142
+  offset: 20, 0
+  index: -1
+fx/n_jiagong_01
+  rotate: false
+  xy: 573, 286
+  size: 75, 51
+  orig: 120, 120
+  offset: 21, 19
+  index: -1
+fx/n_jiagong_02
+  rotate: false
+  xy: 553, 2
+  size: 78, 84
+  orig: 120, 120
+  offset: 22, 17
+  index: -1
+fx/n_jiagong_03
+  rotate: true
+  xy: 696, 435
+  size: 67, 83
+  orig: 120, 120
+  offset: 33, 19
+  index: -1
+fx/n_jiagong_04
+  rotate: true
+  xy: 407, 272
+  size: 65, 82
+  orig: 120, 120
+  offset: 35, 20
+  index: -1
+fx/n_jiagong_05
+  rotate: true
+  xy: 491, 273
+  size: 64, 80
+  orig: 120, 120
+  offset: 36, 22
+  index: -1
+fx/shanzi
+  rotate: true
+  xy: 417, 88
+  size: 182, 135
+  orig: 182, 135
+  offset: 0, 0
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 539
+  size: 209, 266
+  orig: 209, 266
+  offset: 0, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 211, 3
+  size: 204, 266
+  orig: 209, 266
+  offset: 5, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 213, 539
+  size: 197, 266
+  orig: 209, 266
+  offset: 12, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 412, 339
+  size: 192, 265
+  orig: 209, 266
+  offset: 17, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 213, 272
+  size: 192, 265
+  orig: 209, 266
+  offset: 16, 0
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 417, 606
+  size: 199, 266
+  orig: 209, 266
+  offset: 10, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 3
+  size: 207, 266
+  orig: 209, 266
+  offset: 2, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 271
+  size: 209, 266
+  orig: 209, 266
+  offset: 0, 0
+  index: -1

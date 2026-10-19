@@ -1,0 +1,146 @@
+
+zuoci.png
+size: 737,737
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 257, 111
+  size: 91, 123
+  orig: 143, 138
+  offset: 31, 5
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 633, 484
+  size: 89, 124
+  orig: 143, 138
+  offset: 31, 5
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 2, 6
+  size: 106, 125
+  orig: 143, 138
+  offset: 31, 5
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 2, 114
+  size: 130, 121
+  orig: 143, 138
+  offset: 13, 5
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 134, 117
+  size: 117, 121
+  orig: 143, 138
+  offset: 10, 5
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 628, 240
+  size: 107, 125
+  orig: 143, 138
+  offset: 20, 5
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 633, 610
+  size: 99, 125
+  orig: 143, 138
+  offset: 27, 5
+  index: -1
+fx/bingyan_000
+  rotate: false
+  xy: 628, 197
+  size: 105, 41
+  orig: 205, 82
+  offset: 60, 18
+  index: -1
+fx/bingyan_002
+  rotate: false
+  xy: 129, 55
+  size: 124, 57
+  orig: 205, 82
+  offset: 41, 4
+  index: -1
+fx/bingyan_004
+  rotate: true
+  xy: 600, 41
+  size: 143, 51
+  orig: 205, 82
+  offset: 18, 8
+  index: -1
+fx/bingyan_006
+  rotate: true
+  xy: 653, 64
+  size: 131, 53
+  orig: 205, 82
+  offset: 25, 10
+  index: -1
+fx/bingyan_008
+  rotate: false
+  xy: 632, 431
+  size: 77, 51
+  orig: 205, 82
+  offset: 40, 12
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 192, 236
+  size: 184, 249
+  orig: 191, 249
+  offset: 6, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 237
+  size: 188, 248
+  orig: 191, 249
+  offset: 1, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 487
+  size: 189, 248
+  orig: 191, 249
+  offset: 0, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 193, 487
+  size: 187, 248
+  orig: 191, 249
+  offset: 2, 0
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 382, 550
+  size: 185, 249
+  orig: 191, 249
+  offset: 5, 0
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 382, 367
+  size: 181, 248
+  orig: 191, 249
+  offset: 10, 1
+  index: -1
+idle/idle_6
+  rotate: true
+  xy: 378, 186
+  size: 179, 248
+  orig: 191, 249
+  offset: 12, 1
+  index: -1
+idle/idle_7
+  rotate: true
+  xy: 350, 5
+  size: 179, 248
+  orig: 191, 249
+  offset: 12, 1
+  index: -1

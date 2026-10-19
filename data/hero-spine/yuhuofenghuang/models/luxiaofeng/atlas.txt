@@ -1,0 +1,181 @@
+
+luxiaofeng.png
+size: 1070,1070
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+fx/a_xian_0027
+  rotate: true
+  xy: 153, 110
+  size: 143, 44
+  orig: 165, 61
+  offset: 15, 5
+  index: -1
+fx/a_xian_0028
+  rotate: true
+  xy: 199, 110
+  size: 143, 44
+  orig: 165, 61
+  offset: 16, 5
+  index: -1
+fx/a_xian_0029
+  rotate: false
+  xy: 2, 9
+  size: 135, 45
+  orig: 165, 61
+  offset: 23, 4
+  index: -1
+fx/a_xian_0030
+  rotate: false
+  xy: 27, 57
+  size: 125, 45
+  orig: 165, 61
+  offset: 25, 4
+  index: -1
+fx/a_xian_0031
+  rotate: true
+  xy: 154, 2
+  size: 106, 45
+  orig: 165, 61
+  offset: 25, 4
+  index: -1
+fx/xing1
+  rotate: false
+  xy: 238, 38
+  size: 30, 30
+  orig: 30, 30
+  offset: 0, 0
+  index: -1
+idle/atk_1
+  rotate: true
+  xy: 201, 63
+  size: 45, 26
+  orig: 46, 59
+  offset: 1, 16
+  index: -1
+idle/atk_2
+  rotate: false
+  xy: 229, 70
+  size: 35, 38
+  orig: 46, 59
+  offset: 1, 21
+  index: -1
+idle/atk_3
+  rotate: true
+  xy: 201, 18
+  size: 43, 35
+  orig: 46, 59
+  offset: 0, 19
+  index: -1
+idle/atk_4
+  rotate: true
+  xy: 2, 56
+  size: 46, 23
+  orig: 46, 59
+  offset: 0, 13
+  index: -1
+idle/idle_00
+  rotate: false
+  xy: 526, 532
+  size: 264, 267
+  orig: 296, 270
+  offset: 11, 3
+  index: -1
+idle/idle_01
+  rotate: false
+  xy: 536, 263
+  size: 262, 267
+  orig: 296, 270
+  offset: 17, 3
+  index: -1
+idle/idle_02
+  rotate: true
+  xy: 270, 4
+  size: 253, 267
+  orig: 296, 270
+  offset: 27, 3
+  index: -1
+idle/idle_03
+  rotate: false
+  xy: 800, 263
+  size: 256, 267
+  orig: 296, 270
+  offset: 32, 3
+  index: -1
+idle/idle_04
+  rotate: true
+  xy: 539, 3
+  size: 258, 267
+  orig: 296, 270
+  offset: 37, 3
+  index: -1
+idle/idle_05
+  rotate: false
+  xy: 802, 801
+  size: 260, 267
+  orig: 296, 270
+  offset: 36, 3
+  index: -1
+idle/idle_06
+  rotate: false
+  xy: 792, 532
+  size: 261, 267
+  orig: 296, 270
+  offset: 32, 3
+  index: -1
+idle/idle_07
+  rotate: false
+  xy: 536, 801
+  size: 264, 267
+  orig: 296, 270
+  offset: 24, 3
+  index: -1
+idle/idle_08
+  rotate: false
+  xy: 2, 255
+  size: 265, 269
+  orig: 296, 270
+  offset: 15, 1
+  index: -1
+idle/idle_09
+  rotate: false
+  xy: 2, 798
+  size: 264, 270
+  orig: 296, 270
+  offset: 7, 0
+  index: -1
+idle/idle_10
+  rotate: false
+  xy: 2, 526
+  size: 260, 270
+  orig: 296, 270
+  offset: 2, 0
+  index: -1
+idle/idle_11
+  rotate: false
+  xy: 264, 528
+  size: 260, 268
+  orig: 296, 270
+  offset: 0, 2
+  index: -1
+idle/idle_12
+  rotate: false
+  xy: 269, 259
+  size: 265, 267
+  orig: 296, 270
+  offset: 0, 3
+  index: -1
+idle/idle_13
+  rotate: false
+  xy: 268, 801
+  size: 266, 267
+  orig: 296, 270
+  offset: 4, 3
+  index: -1
+jiutan
+  rotate: false
+  xy: 2, 104
+  size: 149, 149
+  orig: 149, 149
+  offset: 0, 0
+  index: -1

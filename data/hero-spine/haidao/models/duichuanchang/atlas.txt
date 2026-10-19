@@ -1,0 +1,153 @@
+
+duichuanchang.png
+size: 926,926
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/attack_1
+  rotate: true
+  xy: 657, 630
+  size: 144, 259
+  orig: 258, 262
+  offset: 8, 0
+  index: -1
+attack/attack_2
+  rotate: true
+  xy: 657, 776
+  size: 148, 259
+  orig: 258, 262
+  offset: 8, 0
+  index: -1
+attack/attack_3
+  rotate: false
+  xy: 481, 141
+  size: 174, 259
+  orig: 258, 262
+  offset: 7, 0
+  index: -1
+attack/attack_4
+  rotate: false
+  xy: 2, 400
+  size: 251, 261
+  orig: 258, 262
+  offset: 2, 0
+  index: -1
+attack/attack_5
+  rotate: false
+  xy: 2, 663
+  size: 252, 261
+  orig: 258, 262
+  offset: 1, 0
+  index: -1
+attack/attack_6
+  rotate: false
+  xy: 2, 138
+  size: 185, 260
+  orig: 258, 262
+  offset: 0, 0
+  index: -1
+attack/attack_7
+  rotate: false
+  xy: 189, 138
+  size: 147, 260
+  orig: 258, 262
+  offset: 5, 0
+  index: -1
+fx/mowangzhili_05
+  rotate: false
+  xy: 657, 40
+  size: 97, 159
+  orig: 117, 300
+  offset: 20, 119
+  index: -1
+fx/mowangzhili_06
+  rotate: true
+  xy: 104, 20
+  size: 116, 172
+  orig: 117, 300
+  offset: 1, 102
+  index: -1
+fx/mowangzhili_07
+  rotate: true
+  xy: 278, 21
+  size: 115, 237
+  orig: 117, 300
+  offset: 2, 3
+  index: -1
+fx/mowangzhili_08
+  rotate: false
+  xy: 541, 697
+  size: 112, 227
+  orig: 117, 300
+  offset: 5, 1
+  index: -1
+fx/mowangzhili_09
+  rotate: false
+  xy: 541, 526
+  size: 112, 169
+  orig: 117, 300
+  offset: 5, 12
+  index: -1
+fx/mowangzhili_10
+  rotate: false
+  xy: 2, 2
+  size: 100, 134
+  orig: 117, 300
+  offset: 15, 27
+  index: -1
+idle/idle_0
+  rotate: true
+  xy: 657, 201
+  size: 140, 259
+  orig: 143, 262
+  offset: 3, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 400, 664
+  size: 139, 260
+  orig: 143, 262
+  offset: 3, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 399, 402
+  size: 140, 260
+  orig: 143, 262
+  offset: 2, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 338, 139
+  size: 141, 260
+  orig: 143, 262
+  offset: 1, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 255, 401
+  size: 142, 260
+  orig: 143, 262
+  offset: 0, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 256, 664
+  size: 142, 260
+  orig: 143, 262
+  offset: 0, 0
+  index: -1
+idle/idle_6
+  rotate: true
+  xy: 657, 486
+  size: 142, 259
+  orig: 143, 262
+  offset: 1, 0
+  index: -1
+idle/idle_7
+  rotate: true
+  xy: 657, 343
+  size: 141, 259
+  orig: 143, 262
+  offset: 2, 0
+  index: -1

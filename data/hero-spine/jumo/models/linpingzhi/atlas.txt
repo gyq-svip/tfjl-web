@@ -1,0 +1,139 @@
+
+linpingzhi.png
+size: 987,987
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 748, 264
+  size: 123, 133
+  orig: 300, 300
+  offset: 55, 48
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 691, 143
+  size: 119, 136
+  orig: 300, 300
+  offset: 58, 45
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 695, 6
+  size: 119, 135
+  orig: 300, 300
+  offset: 57, 46
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 748, 389
+  size: 155, 133
+  orig: 300, 300
+  offset: 4, 48
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 538, 137
+  size: 151, 133
+  orig: 300, 300
+  offset: 13, 48
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 538, 9
+  size: 126, 155
+  orig: 300, 300
+  offset: 42, 26
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 829, 124
+  size: 116, 138
+  orig: 300, 300
+  offset: 44, 43
+  index: -1
+fx/fx1
+  rotate: false
+  xy: 2, 779
+  size: 315, 206
+  orig: 381, 357
+  offset: 17, 88
+  index: -1
+fx/fx2
+  rotate: false
+  xy: 319, 809
+  size: 311, 176
+  orig: 381, 357
+  offset: 21, 81
+  index: -1
+fx/fx3
+  rotate: false
+  xy: 632, 813
+  size: 301, 172
+  orig: 381, 357
+  offset: 32, 88
+  index: -1
+fx/fx4
+  rotate: true
+  xy: 244, 490
+  size: 287, 175
+  orig: 381, 357
+  offset: 48, 90
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 661, 546
+  size: 237, 265
+  orig: 600, 600
+  offset: 96, 97
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 244, 251
+  size: 237, 265
+  orig: 600, 600
+  offset: 98, 97
+  index: -1
+idle/idle_2
+  rotate: true
+  xy: 2, 2
+  size: 238, 266
+  orig: 600, 600
+  offset: 97, 97
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 2, 242
+  size: 240, 266
+  orig: 600, 600
+  offset: 94, 97
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 510
+  size: 240, 267
+  orig: 600, 600
+  offset: 92, 97
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 421, 540
+  size: 238, 267
+  orig: 600, 600
+  offset: 94, 97
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 511, 272
+  size: 235, 266
+  orig: 600, 600
+  offset: 96, 97
+  index: -1
+idle/idle_7
+  rotate: true
+  xy: 270, 13
+  size: 236, 266
+  orig: 600, 600
+  offset: 96, 97
+  index: -1

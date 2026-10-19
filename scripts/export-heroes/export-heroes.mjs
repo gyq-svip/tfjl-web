@@ -602,7 +602,11 @@ function buildTiers(maps, hid, npcId, heroSkillName, heroSkillDesc, heroPassiveI
     // 只认 hero 动画；目录名与 data/hero-spine/<folder> 对应，前端图鉴据此播放（与 export-spine.mjs 同源）
     const res = resById.get(String(npc.res_id ?? '')) || {}
     const anim = String(res.animation || '')
+    // 动画目录 + 基础模型名：combat/animation/hero/<目录>/<模型>
+    // 多个英雄可能共用同一目录（如 木精灵/魔精灵/光精灵 都在 jingling/），
+    // 故必须连模型名一起记录，否则会读成别的英雄的模型（表现为「木精灵显示成魔精灵」）
     const spine = anim.startsWith('combat/animation/hero/') ? anim.split('/')[3] : ''
+    const spineModel = anim.startsWith('combat/animation/hero/') && anim.split('/')[4] ? anim.split('/')[4] : ''
     return {
       id: h.id,
       name: h.name,
@@ -635,8 +639,17 @@ function buildTiers(maps, hid, npcId, heroSkillName, heroSkillDesc, heroPassiveI
         h.passive_desc2
       ),
       spine,
+      spineModel,
       stats: buildHeroStats(maps, h.npc_id),
-      skins: skinsByHero.get(String(h.id)) || []
+      // 皮肤 → 独立骨骼模型（官方每个皮肤在英雄动画目录下有独立资源，路径名即模型名）
+      skins: (skinsByHero.get(String(h.id)) || []).map((sk) => {
+        const npc = npcById.get(String(Number(sk.id) * 10000 + (Number(h.id) || 0)))
+        const res = npc ? resById.get(String(npc.res_id)) : null
+        const a = String((res && res.animation) || '')
+        const parts = a.split('/')
+        const model = a.startsWith('combat/animation/hero/') && parts.length >= 5 ? parts[4] : ''
+        return Object.assign({}, sk, { model: model || '' })
+      })
     }
   })
   // 官方表里同一英雄常有两条 id（低 id 正式行 + 高 id 重复行），重复行的技能文案可能缺失：

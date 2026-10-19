@@ -1,0 +1,132 @@
+
+leifengta.png
+size: 391,391
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+fx/Electricity 016 Charge Right_00002
+  rotate: false
+  xy: 238, 152
+  size: 44, 51
+  orig: 125, 125
+  offset: 28, 26
+  index: -1
+fx/Electricity 016 Charge Right_00006
+  rotate: true
+  xy: 236, 12
+  size: 46, 65
+  orig: 125, 125
+  offset: 31, 27
+  index: -1
+fx/Electricity 016 Charge Right_00010
+  rotate: false
+  xy: 284, 177
+  size: 67, 73
+  orig: 125, 125
+  offset: 29, 29
+  index: -1
+fx/Electricity 016 Charge Right_00012
+  rotate: true
+  xy: 293, 252
+  size: 67, 74
+  orig: 125, 125
+  offset: 30, 27
+  index: -1
+fx/Electricity 016 Charge Right_00016
+  rotate: false
+  xy: 236, 60
+  size: 65, 82
+  orig: 125, 125
+  offset: 32, 25
+  index: -1
+fx/Electricity 016 Charge Right_00019
+  rotate: true
+  xy: 303, 321
+  size: 68, 77
+  orig: 125, 125
+  offset: 35, 28
+  index: -1
+fx/Electricity 016 Charge Right_00021
+  rotate: false
+  xy: 238, 323
+  size: 58, 66
+  orig: 125, 125
+  offset: 44, 39
+  index: -1
+fx/Electricity 016 Charge Right_00023
+  rotate: false
+  xy: 238, 205
+  size: 44, 62
+  orig: 125, 125
+  offset: 48, 41
+  index: -1
+fx/glow2_00004
+  rotate: true
+  xy: 238, 269
+  size: 52, 53
+  orig: 58, 59
+  offset: 3, 3
+  index: -1
+fx/sd01 (2)
+  rotate: false
+  xy: 344, 65
+  size: 31, 57
+  orig: 44, 59
+  offset: 2, 1
+  index: -1
+fx/sd02 (2)
+  rotate: false
+  xy: 353, 196
+  size: 36, 54
+  orig: 44, 59
+  offset: 2, 2
+  index: -1
+fx/sd03 (2)
+  rotate: false
+  xy: 345, 124
+  size: 40, 51
+  orig: 44, 59
+  offset: 1, 7
+  index: -1
+fx/sd04 (2)
+  rotate: false
+  xy: 303, 91
+  size: 39, 51
+  orig: 44, 59
+  offset: 3, 7
+  index: -1
+ta00
+  rotate: true
+  xy: 284, 144
+  size: 31, 59
+  orig: 31, 59
+  offset: 0, 0
+  index: -1
+ta01
+  rotate: false
+  xy: 303, 32
+  size: 29, 57
+  orig: 29, 57
+  offset: 0, 0
+  index: -1
+ta02
+  rotate: false
+  xy: 2, 19
+  size: 116, 123
+  orig: 120, 131
+  offset: 4, 4
+  index: -1
+ta04
+  rotate: false
+  xy: 120, 18
+  size: 114, 124
+  orig: 140, 124
+  offset: 11, 0
+  index: -1
+tashen
+  rotate: false
+  xy: 2, 144
+  size: 234, 245
+  orig: 234, 245
+  offset: 0, 0
+  index: -1

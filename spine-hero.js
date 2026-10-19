@@ -71,10 +71,12 @@
   }
 
   // 加载并解析 folder 的骨架资源（带缓存；失败返回 null，由调用方展示状态）
+  // model：皮肤独立骨骼名（官方每个皮肤在英雄目录下有独立资源），有则读 models/<model>/ 子目录
   // pngCount：清单登记的贴图页数（p0..pN-1）；不传则逐个试到失败为止
-  async function loadAssets(folder, pngCount) {
-    if (assetCache[folder]) return assetCache[folder]
-    const base = baseUrl() + 'data/hero-spine/' + folder + '/'
+  async function loadAssets(folder, pngCount, model) {
+    const key = folder + '@' + (model || '')
+    if (assetCache[key]) return assetCache[key]
+    const base = baseUrl() + 'data/hero-spine/' + folder + (model ? '/models/' + model : '') + '/'
     let skeletonJson, atlasText
     skeletonJson = await (await fetch(base + 'skeleton.json')).json()
     atlasText = await (await fetch(base + 'atlas.txt')).text()
@@ -92,7 +94,7 @@
     })
     const skData = new spine.SkeletonJson(new spine.AtlasAttachmentLoader(atlas)).readSkeletonData(skeletonJson)
     const entry = { skData: skData, atlas: atlas }
-    assetCache[folder] = entry
+    assetCache[key] = entry
     return entry
   }
 
@@ -115,7 +117,7 @@
     if (!spine) { statusCb('Spine 运行时缺失'); return }
     let assets
     try {
-      assets = await loadAssets(folder, opts.pngs)
+      assets = await loadAssets(folder, opts.pngs, opts.model)
     } catch (e) {
       statusCb('读取骨骼资源失败: ' + folder)
       return

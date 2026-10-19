@@ -1,0 +1,153 @@
+
+liangkuan.png
+size: 886,886
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 519, 166
+  size: 132, 140
+  orig: 142, 145
+  offset: 0, 0
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 519, 28
+  size: 131, 136
+  orig: 142, 145
+  offset: 0, 0
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 775, 316
+  size: 108, 137
+  orig: 142, 145
+  offset: 19, 0
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 653, 168
+  size: 116, 138
+  orig: 142, 145
+  offset: 19, 0
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 775, 455
+  size: 108, 141
+  orig: 142, 145
+  offset: 19, 0
+  index: -1
+fx/caocao_06
+  rotate: true
+  xy: 652, 40
+  size: 124, 43
+  orig: 146, 73
+  offset: 21, 0
+  index: -1
+fx/caocao_07
+  rotate: true
+  xy: 786, 607
+  size: 136, 60
+  orig: 146, 73
+  offset: 6, 0
+  index: -1
+fx/caocao_08
+  rotate: true
+  xy: 786, 745
+  size: 139, 66
+  orig: 146, 73
+  offset: 1, 0
+  index: -1
+fx/caocao_09
+  rotate: false
+  xy: 775, 256
+  size: 109, 58
+  orig: 146, 73
+  offset: 0, 12
+  index: -1
+fx/caocao_10
+  rotate: false
+  xy: 771, 196
+  size: 107, 58
+  orig: 146, 73
+  offset: 1, 12
+  index: -1
+fx/jiuyanhantianwu02_1_08
+  rotate: false
+  xy: 737, 113
+  size: 92, 37
+  orig: 104, 52
+  offset: 12, 10
+  index: -1
+fx/jiuyanhantianwu02_1_09
+  rotate: true
+  xy: 697, 74
+  size: 92, 38
+  orig: 104, 52
+  offset: 10, 5
+  index: -1
+fx/jiuyanhantianwu02_1_10
+  rotate: false
+  xy: 771, 152
+  size: 101, 42
+  orig: 104, 52
+  offset: 0, 0
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 10
+  size: 255, 290
+  orig: 262, 290
+  offset: 4, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 302
+  size: 256, 290
+  orig: 262, 290
+  offset: 2, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 594
+  size: 258, 290
+  orig: 262, 290
+  offset: 0, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 262, 596
+  size: 260, 288
+  orig: 262, 290
+  offset: 0, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 524, 598
+  size: 260, 286
+  orig: 262, 290
+  offset: 2, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 259, 15
+  size: 258, 285
+  orig: 262, 290
+  offset: 4, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 517, 308
+  size: 256, 286
+  orig: 262, 290
+  offset: 6, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 260, 305
+  size: 255, 287
+  orig: 262, 290
+  offset: 6, 0
+  index: -1

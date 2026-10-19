@@ -1,0 +1,160 @@
+
+baisuzhen.png
+size: 1449,1449
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 699, 362
+  size: 285, 348
+  orig: 327, 350
+  offset: 19, 0
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 2, 91
+  size: 302, 345
+  orig: 327, 350
+  offset: 25, 0
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 2, 974
+  size: 264, 345
+  orig: 327, 350
+  offset: 33, 0
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 1048, 64
+  size: 296, 348
+  orig: 327, 350
+  offset: 0, 0
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 699, 69
+  size: 291, 347
+  orig: 327, 350
+  offset: 3, 0
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 1048, 649
+  size: 279, 346
+  orig: 327, 350
+  offset: 13, 0
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 2, 395
+  size: 279, 346
+  orig: 327, 350
+  offset: 12, 0
+  index: -1
+fx/s1_dg_00027
+  rotate: false
+  xy: 1046, 930
+  size: 397, 258
+  orig: 427, 295
+  offset: 27, 17
+  index: -1
+fx/s1_dg_00030
+  rotate: false
+  xy: 1070, 1190
+  size: 377, 257
+  orig: 427, 295
+  offset: 40, 22
+  index: -1
+fx/s1_dg_00033
+  rotate: false
+  xy: 712, 1205
+  size: 356, 242
+  orig: 427, 295
+  offset: 54, 27
+  index: -1
+fx/s1_dg_00036
+  rotate: false
+  xy: 379, 1219
+  size: 331, 228
+  orig: 427, 295
+  offset: 71, 37
+  index: -1
+fx/s1_dg_00039
+  rotate: false
+  xy: 92, 1240
+  size: 285, 207
+  orig: 427, 295
+  offset: 97, 51
+  index: -1
+fx/xing1
+  rotate: false
+  xy: 2, 1409
+  size: 38, 38
+  orig: 38, 38
+  offset: 0, 0
+  index: -1
+fx/xing2
+  rotate: false
+  xy: 42, 1399
+  size: 48, 48
+  orig: 54, 54
+  offset: 3, 3
+  index: -1
+idle/idle_0
+  rotate: true
+  xy: 2, 676
+  size: 272, 346
+  orig: 293, 348
+  offset: 20, 0
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 349, 950
+  size: 267, 346
+  orig: 293, 348
+  offset: 24, 0
+  index: -1
+idle/idle_2
+  rotate: true
+  xy: 697, 935
+  size: 268, 347
+  orig: 293, 348
+  offset: 24, 0
+  index: -1
+idle/idle_3
+  rotate: true
+  xy: 350, 661
+  size: 272, 347
+  orig: 293, 348
+  offset: 19, 0
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 1049, 362
+  size: 285, 348
+  orig: 293, 348
+  offset: 3, 0
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 349, 86
+  size: 289, 348
+  orig: 293, 348
+  offset: 0, 0
+  index: -1
+idle/idle_6
+  rotate: true
+  xy: 350, 377
+  size: 282, 347
+  orig: 293, 348
+  offset: 8, 0
+  index: -1
+idle/idle_7
+  rotate: true
+  xy: 699, 651
+  size: 277, 347
+  orig: 293, 348
+  offset: 14, 0
+  index: -1

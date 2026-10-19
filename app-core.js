@@ -176,7 +176,7 @@
             console.error = (...args) => addLog('error', args);
             console.info = (...args) => addLog('info', args);
 
-            // 捕获 F12 Console 里那些“未进 console.error”的运行时报错，让它们也进终端
+            // 捕获 F12 Console 里那些"未进 console.error"的运行时报错，让它们也进终端
             // 1) 未捕获的 JS 异常（window.onerror）——如 ReferenceError: content is not defined
             window.addEventListener('error', (e) => {
                 const where = e.filename ? ` @ ${e.filename.split('/').pop()}:${e.lineno}:${e.colno}` : '';
@@ -199,7 +199,7 @@
         // setInterval(function () { ... }, 15000);
 
         // ==================== Gist GET 304 缓存（省 GitHub API 配额） ====================
-        // 只对“静态内容型”Gist 做 304 缓存：命中时 GitHub 返回 304（不计入 5000 配额）。
+        // 只对"静态内容型"Gist 做 304 缓存：命中时 GitHub 返回 304（不计入 5000 配额）。
         // 共享可变的 Gist（消息墙 / 计数器·含在线状态）一律透传，避免 304 返回旧缓存
         // 导致多人并发改写互相覆盖、丢数据。拍卖行轮询等保持原样（用户决定暂不降速）。
         (function installGist304Cache() {
@@ -10671,7 +10671,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         // 右列「属性详情 / 升级预览」双页签；石台下方皮肤/魔化/融合入口。
         // 数据源：data/heroes.json（stats 按等级给攻击/生命/攻击类型、tiers 给升级阶段）——统计口径与官方一致。
         const HD_COLOR = { 1: '#cbd5e1', 2: '#4ade80', 3: '#60a5fa', 4: '#c084fc', 5: '#fbbf24' }
-        const HD_OCC = { 1: '战士', 2: '猎人', 3: '法师', 4: '牧师', 5: '辅助' }
+        // 职业（官方枚举：1战士 2猎人 3法师 4牧师 5召唤 6精灵 7熊猫 8工程 9术士 10龙族）
+        const HD_OCC = { 1: '战士', 2: '猎人', 3: '法师', 4: '牧师', 5: '召唤', 6: '精灵', 7: '熊猫', 8: '工程', 9: '术士', 10: '龙族' }
         const HD_DTYPE = { 1: '物理伤害', 2: '魔法伤害', 3: '真实伤害', 4: '治疗', 5: '其他' }
 
         // 取当前等级生效行（与官方同口径：取 level ≤ 当前等级的最后一行）
@@ -10709,6 +10710,30 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const card = document.createElement('div')
             card.style.cssText = 'position:relative;width:min(992px,100%);aspect-ratio:992/496;background:url(hero-ui/bg.png) center/cover no-repeat #0e2a52;border-radius:18px;overflow:hidden;box-shadow:0 18px 60px rgba(0,0,0,0.7),inset 0 0 0 2px rgba(120,190,255,0.25);'
             root.appendChild(card)
+
+            // —— 魔化光环 / 地面阴影（官方：魔化后角色脚下带旋转暗色光圈）——
+            try {
+                if (!document.getElementById('hdAuraStyle')) {
+                    const st = document.createElement('style')
+                    st.id = 'hdAuraStyle'
+                    st.textContent = '@keyframes hdAuraSpin{from{transform:translate(-50%,-50%) rotate(0deg)}to{transform:translate(-50%,-50%) rotate(360deg)}}'
+                    document.head.appendChild(st)
+                }
+            } catch (e) {}
+            const auraEl = document.createElement('div')
+            auraEl.style.cssText = 'position:absolute;left:50%;top:56%;width:min(46%,420px);aspect-ratio:1/1;background:url(hero-ui/aura.png) center/contain no-repeat;pointer-events:none;z-index:1;display:none;animation:hdAuraSpin 16s linear infinite;filter:drop-shadow(0 0 12px rgba(120,0,0,0.55));'
+            card.appendChild(auraEl)
+            const shadowEl = document.createElement('div')
+            shadowEl.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);bottom:11%;width:30%;height:8%;background:url(hero-ui/shadow.png) center/contain no-repeat;opacity:0.5;pointer-events:none;z-index:1;'
+            card.appendChild(shadowEl)
+            // 魔化态同步光环显示
+            function paintMoHuaAura() {
+                try {
+                    const on = (typeof getCardMoHua === 'function') ? getCardMoHua(cardId, handType) : false
+                    auraEl.style.display = on ? 'block' : 'none'
+                } catch (e) { auraEl.style.display = 'none' }
+            }
+            paintMoHuaAura()
 
             // —— Spine 动画层（铺满整卡，石台居中偏右下）——
             const stage = document.createElement('div')
@@ -10996,6 +11021,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 actions.appendChild(roundBtn('hero-ui/icon-wake.png', '魔化', async () => {
                     const on = !getCardMoHua(cardId, handType)
                     setCardMoHua(cardId, on, handType)
+                    paintMoHuaAura()
                     if (libSlot && typeof window._llReapplySlot === 'function') { try { await window._llReapplySlot(libSlot) } catch (e) {} }
                     else { try { updateAllCardLevelBadges() } catch (e) {} }
                     pop.dataset.mode = ''
@@ -11090,11 +11116,39 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 card.appendChild(ov)
                 return { ov, box, body }
             }
-            // 底部皮肤缩略图条（选中：金框 + 绿勾）
-            function hdThumbStrip(body, heroName, skins, current, onPick) {
+            // 底部缩略图条（选中：金框 + 绿勾；支持鼠标按住拖动横向滚动，皮肤多时不必去拖滚动条）
+            // portraitOf：可选，自定义「缩略图名 → 立绘 Promise」（融合变体用它取副卡立绘）
+            function hdThumbStrip(body, heroName, skins, current, onPick, portraitOf) {
                 const strip = document.createElement('div')
-                strip.style.cssText = 'position:absolute;left:0;right:0;bottom:0;display:flex;gap:8px;padding:10px 12px;overflow-x:auto;background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,0.45));'
+                strip.style.cssText = 'position:absolute;left:0;right:0;bottom:0;display:flex;gap:8px;padding:10px 12px;overflow-x:auto;overscroll-behavior-x:contain;background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,0.45));cursor:grab;'
+                strip.title = '可按住鼠标左右拖动'
                 body.appendChild(strip)
+                // 拖动滚动（皮肤/变体多时可横向拖；拖动结束不触发点击）
+                let drag = null
+                strip.addEventListener('mousedown', (ev) => {
+                    drag = { x: ev.pageX, sl: strip.scrollLeft, moved: false }
+                    strip.style.cursor = 'grabbing'
+                    ev.preventDefault()
+                })
+                const onMove = (ev) => {
+                    if (!drag) return
+                    const dx = ev.pageX - drag.x
+                    if (Math.abs(dx) > 4) drag.moved = true
+                    strip.scrollLeft = drag.sl - dx
+                }
+                const onUp = () => {
+                    if (!drag) return
+                    const moved = drag.moved
+                    drag = null
+                    strip.style.cursor = 'grab'
+                    if (moved) {
+                        strip.dataset.justDragged = '1'
+                        setTimeout(() => { strip.dataset.justDragged = '' }, 60)
+                    }
+                }
+                window.addEventListener('mousemove', onMove)
+                window.addEventListener('mouseup', onUp)
+                strip.addEventListener('mouseleave', () => { if (drag) onUp() })
                 skins.forEach((sk) => {
                     const label = typeof sk === 'string' ? sk : sk.note
                     const b = document.createElement('button')
@@ -11108,6 +11162,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     tick.style.cssText = 'position:absolute;right:2px;bottom:0;font-size:13px;font-weight:900;color:#4ade80;display:' + (label === current ? 'block' : 'none') + ';text-shadow:0 0 3px #000;'
                     b.appendChild(tick)
                     b.onclick = () => {
+                        if (strip.dataset.justDragged) return
                         strip.querySelectorAll('button').forEach((x) => {
                             const on = x.dataset.skin === label
                             x.style.borderColor = on ? '#ffd75e' : 'rgba(255,255,255,0.28)'
@@ -11117,7 +11172,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         onPick(label)
                     }
                     strip.appendChild(b)
-                    hdPortraitUrl(heroName, label === '默认' ? heroName : label).then((u) => { if (u) img.src = u })
+                    const urlP = portraitOf
+                        ? portraitOf(label)
+                        : hdPortraitUrl(heroName, label === '默认' ? heroName : label)
+                    urlP.then((u) => { if (u) img.src = u })
                 })
                 return strip
             }
@@ -11153,6 +11211,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     hdThumbStrip(sh.body, mainName, skinList, curSkin, (name) => {
                         curSkin = name
                         paintSkin(name)
+                        hdPlaySpine() // 换皮肤 → 切换独立骨骼模型重播
                         // 应用皮肤（与旧弹窗同逻辑：图库槽位写个人覆盖；其余写卡槽/全局默认）
                         if (libSlot && typeof window._llSet === 'function') {
                             const lt = libSlot.getAttribute('data-tab'), ll = libSlot.getAttribute('data-lid'), lsd = libSlot.getAttribute('data-side') || 'my'
@@ -11216,20 +11275,42 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             else { try { updateAllCardLevelBadges() } catch (e) {} }
                         }
                         right.style.borderColor = want ? '#ff5f4d' : 'rgba(255,255,255,0.25)'
+                        paintMoHuaAura()
                     })
                 }
             }
 
-            // ③ 融合（官方版式：左副卡 / 右主卡 + 底部变体切换）
+            // ③ 融合（官方版式：左副卡 / 右主卡 + 底部变体切换 + 副卡等级/皮肤设置）
             const fuseBtn = actions.children[2]
             if (fuseBtn) {
                 fuseBtn.onclick = () => {
                     if (card.querySelector('.hd-sub-fuse')) { card.querySelector('.hd-sub-fuse').remove(); return }
                     const sh = hdSubShell('融合', '#c99a5b', 'linear-gradient(160deg,#4b3418,#241a0d)')
                     sh.ov.className = 'hd-sub-fuse'
-                    const parts = (typeof getFusionParts === 'function') ? getFusionParts(cardName) : null
-                    const mainPart = (parts && parts.length >= 2) ? parts[0] : baseHero
-                    const subPart = (parts && parts.length >= 2) ? parts[1] : ''
+                    // 融合变体：多路兜底（全局函数 → 本地函数 → 从融合名反查），避免闭包作用域取不到
+                    let variants = []
+                    try {
+                        const _g = window.getFusionVariantsForBase
+                        if (typeof _g === 'function') variants = _g(baseHero) || []
+                        if (!variants.length && typeof getFusionVariantsForBase === 'function') variants = getFusionVariantsForBase(baseHero) || []
+                        if (!variants.length && typeof getAllFusionNames === 'function') {
+                            variants = getAllFusionNames().filter((n) => {
+                                const p = (typeof getFusionParts === 'function') ? getFusionParts(n) : null
+                                return p && p.length >= 2 && p[0] === baseHero
+                            })
+                        }
+                    } catch (e) { variants = [] }
+                    // 融合名 → 副卡英雄；普通英雄名 → 本人（修复「融合立绘全显示主卡皮肤」）
+                    const heroOf = (name) => {
+                        const p = (typeof getFusionParts === 'function') ? getFusionParts(name) : null
+                        return (p && p.length >= 2) ? p[1] : name
+                    }
+                    const mainOf = (name) => {
+                        const p = (typeof getFusionParts === 'function') ? getFusionParts(name) : null
+                        return (p && p.length >= 2) ? p[0] : baseHero
+                    }
+                    // 预览态：当前选中的融合（默认=卡片当前融合态）
+                    let preview = cardName
                     const left = document.createElement('div')
                     const right = document.createElement('div')
                     ;[left, right].forEach((el) => {
@@ -11240,23 +11321,82 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     row.appendChild(left)
                     row.appendChild(right)
                     sh.body.appendChild(row)
-                    const paintPart = (el, hero) => {
+                    const paintPart = (el, hero, tag) => {
                         el.innerHTML = ''
-                        if (!hero) { el.innerHTML = '<span style="color:#8a7a5c;font-size:12px;">未选择</span>'; return }
+                        if (!hero) { el.innerHTML = '<span style="color:#8a7a5c;font-size:12px;">' + esc(tag || '未选择') + '</span>'; return }
                         hdPortraitUrl(hero, hero).then((u) => {
+                            if (!el.isConnected) return
                             if (!u) { el.innerHTML = '<span style="color:#8a7a5c;font-size:12px;">' + esc(hero) + '</span>'; return }
                             const im = document.createElement('img')
                             im.src = u
+                            im.alt = hero
                             im.style.cssText = 'width:100%;height:100%;object-fit:cover;'
                             el.appendChild(im)
                         })
                     }
-                    paintPart(left, subPart)
-                    paintPart(right, mainPart)
-                    const variants = (typeof getFusionVariantsForBase === 'function') ? getFusionVariantsForBase(baseHero) : []
+                    function paintCircles() {
+                        const sub = heroOf(preview) === preview ? '' : heroOf(preview)
+                        paintPart(left, sub, '未选择副卡')
+                        paintPart(right, mainOf(preview))
+                    }
+                    paintCircles()
+
+                    // —— 副卡设置区（等级 / 皮肤 / 魔化）：被融合卡的设置 ——
+                    const subBox = document.createElement('div')
+                    subBox.style.cssText = 'position:absolute;left:12px;top:10px;width:200px;background:rgba(20,14,6,0.85);border:1px solid rgba(255,200,120,0.4);border-radius:10px;padding:10px;color:#ffe9c9;font-size:12px;display:none;'
+                    sh.body.appendChild(subBox)
+                    function paintSubSettings() {
+                        const sub = heroOf(preview) === preview ? '' : heroOf(preview)
+                        if (!sub) { subBox.style.display = 'none'; return }
+                        subBox.style.display = 'block'
+                        const lv = (typeof getFusionComponentLevel === 'function') ? getFusionComponentLevel(sub) : 1
+                        const skinsApp = (typeof getAvailableSkins === 'function') ? getAvailableSkins(sub) : []
+                        const subMeta = (window.heroesOfficialMap || {})[sub] || {}
+                        const skinList = (skinsApp && skinsApp.length) ? skinsApp : ['默认'].concat((subMeta.skins || []).map((s) => s.note).filter(Boolean))
+                        const curSkin = (typeof getFusionComponentSkin === 'function') ? (getFusionComponentSkin(sub) || '默认') : '默认'
+                        subBox.innerHTML =
+                            '<div style="font-weight:900;color:#ffd75e;margin-bottom:6px;">副卡：' + esc(sub) + '</div>' +
+                            '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">' +
+                            '<span>等级</span><b style="color:#ffd75e;min-width:2ch;text-align:center;" id="hdFuseSubLv">' + lv + '</b>' +
+                            '<input type="range" min="1" max="30" step="1" value="' + lv + '" style="flex:1;accent-color:#e8a91c;" id="hdFuseSubSlider">' +
+                            '</div>' +
+                            '<div style="margin-bottom:4px;">皮肤</div>' +
+                            '<div id="hdFuseSubSkins" style="display:flex;flex-wrap:wrap;gap:4px;max-height:96px;overflow-y:auto;"></div>'
+                        const slider = subBox.querySelector('#hdFuseSubSlider')
+                        slider.oninput = () => { subBox.querySelector('#hdFuseSubLv').textContent = slider.value }
+                        slider.onchange = () => {
+                            if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(sub, Number(slider.value))
+                        }
+                        const wrap = subBox.querySelector('#hdFuseSubSkins')
+                        skinList.forEach((sk) => {
+                            const b = document.createElement('button')
+                            b.textContent = sk
+                            b.dataset.skin = sk
+                            b.style.cssText = 'padding:3px 7px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid ' + (sk === curSkin ? '#ffd75e' : 'rgba(255,220,150,0.3)') + ';background:' + (sk === curSkin ? 'rgba(255,215,94,0.2)' : 'transparent') + ';color:#ffe9c9;'
+                            b.onclick = async () => {
+                                if (typeof setFusionSkin === 'function') { try { await setFusionSkin(sub, sk === '默认' ? '' : sk) } catch (e) {} }
+                                wrap.querySelectorAll('button').forEach((x) => {
+                                    const on = x.dataset.skin === sk
+                                    x.style.borderColor = on ? '#ffd75e' : 'rgba(255,220,150,0.3)'
+                                    x.style.background = on ? 'rgba(255,215,94,0.2)' : 'transparent'
+                                })
+                            }
+                            wrap.appendChild(b)
+                        })
+                    }
+                    paintSubSettings()
+
                     hdThumbStrip(sh.body, baseHero, [baseHero].concat(variants), cardName, async (opt) => {
+                        preview = opt
+                        paintCircles()
+                        paintSubSettings()
                         const slotEl = badge && badge.closest ? badge.closest('.battle-slot') : null
-                        if (slotEl && typeof upgradeCardToFusion === 'function') {
+                        if (libSlot) {
+                            const lt = libSlot.getAttribute('data-tab'), ll = libSlot.getAttribute('data-lid'), lsd = libSlot.getAttribute('data-side') || 'my'
+                            const heroKey = libSlot.getAttribute('data-hero') || baseHero
+                            if (typeof window._llSet === 'function') window._llSet(lt, ll, 'fus', heroKey + '#' + lsd, opt === heroKey ? '' : opt)
+                            if (typeof window._llReapplySlot === 'function') { try { await window._llReapplySlot(libSlot) } catch (e) {} }
+                        } else if (slotEl && typeof upgradeCardToFusion === 'function') {
                             try { await upgradeCardToFusion(slotEl, opt) } catch (e) {}
                         } else {
                             const handArr = (handType === 'my') ? myHandCards : teammateHandCards
@@ -11268,7 +11408,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             if (typeof autoSaveProject === 'function') autoSaveProject()
                         }
                         try { updateAllCardLevelBadges() } catch (e) {}
-                    })
+                    }, function (label) { var h = heroOf(label); return hdPortraitUrl(h, h) })
                 }
             }
 
@@ -11309,6 +11449,23 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 renderBody()
             }
 
+            // 当前皮肤对应的独立骨骼模型名（官方每皮肤一套；没有则用基础模型）
+            function hdSkinModel(skinName) {
+                const s = ((meta && meta.skins) || []).find((x) => x.note === skinName)
+                return (s && s.model) || ''
+            }
+            // 按当前皮肤起播/重播动画（换皮肤后调用即切换模型）
+            function hdPlaySpine() {
+                try {
+                    if (!window.spineHero || !meta || !meta.spine || !cv.isConnected) return
+                    const man = window.__heroSpineIndex && window.__heroSpineIndex[meta.spine]
+                    if (!man) return
+                    const model = hdSkinModel(curSkin) || (meta.spineModel || '')
+                    const pngs = model ? ((man.modelPngs && man.modelPngs[model]) || 0) : (man.pngs || 0)
+                    window.spineHero.play(cv, meta.spine, { fitPadding: 0.58, pngs, model })
+                } catch (e) {}
+            }
+
             // 起播动画 + 拉官方数据
             ;(async function () {
                 try {
@@ -11317,7 +11474,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (!card.isConnected) return
                     paintAll()
                     color = HD_COLOR[meta && meta.heroColor] || color
-                    // 动画：仅清单内已导出的英雄
+                    // 动画：按当前皮肤的独立骨骼播（官方每皮肤一套模型），仅清单内已导出的英雄
                     if (window.spineHero && meta && meta.spine) {
                         if (!window.__heroSpineIndex) {
                             try {
@@ -11326,10 +11483,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                                 window.__heroSpineIndex = await (await fetch(b + 'data/hero-spine/index.json')).json()
                             } catch (e) { window.__heroSpineIndex = {} }
                         }
-                        const man = window.__heroSpineIndex && window.__heroSpineIndex[meta.spine]
-                        if (man && cv.isConnected) {
-                            window.spineHero.play(cv, meta.spine, { fitPadding: 0.58, pngs: man.pngs || 0 })
-                        }
+                        hdPlaySpine()
                     }
                 } catch (e) { /* 数据失败保留骨架 */ }
             })()
@@ -11477,7 +11631,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         }
                         const man = window.__heroSpineIndex && window.__heroSpineIndex[folder];
                         if (!man || !csCanvas.isConnected) { csStage.style.display = 'none'; return; }
-                        window.spineHero.play(csCanvas, folder, { fitPadding: 0.9, pngs: man.pngs || 0 });
+                        // 当前皮肤的独立骨骼（官方每皮肤一套模型）
+                        const _skinRow = ((oh && oh.skins) || []).find(function (s) { return s.note === curSkin });
+                        const _model = (_skinRow && _skinRow.model) || (oh && oh.spineModel) || '';
+                        const _pngs = _model ? ((man.modelPngs && man.modelPngs[_model]) || 0) : (man.pngs || 0);
+                        window.spineHero.play(csCanvas, folder, { fitPadding: 0.9, pngs: _pngs, model: _model });
                     } catch (e) { csStage.style.display = 'none'; }
                 })();
             }
@@ -18323,8 +18481,8 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             const APP_PREFIX = '塔防精灵助手 - 阵容卡搭配｜';
             let title = String(latest.content).trim();
             // 软件名「塔防精灵助手 - 阵容卡搭配」固定写死；其后「标签+网址」整段跟公告变
-            //   （content 写“本站网址:https://xxx”/“官网:https://xxx”/纯网址均可）；
-            //   若 content 已含“塔防精灵”→ 视为完整标题，整串使用（完全自定义）
+            //   （content 写"本站网址:https://xxx"/"官网:https://xxx"/纯网址均可）；
+            //   若 content 已含"塔防精灵"→ 视为完整标题，整串使用（完全自定义）
             if (!/塔防精灵/.test(title)) title = APP_PREFIX + title;
             try { document.title = title; } catch (e) {}
             try {
@@ -23386,7 +23544,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
                 if (ANON.includes(a) || a.toLowerCase() === '匿名用户') continue; // 排除无昵称的匿名用户
                 if (!map[a]) map[a] = { rep: 0, shares: 0, copies: 0, likes: 0, previews: 0, downloads: 0, firstShare: msgTime(m) };
                 const e = map[a];
-                // 下载 = 站内复制（用户视角的“下载”）+ 实际下载按钮次数（含下载到老马）；复制与下载同义，合并计为下载
+                // 下载 = 站内复制（用户视角的"下载"）+ 实际下载按钮次数（含下载到老马）；复制与下载同义，合并计为下载
                 e.downloads += (m.copyCount || 0) + _globalDlForMsg(m);
                 e.shares++; e.copies += (m.copyCount || 0); e.likes += (m.likes || 0); e.previews += (m.previewCount || 0);
                 e.firstShare = Math.min(e.firstShare, msgTime(m));
@@ -23615,7 +23773,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         //    该数组同时用于：分享脚本时的「🏷️ 分类标签」下拉、「我的」页面分类筛选。
         window.WORK_CATEGORIES = ['未分类', '寒冰', '暗月', '漩涡', '深海', '对战', '隐藏', '活动'];
         window.WALL_CATEGORIES = window.WORK_CATEGORIES;
-    // 根据文件名智能推断需求墙分类，避免用户漏选分类导致消息落“未分类”、没有标签
+    // 根据文件名智能推断需求墙分类，避免用户漏选分类导致消息落"未分类"、没有标签
     window.inferScriptCat = function (name) {
         if (!name) return '';
         var n = String(name);
@@ -29049,9 +29207,12 @@ ${maSection}
                     if (en.isIntersecting && en.intersectionRatio >= 0.25) {
                         if (playing.has(cv)) return;
                         playing.add(cv);
-                        window.spineHero.play(cv, stage.getAttribute('data-spine'), {
+                        const _spFolder = stage.getAttribute('data-spine')
+                        const _spHero = (window.__heroCodexCache || []).find(function (x) { return x.spine === _spFolder && (!x.spineModel || !stage.getAttribute('data-model') || x.spineModel === stage.getAttribute('data-model')) })
+                        window.spineHero.play(cv, _spFolder, {
                             fitPadding: 0.92,
-                            pngs: (window.__heroSpineIndex && window.__heroSpineIndex[stage.getAttribute('data-spine')] || {}).pngs || 0,
+                            model: (stage.getAttribute('data-model') || (_spHero && _spHero.spineModel) || ''),
+                            pngs: (window.__heroSpineIndex && window.__heroSpineIndex[_spFolder] || {}).pngs || 0,
                             onStatus: function (s) {
                                 const el = stage.querySelector('.codex-spine-status');
                                 if (el) el.textContent = s || '';
@@ -29137,7 +29298,7 @@ ${maSection}
                 // spine 动画舞台：仅清单内已导出的英雄；canvas 由 setupHeroCodexSpine 按可见性懒播放
                 const spineFolder = (h.spine && spineIndex[h.spine]) ? h.spine : '';
                 if (spineFolder) {
-                    html += '<div class="codex-spine-stage" data-spine="' + _esc(spineFolder) + '" style="position:relative;height:150px;margin:2px 0 8px;border-radius:8px;overflow:hidden;background:linear-gradient(160deg,rgba(20,26,50,0.55),rgba(13,27,42,0.55));border:1px solid ' + c + '33;">';
+                    html += '<div class="codex-spine-stage" data-spine="' + _esc(spineFolder) + '" data-model="' + _esc(h.spineModel || '') + '" style="position:relative;height:150px;margin:2px 0 8px;border-radius:8px;overflow:hidden;background:linear-gradient(160deg,rgba(20,26,50,0.55),rgba(13,27,42,0.55));border:1px solid ' + c + '33;">';
                     html += '<canvas style="position:absolute;inset:0;width:100%;height:100%;"></canvas>';
                     html += '<div class="codex-spine-status" style="position:absolute;left:50%;bottom:5px;transform:translateX(-50%);font-size:0.6rem;color:rgba(255,255,255,0.5);pointer-events:none;white-space:nowrap;"></div>';
                     html += '</div>';
@@ -32049,7 +32210,7 @@ ${maSection}
             if (typeof refreshFloatConsoleToggleBtn === 'function') refreshFloatConsoleToggleBtn();
             console.log('[ADMIN] 浮动控制台已' + (next ? '开启' : '关闭'));
         }
-        // 刷新终端面板里的“浮窗显示”开关按钮文案（由 toggleConsoleVisibility / 面板打开时调用）
+        // 刷新终端面板里的"浮窗显示"开关按钮文案（由 toggleConsoleVisibility / 面板打开时调用）
         function refreshFloatConsoleToggleBtn() {
             const btn = document.getElementById('adminFloatConsoleToggleBtn');
             if (!btn) return;
@@ -32851,7 +33012,7 @@ ${maSection}
             //   · APP：只认 __tfjlInTray（点 X 真正挂托盘才 true），绝不用 document.hidden 判定 APP 前后台。
             //     前台打开界面（无论是否被遮挡/闲置多久）= 绝对不自动升级，最多弹彩球提示。
             //   · 网页：document.hidden（真正隐藏/最小化）才静默升级；前台绝不升级，弹彩球。
-            //   · forceReload 开关只控制“是否允许后台/托盘静默升”，绝不赋予前台自动升级权限。
+            //   · forceReload 开关只控制"是否允许后台/托盘静默升"，绝不赋予前台自动升级权限。
             const isTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
             const inTray = isTauri && window.__tfjlInTray === true;
             const inBackground = isTauri ? inTray : document.hidden;
@@ -34064,7 +34225,7 @@ ${maSection}
 
                 renderAdminNewsList(newsData);
                 showAdminStatus('公告发布成功！', 'success');
-                alert('✅ 公告发布成功！' + (category === '窗口标题' ? '\n\n窗口标题栏已更新：软件名“塔防精灵助手 - 阵容卡搭配”固定不变，内容框填「标签+网址」（如：本站网址:https://xxx）即可（只作用于标题栏，不进公告）。' : ''));
+                alert('✅ 公告发布成功！' + (category === '窗口标题' ? '\n\n窗口标题栏已更新：软件名"塔防精灵助手 - 阵容卡搭配"固定不变，内容框填「标签+网址」（如：本站网址:https://xxx）即可（只作用于标题栏，不进公告）。' : ''));
             } catch (error) {
                 console.error('发布公告失败:', error);
                 const _m = '发布失败: ' + ((error && error.message) ? error.message : error);

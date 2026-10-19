@@ -1,0 +1,209 @@
+
+zhaowuji.png
+size: 745,745
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 463, 26
+  size: 84, 111
+  orig: 200, 200
+  offset: 66, 39
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 668, 632
+  size: 74, 111
+  orig: 200, 200
+  offset: 70, 39
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 490, 184
+  size: 70, 111
+  orig: 200, 200
+  offset: 70, 39
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 497, 408
+  size: 82, 111
+  orig: 200, 200
+  offset: 62, 39
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 581, 412
+  size: 102, 111
+  orig: 200, 200
+  offset: 60, 39
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 557, 306
+  size: 100, 111
+  orig: 200, 200
+  offset: 60, 39
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 562, 193
+  size: 98, 111
+  orig: 200, 200
+  offset: 60, 39
+  index: -1
+attack/atk_8
+  rotate: true
+  xy: 562, 96
+  size: 95, 111
+  orig: 200, 200
+  offset: 63, 39
+  index: -1
+fx/caocao_06
+  rotate: false
+  xy: 143, 28
+  size: 125, 43
+  orig: 146, 73
+  offset: 21, 0
+  index: -1
+fx/caocao_07
+  rotate: false
+  xy: 501, 525
+  size: 136, 60
+  orig: 146, 73
+  offset: 6, 0
+  index: -1
+fx/caocao_08
+  rotate: false
+  xy: 2, 5
+  size: 139, 66
+  orig: 146, 73
+  offset: 1, 0
+  index: -1
+fx/caocao_09
+  rotate: true
+  xy: 497, 297
+  size: 109, 58
+  orig: 146, 73
+  offset: 0, 12
+  index: -1
+fx/caocao_10
+  rotate: true
+  xy: 685, 431
+  size: 107, 58
+  orig: 146, 73
+  offset: 1, 12
+  index: -1
+fx/caocao_11
+  rotate: true
+  xy: 675, 128
+  size: 80, 48
+  orig: 146, 73
+  offset: 0, 24
+  index: -1
+fx/kaihuo0_add_00012
+  rotate: false
+  xy: 332, 14
+  size: 129, 123
+  orig: 165, 156
+  offset: 16, 19
+  index: -1
+fx/kaihuo0_add_00013
+  rotate: false
+  xy: 332, 139
+  size: 156, 156
+  orig: 165, 156
+  offset: 0, 0
+  index: -1
+fx/kaihuo0_add_00014
+  rotate: false
+  xy: 501, 587
+  size: 165, 156
+  orig: 165, 156
+  offset: 0, 0
+  index: -1
+fx/kaihuo0_add_00015
+  rotate: true
+  xy: 549, 7
+  size: 87, 96
+  orig: 165, 156
+  offset: 65, 26
+  index: -1
+fx/kaihuo0_add_00016
+  rotate: false
+  xy: 662, 210
+  size: 79, 94
+  orig: 165, 156
+  offset: 74, 27
+  index: -1
+fx/kaihuo0_add_00017
+  rotate: false
+  xy: 668, 540
+  size: 73, 90
+  orig: 165, 156
+  offset: 79, 29
+  index: -1
+fx/kaihuo0_add_00018
+  rotate: false
+  xy: 647, 9
+  size: 64, 85
+  orig: 165, 156
+  offset: 82, 31
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 521
+  size: 166, 222
+  orig: 400, 400
+  offset: 128, 78
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 170, 521
+  size: 164, 222
+  orig: 400, 400
+  offset: 129, 78
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 335, 297
+  size: 160, 222
+  orig: 400, 400
+  offset: 132, 78
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 168, 73
+  size: 162, 222
+  orig: 400, 400
+  offset: 130, 78
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 73
+  size: 164, 222
+  orig: 400, 400
+  offset: 128, 78
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 169, 297
+  size: 164, 222
+  orig: 400, 400
+  offset: 128, 78
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 336, 521
+  size: 163, 222
+  orig: 400, 400
+  offset: 129, 78
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 297
+  size: 165, 222
+  orig: 400, 400
+  offset: 128, 78
+  index: -1

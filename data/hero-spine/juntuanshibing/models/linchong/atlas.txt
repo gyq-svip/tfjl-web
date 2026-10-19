@@ -1,0 +1,132 @@
+
+linchong.png
+size: 968,968
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 830, 117
+  size: 124, 129
+  orig: 212, 176
+  offset: 12, 18
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 530, 460
+  size: 122, 131
+  orig: 212, 176
+  offset: 20, 20
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 700, 98
+  size: 143, 128
+  orig: 212, 176
+  offset: 10, 21
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 530, 338
+  size: 131, 120
+  orig: 212, 176
+  offset: 15, 21
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 593, 10
+  size: 198, 105
+  orig: 212, 176
+  offset: 10, 21
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 471, 2
+  size: 206, 120
+  orig: 212, 176
+  offset: 6, 21
+  index: -1
+attack/atk_8
+  rotate: true
+  xy: 471, 210
+  size: 126, 155
+  orig: 212, 176
+  offset: 12, 21
+  index: -1
+fx/fx2
+  rotate: false
+  xy: 2, 773
+  size: 342, 193
+  orig: 420, 394
+  offset: 24, 90
+  index: -1
+fx/fx3
+  rotate: false
+  xy: 346, 778
+  size: 331, 188
+  orig: 420, 394
+  offset: 36, 98
+  index: -1
+fx/fx4
+  rotate: false
+  xy: 346, 584
+  size: 316, 192
+  orig: 420, 394
+  offset: 53, 100
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 290
+  size: 260, 238
+  orig: 263, 244
+  offset: 3, 0
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 237, 29
+  size: 259, 232
+  orig: 263, 244
+  offset: 4, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 663, 243
+  size: 258, 231
+  orig: 263, 244
+  offset: 5, 0
+  index: -1
+idle/idle_3
+  rotate: true
+  xy: 2, 28
+  size: 260, 233
+  orig: 263, 244
+  offset: 3, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 267, 345
+  size: 261, 237
+  orig: 263, 244
+  offset: 2, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 2, 530
+  size: 263, 241
+  orig: 263, 244
+  offset: 0, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 679, 722
+  size: 263, 244
+  orig: 263, 244
+  offset: 0, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 664, 476
+  size: 263, 244
+  orig: 263, 244
+  offset: 0, 0
+  index: -1

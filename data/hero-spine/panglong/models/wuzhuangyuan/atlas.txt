@@ -1,0 +1,62 @@
+
+wuzhuangyuan.png
+size: 724,724
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+idle/idle_0
+  rotate: false
+  xy: 375, 189
+  size: 183, 265
+  orig: 188, 266
+  offset: 3, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 189, 188
+  size: 184, 266
+  orig: 188, 266
+  offset: 2, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 377, 456
+  size: 183, 266
+  orig: 188, 266
+  offset: 3, 0
+  index: -1
+idle/idle_3
+  rotate: true
+  xy: 270, 2
+  size: 184, 266
+  orig: 188, 266
+  offset: 3, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 456
+  size: 186, 266
+  orig: 188, 266
+  offset: 2, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 2, 188
+  size: 185, 266
+  orig: 188, 266
+  offset: 3, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 190, 456
+  size: 185, 266
+  orig: 188, 266
+  offset: 3, 0
+  index: -1
+idle/idle_7
+  rotate: true
+  xy: 2, 2
+  size: 184, 266
+  orig: 188, 266
+  offset: 3, 0
+  index: -1

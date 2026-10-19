@@ -1,0 +1,244 @@
+
+xiaoyewansheng.png
+size: 620,620
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 505, 163
+  size: 79, 99
+  orig: 95, 108
+  offset: 6, 0
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 505, 84
+  size: 77, 97
+  orig: 95, 108
+  offset: 8, 0
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 419, 112
+  size: 84, 104
+  orig: 95, 108
+  offset: 5, 1
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 499, 367
+  size: 74, 101
+  orig: 95, 108
+  offset: 5, 7
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 326, 3
+  size: 87, 105
+  orig: 95, 108
+  offset: 2, 3
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 326, 110
+  size: 91, 106
+  orig: 95, 108
+  offset: 0, 0
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 490, 264
+  size: 87, 101
+  orig: 95, 108
+  offset: 0, 0
+  index: -1
+fx/1/idle_0
+  rotate: false
+  xy: 439, 86
+  size: 23, 24
+  orig: 169, 199
+  offset: 130, 62
+  index: -1
+fx/1/idle_1
+  rotate: false
+  xy: 440, 34
+  size: 22, 24
+  orig: 169, 199
+  offset: 130, 61
+  index: -1
+fx/1/idle_2
+  rotate: false
+  xy: 415, 56
+  size: 23, 25
+  orig: 169, 199
+  offset: 130, 60
+  index: -1
+fx/1/idle_3
+  rotate: false
+  xy: 464, 35
+  size: 22, 23
+  orig: 169, 199
+  offset: 131, 61
+  index: -1
+fx/1/idle_4
+  rotate: false
+  xy: 415, 29
+  size: 23, 25
+  orig: 169, 199
+  offset: 132, 62
+  index: -1
+fx/1/idle_5
+  rotate: false
+  xy: 464, 86
+  size: 23, 24
+  orig: 169, 199
+  offset: 133, 63
+  index: -1
+fx/1/idle_6
+  rotate: false
+  xy: 440, 60
+  size: 23, 24
+  orig: 169, 199
+  offset: 133, 64
+  index: -1
+fx/1/idle_7
+  rotate: false
+  xy: 415, 83
+  size: 22, 25
+  orig: 169, 199
+  offset: 132, 63
+  index: -1
+fx/Energy01
+  rotate: false
+  xy: 586, 164
+  size: 18, 18
+  orig: 135, 135
+  offset: 31, 70
+  index: -1
+fx/Energy02
+  rotate: false
+  xy: 489, 61
+  size: 22, 21
+  orig: 135, 135
+  offset: 24, 66
+  index: -1
+fx/Energy03
+  rotate: false
+  xy: 465, 60
+  size: 22, 24
+  orig: 135, 135
+  offset: 21, 61
+  index: -1
+fx/Energy04
+  rotate: true
+  xy: 586, 184
+  size: 30, 28
+  orig: 135, 135
+  offset: 21, 52
+  index: -1
+fx/Energy05
+  rotate: true
+  xy: 586, 216
+  size: 46, 26
+  orig: 135, 135
+  offset: 28, 47
+  index: -1
+fx/Energy06
+  rotate: true
+  xy: 579, 311
+  size: 54, 25
+  orig: 135, 135
+  offset: 45, 46
+  index: -1
+fx/Energy07
+  rotate: true
+  xy: 579, 264
+  size: 45, 27
+  orig: 135, 135
+  offset: 66, 47
+  index: -1
+fx/Energy08
+  rotate: false
+  xy: 415, 2
+  size: 22, 25
+  orig: 135, 135
+  offset: 93, 56
+  index: -1
+fx/Energy09
+  rotate: false
+  xy: 513, 61
+  size: 22, 21
+  orig: 135, 135
+  offset: 91, 61
+  index: -1
+fx/Energy10
+  rotate: false
+  xy: 537, 62
+  size: 20, 20
+  orig: 135, 135
+  offset: 88, 64
+  index: -1
+fx/glow2_00003
+  rotate: true
+  xy: 499, 443
+  size: 175, 114
+  orig: 191, 160
+  offset: 8, 23
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 340, 419
+  size: 157, 199
+  orig: 169, 199
+  offset: 9, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 334, 218
+  size: 154, 199
+  orig: 169, 199
+  offset: 12, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 169, 17
+  size: 155, 199
+  orig: 169, 199
+  offset: 11, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 173, 218
+  size: 159, 199
+  orig: 169, 199
+  offset: 8, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 173, 419
+  size: 165, 199
+  orig: 169, 199
+  offset: 3, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 2, 419
+  size: 169, 199
+  orig: 169, 199
+  offset: 0, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 218
+  size: 169, 199
+  orig: 169, 199
+  offset: 0, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 17
+  size: 165, 199
+  orig: 169, 199
+  offset: 3, 0
+  index: -1

@@ -1,0 +1,153 @@
+
+linghuchong.png
+size: 916,916
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 726, 247
+  size: 113, 129
+  orig: 300, 300
+  offset: 59, 48
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 478, 105
+  size: 109, 127
+  orig: 300, 300
+  offset: 60, 48
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 726, 143
+  size: 102, 134
+  orig: 300, 300
+  offset: 62, 48
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 200, 9
+  size: 196, 121
+  orig: 300, 300
+  offset: 60, 48
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 603, 226
+  size: 161, 121
+  orig: 300, 300
+  offset: 47, 48
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 751, 511
+  size: 188, 143
+  orig: 300, 300
+  offset: 44, 48
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 478, 216
+  size: 123, 171
+  orig: 300, 300
+  offset: 45, 48
+  index: -1
+fx/dadaoguang_00012
+  rotate: true
+  xy: 751, 701
+  size: 213, 140
+  orig: 231, 158
+  offset: 7, 10
+  index: -1
+fx/dadaoguang_00013
+  rotate: false
+  xy: 2, 2
+  size: 196, 129
+  orig: 231, 158
+  offset: 28, 11
+  index: -1
+fx/dadaoguang_00014
+  rotate: false
+  xy: 751, 378
+  size: 144, 131
+  orig: 231, 158
+  offset: 76, 9
+  index: -1
+fx/dadaoguang_00015
+  rotate: false
+  xy: 607, 99
+  size: 111, 125
+  orig: 231, 158
+  offset: 101, 9
+  index: -1
+fx/dadaoguang_00016
+  rotate: false
+  xy: 720, 33
+  size: 109, 108
+  orig: 231, 158
+  offset: 102, 10
+  index: -1
+fx/wanjianjue2
+  rotate: false
+  xy: 484, 389
+  size: 226, 55
+  orig: 286, 96
+  offset: 28, 21
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 247, 655
+  size: 240, 259
+  orig: 600, 600
+  offset: 104, 97
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 489, 679
+  size: 235, 260
+  orig: 600, 600
+  offset: 110, 97
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 244, 132
+  size: 232, 260
+  orig: 600, 600
+  offset: 113, 97
+  index: -1
+idle/idle_3
+  rotate: true
+  xy: 489, 446
+  size: 231, 260
+  orig: 600, 600
+  offset: 113, 97
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 247, 394
+  size: 235, 259
+  orig: 600, 600
+  offset: 109, 97
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 2, 133
+  size: 240, 259
+  orig: 600, 600
+  offset: 104, 97
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 655
+  size: 243, 259
+  orig: 600, 600
+  offset: 101, 97
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 394
+  size: 243, 259
+  orig: 600, 600
+  offset: 101, 97
+  index: -1

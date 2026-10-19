@@ -1,0 +1,125 @@
+
+shisanyi.png
+size: 743,743
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 620, 605
+  size: 75, 136
+  orig: 103, 139
+  offset: 13, 0
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 335, 607
+  size: 88, 134
+  orig: 103, 139
+  offset: 8, 0
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 149, 608
+  size: 91, 133
+  orig: 103, 139
+  offset: 6, 1
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 242, 608
+  size: 91, 133
+  orig: 103, 139
+  offset: 8, 1
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 425, 607
+  size: 103, 134
+  orig: 103, 139
+  offset: 0, 1
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 530, 606
+  size: 88, 135
+  orig: 103, 139
+  offset: 8, 1
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 2, 496
+  size: 86, 137
+  orig: 103, 139
+  offset: 9, 0
+  index: -1
+fx/fx1
+  rotate: false
+  xy: 2, 706
+  size: 36, 35
+  orig: 40, 39
+  offset: 2, 2
+  index: -1
+fx/glow2_00004
+  rotate: false
+  xy: 40, 635
+  size: 107, 106
+  orig: 123, 120
+  offset: 8, 7
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 90, 333
+  size: 161, 273
+  orig: 162, 274
+  offset: 0, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 253, 332
+  size: 162, 273
+  orig: 162, 274
+  offset: 0, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 417, 331
+  size: 162, 273
+  orig: 162, 274
+  offset: 0, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 164, 56
+  size: 162, 274
+  orig: 162, 274
+  offset: 0, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 328, 55
+  size: 162, 274
+  orig: 162, 274
+  offset: 0, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 492, 54
+  size: 161, 274
+  orig: 162, 274
+  offset: 0, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 581, 330
+  size: 160, 273
+  orig: 162, 274
+  offset: 0, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 58
+  size: 160, 273
+  orig: 162, 274
+  offset: 0, 0
+  index: -1

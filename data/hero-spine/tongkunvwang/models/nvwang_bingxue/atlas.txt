@@ -1,0 +1,181 @@
+
+nvwang_bingxue.png
+size: 665,665
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/FX/baoshi/a0000
+  rotate: false
+  xy: 647, 547
+  size: 13, 18
+  orig: 410, 410
+  offset: 210, 201
+  index: -1
+images/FX/baoshi/a0004
+  rotate: false
+  xy: 647, 527
+  size: 13, 18
+  orig: 410, 410
+  offset: 210, 202
+  index: -1
+images/FX/baoshi/a0008
+  rotate: false
+  xy: 647, 508
+  size: 13, 17
+  orig: 410, 410
+  offset: 210, 203
+  index: -1
+images/FX/baoshi/a0012
+  rotate: false
+  xy: 647, 626
+  size: 14, 18
+  orig: 410, 410
+  offset: 209, 203
+  index: -1
+images/FX/baoshi/a0016
+  rotate: false
+  xy: 647, 567
+  size: 14, 17
+  orig: 410, 410
+  offset: 209, 204
+  index: -1
+images/FX/baoshi/a0020
+  rotate: false
+  xy: 647, 606
+  size: 14, 18
+  orig: 410, 410
+  offset: 209, 203
+  index: -1
+images/FX/baoshi/a0024
+  rotate: false
+  xy: 647, 586
+  size: 14, 18
+  orig: 410, 410
+  offset: 209, 202
+  index: -1
+images/FX/baoshi/a0028
+  rotate: false
+  xy: 647, 489
+  size: 13, 17
+  orig: 410, 410
+  offset: 210, 202
+  index: -1
+images/FX/binghua
+  rotate: false
+  xy: 266, 40
+  size: 38, 41
+  orig: 40, 42
+  offset: 1, 0
+  index: -1
+images/FX/bingjing
+  rotate: true
+  xy: 647, 646
+  size: 17, 16
+  orig: 17, 18
+  offset: 0, 1
+  index: -1
+images/attack/a0038
+  rotate: false
+  xy: 407, 169
+  size: 103, 96
+  orig: 205, 205
+  offset: 18, 47
+  index: -1
+images/attack/a0042
+  rotate: false
+  xy: 512, 83
+  size: 101, 94
+  orig: 205, 205
+  offset: 20, 47
+  index: -1
+images/attack/a0046
+  rotate: false
+  xy: 407, 70
+  size: 100, 97
+  orig: 205, 205
+  offset: 28, 47
+  index: -1
+images/attack/a0049
+  rotate: true
+  xy: 512, 179
+  size: 86, 102
+  orig: 205, 205
+  offset: 51, 47
+  index: -1
+images/attack/a0051
+  rotate: true
+  xy: 176, 12
+  size: 69, 88
+  orig: 205, 205
+  offset: 68, 47
+  index: -1
+images/attack/a0054
+  rotate: false
+  xy: 94, 8
+  size: 80, 73
+  orig: 205, 205
+  offset: 60, 47
+  index: -1
+images/attack/a0060
+  rotate: true
+  xy: 2, 5
+  size: 76, 90
+  orig: 205, 205
+  offset: 58, 47
+  index: -1
+images/idle/a0000
+  rotate: false
+  xy: 442, 267
+  size: 200, 200
+  orig: 410, 410
+  offset: 48, 95
+  index: -1
+images/idle/a0004
+  rotate: false
+  xy: 224, 457
+  size: 216, 206
+  orig: 410, 410
+  offset: 56, 95
+  index: -1
+images/idle/a0008
+  rotate: false
+  xy: 2, 460
+  size: 220, 203
+  orig: 410, 410
+  offset: 58, 95
+  index: -1
+images/idle/a0012
+  rotate: false
+  xy: 210, 83
+  size: 195, 195
+  orig: 410, 410
+  offset: 58, 95
+  index: -1
+images/idle/a0016
+  rotate: true
+  xy: 2, 102
+  size: 170, 195
+  orig: 410, 410
+  offset: 64, 95
+  index: -1
+images/idle/a0020
+  rotate: true
+  xy: 210, 280
+  size: 175, 200
+  orig: 410, 410
+  offset: 59, 95
+  index: -1
+images/idle/a0024
+  rotate: true
+  xy: 2, 274
+  size: 184, 206
+  orig: 410, 410
+  offset: 50, 95
+  index: -1
+images/idle/a0028
+  rotate: true
+  xy: 442, 469
+  size: 194, 203
+  orig: 410, 410
+  offset: 43, 95
+  index: -1

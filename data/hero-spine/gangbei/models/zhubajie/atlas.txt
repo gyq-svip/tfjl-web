@@ -1,0 +1,160 @@
+
+zhubajie.png
+size: 914,914
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/attack_1
+  rotate: false
+  xy: 487, 135
+  size: 130, 124
+  orig: 298, 211
+  offset: 23, 44
+  index: -1
+attack/attack_2
+  rotate: false
+  xy: 2, 2
+  size: 137, 128
+  orig: 298, 211
+  offset: 15, 44
+  index: -1
+attack/attack_3
+  rotate: false
+  xy: 534, 2
+  size: 141, 131
+  orig: 298, 211
+  offset: 11, 43
+  index: -1
+attack/attack_4
+  rotate: false
+  xy: 677, 41
+  size: 151, 152
+  orig: 298, 211
+  offset: 51, 44
+  index: -1
+attack/attack_5
+  rotate: false
+  xy: 141, 11
+  size: 199, 119
+  orig: 298, 211
+  offset: 69, 40
+  index: -1
+attack/attack_6
+  rotate: false
+  xy: 342, 4
+  size: 190, 126
+  orig: 298, 211
+  offset: 79, 40
+  index: -1
+attack/attack_7
+  rotate: false
+  xy: 489, 261
+  size: 183, 139
+  orig: 298, 211
+  offset: 44, 44
+  index: -1
+attack/attack_8
+  rotate: true
+  xy: 674, 195
+  size: 144, 154
+  orig: 298, 211
+  offset: 48, 44
+  index: -1
+fx/dimianyan_00012
+  rotate: false
+  xy: 801, 829
+  size: 103, 83
+  orig: 197, 94
+  offset: 15, 4
+  index: -1
+fx/dimianyan_00016
+  rotate: false
+  xy: 801, 744
+  size: 102, 83
+  orig: 197, 94
+  offset: 13, 4
+  index: -1
+fx/dimianyan_00020
+  rotate: true
+  xy: 830, 256
+  size: 83, 78
+  orig: 197, 94
+  offset: 10, 5
+  index: -1
+fx/dimianyan_00024
+  rotate: false
+  xy: 801, 685
+  size: 63, 57
+  orig: 197, 94
+  offset: 10, 9
+  index: -1
+fx/kuangmozhan_13
+  rotate: false
+  xy: 730, 341
+  size: 161, 191
+  orig: 190, 206
+  offset: 17, 6
+  index: -1
+fx/kuangmozhan_14
+  rotate: true
+  xy: 730, 534
+  size: 135, 182
+  orig: 190, 206
+  offset: 15, 5
+  index: -1
+idle/idle_0
+  rotate: true
+  xy: 2, 132
+  size: 265, 242
+  orig: 282, 254
+  offset: 11, 0
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 246, 132
+  size: 264, 239
+  orig: 282, 254
+  offset: 11, 0
+  index: -1
+idle/idle_2
+  rotate: true
+  xy: 249, 398
+  size: 266, 238
+  orig: 282, 254
+  offset: 8, 0
+  index: -1
+idle/idle_3
+  rotate: true
+  xy: 489, 402
+  size: 265, 239
+  orig: 282, 254
+  offset: 8, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 535, 671
+  size: 264, 241
+  orig: 282, 254
+  offset: 8, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 268, 669
+  size: 265, 243
+  orig: 282, 254
+  offset: 8, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 666
+  size: 264, 246
+  orig: 282, 254
+  offset: 10, 0
+  index: -1
+idle/idle_7
+  rotate: true
+  xy: 2, 399
+  size: 265, 245
+  orig: 282, 254
+  offset: 11, 0
+  index: -1

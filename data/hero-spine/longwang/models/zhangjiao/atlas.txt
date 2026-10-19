@@ -1,0 +1,209 @@
+
+zhangjiao.png
+size: 902,902
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 701, 305
+  size: 113, 145
+  orig: 129, 149
+  offset: 8, 0
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 701, 158
+  size: 110, 145
+  orig: 129, 149
+  offset: 7, 0
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 468, 23
+  size: 109, 145
+  orig: 129, 149
+  offset: 8, 0
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 702, 603
+  size: 118, 147
+  orig: 129, 149
+  offset: 3, 0
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 701, 452
+  size: 115, 149
+  orig: 129, 149
+  offset: 10, 0
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 702, 752
+  size: 124, 148
+  orig: 129, 149
+  offset: 5, 0
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 468, 170
+  size: 125, 146
+  orig: 129, 149
+  offset: 2, 0
+  index: -1
+fx/d4_002
+  rotate: false
+  xy: 595, 220
+  size: 104, 96
+  orig: 112, 112
+  offset: 6, 14
+  index: -1
+fx/d4_004
+  rotate: false
+  xy: 595, 133
+  size: 95, 85
+  orig: 112, 112
+  offset: 13, 16
+  index: -1
+fx/d4_006
+  rotate: false
+  xy: 579, 55
+  size: 93, 76
+  orig: 112, 112
+  offset: 13, 19
+  index: -1
+fx/d4_008
+  rotate: false
+  xy: 809, 90
+  size: 91, 66
+  orig: 112, 112
+  offset: 13, 27
+  index: -1
+fx/fuzhou_00
+  rotate: false
+  xy: 816, 261
+  size: 61, 68
+  orig: 134, 138
+  offset: 41, 31
+  index: -1
+fx/fuzhou_01
+  rotate: false
+  xy: 828, 832
+  size: 72, 68
+  orig: 134, 138
+  offset: 29, 31
+  index: -1
+fx/fuzhou_02
+  rotate: false
+  xy: 828, 761
+  size: 70, 69
+  orig: 134, 138
+  offset: 41, 30
+  index: -1
+fx/fuzhou_03
+  rotate: false
+  xy: 822, 545
+  size: 68, 69
+  orig: 134, 138
+  offset: 31, 30
+  index: -1
+fx/fuzhou_04
+  rotate: false
+  xy: 692, 37
+  size: 115, 119
+  orig: 134, 138
+  offset: 9, 10
+  index: -1
+fx/fuzhou_05
+  rotate: false
+  xy: 822, 616
+  size: 77, 71
+  orig: 134, 138
+  offset: 34, 29
+  index: -1
+fx/fuzhou_06
+  rotate: false
+  xy: 828, 689
+  size: 68, 70
+  orig: 134, 138
+  offset: 41, 30
+  index: -1
+fx/fuzhou_07
+  rotate: false
+  xy: 816, 331
+  size: 60, 70
+  orig: 134, 138
+  offset: 41, 30
+  index: -1
+fx/fuzhou_08
+  rotate: false
+  xy: 818, 474
+  size: 61, 69
+  orig: 134, 138
+  offset: 41, 31
+  index: -1
+fx/fuzhou_09
+  rotate: false
+  xy: 818, 403
+  size: 61, 69
+  orig: 134, 138
+  offset: 41, 31
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 236, 610
+  size: 231, 290
+  orig: 232, 290
+  offset: 0, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 610
+  size: 232, 290
+  orig: 232, 290
+  offset: 0, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 469, 610
+  size: 231, 290
+  orig: 232, 290
+  offset: 1, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 2, 318
+  size: 232, 290
+  orig: 232, 290
+  offset: 0, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 26
+  size: 232, 290
+  orig: 232, 290
+  offset: 0, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 236, 318
+  size: 231, 290
+  orig: 232, 290
+  offset: 0, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 469, 318
+  size: 230, 290
+  orig: 232, 290
+  offset: 1, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 236, 26
+  size: 230, 290
+  orig: 232, 290
+  offset: 1, 0
+  index: -1

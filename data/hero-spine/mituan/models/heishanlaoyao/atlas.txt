@@ -1,0 +1,111 @@
+
+heishanlaoyao.png
+size: 867,867
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 710, 97
+  size: 117, 143
+  orig: 182, 170
+  offset: 36, 1
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 590, 141
+  size: 118, 137
+  orig: 182, 170
+  offset: 38, 1
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 714, 216
+  size: 99, 148
+  orig: 182, 170
+  offset: 46, 1
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 714, 461
+  size: 134, 150
+  orig: 182, 170
+  offset: 24, 1
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 714, 735
+  size: 130, 151
+  orig: 182, 170
+  offset: 21, 1
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 714, 597
+  size: 136, 150
+  orig: 182, 170
+  offset: 21, 1
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 714, 317
+  size: 142, 149
+  orig: 182, 170
+  offset: 20, 1
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 571
+  size: 234, 294
+  orig: 355, 334
+  offset: 59, 23
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 275
+  size: 233, 294
+  orig: 355, 334
+  offset: 60, 23
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 238, 572
+  size: 234, 293
+  orig: 355, 334
+  offset: 60, 23
+  index: -1
+idle/idle_3
+  rotate: true
+  xy: 296, 38
+  size: 236, 292
+  orig: 355, 334
+  offset: 59, 23
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 475, 280
+  size: 237, 291
+  orig: 355, 334
+  offset: 58, 23
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 2, 33
+  size: 240, 292
+  orig: 355, 334
+  offset: 56, 23
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 474, 573
+  size: 238, 292
+  orig: 355, 334
+  offset: 57, 23
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 237, 276
+  size: 236, 293
+  orig: 355, 334
+  offset: 58, 23
+  index: -1

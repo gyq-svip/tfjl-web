@@ -1,0 +1,153 @@
+
+taishanglaojun.png
+size: 955,955
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/attack_1
+  rotate: false
+  xy: 834, 155
+  size: 119, 140
+  orig: 193, 144
+  offset: 7, 0
+  index: -1
+attack/attack_2
+  rotate: false
+  xy: 834, 14
+  size: 119, 139
+  orig: 193, 144
+  offset: 7, 0
+  index: -1
+attack/attack_3
+  rotate: false
+  xy: 706, 112
+  size: 126, 141
+  orig: 193, 144
+  offset: 2, 0
+  index: -1
+attack/attack_4
+  rotate: true
+  xy: 779, 297
+  size: 126, 142
+  orig: 193, 144
+  offset: 0, 0
+  index: -1
+attack/attack_5
+  rotate: true
+  xy: 804, 588
+  size: 174, 142
+  orig: 193, 144
+  offset: 0, 0
+  index: -1
+attack/attack_6
+  rotate: true
+  xy: 804, 764
+  size: 189, 142
+  orig: 193, 144
+  offset: 3, 0
+  index: -1
+attack/attack_7
+  rotate: true
+  xy: 804, 425
+  size: 161, 142
+  orig: 193, 144
+  offset: 4, 0
+  index: -1
+fx/fhchb_06
+  rotate: false
+  xy: 2, 31
+  size: 125, 65
+  orig: 135, 135
+  offset: 0, 42
+  index: -1
+fx/fhchb_10
+  rotate: true
+  xy: 710, 324
+  size: 124, 67
+  orig: 135, 135
+  offset: 6, 43
+  index: -1
+fx/fhchb_14
+  rotate: false
+  xy: 129, 28
+  size: 121, 68
+  orig: 135, 135
+  offset: 12, 42
+  index: -1
+fx/fhchb_18
+  rotate: false
+  xy: 252, 33
+  size: 83, 63
+  orig: 135, 135
+  offset: 50, 44
+  index: -1
+fx/guanghuan
+  rotate: false
+  xy: 515, 255
+  size: 193, 193
+  orig: 245, 245
+  offset: 26, 26
+  index: -1
+fx/guanghuan2
+  rotate: true
+  xy: 511, 61
+  size: 192, 193
+  orig: 356, 361
+  offset: 79, 84
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 384
+  size: 256, 283
+  orig: 256, 284
+  offset: 0, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 260, 670
+  size: 256, 283
+  orig: 256, 284
+  offset: 0, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 669
+  size: 256, 284
+  orig: 256, 284
+  offset: 0, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 2, 98
+  size: 254, 284
+  orig: 256, 284
+  offset: 0, 0
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 518, 702
+  size: 251, 284
+  orig: 256, 284
+  offset: 0, 0
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 518, 450
+  size: 250, 284
+  orig: 256, 284
+  offset: 0, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 258, 98
+  size: 251, 284
+  orig: 256, 284
+  offset: 0, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 260, 384
+  size: 253, 284
+  orig: 256, 284
+  offset: 0, 0
+  index: -1

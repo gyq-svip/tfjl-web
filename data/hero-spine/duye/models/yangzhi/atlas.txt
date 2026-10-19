@@ -1,0 +1,321 @@
+
+yangzhi.png
+size: 985,985
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_2
+  rotate: false
+  xy: 835, 662
+  size: 144, 138
+  orig: 250, 178
+  offset: 32, 8
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 555, 115
+  size: 158, 134
+  orig: 250, 178
+  offset: 22, 8
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 833, 347
+  size: 147, 143
+  orig: 250, 178
+  offset: 38, 1
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 835, 802
+  size: 181, 137
+  orig: 250, 178
+  offset: 61, 8
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 555, 251
+  size: 160, 159
+  orig: 250, 178
+  offset: 57, 8
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 833, 492
+  size: 168, 140
+  orig: 250, 178
+  offset: 59, 8
+  index: -1
+fx/33
+  rotate: false
+  xy: 655, 18
+  size: 80, 95
+  orig: 80, 95
+  offset: 0, 0
+  index: -1
+fx/37
+  rotate: false
+  xy: 2, 45
+  size: 113, 80
+  orig: 113, 80
+  offset: 0, 0
+  index: -1
+fx/caocao_06
+  rotate: false
+  xy: 2, 4
+  size: 113, 39
+  orig: 134, 66
+  offset: 20, 0
+  index: -1
+fx/caocao_07
+  rotate: true
+  xy: 716, 287
+  size: 125, 54
+  orig: 134, 66
+  offset: 5, 0
+  index: -1
+fx/caocao_08
+  rotate: false
+  xy: 117, 66
+  size: 127, 59
+  orig: 134, 66
+  offset: 1, 0
+  index: -1
+fx/caocao_09
+  rotate: false
+  xy: 117, 12
+  size: 100, 52
+  orig: 134, 66
+  offset: 0, 11
+  index: -1
+fx/caocao_10
+  rotate: true
+  xy: 931, 199
+  size: 98, 52
+  orig: 134, 66
+  offset: 1, 11
+  index: -1
+fx/caocao_11
+  rotate: false
+  xy: 876, 135
+  size: 73, 43
+  orig: 134, 66
+  offset: 0, 22
+  index: -1
+fx/daoguang1_00000
+  rotate: true
+  xy: 323, 2
+  size: 18, 13
+  orig: 280, 284
+  offset: 126, 68
+  index: -1
+fx/daoguang1_00001
+  rotate: true
+  xy: 614, 16
+  size: 49, 26
+  orig: 280, 284
+  offset: 126, 56
+  index: -1
+fx/daoguang1_00002
+  rotate: false
+  xy: 386, 41
+  size: 96, 39
+  orig: 280, 284
+  offset: 126, 44
+  index: -1
+fx/daoguang1_00003
+  rotate: true
+  xy: 772, 285
+  size: 127, 50
+  orig: 280, 284
+  offset: 126, 33
+  index: -1
+fx/daoguang1_00004
+  rotate: false
+  xy: 824, 299
+  size: 125, 46
+  orig: 280, 284
+  offset: 149, 28
+  index: -1
+fx/daoguang1_00005
+  rotate: true
+  xy: 715, 157
+  size: 92, 44
+  orig: 280, 284
+  offset: 181, 24
+  index: -1
+fx/daoguang1_00006
+  rotate: false
+  xy: 491, 82
+  size: 61, 44
+  orig: 280, 284
+  offset: 211, 22
+  index: -1
+fx/daoguang1_00007
+  rotate: false
+  xy: 716, 260
+  size: 25, 25
+  orig: 280, 284
+  offset: 248, 24
+  index: -1
+fx/daoguang2_00000
+  rotate: true
+  xy: 761, 142
+  size: 55, 44
+  orig: 280, 284
+  offset: 111, 60
+  index: -1
+fx/daoguang2_00001
+  rotate: false
+  xy: 484, 36
+  size: 68, 44
+  orig: 280, 284
+  offset: 113, 60
+  index: -1
+fx/daoguang2_00002
+  rotate: true
+  xy: 761, 199
+  size: 84, 44
+  orig: 280, 284
+  offset: 113, 61
+  index: -1
+fx/daoguang2_00003
+  rotate: false
+  xy: 386, 82
+  size: 103, 44
+  orig: 280, 284
+  offset: 112, 61
+  index: -1
+fx/daoguang2_00004
+  rotate: false
+  xy: 824, 251
+  size: 105, 46
+  orig: 280, 284
+  offset: 110, 59
+  index: -1
+fx/daoguang2_00005
+  rotate: false
+  xy: 279, 79
+  size: 105, 47
+  orig: 280, 284
+  offset: 109, 57
+  index: -1
+fx/daoguang2_00006
+  rotate: false
+  xy: 554, 67
+  size: 99, 46
+  orig: 280, 284
+  offset: 115, 56
+  index: -1
+fx/daoguang2_00007
+  rotate: true
+  xy: 287, 2
+  size: 75, 34
+  orig: 280, 284
+  offset: 140, 56
+  index: -1
+fx/daoguanga_00003
+  rotate: true
+  xy: 877, 180
+  size: 69, 48
+  orig: 88, 88
+  offset: 9, 9
+  index: -1
+fx/daoguanga_00006
+  rotate: false
+  xy: 807, 195
+  size: 68, 54
+  orig: 88, 88
+  offset: 11, 9
+  index: -1
+fx/daoguanga_00007
+  rotate: false
+  xy: 807, 138
+  size: 67, 55
+  orig: 88, 88
+  offset: 12, 9
+  index: -1
+fx/daoguanga_00008
+  rotate: false
+  xy: 219, 9
+  size: 66, 55
+  orig: 88, 88
+  offset: 13, 10
+  index: -1
+fx/daoguanga_00009
+  rotate: true
+  xy: 554, 2
+  size: 63, 58
+  orig: 88, 88
+  offset: 16, 10
+  index: -1
+fx/daoguanga_00010
+  rotate: false
+  xy: 323, 22
+  size: 59, 55
+  orig: 88, 88
+  offset: 19, 14
+  index: -1
+fx/xing1
+  rotate: false
+  xy: 951, 317
+  size: 28, 28
+  orig: 28, 28
+  offset: 0, 0
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 127
+  size: 275, 284
+  orig: 280, 284
+  offset: 3, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 699
+  size: 276, 284
+  orig: 280, 284
+  offset: 3, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 413
+  size: 276, 284
+  orig: 280, 284
+  offset: 3, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 280, 699
+  size: 276, 284
+  orig: 280, 284
+  offset: 2, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 280, 413
+  size: 275, 284
+  orig: 280, 284
+  offset: 2, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 279, 128
+  size: 274, 283
+  orig: 280, 284
+  offset: 2, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 557, 414
+  size: 274, 283
+  orig: 280, 284
+  offset: 2, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 558, 699
+  size: 275, 284
+  orig: 280, 284
+  offset: 2, 0
+  index: -1

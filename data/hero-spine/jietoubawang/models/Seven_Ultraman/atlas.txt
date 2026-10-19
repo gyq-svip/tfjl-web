@@ -1,0 +1,223 @@
+
+Seven_Ultraman.png
+size: 823,823
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 2, 396
+  size: 174, 246
+  orig: 181, 248
+  offset: 0, 0
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 145, 673
+  size: 148, 244
+  orig: 181, 248
+  offset: 12, 0
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 644, 533
+  size: 136, 244
+  orig: 181, 248
+  offset: 19, 0
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 378, 60
+  size: 121, 217
+  orig: 181, 248
+  offset: 41, 0
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 644, 317
+  size: 126, 214
+  orig: 181, 248
+  offset: 43, 0
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 2, 5
+  size: 138, 217
+  orig: 181, 248
+  offset: 43, 0
+  index: -1
+fx/2/idle_00
+  rotate: true
+  xy: 221, 580
+  size: 61, 21
+  orig: 141, 249
+  offset: 52, 159
+  index: -1
+fx/2/idle_01
+  rotate: true
+  xy: 214, 264
+  size: 61, 20
+  orig: 141, 249
+  offset: 51, 160
+  index: -1
+fx/2/idle_02
+  rotate: false
+  xy: 642, 801
+  size: 61, 20
+  orig: 141, 249
+  offset: 51, 160
+  index: -1
+fx/2/idle_03
+  rotate: true
+  xy: 145, 246
+  size: 61, 21
+  orig: 141, 249
+  offset: 51, 159
+  index: -1
+fx/2/idle_04
+  rotate: false
+  xy: 181, 327
+  size: 62, 20
+  orig: 141, 249
+  offset: 51, 159
+  index: -1
+fx/2/idle_05
+  rotate: true
+  xy: 168, 246
+  size: 61, 21
+  orig: 141, 249
+  offset: 51, 158
+  index: -1
+fx/2/idle_06
+  rotate: false
+  xy: 182, 373
+  size: 61, 21
+  orig: 141, 249
+  offset: 52, 158
+  index: -1
+fx/2/idle_07
+  rotate: false
+  xy: 182, 350
+  size: 61, 21
+  orig: 141, 249
+  offset: 52, 158
+  index: -1
+fx/2/idle_08
+  rotate: false
+  xy: 642, 779
+  size: 61, 20
+  orig: 141, 249
+  offset: 52, 159
+  index: -1
+fx/2/idle_09
+  rotate: true
+  xy: 191, 264
+  size: 61, 21
+  orig: 141, 249
+  offset: 52, 159
+  index: -1
+fx/Energy 025 Ray Impact Up_00005
+  rotate: false
+  xy: 145, 577
+  size: 44, 37
+  orig: 105, 105
+  offset: 52, 2
+  index: -1
+fx/Energy 025 Ray Impact Up_00007
+  rotate: true
+  xy: 145, 349
+  size: 45, 35
+  orig: 105, 105
+  offset: 53, 2
+  index: -1
+fx/Energy 025 Ray Impact Up_00009
+  rotate: false
+  xy: 221, 643
+  size: 27, 28
+  orig: 105, 105
+  offset: 71, 5
+  index: -1
+fx/mowanghandi_61
+  rotate: false
+  xy: 145, 616
+  size: 74, 55
+  orig: 74, 69
+  offset: 0, 7
+  index: -1
+fx/mowanghandi_62
+  rotate: false
+  xy: 145, 309
+  size: 34, 38
+  orig: 74, 69
+  offset: 0, 2
+  index: -1
+idle/idle_00
+  rotate: false
+  xy: 2, 572
+  size: 141, 249
+  orig: 141, 249
+  offset: 0, 0
+  index: -1
+idle/idle_01
+  rotate: false
+  xy: 250, 422
+  size: 141, 249
+  orig: 141, 249
+  offset: 0, 0
+  index: -1
+idle/idle_02
+  rotate: true
+  xy: 391, 680
+  size: 141, 249
+  orig: 141, 249
+  offset: 0, 0
+  index: -1
+idle/idle_03
+  rotate: true
+  xy: 250, 279
+  size: 141, 249
+  orig: 141, 249
+  offset: 0, 0
+  index: -1
+idle/idle_04
+  rotate: false
+  xy: 2, 145
+  size: 141, 249
+  orig: 141, 249
+  offset: 0, 0
+  index: -1
+idle/idle_05
+  rotate: true
+  xy: 501, 144
+  size: 140, 248
+  orig: 141, 249
+  offset: 1, 0
+  index: -1
+idle/idle_06
+  rotate: false
+  xy: 236, 29
+  size: 140, 248
+  orig: 141, 249
+  offset: 1, 0
+  index: -1
+idle/idle_07
+  rotate: true
+  xy: 501, 2
+  size: 140, 248
+  orig: 141, 249
+  offset: 1, 0
+  index: -1
+idle/idle_08
+  rotate: true
+  xy: 393, 537
+  size: 141, 249
+  orig: 141, 249
+  offset: 0, 0
+  index: -1
+idle/idle_09
+  rotate: false
+  xy: 501, 286
+  size: 141, 249
+  orig: 141, 249
+  offset: 0, 0
+  index: -1

@@ -1,0 +1,181 @@
+
+huataishi.png
+size: 822,822
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 488, 685
+  size: 90, 135
+  orig: 126, 136
+  offset: 8, 0
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 580, 290
+  size: 87, 136
+  orig: 126, 136
+  offset: 9, 0
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 669, 340
+  size: 86, 136
+  orig: 126, 136
+  offset: 8, 0
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 662, 141
+  size: 97, 135
+  orig: 126, 136
+  offset: 12, 0
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 716, 428
+  size: 101, 135
+  orig: 126, 136
+  offset: 17, 0
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 579, 556
+  size: 111, 135
+  orig: 126, 136
+  offset: 15, 0
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 669, 240
+  size: 98, 135
+  orig: 126, 136
+  offset: 14, 0
+  index: -1
+fx/TX_penshe_0001
+  rotate: false
+  xy: 580, 435
+  size: 95, 119
+  orig: 100, 167
+  offset: 1, 7
+  index: -1
+fx/TX_penshe_0003
+  rotate: false
+  xy: 582, 22
+  size: 96, 117
+  orig: 100, 167
+  offset: 2, 27
+  index: -1
+fx/TX_penshe_0005
+  rotate: false
+  xy: 403, 553
+  size: 83, 114
+  orig: 100, 167
+  offset: 9, 35
+  index: -1
+fx/TX_penshe_0007
+  rotate: false
+  xy: 740, 722
+  size: 79, 98
+  orig: 100, 167
+  offset: 11, 56
+  index: -1
+fx/fxg01
+  rotate: false
+  xy: 403, 752
+  size: 80, 68
+  orig: 121, 85
+  offset: 0, 0
+  index: -1
+fx/fxg02
+  rotate: true
+  xy: 582, 202
+  size: 86, 78
+  orig: 115, 121
+  offset: 29, 0
+  index: -1
+fx/fxg03
+  rotate: true
+  xy: 488, 606
+  size: 77, 89
+  orig: 83, 110
+  offset: 0, 21
+  index: -1
+fx/fxg04
+  rotate: false
+  xy: 403, 673
+  size: 71, 77
+  orig: 103, 124
+  offset: 0, 0
+  index: -1
+fx/fxg05
+  rotate: true
+  xy: 582, 669
+  size: 151, 156
+  orig: 151, 156
+  offset: 0, 0
+  index: -1
+fx/glow2_00004
+  rotate: true
+  xy: 716, 565
+  size: 102, 104
+  orig: 115, 118
+  offset: 6, 7
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 204, 552
+  size: 197, 268
+  orig: 202, 269
+  offset: 4, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 389, 10
+  size: 191, 268
+  orig: 202, 269
+  offset: 10, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 391, 282
+  size: 187, 268
+  orig: 202, 269
+  offset: 14, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 203, 280
+  size: 186, 269
+  orig: 202, 269
+  offset: 14, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 198, 9
+  size: 189, 269
+  orig: 202, 269
+  offset: 11, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 2, 9
+  size: 194, 269
+  orig: 202, 269
+  offset: 5, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 280
+  size: 199, 269
+  orig: 202, 269
+  offset: 1, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 551
+  size: 200, 269
+  orig: 202, 269
+  offset: 1, 0
+  index: -1

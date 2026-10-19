@@ -1,0 +1,132 @@
+
+baopopo.png
+size: 977,977
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 2, 168
+  size: 194, 256
+  orig: 500, 500
+  offset: 206, 121
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 781, 720
+  size: 194, 255
+  orig: 500, 500
+  offset: 206, 121
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 2, 556
+  size: 185, 256
+  orig: 500, 500
+  offset: 207, 121
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 2, 743
+  size: 174, 257
+  orig: 500, 500
+  offset: 207, 121
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 522, 807
+  size: 168, 257
+  orig: 500, 500
+  offset: 207, 121
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 261, 740
+  size: 176, 257
+  orig: 500, 500
+  offset: 207, 121
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 520, 623
+  size: 182, 257
+  orig: 500, 500
+  offset: 207, 121
+  index: -1
+fx/a_xian_0027
+  rotate: false
+  xy: 183, 919
+  size: 179, 56
+  orig: 206, 76
+  offset: 19, 6
+  index: -1
+fx/a_xian_0028
+  rotate: false
+  xy: 2, 920
+  size: 179, 55
+  orig: 206, 76
+  offset: 19, 6
+  index: -1
+fx/a_xian_0030
+  rotate: false
+  xy: 364, 918
+  size: 156, 57
+  orig: 206, 76
+  offset: 31, 5
+  index: -1
+idle/idle_0
+  rotate: true
+  xy: 260, 357
+  size: 191, 257
+  orig: 500, 500
+  offset: 207, 121
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 519, 242
+  size: 189, 258
+  orig: 500, 500
+  offset: 207, 121
+  index: -1
+idle/idle_2
+  rotate: true
+  xy: 260, 550
+  size: 188, 257
+  orig: 500, 500
+  offset: 207, 121
+  index: -1
+idle/idle_3
+  rotate: true
+  xy: 519, 433
+  size: 188, 257
+  orig: 500, 500
+  offset: 207, 121
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 2, 364
+  size: 190, 256
+  orig: 500, 500
+  offset: 207, 121
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 779, 463
+  size: 192, 255
+  orig: 500, 500
+  offset: 207, 121
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 779, 206
+  size: 194, 255
+  orig: 500, 500
+  offset: 206, 121
+  index: -1
+idle/idle_7
+  rotate: true
+  xy: 260, 161
+  size: 194, 256
+  orig: 500, 500
+  offset: 206, 121
+  index: -1

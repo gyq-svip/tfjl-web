@@ -1,0 +1,230 @@
+
+xiaoshiyilang.png
+size: 1047,1047
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 896, 898
+  size: 147, 142
+  orig: 169, 170
+  offset: 12, 28
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 2, 18
+  size: 139, 144
+  orig: 169, 170
+  offset: 17, 22
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 264, 8
+  size: 138, 135
+  orig: 169, 170
+  offset: 27, 28
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 871, 44
+  size: 119, 134
+  orig: 169, 170
+  offset: 24, 28
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 586, 29
+  size: 137, 134
+  orig: 169, 170
+  offset: 2, 28
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 148, 3
+  size: 114, 154
+  orig: 169, 170
+  offset: 19, 11
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 452, 298
+  size: 123, 154
+  orig: 169, 170
+  offset: 4, 14
+  index: -1
+fx/dadaoguang_00012
+  rotate: false
+  xy: 288, 145
+  size: 213, 140
+  orig: 231, 158
+  offset: 7, 10
+  index: -1
+fx/dadaoguang_00013
+  rotate: true
+  xy: 897, 562
+  size: 196, 129
+  orig: 231, 158
+  offset: 28, 11
+  index: -1
+fx/dadaoguang_00014
+  rotate: false
+  xy: 725, 32
+  size: 144, 131
+  orig: 231, 158
+  offset: 76, 9
+  index: -1
+fx/dadaoguang_00015
+  rotate: false
+  xy: 897, 435
+  size: 111, 125
+  orig: 231, 158
+  offset: 101, 9
+  index: -1
+fx/dadaoguang_00016
+  rotate: true
+  xy: 897, 324
+  size: 109, 108
+  orig: 231, 158
+  offset: 102, 10
+  index: -1
+fx/dadaoguang_00017
+  rotate: false
+  xy: 404, 108
+  size: 61, 35
+  orig: 231, 158
+  offset: 99, 15
+  index: -1
+fx/dadaoguang_00018
+  rotate: false
+  xy: 596, 754
+  size: 15, 5
+  orig: 231, 158
+  offset: 96, 28
+  index: -1
+fx/daoguang_00000
+  rotate: false
+  xy: 288, 736
+  size: 18, 23
+  orig: 310, 284
+  offset: 114, 100
+  index: -1
+fx/daoguang_00001
+  rotate: true
+  xy: 897, 168
+  size: 44, 45
+  orig: 310, 284
+  offset: 115, 78
+  index: -1
+fx/daoguang_00002
+  rotate: true
+  xy: 962, 248
+  size: 74, 54
+  orig: 310, 284
+  offset: 114, 69
+  index: -1
+fx/daoguang_00003
+  rotate: true
+  xy: 897, 214
+  size: 108, 63
+  orig: 310, 284
+  offset: 115, 59
+  index: -1
+fx/daoguang_00004
+  rotate: false
+  xy: 896, 818
+  size: 149, 78
+  orig: 310, 284
+  offset: 115, 44
+  index: -1
+fx/daoguang_00005
+  rotate: true
+  xy: 503, 105
+  size: 191, 81
+  orig: 310, 284
+  offset: 114, 42
+  index: -1
+fx/daoguang_00006
+  rotate: false
+  xy: 404, 27
+  size: 173, 76
+  orig: 310, 284
+  offset: 132, 39
+  index: -1
+fx/daoguang_00007
+  rotate: false
+  xy: 896, 760
+  size: 128, 56
+  orig: 310, 284
+  offset: 177, 40
+  index: -1
+fx/daoguang_00008
+  rotate: true
+  xy: 577, 359
+  size: 93, 25
+  orig: 310, 284
+  offset: 212, 55
+  index: -1
+fx/glow2_00004
+  rotate: false
+  xy: 288, 287
+  size: 162, 165
+  orig: 183, 189
+  offset: 10, 12
+  index: -1
+idle/idle_0
+  rotate: true
+  xy: 310, 740
+  size: 305, 284
+  orig: 310, 284
+  offset: 0, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 761
+  size: 306, 284
+  orig: 310, 284
+  offset: 0, 0
+  index: -1
+idle/idle_2
+  rotate: true
+  xy: 2, 455
+  size: 304, 284
+  orig: 310, 284
+  offset: 4, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 596, 761
+  size: 298, 284
+  orig: 310, 284
+  offset: 11, 0
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 611, 459
+  size: 293, 284
+  orig: 310, 284
+  offset: 16, 0
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 611, 165
+  size: 292, 284
+  orig: 310, 284
+  offset: 15, 0
+  index: -1
+idle/idle_6
+  rotate: true
+  xy: 2, 159
+  size: 294, 284
+  orig: 310, 284
+  offset: 12, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 308, 454
+  size: 301, 284
+  orig: 310, 284
+  offset: 4, 0
+  index: -1

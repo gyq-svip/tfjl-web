@@ -1,0 +1,160 @@
+
+shenhaimogui.png
+size: 917,917
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+fx/Energy 008 Impact Radial_00001
+  rotate: true
+  xy: 248, 844
+  size: 71, 144
+  orig: 225, 225
+  offset: 77, 40
+  index: -1
+fx/Energy 008 Impact Radial_00003
+  rotate: true
+  xy: 394, 821
+  size: 94, 162
+  orig: 225, 225
+  offset: 65, 29
+  index: -1
+fx/Energy 008 Impact Radial_00005
+  rotate: true
+  xy: 558, 809
+  size: 106, 175
+  orig: 225, 225
+  offset: 59, 22
+  index: -1
+fx/Energy 008 Impact Radial_00007
+  rotate: true
+  xy: 735, 800
+  size: 115, 180
+  orig: 225, 225
+  offset: 54, 16
+  index: -1
+fx/Energy 008 Impact Radial_00009
+  rotate: true
+  xy: 146, 722
+  size: 120, 175
+  orig: 225, 225
+  offset: 52, 15
+  index: -1
+fx/Energy 008 Impact Radial_00011
+  rotate: true
+  xy: 2, 767
+  size: 122, 142
+  orig: 225, 225
+  offset: 51, 16
+  index: -1
+fx/b1_001
+  rotate: true
+  xy: 147, 881
+  size: 34, 35
+  orig: 77, 77
+  offset: 7, 16
+  index: -1
+fx/b1_002
+  rotate: false
+  xy: 184, 879
+  size: 62, 36
+  orig: 77, 77
+  offset: 4, 18
+  index: -1
+fx/b1_003
+  rotate: false
+  xy: 59, 892
+  size: 43, 23
+  orig: 77, 77
+  offset: 13, 24
+  index: -1
+fx/b1_004
+  rotate: false
+  xy: 104, 891
+  size: 41, 24
+  orig: 77, 77
+  offset: 16, 24
+  index: -1
+fx/b1_005
+  rotate: false
+  xy: 20, 895
+  size: 37, 20
+  orig: 77, 77
+  offset: 20, 26
+  index: -1
+fx/b1_006
+  rotate: false
+  xy: 2, 910
+  size: 16, 5
+  orig: 77, 77
+  offset: 25, 31
+  index: -1
+idle/a_00
+  rotate: true
+  xy: 627, 497
+  size: 301, 209
+  orig: 315, 214
+  offset: 9, 5
+  index: -1
+idle/a_01
+  rotate: false
+  xy: 610, 92
+  size: 302, 207
+  orig: 315, 214
+  offset: 8, 6
+  index: -1
+idle/a_02
+  rotate: false
+  xy: 306, 225
+  size: 302, 202
+  orig: 315, 214
+  offset: 8, 8
+  index: -1
+idle/a_03
+  rotate: false
+  xy: 2, 335
+  size: 302, 194
+  orig: 315, 214
+  offset: 8, 11
+  index: -1
+idle/a_04
+  rotate: false
+  xy: 2, 531
+  size: 302, 189
+  orig: 315, 214
+  offset: 8, 13
+  index: -1
+idle/a_05
+  rotate: false
+  xy: 323, 620
+  size: 302, 187
+  orig: 315, 214
+  offset: 8, 14
+  index: -1
+idle/a_06
+  rotate: false
+  xy: 306, 429
+  size: 302, 189
+  orig: 315, 214
+  offset: 8, 13
+  index: -1
+idle/a_07
+  rotate: false
+  xy: 610, 301
+  size: 302, 194
+  orig: 315, 214
+  offset: 8, 11
+  index: -1
+idle/a_08
+  rotate: false
+  xy: 2, 131
+  size: 302, 202
+  orig: 315, 214
+  offset: 8, 8
+  index: -1
+idle/a_09
+  rotate: false
+  xy: 306, 16
+  size: 302, 207
+  orig: 315, 214
+  offset: 8, 6
+  index: -1

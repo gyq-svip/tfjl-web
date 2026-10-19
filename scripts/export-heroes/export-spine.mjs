@@ -309,19 +309,12 @@ async function setupCtx() {
 }
 
 // 导出单个英雄：下载 → 解析 → 落盘。返回结果对象（不碰 manifest，由调用方汇总）
-async function exportHero(ctx, HERO) {
-  const { index, heroRows, npcRows, resRows } = ctx
-  const hero = (heroRows || []).find((h) => String(h.name).trim() === HERO)
-  if (!hero) return { ok: false, reason: '未找到英雄' }
-  const npc = (npcRows || []).find((r) => String(r.id) === String(hero.npc_id))
-  const res = (resRows || []).find((r) => String(r.id) === String(npc && npc.res_id))
-  const anim = String((res && res.animation) || '')
-  if (!anim.startsWith('combat/animation/hero/')) return { ok: false, reason: '非英雄动画: ' + anim }
-
-  const entries = index.uuidByPath.get(anim) || []
+// 导出指定动画路径的骨骼资源到 outDir（skeleton.json + atlas.txt + p*.png）
+// 返回 { anims, pngs, kb }；资源不完整返回 null
+async function exportModelAt(index, animPath, outDir) {
+  const entries = index.uuidByPath.get(animPath) || []
+  if (!entries.length) return null
   const typeByUuid = new Map(entries.map((e) => [e.uuid, e.type]))
-
-  // 1) 逐个 entry 拉 import：sp.SkeletonData → 解析；并提取 native 引用（贴图）
   const refs = new Set()
   let skeletonJson = null
   let atlasText = null
@@ -339,7 +332,6 @@ async function exportHero(ctx, HERO) {
     }
     for (const r of extractNativeRefs(txt, index)) refs.add(r)
   }
-  // 2) 下载 native 贴图（跳过 sp.SkeletonData，它无 native）
   const pngs = []
   for (const uuid of refs) {
     if (typeByUuid.get(uuid) === 'sp.SkeletonData') continue
@@ -348,28 +340,79 @@ async function exportHero(ctx, HERO) {
     const { status, buf } = await fetchBuffer(`${CDN}/assets/resources/${rel}.png`)
     if (status === 200 && buf.length) pngs.push(buf)
   }
-  if (!skeletonJson || !atlasText || !pngs.length)
-    return { ok: false, reason: '资源不完整 skeleton=' + !!skeletonJson + ' atlas=' + !!atlasText + ' pngs=' + pngs.length }
-
-  const folder = anim.split('/')[3]
-  const outDir = path.join(OUT_DIR, folder)
+  if (!skeletonJson || !atlasText || !pngs.length) return null
   fs.mkdirSync(outDir, { recursive: true })
   fs.writeFileSync(path.join(outDir, 'skeleton.json'), JSON.stringify(skeletonJson))
   fs.writeFileSync(path.join(outDir, 'atlas.txt'), atlasText)
   pngs.forEach((b, i) => fs.writeFileSync(path.join(outDir, `p${i}.png`), b))
-  const totalKB = Math.round(pngs.reduce((a, b) => a + b.length, 0) / 1024)
+  return {
+    anims: Object.keys(skeletonJson.animations || {}),
+    pngs: pngs.length,
+    kb: Math.round(pngs.reduce((a, b) => a + b.length, 0) / 1024)
+  }
+}
+
+async function exportHero(ctx, HERO) {
+  const { index, heroRows, npcRows, resRows } = ctx
+  const hero = (heroRows || []).find((h) => String(h.name).trim() === HERO)
+  if (!hero) return { ok: false, reason: '未找到英雄' }
+  const npc = (npcRows || []).find((r) => String(r.id) === String(hero.npc_id))
+  const res = (resRows || []).find((r) => String(r.id) === String(npc && npc.res_id))
+  const anim = String((res && res.animation) || '')
+  if (!anim.startsWith('combat/animation/hero/')) return { ok: false, reason: '非英雄动画: ' + anim }
+
+  // 1) 基础模型：写入 models/<基础模型名>/（多英雄共用目录时各自独立，避免互相覆盖）
+  const folder = anim.split('/')[3]
+  const baseModel = anim.split('/')[4] || 'base'
+  const outDir = path.join(OUT_DIR, folder)
+  const base = await exportModelAt(index, anim, path.join(outDir, 'models', baseModel))
+  if (!base) return { ok: false, reason: '基础资源不完整: ' + anim }
+
+  // 清理历史遗留：旧方案把基础模型写在目录根（多英雄共用目录时会互相覆盖 → 木精灵显示成魔精灵）
+  try {
+    for (const f of fs.readdirSync(outDir)) {
+      if (/^skeleton\.json$|^atlas\.txt$|^p\d+\.png$/.test(f)) fs.unlinkSync(path.join(outDir, f))
+    }
+  } catch (e) {}
+
+  // 2) 皮肤模型（官方：每个皮肤在英雄目录下有独立骨骼，模型名见 heroes.json 的 skins[].model）
+  const heroDir = anim.split('/').slice(0, 4).join('/') + '/'
+  const models = {}
+  const modelPngs = {}
+  let skinOk = 0
+  let skinFail = 0
+  try {
+    const heroesJson = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../data/heroes.json'), 'utf8'))
+    const hj = heroesJson.find((h) => h.name === HERO)
+    for (const sk of (hj && hj.skins) || []) {
+      if (!sk.model) continue
+      const r = await exportModelAt(index, heroDir + sk.model, path.join(outDir, 'models', sk.model))
+      if (r) {
+        models[sk.note] = sk.model
+        modelPngs[sk.model] = r.pngs
+        skinOk++
+      } else skinFail++
+    }
+  } catch (e) {}
+  // 基础模型也记一份贴图页数（前端播基础模型时可直接按页数加载，不必探测）
+  modelPngs[baseModel] = base.pngs
+
   return {
     ok: true,
     folder,
-    anims: Object.keys(skeletonJson.animations || {}),
-    pngCount: pngs.length,
-    totalKB,
+    anims: base.anims,
+    pngCount: base.pngs,
+    totalKB: base.kb,
     entry: {
       hero: HERO,
-      anims: Object.keys(skeletonJson.animations || {}),
-      pngs: pngs.length,
+      model: baseModel,            // 基础模型名（前端默认播这个）
+      anims: base.anims,
+      pngs: base.pngs,
+      models,
+      modelPngs,
       updated: new Date().toISOString().slice(0, 10)
-    }
+    },
+    skinModels: { ok: skinOk, fail: skinFail }
   }
 }
 
@@ -413,7 +456,12 @@ function mergeManifest(entries) {
       for (const { t, r } of results) {
         if (r.ok) {
           ok++
-          entries[r.folder] = r.entry
+          // 多个英雄共用同一动画目录 → 清单按目录合并（models/modelPngs 累加），不能整条覆盖
+          const prev = entries[r.folder] || {}
+          entries[r.folder] = Object.assign({}, prev, r.entry, {
+            models: Object.assign({}, prev.models || {}, r.entry.models || {}),
+            modelPngs: Object.assign({}, prev.modelPngs || {}, r.entry.modelPngs || {})
+          })
           if (r.folder !== t.spine) console.log(`  ⚠ ${t.name}: CDN 目录 ${r.folder} 与 heroes.json 的 ${t.spine} 不一致（按 CDN 为准）`)
           console.log(`✅ [${ok + fail}/${targets.length}] ${t.name} -> ${r.folder}（${r.pngCount} png / ${r.totalKB}KB / ${r.anims.length} anims）`)
         } else {

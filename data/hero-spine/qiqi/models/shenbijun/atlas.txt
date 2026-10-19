@@ -1,0 +1,230 @@
+
+shenbijun.png
+size: 793,793
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 679, 152
+  size: 104, 134
+  orig: 118, 136
+  offset: 13, 0
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 679, 16
+  size: 100, 134
+  orig: 118, 136
+  offset: 17, 0
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 653, 694
+  size: 97, 133
+  orig: 118, 136
+  offset: 20, 0
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 652, 288
+  size: 115, 134
+  orig: 118, 136
+  offset: 2, 0
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 542, 134
+  size: 118, 135
+  orig: 118, 136
+  offset: 0, 0
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 542, 15
+  size: 117, 135
+  orig: 118, 136
+  offset: 0, 0
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 652, 405
+  size: 117, 135
+  orig: 118, 136
+  offset: 0, 0
+  index: -1
+fx/huaban01_00
+  rotate: false
+  xy: 58, 3
+  size: 54, 30
+  orig: 138, 86
+  offset: 44, 3
+  index: -1
+fx/huaban01_01
+  rotate: false
+  xy: 335, 5
+  size: 50, 32
+  orig: 138, 86
+  offset: 45, 0
+  index: -1
+fx/huaban01_02
+  rotate: false
+  xy: 281, 4
+  size: 52, 33
+  orig: 138, 86
+  offset: 44, 0
+  index: -1
+fx/huaban01_03
+  rotate: false
+  xy: 2, 2
+  size: 54, 31
+  orig: 138, 86
+  offset: 43, 3
+  index: -1
+fx/xing1
+  rotate: false
+  xy: 249, 3
+  size: 30, 30
+  orig: 30, 30
+  offset: 0, 0
+  index: -1
+fx/xing2
+  rotate: false
+  xy: 729, 651
+  size: 41, 41
+  orig: 43, 43
+  offset: 1, 1
+  index: -1
+fx/yan
+  rotate: true
+  xy: 653, 652
+  size: 40, 74
+  orig: 76, 106
+  offset: 20, 18
+  index: -1
+idle/idle_0
+  rotate: true
+  xy: 2, 35
+  size: 216, 268
+  orig: 218, 269
+  offset: 2, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 438, 254
+  size: 212, 267
+  orig: 218, 269
+  offset: 6, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 440, 524
+  size: 211, 267
+  orig: 218, 269
+  offset: 7, 0
+  index: -1
+idle/idle_3
+  rotate: true
+  xy: 272, 39
+  size: 212, 268
+  orig: 218, 269
+  offset: 6, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 222, 253
+  size: 214, 268
+  orig: 218, 269
+  offset: 4, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 222, 523
+  size: 216, 268
+  orig: 218, 269
+  offset: 2, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 523
+  size: 218, 268
+  orig: 218, 269
+  offset: 0, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 253
+  size: 218, 268
+  orig: 218, 269
+  offset: 0, 0
+  index: -1
+images/fx/Energy01
+  rotate: true
+  xy: 517, 20
+  size: 17, 16
+  orig: 120, 120
+  offset: 27, 62
+  index: -1
+images/fx/Energy02
+  rotate: true
+  xy: 477, 18
+  size: 19, 18
+  orig: 120, 120
+  offset: 22, 59
+  index: -1
+images/fx/Energy03
+  rotate: false
+  xy: 435, 16
+  size: 19, 21
+  orig: 120, 120
+  offset: 19, 55
+  index: -1
+images/fx/Energy04
+  rotate: true
+  xy: 387, 11
+  size: 26, 25
+  orig: 120, 120
+  offset: 19, 47
+  index: -1
+images/fx/Energy05
+  rotate: false
+  xy: 206, 11
+  size: 41, 22
+  orig: 120, 120
+  offset: 25, 42
+  index: -1
+images/fx/Energy06
+  rotate: false
+  xy: 114, 10
+  size: 48, 23
+  orig: 120, 120
+  offset: 40, 40
+  index: -1
+images/fx/Energy07
+  rotate: false
+  xy: 164, 9
+  size: 40, 24
+  orig: 120, 120
+  offset: 58, 42
+  index: -1
+images/fx/Energy08
+  rotate: false
+  xy: 414, 14
+  size: 19, 23
+  orig: 120, 120
+  offset: 83, 49
+  index: -1
+images/fx/Energy09
+  rotate: false
+  xy: 456, 18
+  size: 19, 19
+  orig: 120, 120
+  offset: 81, 54
+  index: -1
+images/fx/Energy10
+  rotate: false
+  xy: 497, 19
+  size: 18, 18
+  orig: 120, 120
+  offset: 78, 57
+  index: -1
