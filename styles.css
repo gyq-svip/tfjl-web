@@ -398,7 +398,8 @@
 
         .battle-column h4 {
             text-align: center;
-            margin-top: 0;
+            /* 🔴 2026-10-19 卡组标题上拉与「⚔️出战选择」标题行齐平(同一行)，整列随之紧凑上移 */
+            margin-top: -24px;
             margin-bottom: 6px;
             font-size: 0.9rem;
             width: 100%;
