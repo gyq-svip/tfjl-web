@@ -28192,6 +28192,13 @@ ${maSection}
                     if (typeof window.bindHeroCodex === 'function') window.bindHeroCodex();
                     if (typeof window.renderHeroCodex === 'function') window.renderHeroCodex();
                 }
+            } else if (page === 'skins') {
+                const pageEl = document.getElementById('adminPageSkins');
+                if (pageEl) {
+                    pageEl.style.display = 'block';
+                    if (typeof window.bindSkins === 'function') window.bindSkins();
+                    if (typeof window.renderSkins === 'function') window.renderSkins();
+                }
             }
         }
 
@@ -28270,6 +28277,63 @@ ${maSection}
                   });
                   html += '</details>';
                 }
+                html += '</div>';
+            });
+            html += '</div>';
+            body.innerHTML = html;
+        };
+
+        // ==================== 皮肤图鉴（官方配置表自动导出 data/heroes.json 的 skins 字段）====================
+        window.bindSkins = function () {
+            if (window.__skinsBound) return;
+            window.__skinsBound = true;
+            const s = document.getElementById('skinsSearch');
+            if (s) s.addEventListener('input', function () { if (window.renderSkins) window.renderSkins(); });
+        };
+        window.renderSkins = async function () {
+            const body = document.getElementById('skinsBody');
+            if (!body) return;
+            const search = document.getElementById('skinsSearch');
+            if (!window.__heroCodexCache) {
+                body.innerHTML = '<div style="color:rgba(255,255,255,0.6);padding:20px;">⏳ 加载英雄数据…</div>';
+                try {
+                    const p = location.pathname;
+                    const base = p.endsWith('/') ? p : (p.lastIndexOf('/') >= 0 ? p.slice(0, p.lastIndexOf('/') + 1) : '/');
+                    const res = await fetch(base + 'data/heroes.json');
+                    window.__heroCodexCache = await res.json();
+                } catch (e) {
+                    body.innerHTML = '<div style="color:#f87171;padding:20px;">加载失败：' + (e.message || e) + '</div>';
+                    return;
+                }
+            }
+            const heroes = window.__heroCodexCache || [];
+            const heroNameById = {};
+            heroes.forEach(function (h) { heroNameById[String(h.id)] = h.name; });
+            const kw = (search ? search.value : '').trim().toLowerCase();
+            const all = [];
+            heroes.forEach(function (h) {
+                (h.skins || []).forEach(function (sk) {
+                    all.push({ skin: sk, heroName: heroNameById[String(sk.heroItemId)] || '未知英雄', heroId: sk.heroItemId });
+                });
+            });
+            const list = all.filter(function (x) {
+                if (!kw) return true;
+                return (x.skin.note || '').toLowerCase().indexOf(kw) >= 0
+                    || (x.heroName || '').toLowerCase().indexOf(kw) >= 0
+                    || (x.skin.extraParam || '').toLowerCase().indexOf(kw) >= 0
+                    || String(x.skin.id || '').indexOf(kw) >= 0;
+            });
+            let html = '<div style="color:rgba(255,255,255,0.6);font-size:0.78rem;margin-bottom:10px;">共 ' + list.length + ' 个皮肤（官方配置表自动导出）</div>';
+            html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;">';
+            list.forEach(function (x) {
+                const sk = x.skin;
+                const name = sk.note || ('皮肤' + sk.id);
+                html += '<div style="background:rgba(255,255,255,0.05);border:1px solid rgba(96,165,250,0.35);border-radius:10px;padding:12px;">';
+                html += '<div style="font-size:1.02rem;font-weight:700;color:#60a5fa;margin-bottom:4px;">🎨 ' + _esc(name) + '</div>';
+                html += '<div style="font-size:0.72rem;color:#fbbf24;margin-bottom:6px;">所属英雄：' + _esc(x.heroName) + '</div>';
+                if (sk.describe) html += '<div style="font-size:0.7rem;color:rgba(255,255,255,0.8);line-height:1.4;margin-bottom:4px;">额外被动：' + _esc(sk.describe) + '</div>';
+                if (sk.heroSkinHp) html += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.6);">基础血量 +' + _esc(sk.heroSkinHp) + '</div>';
+                if (sk.extraParam) html += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.55);line-height:1.4;margin-top:4px;">获取：' + _esc(sk.extraParam) + '</div>';
                 html += '</div>';
             });
             html += '</div>';

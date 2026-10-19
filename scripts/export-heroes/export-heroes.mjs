@@ -177,14 +177,23 @@ function parseCsvRow(line) {
   return out
 }
 function parseCsv(text) {
-  const lines = text.split('\n')
+  const lines = text.split(/\r?\n/)
   while (lines.length && lines[lines.length - 1].trim() === '') lines.pop()
   if (lines.length < 4) return []
-  const headers = parseCsvRow(lines[0])
+  // Cocos 表：3 行元数据 + 数据。字段名所在行分两种：
+  //   标准表：第1行=英文字段名 / 第2行=类型 / 第3行=中文描述
+  //   特殊表(如 HeroSkinTableData)：第1行=类型 / 第2行=中文描述 / 第3行=英文字段名
+  // 判断第3行是否为「英文字段名行」(全为合法标识符)：是则取第3行，否则取第1行。
+  // 数据固定从第4行(索引3)开始。
+  const isFieldNameRow = (cols) =>
+    cols.length > 0 && cols.every((c) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(c.trim()))
+  let headerLine = 0
+  if (isFieldNameRow(parseCsvRow(lines[2] || ''))) headerLine = 2
+  const headers = parseCsvRow(lines[headerLine]).map((h) => h.trim())
   const rows = []
   for (let i = 3; i < lines.length; i++) {
     const vals = parseCsvRow(lines[i])
-    if (!vals[0]) continue
+    if (!vals[0] || !vals[0].trim()) continue
     const obj = {}
     headers.forEach((h, j) => (obj[h] = vals[j]))
     rows.push(obj)
@@ -198,7 +207,8 @@ const TABLE_UUIDS = {
   NpcTemplateTableData: 'ada85cac-652d-440b-ae96-2a12339dd920',
   SkillTableData: '25abd541-ec2c-4c55-8e45-da1ae5e2c41c',
   PassiveSkillTableData: 'a8b456ad-5e83-40a1-a382-481d69ab27ef',
-  HeroTalentTableData: 'e6547958-e595-41d0-93a8-32b81d5921af'
+  HeroTalentTableData: 'e6547958-e595-41d0-93a8-32b81d5921af',
+  HeroSkinTableData: '20c425ab-4282-4ba6-9df6-76f91271bf18'
 }
 
 async function fetchTable(index, uuid, name) {
@@ -342,11 +352,20 @@ function buildTiers(maps, hid, npcId, heroSkillName, heroSkillDesc, heroPassiveI
   const skillRows = await fetchTable(index, TABLE_UUIDS.SkillTableData, 'SkillTableData')
   const passiveRows = await fetchTable(index, TABLE_UUIDS.PassiveSkillTableData, 'PassiveSkillTableData')
   const talentRows = await fetchTable(index, TABLE_UUIDS.HeroTalentTableData, 'HeroTalentTableData')
+  const skinRows = await fetchTable(index, TABLE_UUIDS.HeroSkinTableData, 'HeroSkinTableData')
   console.log(
-    `表行数 hero=${heroRows?.length} npc=${npcRows?.length} skill=${skillRows?.length} passive=${passiveRows?.length} talent=${talentRows?.length}`
+    `表行数 hero=${heroRows?.length} npc=${npcRows?.length} skill=${skillRows?.length} passive=${passiveRows?.length} talent=${talentRows?.length} skin=${skinRows?.length}`
   )
   const npcById = new Map((npcRows || []).map((r) => [String(r.id), r]))
   const maps = buildIndexMaps(skillRows, npcRows, talentRows)
+  const skinsByHero = new Map()
+  for (const s of skinRows || []) {
+    const hid = String(s.heroItemId ?? '')
+    if (!hid) continue
+    const arr = skinsByHero.get(hid) || []
+    arr.push(s)
+    skinsByHero.set(hid, arr)
+  }
   const heroes = (heroRows || []).map((h) => {
     const npc = npcById.get(String(h.npc_id)) || {}
     const baseSkill = maps.skillById.get(String(h.id))
@@ -386,7 +405,11 @@ function buildTiers(maps, hid, npcId, heroSkillName, heroSkillDesc, heroPassiveI
         heroSkillDesc,
         h.passive_desc,
         h.passive_desc2
-      )
+      ),
+      skins: (skinsByHero.get(String(h.id)) || []).map((s) => {
+        const { heroItemId, ...rest } = s
+        return rest
+      })
     }
   })
   fs.mkdirSync(path.dirname(OUT), { recursive: true })
