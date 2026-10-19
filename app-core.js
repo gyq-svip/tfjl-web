@@ -10666,6 +10666,417 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             return levelBadge + mohuaIcon;
         }
 
+        // ==================== 英雄详情弹窗（官方版式 1:1 复刻）====================
+        // 版式参照官方「英雄详情」：整卡背景 + 石台 Spine 动画；左列斜切铭牌（品质配色+等级盾）/技能/被动；
+        // 右列「属性详情 / 升级预览」双页签；石台下方皮肤/魔化/融合入口。
+        // 数据源：data/heroes.json（stats 按等级给攻击/生命/攻击类型、tiers 给升级阶段）——统计口径与官方一致。
+        const HD_COLOR = { 1: '#cbd5e1', 2: '#4ade80', 3: '#60a5fa', 4: '#c084fc', 5: '#fbbf24' }
+        const HD_OCC = { 1: '战士', 2: '猎人', 3: '法师', 4: '牧师', 5: '辅助' }
+        const HD_DTYPE = { 1: '物理伤害', 2: '魔法伤害', 3: '真实伤害', 4: '治疗', 5: '其他' }
+
+        // 取当前等级生效行（与官方同口径：取 level ≤ 当前等级的最后一行）
+        function hdRowAt(stats, lv) {
+            if (!stats || !stats.length) return null
+            let hit = stats[0]
+            for (const r of stats) if (Number(r.level) <= Number(lv)) hit = r
+            return hit
+        }
+
+        function showHeroDetailModal(event, cardId, cardType, handType = 'my', cardName = '') {
+            if (event) { try { event.stopPropagation(); event.preventDefault(); } catch (e) {} }
+            document.querySelectorAll('.hero-detail-root').forEach((el) => { try { el.remove(); } catch (e) {} })
+            if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('打开英雄详情弹窗')
+
+            const mainName = typeof getMainCardName === 'function' ? getMainCardName(cardName) : cardName
+            // 等级档位：优先按卡类型取；取不到（空/单档）时回退 1..30（官方英雄上限 30，与 stats 行一致）
+            let levels = getAvailableLevels(cardType)
+            if (!levels || levels.length < 2) levels = Array.from({ length: 30 }, (_, i) => i + 1)
+            const libSlot = (event && event.target && event.target.closest) ? event.target.closest('.ll-slot') : null
+            const badge = event ? event.target : null
+            const fusionParts = (typeof getFusionParts === 'function') ? getFusionParts(cardName) : null
+            const isFusion = !!(fusionParts && fusionParts.length >= 2)
+
+            let curLevel = getCardLevel(cardId, cardType, handType)
+            let curSkin = getCardSkin(cardId, cardName, handType)
+            let meta = null
+            let color = '#c084fc'
+            let tab = 'detail'
+            const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+
+            const root = document.createElement('div')
+            root.className = 'hero-detail-root'
+            root.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.66);z-index:100001;display:flex;align-items:center;justify-content:center;padding:12px;'
+            const card = document.createElement('div')
+            card.style.cssText = 'position:relative;width:min(992px,100%);aspect-ratio:992/496;background:url(hero-ui/bg.png) center/cover no-repeat #0e2a52;border-radius:18px;overflow:hidden;box-shadow:0 18px 60px rgba(0,0,0,0.7),inset 0 0 0 2px rgba(120,190,255,0.25);'
+            root.appendChild(card)
+
+            // —— Spine 动画层（铺满整卡，石台居中偏右下）——
+            const stage = document.createElement('div')
+            stage.style.cssText = 'position:absolute;inset:0;pointer-events:none;'
+            const cv = document.createElement('canvas')
+            cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;'
+            stage.appendChild(cv)
+            card.appendChild(stage)
+
+            // 关闭按钮
+            const closeBtn = document.createElement('button')
+            closeBtn.textContent = '✕'
+            closeBtn.style.cssText = 'position:absolute;right:10px;top:8px;z-index:9;width:30px;height:30px;border-radius:8px;border:1px solid rgba(255,255,255,0.35);background:rgba(180,30,30,0.85);color:#fff;font-weight:900;cursor:pointer;font-size:14px;'
+            closeBtn.onclick = () => root.remove()
+            card.appendChild(closeBtn)
+            root.onclick = (e) => { if (e.target === root) root.remove() }
+
+            // 关窗即停动画
+            const _origRemove = root.remove.bind(root)
+            root.remove = function () {
+                try { if (window.spineHero) window.spineHero.stop(cv) } catch (e) {}
+                return _origRemove()
+            }
+
+            // —— 左列：铭牌 + 技能 + 被动 ——
+            const left = document.createElement('div')
+            left.style.cssText = 'position:absolute;left:3.2%;top:9%;bottom:12%;width:34%;display:flex;flex-direction:column;justify-content:space-between;z-index:6;pointer-events:none;'
+            card.appendChild(left)
+
+            const plate = document.createElement('div')
+            plate.style.cssText = 'position:relative;height:22%;min-height:74px;pointer-events:auto;'
+            left.appendChild(plate)
+
+            const banner = document.createElement('div')
+            banner.style.cssText = 'position:absolute;inset:0;background:linear-gradient(100deg,#f5a623,#f7b733 55%,#e8931a);clip-path:polygon(7% 0,100% 0,100% 100%,0 100%);box-shadow:0 4px 10px rgba(0,0,0,0.45);'
+            plate.appendChild(banner)
+            const inner = document.createElement('div')
+            inner.style.cssText = 'position:absolute;inset:0;padding:2% 5% 2% 11%;display:flex;flex-direction:column;justify-content:center;gap:2px;'
+            plate.appendChild(inner)
+
+            const nameEl = document.createElement('div')
+            nameEl.style.cssText = 'font-size:clamp(17px,2.4vw,28px);font-weight:900;color:#fff;letter-spacing:0.06em;line-height:1.05;text-shadow:0 0 3px #2b1a00,0 2px 0 #6b3d00,2px 0 0 #6b3d00,-2px 0 0 #6b3d00,0 -2px 0 #6b3d00;'
+            inner.appendChild(nameEl)
+            const jobEl = document.createElement('div')
+            jobEl.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:clamp(11px,1.15vw,14px);font-weight:800;color:#fff;text-shadow:0 1px 0 #563000,0 0 2px #563000;'
+            inner.appendChild(jobEl)
+
+            // 等级盾（可点：打开等级设置）
+            const shield = document.createElement('div')
+            shield.id = 'hdShield'
+            shield.style.cssText = 'position:absolute;left:4%;top:-26%;width:clamp(30px,4.2vw,46px);aspect-ratio:50/57;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:clamp(13px,1.7vw,21px);cursor:pointer;pointer-events:auto;filter:drop-shadow(0 3px 4px rgba(0,0,0,0.5));'
+            const shieldBg = document.createElement('div')
+            shieldBg.style.cssText = 'position:absolute;inset:0;clip-path:polygon(50% 0,100% 22%,100% 74%,50% 100%,0 74%,0 22%);'
+            shield.appendChild(shieldBg)
+            const shieldNum = document.createElement('span')
+            shieldNum.style.cssText = 'position:relative;z-index:1;margin-top:-14%;text-shadow:0 2px 0 #000,0 0 3px #000;'
+            shield.appendChild(shieldNum)
+            plate.appendChild(shield)
+
+            const skillCard = document.createElement('div')
+            skillCard.style.cssText = 'margin-top:2%;background:rgba(8,32,66,0.82);border:1px solid rgba(120,190,255,0.35);border-radius:10px;padding:8px 10px;color:#eaf4ff;font-size:clamp(10px,1.1vw,13px);line-height:1.5;'
+            left.appendChild(skillCard)
+            const passiveCard = document.createElement('div')
+            passiveCard.style.cssText = 'margin-top:2%;background:rgba(8,32,66,0.82);border:1px solid rgba(120,190,255,0.35);border-radius:10px;padding:8px 10px;color:#eaf4ff;font-size:clamp(10px,1.1vw,13px);line-height:1.55;'
+            left.appendChild(passiveCard)
+
+            // —— 右列：属性详情 / 升级预览 ——
+            const right = document.createElement('div')
+            right.style.cssText = 'position:absolute;right:3.2%;top:9%;width:31%;max-height:82%;display:flex;flex-direction:column;z-index:6;'
+            card.appendChild(right)
+            const panel = document.createElement('div')
+            panel.style.cssText = 'background:rgba(6,26,56,0.9);border:2px solid rgba(90,170,255,0.45);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;min-height:0;box-shadow:0 6px 18px rgba(0,0,0,0.45);'
+            right.appendChild(panel)
+            const tabs = document.createElement('div')
+            tabs.style.cssText = 'display:flex;flex:none;'
+            panel.appendChild(tabs)
+            const body = document.createElement('div')
+            body.style.cssText = 'padding:8px 10px 10px;overflow-y:auto;min-height:0;flex:1;'
+            panel.appendChild(body)
+
+            const tabDefs = [{ k: 'detail', t: '属性详情' }, { k: 'upgrade', t: '升级预览' }]
+            const tabBtns = {}
+            tabDefs.forEach((d) => {
+                const b = document.createElement('button')
+                b.textContent = d.t
+                b.style.cssText = 'flex:1;padding:7px 0;border:0;cursor:pointer;font-weight:900;font-size:clamp(11px,1.2vw,14px);letter-spacing:0.04em;'
+                b.onclick = () => { tab = d.k; paintTabs(); renderBody() }
+                tabs.appendChild(b)
+                tabBtns[d.k] = b
+            })
+            function paintTabs() {
+                tabDefs.forEach((d) => {
+                    const b = tabBtns[d.k]
+                    const on = tab === d.k
+                    b.style.background = on ? 'linear-gradient(180deg,#ffd75e,#e8a91c)' : 'linear-gradient(180deg,rgba(30,70,130,0.95),rgba(16,44,86,0.95))'
+                    b.style.color = on ? '#3d2600' : '#cfe6ff'
+                })
+            }
+
+            function statRowsHtml() {
+                const row = hdRowAt(meta && meta.stats, curLevel) || {}
+                const dtype = row.damageType != null ? (HD_DTYPE[row.damageType] || '—') : '—'
+                const speed = row.cd ? (Number(row.cd) / 1000).toFixed(2) + '秒/次' : '—'
+                const mk = (label, val) =>
+                    '<div style="display:flex;align-items:center;gap:8px;background:rgba(20,60,110,0.55);border-radius:8px;padding:7px 9px;margin-bottom:6px;">' +
+                    '<span style="width:20px;text-align:center;font-size:13px;">' + label.ico + '</span>' +
+                    '<span style="flex:1;font-size:clamp(10px,1.05vw,13px);color:#9fc7ff;">' + label.t + '</span>' +
+                    '<span style="font-size:clamp(11px,1.2vw,14px);font-weight:900;color:#fff;">' + val + '</span>' +
+                    '</div>'
+                return (
+                    mk({ ico: '⚔️', t: '攻击力' }, row.attack != null ? row.attack : '—') +
+                    mk({ ico: '🔧', t: '攻击类型' }, dtype) +
+                    mk({ ico: '⚡', t: '攻速' }, speed) +
+                    mk({ ico: '❤️', t: '生命' }, row.hp != null ? row.hp : '—')
+                )
+            }
+
+            function upgradeRowsHtml() {
+                const tiers = (meta && meta.tiers) || []
+                const list = tiers.filter((t) => Number(t.level) > 1)
+                if (!list.length) return '<div style="opacity:0.6;font-size:12px;padding:8px 4px;">暂无升级阶段数据</div>'
+                let html = ''
+                list.forEach((t) => {
+                    const reached = Number(t.level) <= Number(curLevel)
+                    const txt = t.talentDesc || t.passiveFull || t.passiveInitial || ''
+                    html +=
+                        '<div style="display:flex;gap:7px;align-items:flex-start;margin-bottom:7px;opacity:' + (reached ? '1' : '0.55') + ';">' +
+                        '<span style="flex:none;width:22px;height:24px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:#fff;background:' + (reached ? color : '#5b6b80') + ';clip-path:polygon(50% 0,100% 22%,100% 74%,50% 100%,0 74%,0 22%);">' + t.level + '</span>' +
+                        '<span style="font-size:clamp(9.5px,1vw,12px);line-height:1.45;color:' + (reached ? '#eaf4ff' : '#8fa7c4') + ';">' +
+                        '<b style="color:' + (reached ? '#ffd75e' : '#9db4d0') + ';">' + (t.talentName || ('阶段 ' + t.level)) + '：</b>' + txt +
+                        '</span></div>'
+                })
+                // 等级进度条（当前/下一档）
+                const next = list.find((t) => Number(t.level) > Number(curLevel))
+                const maxLv = levels[levels.length - 1] || 1
+                const pct = Math.max(0, Math.min(100, (Number(curLevel) / Number(maxLv)) * 100))
+                html +=
+                    '<div style="margin-top:8px;background:rgba(0,0,0,0.35);border-radius:7px;padding:6px 8px;">' +
+                    '<div style="display:flex;justify-content:space-between;font-size:11px;color:#9fc7ff;font-weight:800;margin-bottom:4px;">' +
+                    '<span>等级 ' + curLevel + '</span><span>' + (next ? '下一档 ' + next.level : '已满') + '</span></div>' +
+                    '<div style="height:7px;border-radius:4px;background:#233a58;overflow:hidden;"><div style="height:100%;width:' + pct.toFixed(1) + '%;background:linear-gradient(90deg,#ffd75e,#e8891c);"></div></div>' +
+                    '</div>'
+                return html
+            }
+
+            function renderBody() {
+                body.innerHTML = tab === 'detail' ? statRowsHtml() : upgradeRowsHtml()
+                paintTabs()
+            }
+
+            // —— 石台下方：皮肤 / 魔化 / 融合 ——
+            const actions = document.createElement('div')
+            actions.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);bottom:3.2%;display:flex;gap:10px;z-index:7;'
+            card.appendChild(actions)
+            const pop = document.createElement('div')
+            pop.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);bottom:calc(3.2% + 48px);display:none;z-index:8;background:rgba(6,26,56,0.96);border:2px solid rgba(90,170,255,0.5);border-radius:12px;padding:10px;max-width:88%;box-shadow:0 10px 30px rgba(0,0,0,0.6);'
+            card.appendChild(pop)
+
+            function roundBtn(iconSrc, label, onClick) {
+                const b = document.createElement('button')
+                b.title = label
+                b.style.cssText = 'width:clamp(34px,4.6vw,46px);height:clamp(34px,4.6vw,46px);border-radius:50%;border:2px solid rgba(180,220,255,0.55);background:radial-gradient(circle at 35% 30%,#4a7bb5,#12294a);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 3px 8px rgba(0,0,0,0.5);'
+                if (iconSrc) {
+                    const img = document.createElement('img')
+                    img.src = iconSrc
+                    img.alt = label
+                    img.style.cssText = 'width:62%;height:62%;object-fit:contain;pointer-events:none;'
+                    b.appendChild(img)
+                } else { b.textContent = label }
+                b.onclick = onClick
+                return b
+            }
+
+            // 皮肤
+            actions.appendChild(roundBtn('hero-ui/icon-skin.png', '皮肤', () => {
+                if (pop.dataset.mode === 'skin') { pop.style.display = 'none'; pop.dataset.mode = ''; return }
+                pop.dataset.mode = 'skin'
+                pop.style.display = 'block'
+                const skins = getAvailableSkins(cardName)
+                pop.innerHTML = '<div style="font-size:12px;color:#9fc7ff;font-weight:800;margin-bottom:8px;">皮肤</div>'
+                const wrap = document.createElement('div')
+                wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;max-width:min(520px,80vw);'
+                skins.forEach((sk) => {
+                    const sel = sk === curSkin
+                    const b = createSkinThumb(cardName, sk, sel, async () => {
+                        curSkin = sk
+                        setSkinThumbSelected(wrap, sk)
+                        if (libSlot && typeof window._llSet === 'function') {
+                            const lt = libSlot.getAttribute('data-tab'), ll = libSlot.getAttribute('data-lid'), lsd = libSlot.getAttribute('data-side') || 'my'
+                            const baseName = (window.getFusionParts && window.getFusionParts(cardName)) ? window.getFusionParts(cardName)[0] : cardName
+                            window._llSet(lt, ll, 'skin', (baseName || cardName) + '#' + lsd, sk)
+                            if (typeof window._llReapplySlot === 'function') window._llReapplySlot(libSlot)
+                        } else if (typeof setCardSkin === 'function') {
+                            await setCardSkin(cardId, sk, handType)
+                            setTimeout(() => { try { updateAllCardLevelBadges() } catch (e) {} }, 0)
+                        }
+                    })
+                    wrap.appendChild(b)
+                })
+                pop.appendChild(wrap)
+            }))
+
+            // 魔化
+            if (hasMoHuaData(mainName)) {
+                actions.appendChild(roundBtn('hero-ui/icon-wake.png', '魔化', async () => {
+                    const on = !getCardMoHua(cardId, handType)
+                    setCardMoHua(cardId, on, handType)
+                    if (libSlot && typeof window._llReapplySlot === 'function') { try { await window._llReapplySlot(libSlot) } catch (e) {} }
+                    else { try { updateAllCardLevelBadges() } catch (e) {} }
+                    pop.dataset.mode = ''
+                    pop.style.display = 'block'
+                    pop.innerHTML = '<div style="font-size:12px;color:' + (on ? '#c084fc' : '#9fc7ff') + ';font-weight:800;">魔化' + (on ? '已开启' : '已关闭') + '</div>'
+                    setTimeout(() => { if (pop.dataset.mode === '') pop.style.display = 'none' }, 1200)
+                }))
+            }
+
+            // 融合变体
+            const baseHero = (typeof getBaseHeroName === 'function') ? getBaseHeroName(mainName).heroName : mainName
+            const variants = (typeof getFusionVariantsForBase === 'function') ? getFusionVariantsForBase(baseHero) : []
+            if (variants && variants.length) {
+                actions.appendChild(roundBtn('hero-ui/icon-fuse.png', '融合', () => {
+                    if (pop.dataset.mode === 'fuse') { pop.style.display = 'none'; pop.dataset.mode = ''; return }
+                    pop.dataset.mode = 'fuse'
+                    pop.style.display = 'block'
+                    pop.innerHTML = '<div style="font-size:12px;color:#9fc7ff;font-weight:800;margin-bottom:8px;">融合变体（点击切换副卡）</div>'
+                    const wrap = document.createElement('div')
+                    wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;'
+                    const curParts = (typeof getFusionParts === 'function') ? getFusionParts(cardName) : null
+                    ;[baseHero].concat(variants).forEach((opt) => {
+                        const isCur = opt === cardName
+                        const b = document.createElement('button')
+                        b.textContent = opt === baseHero ? '不融合' : opt
+                        b.style.cssText = 'padding:6px 10px;border-radius:8px;border:1px solid ' + (isCur ? '#ffd75e' : 'rgba(255,255,255,0.25)') + ';background:' + (isCur ? 'rgba(255,215,94,0.18)' : 'rgba(255,255,255,0.06)') + ';color:#eaf4ff;font-size:12px;cursor:pointer;'
+                        b.onclick = async () => {
+                            const slotEl = badge && badge.closest ? badge.closest('.battle-slot') : null
+                            if (slotEl && typeof upgradeCardToFusion === 'function') {
+                                try { await upgradeCardToFusion(slotEl, opt) } catch (e) {}
+                            } else {
+                                const handArr = (handType === 'my') ? myHandCards : teammateHandCards
+                                const hc = handArr && handArr.find((c) => c.id === cardId)
+                                if (hc) hc.name = opt
+                                const handCard = badge && badge.closest ? badge.closest('.selected-card.card-item') : null
+                                if (handCard) handCard.dataset.name = opt
+                                if (typeof reapplySingleHandCard === 'function' && handCard) { try { await reapplySingleHandCard(handCard, cardId, handType) } catch (e) {} }
+                                if (typeof autoSaveProject === 'function') autoSaveProject()
+                            }
+                            try { updateAllCardLevelBadges() } catch (e) {}
+                            pop.style.display = 'none'
+                            pop.dataset.mode = ''
+                        }
+                        wrap.appendChild(b)
+                    })
+                    pop.appendChild(wrap)
+                }))
+            }
+
+            // 挂到 DOM
+            document.body.appendChild(root)
+
+            // 先渲染骨架文字（官方数据未到也能出结构），数据到位后补全
+            nameEl.textContent = mainName || cardName || '英雄'
+            jobEl.innerHTML = '<span style="display:inline-flex;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.28);align-items:center;justify-content:center;font-size:10px;">◈</span>'
+            skillCard.textContent = '技能加载中…'
+            passiveCard.textContent = '被动加载中…'
+            shieldBg.style.background = color
+            shieldNum.textContent = String(curLevel)
+            renderBody()
+
+            // 等级设置面板（点盾牌/名字）
+            let editOpen = false
+            const edit = document.createElement('div')
+            edit.style.cssText = 'display:none;position:absolute;left:0;top:100%;margin-top:8px;width:100%;background:rgba(6,26,56,0.97);border:2px solid ' + color + ';border-radius:10px;padding:10px;z-index:10;pointer-events:auto;'
+            plate.appendChild(edit)
+            function paintEdit() {
+                edit.innerHTML =
+                    '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#9fc7ff;font-weight:800;margin-bottom:6px;">等级 <span style="color:#fff;font-size:15px;">' + curLevel + '</span></div>' +
+                    '<input type="range" min="0" max="' + Math.max(0, levels.length - 1) + '" step="1" value="' + Math.max(0, levels.indexOf(curLevel)) + '" style="width:100%;" class="hd-lv-slider">' +
+                    '<div style="display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 8px;" class="hd-lv-quick"></div>' +
+                    '<div style="display:flex;gap:8px;justify-content:flex-end;"><button class="hd-lv-cancel" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(255,255,255,0.3);background:transparent;color:#cfe6ff;font-size:12px;cursor:pointer;">取消</button><button class="hd-lv-ok" style="padding:5px 12px;border-radius:7px;border:0;background:linear-gradient(180deg,#ffd75e,#e8a91c);color:#3d2600;font-weight:900;font-size:12px;cursor:pointer;">完成</button></div>'
+                const slider = edit.querySelector('.hd-lv-slider')
+                const quick = edit.querySelector('.hd-lv-quick')
+                quickLevels().forEach((lv) => {
+                    const b = document.createElement('button')
+                    b.textContent = lv
+                    b.style.cssText = 'padding:3px 8px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid ' + (lv === curLevel ? color : 'rgba(255,255,255,0.25)') + ';background:' + (lv === curLevel ? color + '33' : 'transparent') + ';color:#eaf4ff;'
+                    b.onclick = () => { curLevel = lv; slider.value = String(levels.indexOf(lv)); paintEdit() }
+                    quick.appendChild(b)
+                })
+                edit.querySelector('.hd-lv-cancel').onclick = () => { editOpen = false; edit.style.display = 'none'; paintAll() }
+                edit.querySelector('.hd-lv-ok').onclick = () => {
+                    setCardLevel(cardId, curLevel, cardType, handType)
+                    if (libSlot && typeof window._llReapplySlot === 'function') { try { window._llReapplySlot(libSlot) } catch (e) {} }
+                    else { try { updateAllCardLevelBadges() } catch (e) {} }
+                    editOpen = false; edit.style.display = 'none'
+                    paintAll()
+                }
+                slider.oninput = () => {
+                    const lv = levels[Number(slider.value)]
+                    if (lv == null) return
+                    curLevel = lv
+                    paintEdit()
+                    shieldNum.textContent = String(curLevel)
+                    renderBody()
+                }
+            }
+            function quickLevels() {
+                return ((meta && meta.tiers) || []).map((t) => Number(t.level)).filter((n) => levels.indexOf(n) >= 0)
+            }
+            function toggleEdit() {
+                editOpen = !editOpen
+                if (editOpen) paintEdit()
+                edit.style.display = editOpen ? 'block' : 'none'
+            }
+            shield.onclick = (e) => { e.stopPropagation(); toggleEdit() }
+            nameEl.style.cursor = 'pointer'
+            nameEl.onclick = (e) => { e.stopPropagation(); toggleEdit() }
+
+            function paintAll() {
+                if (!meta) return
+                nameEl.textContent = meta.name
+                const occ = HD_OCC[meta.occupation] || ''
+                jobEl.innerHTML =
+                    '<span style="display:inline-flex;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.3);align-items:center;justify-content:center;font-size:10px;">◈</span>' +
+                    '<span>' + esc(occ) + '</span>' +
+                    (meta.positioning ? '<span style="opacity:0.85;font-weight:700;margin-left:4px;">定位：' + esc(meta.positioning) + '</span>' : '')
+                const skDesc = meta.skillDesc || ((meta.tiers && meta.tiers[0] && meta.tiers[0].skillDesc) || '')
+                if (skDesc) {
+                    skillCard.style.display = ''
+                    skillCard.innerHTML = '<span style="color:#ffd75e;font-weight:900;">技能：</span>' + esc(skDesc)
+                } else {
+                    skillCard.style.display = 'none'
+                }
+                let ph = ''
+                if (meta.passiveDesc) ph += '<div style="display:flex;gap:6px;align-items:flex-start;"><img src="hero-ui/star-initial.png" alt="" style="width:14px;height:14px;margin-top:2px;"><span><b style="color:#8ef58a;">初始被动</b> ' + esc(String(meta.passiveDesc).replace(/^(初始被动|满星被动)\s*/, '')) + '</span></div>'
+                if (meta.passiveDesc2) ph += '<div style="display:flex;gap:6px;align-items:flex-start;margin-top:4px;"><img src="hero-ui/star-full.png" alt="" style="width:14px;height:14px;margin-top:2px;"><span><b style="color:#ffd75e;">满星被动</b> ' + esc(String(meta.passiveDesc2).replace(/^(初始被动|满星被动)\s*/, '')) + '</span></div>'
+                passiveCard.innerHTML = ph || '—'
+                shieldNum.textContent = String(curLevel)
+                shieldBg.style.background = color
+                renderBody()
+            }
+
+            // 起播动画 + 拉官方数据
+            ;(async function () {
+                try {
+                    await ensureOfficialHeroes()
+                    meta = (window.heroesOfficialMap || {})[mainName] || null
+                    if (!card.isConnected) return
+                    paintAll()
+                    color = HD_COLOR[meta && meta.heroColor] || color
+                    shieldBg.style.background = color
+                    // 动画：仅清单内已导出的英雄
+                    if (window.spineHero && meta && meta.spine) {
+                        if (!window.__heroSpineIndex) {
+                            try {
+                                const p = location.pathname
+                                const b = p.endsWith('/') ? p : (p.lastIndexOf('/') >= 0 ? p.slice(0, p.lastIndexOf('/') + 1) : '/')
+                                window.__heroSpineIndex = await (await fetch(b + 'data/hero-spine/index.json')).json()
+                            } catch (e) { window.__heroSpineIndex = {} }
+                        }
+                        const man = window.__heroSpineIndex && window.__heroSpineIndex[meta.spine]
+                        if (man && cv.isConnected) {
+                            window.spineHero.play(cv, meta.spine, { fitPadding: 0.58, pngs: man.pngs || 0 })
+                        }
+                    }
+                } catch (e) { /* 数据失败保留骨架 */ }
+            })()
+        }
+
         // 显示等级下拉选择器
         // 🔴 2026-09-28：角标点击弹出的「一窗搞定」卡片设置面板
         // 含：等级(进度条) / 皮肤 / 主卡魔化 / 融合副卡(皮肤+等级+魔化，副卡魔化需主卡先开) / 减伤值(同步减伤记录表)
@@ -16165,7 +16576,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         const cardType = badge.dataset.cardType;
                         const handType = badge.dataset.handType || 'my';
                         const cardName = badge.dataset.cardName || '';
-                        showLevelDropdown(e, cardId, cardType, handType, cardName);
+                        // 🔴 2026-10-20 改为官方版式英雄详情弹窗（等级/皮肤/魔化/融合 入口在石台下方）
+                        showHeroDetailModal(e, cardId, cardType, handType, cardName);
                     }
                     return;
                 }
