@@ -10756,17 +10756,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             jobEl.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:clamp(11px,1.15vw,14px);font-weight:800;color:#fff;text-shadow:0 1px 0 #563000,0 0 2px #563000;'
             inner.appendChild(jobEl)
 
-            // 等级盾（可点：打开等级设置）
-            const shield = document.createElement('div')
-            shield.id = 'hdShield'
-            shield.style.cssText = 'position:absolute;left:4%;top:-26%;width:clamp(30px,4.2vw,46px);aspect-ratio:50/57;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:clamp(13px,1.7vw,21px);cursor:pointer;pointer-events:auto;filter:drop-shadow(0 3px 4px rgba(0,0,0,0.5));'
-            const shieldBg = document.createElement('div')
-            shieldBg.style.cssText = 'position:absolute;inset:0;clip-path:polygon(50% 0,100% 22%,100% 74%,50% 100%,0 74%,0 22%);'
-            shield.appendChild(shieldBg)
-            const shieldNum = document.createElement('span')
-            shieldNum.style.cssText = 'position:relative;z-index:1;margin-top:-14%;text-shadow:0 2px 0 #000,0 0 3px #000;'
-            shield.appendChild(shieldNum)
-            plate.appendChild(shield)
+            // 等级显示统一放到右下面板底部（等级 + 进度条），横幅上不再放等级盾
 
             const skillCard = document.createElement('div')
             skillCard.style.cssText = 'margin-top:2%;background:rgba(8,32,66,0.82);border:1px solid rgba(120,190,255,0.35);border-radius:10px;padding:8px 10px;color:#eaf4ff;font-size:clamp(10px,1.1vw,13px);line-height:1.5;'
@@ -10839,10 +10829,13 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             panel.appendChild(body)
             panel.appendChild(lvRow)
             panel.appendChild(lvChips)
+            // 快捷档位（官方 tier 等级，且在当前可选等级表里）
+            function quickLevels() {
+                return ((meta && meta.tiers) || []).map((t) => Number(t.level)).filter((n) => levels.indexOf(n) >= 0)
+            }
             function paintLevel() {
                 lvVal.textContent = String(curLevel)
                 lvSlider.value = String(Math.max(0, levels.indexOf(curLevel)))
-                shieldNum.textContent = String(curLevel)
                 // 进度条：当前等级 → 下一档（tier 里程碑）；满级则满格
                 const tiersLv = ((meta && meta.tiers) || []).map((t) => Number(t.level)).filter((n) => n > 1)
                 const next = tiersLv.find((n) => n > Number(curLevel))
@@ -10938,7 +10931,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
 
             function renderBody() {
-                body.innerHTML = tab === 'detail' ? statRowsHtml() : upgradeRowsHtml()
+                try {
+                    body.innerHTML = tab === 'detail' ? statRowsHtml() : upgradeRowsHtml()
+                } catch (e) {
+                    body.innerHTML = '<div style="color:#f87171;font-size:12px;padding:8px;">渲染异常：' + String(e && e.message || e) + '</div>'
+                }
                 paintTabs()
             }
 
@@ -11026,6 +11023,21 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         b.textContent = opt === baseHero ? '不融合' : opt
                         b.style.cssText = 'padding:6px 10px;border-radius:8px;border:1px solid ' + (isCur ? '#ffd75e' : 'rgba(255,255,255,0.25)') + ';background:' + (isCur ? 'rgba(255,215,94,0.18)' : 'rgba(255,255,255,0.06)') + ';color:#eaf4ff;font-size:12px;cursor:pointer;'
                         b.onclick = async () => {
+                            // 阵容图库槽位：写本槽融合覆盖 + 重铺该槽（与图库自身交互一致）
+                            if (libSlot) {
+                                const lt = libSlot.getAttribute('data-tab'), ll = libSlot.getAttribute('data-lid'), lsd = libSlot.getAttribute('data-side') || 'my'
+                                const heroKey = libSlot.getAttribute('data-hero') || baseHero
+                                const newFus = opt === heroKey ? '' : opt
+                                if (typeof window._llSet === 'function') window._llSet(lt, ll, 'fus', heroKey + '#' + lsd, newFus)
+                                if (newFus && typeof window.getFusionParts === 'function') {
+                                    const pp = window.getFusionParts(opt)
+                                    if (pp && pp.length >= 2) { try { window.fusionSkins = window.fusionSkins || {}; window.fusionSkins[pp[1]] = '' } catch (e) {} }
+                                }
+                                if (typeof window._llReapplySlot === 'function') { try { await window._llReapplySlot(libSlot) } catch (e) {} }
+                                pop.style.display = 'none'
+                                pop.dataset.mode = ''
+                                return
+                            }
                             const slotEl = badge && badge.closest ? badge.closest('.battle-slot') : null
                             if (slotEl && typeof upgradeCardToFusion === 'function') {
                                 try { await upgradeCardToFusion(slotEl, opt) } catch (e) {}
@@ -11268,8 +11280,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             jobEl.innerHTML = '<span style="display:inline-flex;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.28);align-items:center;justify-content:center;font-size:10px;">◈</span>'
             skillCard.textContent = '技能加载中…'
             passiveCard.textContent = '被动加载中…'
-            shieldBg.style.background = color
-            shieldNum.textContent = String(curLevel)
             renderBody()
 
             function paintAll() {
@@ -11295,8 +11305,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 if (pInit) ph += '<div style="display:flex;gap:6px;align-items:flex-start;"><img src="hero-ui/star-initial.png" alt="" style="width:14px;height:14px;margin-top:2px;"><span><b style="color:#8ef58a;">初始被动</b> ' + esc(pInit) + '</span></div>'
                 if (pFull) ph += '<div style="display:flex;gap:6px;align-items:flex-start;margin-top:4px;"><img src="hero-ui/star-full.png" alt="" style="width:14px;height:14px;margin-top:2px;"><span><b style="color:#ffd75e;">满星被动</b> ' + esc(pFull) + '</span></div>'
                 passiveCard.innerHTML = ph || '—'
-                shieldNum.textContent = String(curLevel)
-                shieldBg.style.background = color
                 paintLevel()
                 renderBody()
             }
@@ -11309,7 +11317,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (!card.isConnected) return
                     paintAll()
                     color = HD_COLOR[meta && meta.heroColor] || color
-                    shieldBg.style.background = color
                     // 动画：仅清单内已导出的英雄
                     if (window.spineHero && meta && meta.spine) {
                         if (!window.__heroSpineIndex) {
@@ -11327,6 +11334,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 } catch (e) { /* 数据失败保留骨架 */ }
             })()
         }
+        // 供阵容图库等外部入口复用同一套英雄详情面板
+        window.showHeroDetailModal = showHeroDetailModal
 
         // 显示等级下拉选择器
         // 🔴 2026-09-28：角标点击弹出的「一窗搞定」卡片设置面板

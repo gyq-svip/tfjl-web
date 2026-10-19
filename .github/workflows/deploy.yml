@@ -62,6 +62,8 @@ jobs:
           [ -d projects ] && cp -rv projects _site/ || true
           # 🔴 内置背景图（设置窗「内置背景图」直链 bg/xxx.jpg，白名单漏拷会导致线上 404 → 图片显示不出来）
           [ -d bg ] && cp -rv bg _site/ || true
+          # 🔴 英雄详情弹窗 UI 资产（官方版式：整卡背景/石台阴影/子系统图标/铭牌图集；漏拷会导致动画弹窗没背景、按钮图标全裂）
+          [ -d hero-ui ] && cp -rv hero-ui _site/ || true
 
           echo "=== staged size ==="
           du -sh _site

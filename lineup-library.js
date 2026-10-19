@@ -656,6 +656,12 @@
         const _ci = _llCardInfo(hero, cur);
         const pcId = _ci.id;
         const pcType = _ci.type;
+        // 🔴 2026-10-20 统一用官方版式「英雄详情」面板（与主页同一套：等级进度条/属性详情/升级预览/皮肤/魔化/融合）。
+        //    面板内部已识别 .ll-slot（写本槽个人皮肤/融合覆盖并重铺该槽），故图库与主页交互完全一致。
+        if (window.showHeroDetailModal) {
+            window.showHeroDetailModal(e, pcId, pcType, 'my', cur);
+            return;
+        }
         if (!window.showLevelDropdown) return;
         window.showLevelDropdown(e, pcId, pcType, 'my', cur);
         try {
