@@ -1743,6 +1743,10 @@
                         <span class="mi-emoji">📖</span>
                         <div class="mi-text"><div class="mi-title">英雄图鉴</div><div class="mi-sub">官方数据(内测)</div></div>
                     </div>
+                    <div class="admin-menu-item" data-key="skins" onclick="adminShowPage('skins')">
+                        <span class="mi-emoji">🎨</span>
+                        <div class="mi-text"><div class="mi-title">皮肤图鉴</div><div class="mi-sub">官方数据(内测)</div></div>
+                    </div>
 
                 </div>
                 <div id="adminSortEditBtn" style="display:flex;gap:8px;margin-top:8px;">
@@ -1772,6 +1776,17 @@
                     </select>
                 </div>
                 <div id="heroCodexBody" style="max-height:64vh;overflow-y:auto;"></div>
+            </div>
+
+            <div id="adminPageSkins" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🎨 皮肤图鉴（官方数据 · 内测）</h3>
+                </div>
+                <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+                    <input id="skinsSearch" placeholder="搜索皮肤名 / 所属英雄 / 获取途径…" style="flex:1;min-width:180px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:8px 10px;font-size:0.85rem;">
+                </div>
+                <div id="skinsBody" style="max-height:64vh;overflow-y:auto;"></div>
             </div>
 
             <div id="adminPageToolbox" style="display:none;">
