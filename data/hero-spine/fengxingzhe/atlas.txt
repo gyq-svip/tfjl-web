@@ -1,0 +1,139 @@
+
+fengxingzhe.png
+size: 786,786
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/attack/a0038
+  rotate: true
+  xy: 469, 73
+  size: 113, 119
+  orig: 200, 200
+  offset: 35, 41
+  index: -1
+images/attack/a0041
+  rotate: true
+  xy: 590, 54
+  size: 108, 123
+  orig: 200, 200
+  offset: 36, 37
+  index: -1
+images/attack/a0044
+  rotate: false
+  xy: 647, 433
+  size: 106, 124
+  orig: 200, 200
+  offset: 39, 36
+  index: -1
+images/attack/a0046
+  rotate: true
+  xy: 2, 52
+  size: 110, 119
+  orig: 200, 200
+  offset: 43, 38
+  index: -1
+images/attack/a0049
+  rotate: false
+  xy: 590, 164
+  size: 110, 112
+  orig: 200, 200
+  offset: 38, 45
+  index: -1
+images/attack/a0052
+  rotate: false
+  xy: 348, 52
+  size: 111, 112
+  orig: 200, 200
+  offset: 34, 46
+  index: -1
+images/attack/a0057
+  rotate: true
+  xy: 232, 53
+  size: 111, 114
+  orig: 200, 200
+  offset: 34, 46
+  index: -1
+images/fx/qi/qi3_000
+  rotate: false
+  xy: 585, 278
+  size: 139, 86
+  orig: 205, 205
+  offset: 62, 63
+  index: -1
+images/fx/qi/qi3_001
+  rotate: true
+  xy: 469, 188
+  size: 176, 114
+  orig: 205, 205
+  offset: 21, 50
+  index: -1
+images/fx/qi/qi3_002
+  rotate: false
+  xy: 595, 559
+  size: 188, 144
+  orig: 205, 205
+  offset: 6, 38
+  index: -1
+images/fx/qi/qi3_003
+  rotate: false
+  xy: 595, 705
+  size: 189, 79
+  orig: 205, 205
+  offset: 5, 74
+  index: -1
+images/idle/a0000
+  rotate: true
+  xy: 2, 164
+  size: 189, 228
+  orig: 400, 400
+  offset: 83, 91
+  index: -1
+images/idle/a0004
+  rotate: true
+  xy: 184, 593
+  size: 191, 229
+  orig: 400, 400
+  offset: 80, 91
+  index: -1
+images/idle/a0008
+  rotate: true
+  xy: 2, 355
+  size: 191, 232
+  orig: 400, 400
+  offset: 78, 88
+  index: -1
+images/idle/a0012
+  rotate: true
+  xy: 232, 166
+  size: 187, 235
+  orig: 400, 400
+  offset: 81, 84
+  index: -1
+images/idle/a0016
+  rotate: false
+  xy: 2, 548
+  size: 180, 236
+  orig: 400, 400
+  offset: 88, 81
+  index: -1
+images/idle/a0020
+  rotate: false
+  xy: 236, 355
+  size: 177, 236
+  orig: 400, 400
+  offset: 91, 80
+  index: -1
+images/idle/a0024
+  rotate: false
+  xy: 415, 551
+  size: 178, 233
+  orig: 400, 400
+  offset: 91, 83
+  index: -1
+images/idle/a0028
+  rotate: true
+  xy: 415, 366
+  size: 183, 230
+  orig: 400, 400
+  offset: 88, 88
+  index: -1

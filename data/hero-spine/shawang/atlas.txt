@@ -1,0 +1,370 @@
+
+woailuo.png
+size: 1138,1138
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+fx/0
+  rotate: false
+  xy: 341, 225
+  size: 134, 75
+  orig: 137, 76
+  offset: 1, 1
+  index: -1
+fx/1
+  rotate: false
+  xy: 835, 290
+  size: 135, 71
+  orig: 137, 74
+  offset: 1, 2
+  index: -1
+fx/10
+  rotate: true
+  xy: 971, 143
+  size: 132, 75
+  orig: 134, 77
+  offset: 1, 1
+  index: -1
+fx/11
+  rotate: false
+  xy: 341, 302
+  size: 138, 78
+  orig: 140, 80
+  offset: 1, 1
+  index: -1
+fx/2
+  rotate: false
+  xy: 835, 219
+  size: 134, 69
+  orig: 137, 71
+  offset: 2, 2
+  index: -1
+fx/3
+  rotate: false
+  xy: 822, 149
+  size: 132, 68
+  orig: 135, 70
+  offset: 1, 1
+  index: -1
+fx/4
+  rotate: true
+  xy: 888, 8
+  size: 133, 67
+  orig: 135, 69
+  offset: 1, 1
+  index: -1
+fx/5
+  rotate: true
+  xy: 822, 7
+  size: 134, 64
+  orig: 136, 67
+  offset: 1, 1
+  index: -1
+fx/6
+  rotate: true
+  xy: 1074, 568
+  size: 133, 62
+  orig: 135, 66
+  offset: 1, 1
+  index: -1
+fx/7
+  rotate: true
+  xy: 957, 9
+  size: 132, 64
+  orig: 135, 68
+  offset: 1, 1
+  index: -1
+fx/8
+  rotate: true
+  xy: 1023, 10
+  size: 131, 68
+  orig: 134, 71
+  offset: 1, 1
+  index: -1
+fx/9
+  rotate: true
+  xy: 1062, 234
+  size: 126, 72
+  orig: 134, 74
+  offset: 1, 1
+  index: -1
+images/FX/a0039
+  rotate: false
+  xy: 788, 466
+  size: 57, 39
+  orig: 800, 600
+  offset: 428, 274
+  index: -1
+images/FX/a0041
+  rotate: false
+  xy: 488, 431
+  size: 43, 38
+  orig: 800, 600
+  offset: 428, 275
+  index: -1
+images/FX/a0043
+  rotate: false
+  xy: 1087, 930
+  size: 48, 38
+  orig: 800, 600
+  offset: 411, 285
+  index: -1
+images/FX/a0045
+  rotate: false
+  xy: 1073, 362
+  size: 53, 37
+  orig: 800, 600
+  offset: 400, 292
+  index: -1
+images/FX/a0047
+  rotate: true
+  xy: 972, 316
+  size: 45, 39
+  orig: 800, 600
+  offset: 421, 289
+  index: -1
+images/FX/a0049
+  rotate: true
+  xy: 1087, 703
+  size: 64, 46
+  orig: 800, 600
+  offset: 437, 278
+  index: -1
+images/FX/a_0
+  rotate: true
+  xy: 829, 930
+  size: 206, 256
+  orig: 800, 600
+  offset: 233, 161
+  index: -1
+images/FX/a_1
+  rotate: true
+  xy: 829, 723
+  size: 205, 256
+  orig: 800, 600
+  offset: 235, 161
+  index: -1
+images/FX/a_2
+  rotate: true
+  xy: 276, 471
+  size: 204, 255
+  orig: 800, 600
+  offset: 237, 161
+  index: -1
+images/FX/a_3
+  rotate: true
+  xy: 276, 677
+  size: 202, 256
+  orig: 800, 600
+  offset: 240, 161
+  index: -1
+images/FX/a_4
+  rotate: true
+  xy: 2, 424
+  size: 201, 254
+  orig: 800, 600
+  offset: 241, 161
+  index: -1
+images/FX/a_5
+  rotate: true
+  xy: 533, 461
+  size: 208, 253
+  orig: 800, 600
+  offset: 233, 161
+  index: -1
+images/FX/a_6
+  rotate: true
+  xy: 818, 507
+  size: 214, 254
+  orig: 800, 600
+  offset: 226, 161
+  index: -1
+images/FX/a_7
+  rotate: true
+  xy: 534, 671
+  size: 208, 255
+  orig: 800, 600
+  offset: 233, 161
+  index: -1
+images/FX/baofengnvwang_27
+  rotate: false
+  xy: 2, 218
+  size: 225, 204
+  orig: 225, 204
+  offset: 0, 0
+  index: -1
+images/FX/baofengnvwang_28
+  rotate: false
+  xy: 71, 12
+  size: 225, 204
+  orig: 225, 204
+  offset: 0, 0
+  index: -1
+images/FX/baofengnvwang_29
+  rotate: false
+  xy: 298, 18
+  size: 225, 204
+  orig: 225, 204
+  offset: 0, 0
+  index: -1
+images/FX/baofengnvwang_31
+  rotate: false
+  xy: 488, 225
+  size: 225, 204
+  orig: 225, 204
+  offset: 0, 0
+  index: -1
+images/FX/baofengnvwang_32
+  rotate: false
+  xy: 595, 19
+  size: 225, 204
+  orig: 225, 204
+  offset: 0, 0
+  index: -1
+images/FX/fengjuancanyun_34
+  rotate: true
+  xy: 791, 698
+  size: 89, 25
+  orig: 200, 100
+  offset: 29, 25
+  index: -1
+images/FX/fengjuancanyun_35
+  rotate: false
+  xy: 1015, 367
+  size: 56, 55
+  orig: 200, 100
+  offset: 20, 26
+  index: -1
+images/FX/fengjuancanyun_36
+  rotate: true
+  xy: 715, 231
+  size: 168, 44
+  orig: 200, 100
+  offset: 14, 29
+  index: -1
+images/FX/fengjuancanyun_37
+  rotate: true
+  xy: 1087, 970
+  size: 166, 48
+  orig: 200, 100
+  offset: 17, 26
+  index: -1
+images/FX/fengjuancanyun_38
+  rotate: true
+  xy: 1087, 769
+  size: 159, 46
+  orig: 200, 100
+  offset: 21, 26
+  index: -1
+images/FX/fengjuancanyun_39
+  rotate: true
+  xy: 289, 224
+  size: 156, 50
+  orig: 200, 100
+  offset: 22, 26
+  index: -1
+images/FX/fengjuancanyun_40
+  rotate: true
+  xy: 791, 789
+  size: 90, 25
+  orig: 200, 100
+  offset: 38, 34
+  index: -1
+images/FX/fengjuancanyun_41
+  rotate: false
+  xy: 865, 363
+  size: 148, 59
+  orig: 200, 100
+  offset: 26, 20
+  index: -1
+images/FX/fengjuancanyun_42
+  rotate: true
+  xy: 1074, 401
+  size: 165, 59
+  orig: 200, 100
+  offset: 28, 22
+  index: -1
+images/FX/fengjuancanyun_43
+  rotate: true
+  xy: 761, 234
+  size: 165, 72
+  orig: 200, 100
+  offset: 28, 14
+  index: -1
+images/FX/fengjuancanyun_44
+  rotate: true
+  xy: 229, 219
+  size: 161, 58
+  orig: 200, 100
+  offset: 30, 28
+  index: -1
+images/FX/fengjuancanyun_45
+  rotate: false
+  xy: 715, 401
+  size: 148, 58
+  orig: 200, 100
+  offset: 30, 20
+  index: -1
+images/FX/mowanghandi_23
+  rotate: true
+  xy: 2, 5
+  size: 211, 67
+  orig: 267, 121
+  offset: 33, 16
+  index: -1
+images/FX/mowanghandi_24
+  rotate: false
+  xy: 865, 424
+  size: 204, 81
+  orig: 267, 121
+  offset: 12, 16
+  index: -1
+images/FX/mowanghandi_25
+  rotate: false
+  xy: 258, 382
+  size: 228, 87
+  orig: 267, 121
+  offset: 8, 16
+  index: -1
+images/FX/mowanghandi_26
+  rotate: true
+  xy: 525, 2
+  size: 221, 68
+  orig: 267, 121
+  offset: 20, 29
+  index: -1
+images/FX/shou
+  rotate: false
+  xy: 1015, 277
+  size: 45, 88
+  orig: 46, 88
+  offset: 1, 0
+  index: -1
+images/a0000
+  rotate: false
+  xy: 281, 881
+  size: 273, 255
+  orig: 800, 600
+  offset: 233, 161
+  index: -1
+images/a0004
+  rotate: false
+  xy: 556, 881
+  size: 271, 255
+  orig: 800, 600
+  offset: 235, 161
+  index: -1
+images/a0024
+  rotate: false
+  xy: 2, 883
+  size: 277, 253
+  orig: 800, 600
+  offset: 226, 161
+  index: -1
+images/a0028
+  rotate: false
+  xy: 2, 627
+  size: 272, 254
+  orig: 800, 600
+  offset: 233, 161
+  index: -1

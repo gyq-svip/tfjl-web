@@ -1,0 +1,160 @@
+
+huoqiang.png
+size: 887,887
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+a0000
+  rotate: false
+  xy: 298, 475
+  size: 290, 206
+  orig: 410, 410
+  offset: 87, 80
+  index: -1
+a0004
+  rotate: false
+  xy: 602, 675
+  size: 283, 210
+  orig: 410, 410
+  offset: 92, 80
+  index: -1
+a0008
+  rotate: false
+  xy: 291, 263
+  size: 277, 210
+  orig: 410, 410
+  offset: 97, 80
+  index: -1
+a0012
+  rotate: false
+  xy: 590, 466
+  size: 278, 207
+  orig: 410, 410
+  offset: 96, 80
+  index: -1
+a0016
+  rotate: false
+  xy: 2, 277
+  size: 287, 203
+  orig: 410, 410
+  offset: 89, 80
+  index: -1
+a0020
+  rotate: false
+  xy: 2, 482
+  size: 294, 201
+  orig: 410, 410
+  offset: 84, 80
+  index: -1
+a0024
+  rotate: false
+  xy: 2, 685
+  size: 299, 200
+  orig: 410, 410
+  offset: 80, 80
+  index: -1
+a0028
+  rotate: false
+  xy: 303, 683
+  size: 297, 202
+  orig: 410, 410
+  offset: 81, 80
+  index: -1
+a0037
+  rotate: false
+  xy: 739, 208
+  size: 144, 107
+  orig: 205, 205
+  offset: 51, 40
+  index: -1
+a0041
+  rotate: true
+  xy: 570, 315
+  size: 149, 111
+  orig: 205, 205
+  offset: 52, 40
+  index: -1
+a0044
+  rotate: true
+  xy: 683, 317
+  size: 147, 109
+  orig: 205, 205
+  offset: 53, 40
+  index: -1
+a0046
+  rotate: true
+  xy: 575, 165
+  size: 148, 110
+  orig: 205, 205
+  offset: 52, 40
+  index: -1
+a0048
+  rotate: false
+  xy: 359, 8
+  size: 154, 121
+  orig: 205, 205
+  offset: 51, 38
+  index: -1
+a0050
+  rotate: true
+  xy: 197, 8
+  size: 121, 160
+  orig: 205, 205
+  offset: 44, 37
+  index: -1
+a0053
+  rotate: false
+  xy: 605, 17
+  size: 132, 146
+  orig: 205, 205
+  offset: 36, 40
+  index: -1
+a0056
+  rotate: true
+  xy: 274, 131
+  size: 130, 119
+  orig: 205, 205
+  offset: 38, 40
+  index: -1
+a0060
+  rotate: true
+  xy: 82, 4
+  size: 125, 113
+  orig: 205, 205
+  offset: 44, 40
+  index: -1
+a0064
+  rotate: false
+  xy: 739, 101
+  size: 135, 105
+  orig: 205, 205
+  offset: 51, 40
+  index: -1
+qi/qi3_000
+  rotate: true
+  xy: 515, 5
+  size: 139, 88
+  orig: 205, 205
+  offset: 61, 62
+  index: -1
+qi/qi3_001
+  rotate: false
+  xy: 395, 146
+  size: 178, 115
+  orig: 205, 205
+  offset: 20, 49
+  index: -1
+qi/qi3_002
+  rotate: false
+  xy: 82, 131
+  size: 190, 144
+  orig: 205, 205
+  offset: 5, 37
+  index: -1
+qi/qi3_003
+  rotate: true
+  xy: 2, 70
+  size: 191, 78
+  orig: 205, 205
+  offset: 5, 74
+  index: -1

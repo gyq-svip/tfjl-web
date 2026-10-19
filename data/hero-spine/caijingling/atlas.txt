@@ -1,0 +1,97 @@
+
+caijingling.png
+size: 712,712
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/FX/guang
+  rotate: false
+  xy: 2, 502
+  size: 202, 208
+  orig: 202, 208
+  offset: 0, 0
+  index: -1
+images/images/jingl_00
+  rotate: false
+  xy: 350, 78
+  size: 179, 155
+  orig: 290, 255
+  offset: 51, 43
+  index: -1
+images/images/jingl_01
+  rotate: false
+  xy: 206, 399
+  size: 193, 151
+  orig: 290, 255
+  offset: 49, 47
+  index: -1
+images/images/jingl_02
+  rotate: true
+  xy: 2, 291
+  size: 209, 158
+  orig: 290, 255
+  offset: 48, 40
+  index: -1
+images/images/jingl_03
+  rotate: false
+  xy: 206, 552
+  size: 209, 158
+  orig: 290, 255
+  offset: 50, 44
+  index: -1
+images/images/jingl_04
+  rotate: true
+  xy: 536, 214
+  size: 177, 155
+  orig: 290, 255
+  offset: 53, 49
+  index: -1
+images/images/jingl_05
+  rotate: false
+  xy: 531, 58
+  size: 179, 154
+  orig: 290, 255
+  offset: 52, 49
+  index: -1
+images/images/jingl_06
+  rotate: false
+  xy: 351, 235
+  size: 183, 156
+  orig: 290, 255
+  offset: 51, 51
+  index: -1
+images/images/jingl_07
+  rotate: false
+  xy: 164, 83
+  size: 184, 156
+  orig: 290, 255
+  offset: 50, 52
+  index: -1
+images/images/jingl_08
+  rotate: false
+  xy: 164, 241
+  size: 185, 156
+  orig: 290, 255
+  offset: 49, 49
+  index: -1
+images/images/jingl_09
+  rotate: false
+  xy: 401, 393
+  size: 187, 157
+  orig: 290, 255
+  offset: 44, 47
+  index: -1
+images/images/jingl_10
+  rotate: true
+  xy: 2, 97
+  size: 192, 160
+  orig: 290, 255
+  offset: 42, 45
+  index: -1
+images/images/jingl_11
+  rotate: false
+  xy: 417, 552
+  size: 190, 158
+  orig: 290, 255
+  offset: 43, 44
+  index: -1

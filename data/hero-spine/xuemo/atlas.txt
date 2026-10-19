@@ -1,0 +1,153 @@
+
+xuemo.png
+size: 923,923
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 569, 5
+  size: 140, 128
+  orig: 260, 260
+  offset: 48, 48
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 654, 135
+  size: 145, 132
+  orig: 260, 260
+  offset: 38, 48
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 262, 2
+  size: 138, 137
+  orig: 260, 260
+  offset: 49, 48
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 523, 222
+  size: 179, 129
+  orig: 260, 260
+  offset: 65, 51
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 2, 3
+  size: 190, 130
+  orig: 260, 260
+  offset: 61, 50
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 402, 6
+  size: 165, 133
+  orig: 260, 260
+  offset: 60, 45
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 654, 269
+  size: 145, 138
+  orig: 260, 260
+  offset: 59, 37
+  index: -1
+fx/dongganguangbo_12
+  rotate: false
+  xy: 809, 724
+  size: 90, 95
+  orig: 102, 102
+  offset: 2, 3
+  index: -1
+fx/dongganguangbo_13_1
+  rotate: false
+  xy: 809, 821
+  size: 98, 100
+  orig: 102, 102
+  offset: 2, 2
+  index: -1
+fx/dongganguangbo_15
+  rotate: false
+  xy: 523, 141
+  size: 92, 79
+  orig: 102, 102
+  offset: 2, 11
+  index: -1
+fx/dongganguangbo_17
+  rotate: false
+  xy: 711, 103
+  size: 67, 30
+  orig: 102, 102
+  offset: 20, 35
+  index: -1
+fx/fxsk101_0002
+  rotate: false
+  xy: 809, 643
+  size: 52, 79
+  orig: 80, 100
+  offset: 12, 12
+  index: -1
+fx/fxsk101_0003
+  rotate: false
+  xy: 194, 46
+  size: 49, 87
+  orig: 80, 100
+  offset: 13, 5
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 662
+  size: 271, 259
+  orig: 520, 520
+  offset: 117, 87
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 403
+  size: 271, 257
+  orig: 520, 520
+  offset: 121, 90
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 542, 663
+  size: 265, 258
+  orig: 520, 520
+  offset: 127, 92
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 262, 141
+  size: 259, 260
+  orig: 520, 520
+  offset: 133, 94
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 544, 409
+  size: 252, 263
+  orig: 520, 520
+  offset: 138, 93
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 275, 403
+  size: 253, 267
+  orig: 520, 520
+  offset: 134, 89
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 135
+  size: 258, 266
+  orig: 520, 520
+  offset: 128, 87
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 275, 658
+  size: 265, 263
+  orig: 520, 520
+  offset: 122, 85
+  index: -1

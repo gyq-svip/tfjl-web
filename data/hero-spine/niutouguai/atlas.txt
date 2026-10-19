@@ -1,0 +1,125 @@
+
+niutouguai.png
+size: 1192,1192
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+a0000
+  rotate: true
+  xy: 829, 960
+  size: 230, 277
+  orig: 512, 512
+  offset: 123, 151
+  index: -1
+a0004
+  rotate: false
+  xy: 232, 114
+  size: 229, 273
+  orig: 512, 512
+  offset: 123, 151
+  index: -1
+a0008
+  rotate: true
+  xy: 692, 139
+  size: 227, 270
+  orig: 512, 512
+  offset: 123, 151
+  index: -1
+a0012
+  rotate: false
+  xy: 964, 95
+  size: 226, 271
+  orig: 512, 512
+  offset: 123, 151
+  index: -1
+a0016
+  rotate: false
+  xy: 463, 136
+  size: 227, 273
+  orig: 512, 512
+  offset: 123, 151
+  index: -1
+a0020
+  rotate: false
+  xy: 2, 111
+  size: 228, 276
+  orig: 512, 512
+  offset: 124, 151
+  index: -1
+a0024
+  rotate: true
+  xy: 829, 729
+  size: 229, 277
+  orig: 512, 512
+  offset: 124, 151
+  index: -1
+a0028
+  rotate: false
+  xy: 764, 368
+  size: 231, 277
+  orig: 512, 512
+  offset: 123, 151
+  index: -1
+a0037
+  rotate: true
+  xy: 500, 411
+  size: 234, 262
+  orig: 512, 512
+  offset: 123, 149
+  index: -1
+a0040
+  rotate: false
+  xy: 253, 411
+  size: 245, 247
+  orig: 512, 512
+  offset: 118, 145
+  index: -1
+a0044
+  rotate: false
+  xy: 265, 672
+  size: 283, 245
+  orig: 512, 512
+  offset: 86, 145
+  index: -1
+a0046
+  rotate: false
+  xy: 2, 943
+  size: 291, 247
+  orig: 512, 512
+  offset: 85, 145
+  index: -1
+a0048
+  rotate: true
+  xy: 2, 660
+  size: 281, 261
+  orig: 512, 512
+  offset: 125, 145
+  index: -1
+a0050
+  rotate: true
+  xy: 295, 919
+  size: 271, 269
+  orig: 512, 512
+  offset: 112, 148
+  index: -1
+a0053
+  rotate: false
+  xy: 2, 389
+  size: 249, 269
+  orig: 512, 512
+  offset: 108, 150
+  index: -1
+a0058
+  rotate: true
+  xy: 566, 933
+  size: 257, 261
+  orig: 512, 512
+  offset: 108, 150
+  index: -1
+a0063
+  rotate: false
+  xy: 550, 647
+  size: 259, 270
+  orig: 512, 512
+  offset: 118, 151
+  index: -1

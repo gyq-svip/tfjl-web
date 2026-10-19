@@ -7,6 +7,909 @@
       "idle"
     ],
     "pngs": 1,
-    "updated": "2026-10-20"
+    "updated": "2026-10-19"
+  },
+  "aersasi": {
+    "hero": "冰骑",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "yilidan": {
+    "hero": "恶魔",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "huonv": {
+    "hero": "火法",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "jiansheng": {
+    "hero": "剑客",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "huanci": {
+    "hero": "刺客",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "xiaolu": {
+    "hero": "小鹿",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "jianna": {
+    "hero": "冰法",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "najia": {
+    "hero": "蛇女",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "fengxingzhe": {
+    "hero": "绿弓",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "heianyouxia": {
+    "hero": "冰弓",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "guangfa": {
+    "hero": "暗法",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "zhousi": {
+    "hero": "雷神",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "jumo": {
+    "hero": "战将",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "siwen": {
+    "hero": "刀客",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "chaoxi": {
+    "hero": "海妖",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "dashu": {
+    "hero": "大树",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "juntuanshibing": {
+    "hero": "铁骑",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "feiji": {
+    "hero": "飞机",
+    "anims": [
+      "attack",
+      "dead",
+      "idle",
+      "walk"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "xiubujiang": {
+    "hero": "炸弹",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "mituan": {
+    "hero": "谜云",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "shenling": {
+    "hero": "神龛",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "gugong": {
+    "hero": "骨弓",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "xianzhi": {
+    "hero": "祭司",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "fuwang": {
+    "hero": "斧客",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "fashi": {
+    "hero": "死神",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "dianhun": {
+    "hero": "电法",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "huoqiang": {
+    "hero": "火枪",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "xiaoxiao": {
+    "hero": "石头",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "zhizhu": {
+    "hero": "蜘蛛",
+    "anims": [
+      "attack",
+      "idle",
+      "walk"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "silinglong": {
+    "hero": "骨龙",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "shengqi": {
+    "hero": "圣骑",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "wuyi": {
+    "hero": "巫医",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "tongkunvwang": {
+    "hero": "女王",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "jingling": {
+    "hero": "魔精灵",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "sunwukong": {
+    "hero": "悟空",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "yougui": {
+    "hero": "幽鬼",
+    "anims": [
+      "attack",
+      "dead",
+      "idle",
+      "walk"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "fatiao": {
+    "hero": "工匠",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "jingling1": {
+    "hero": "幻精灵",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "xiongmao": {
+    "hero": "萌萌",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "tufu": {
+    "hero": "恶匪",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "huniu": {
+    "hero": "虎弓",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "jietoubawang": {
+    "hero": "霸王",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "dijing": {
+    "hero": "地精",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "duye": {
+    "hero": "毒王",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "daize": {
+    "hero": "萨满",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "panglong": {
+    "hero": "神龙",
+    "anims": [
+      "attack",
+      "dead",
+      "idle",
+      "idle2",
+      "walk"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "ken": {
+    "hero": "狂龙",
+    "anims": [
+      "attack",
+      "attack2",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "niutouguai": {
+    "hero": "酋长",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "houyi": {
+    "hero": "后羿",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "songshu": {
+    "hero": "松鼠",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "kulouwang": {
+    "hero": "亡将",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "yanmo": {
+    "hero": "炎魔",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "xiaochou": {
+    "hero": "小丑",
+    "anims": [
+      "attack",
+      "attack1",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "gugu": {
+    "hero": "咕咕",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "jianongpao": {
+    "hero": "邪能火炮",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "mori": {
+    "hero": "领主",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "shawang": {
+    "hero": "沙皇",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "shangjin": {
+    "hero": "孤星",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "caijingling": {
+    "hero": "彩精灵",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "renyu": {
+    "hero": "鲛女",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "haidao": {
+    "hero": "船长",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "tujingling": {
+    "hero": "土精灵",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "guixianren": {
+    "hero": "龟相",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "longwang": {
+    "hero": "龙王",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "kuangjiang": {
+    "hero": "狂将",
+    "anims": [
+      "attack",
+      "attack2",
+      "attack3",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "aishen": {
+    "hero": "爱神",
+    "anims": [
+      "attack",
+      "attack1",
+      "attack2",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "ying": {
+    "hero": "影",
+    "anims": [
+      "attack",
+      "attack2",
+      "attack3",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "qiuwang": {
+    "hero": "阿翼",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "gangquan": {
+    "hero": "龙拳",
+    "anims": [
+      "attack",
+      "attack2",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "gangbei": {
+    "hero": "钢鬃",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "nvyao": {
+    "hero": "女妖",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "maomi": {
+    "hero": "猫咪",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "yemo": {
+    "hero": "魇",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "shan": {
+    "hero": "闪",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "kui": {
+    "hero": "葵",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "baoxiangui": {
+    "hero": "地精宝库",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "zhurushexian": {
+    "hero": "侏儒射线",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "jingling7": {
+    "hero": "魂精灵",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "daocaoren": {
+    "hero": "傀",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "hongkai": {
+    "hero": "火神",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "xie": {
+    "hero": "邪",
+    "anims": [
+      "attack",
+      "attack2",
+      "idle",
+      "idle1",
+      "idle2",
+      "idle3",
+      "idle4",
+      "idle5"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "dasheng": {
+    "hero": "大圣",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "dazui": {
+    "hero": "咬人娃娃",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "yuhuofenghuang": {
+    "hero": "凤凰",
+    "anims": [
+      "attack",
+      "idle",
+      "idle1",
+      "idle2",
+      "idle3",
+      "idle4"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "xiaoyuren": {
+    "hero": "鱼人",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "bingjingling": {
+    "hero": "冰精灵",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "tuling": {
+    "hero": "土灵",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "shuimao": {
+    "hero": "水灵",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "huoling": {
+    "hero": "火灵",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "zhongkui": {
+    "hero": "钟馗",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "kuangtu": {
+    "hero": "小炮",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "tianshi": {
+    "hero": "天使",
+    "anims": [
+      "attack",
+      "attack2",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "qianting": {
+    "hero": "微型潜艇",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "fengling": {
+    "hero": "风灵",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "bingniao": {
+    "hero": "冰鸟",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "shuiren": {
+    "hero": "水人",
+    "anims": [
+      "attack",
+      "deadk",
+      "idle",
+      "walk"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
+  },
+  "xuemo": {
+    "hero": "血魔",
+    "anims": [
+      "attack",
+      "idle"
+    ],
+    "pngs": 1,
+    "updated": "2026-10-19"
   }
 }

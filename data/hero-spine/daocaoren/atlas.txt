@@ -1,0 +1,153 @@
+
+daocaoren.png
+size: 951,951
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+a0000
+  rotate: false
+  xy: 727, 380
+  size: 197, 230
+  orig: 410, 410
+  offset: 84, 91
+  index: -1
+a0004
+  rotate: true
+  xy: 2, 311
+  size: 196, 229
+  orig: 410, 410
+  offset: 84, 91
+  index: -1
+a0008
+  rotate: false
+  xy: 361, 311
+  size: 196, 227
+  orig: 410, 410
+  offset: 82, 91
+  index: -1
+a0012
+  rotate: true
+  xy: 399, 31
+  size: 196, 226
+  orig: 410, 410
+  offset: 81, 91
+  index: -1
+a0016
+  rotate: true
+  xy: 2, 509
+  size: 196, 230
+  orig: 410, 410
+  offset: 81, 91
+  index: -1
+a0020
+  rotate: true
+  xy: 678, 181
+  size: 197, 226
+  orig: 410, 410
+  offset: 81, 91
+  index: -1
+a0024
+  rotate: false
+  xy: 2, 81
+  size: 197, 228
+  orig: 410, 410
+  offset: 82, 90
+  index: -1
+a0028
+  rotate: false
+  xy: 201, 81
+  size: 196, 228
+  orig: 410, 410
+  offset: 84, 91
+  index: -1
+a0037
+  rotate: false
+  xy: 627, 65
+  size: 94, 114
+  orig: 205, 205
+  offset: 49, 57
+  index: -1
+a0040
+  rotate: false
+  xy: 234, 595
+  size: 127, 110
+  orig: 205, 205
+  offset: 51, 71
+  index: -1
+a0044
+  rotate: false
+  xy: 559, 436
+  size: 123, 102
+  orig: 205, 205
+  offset: 50, 70
+  index: -1
+a0046
+  rotate: false
+  xy: 559, 336
+  size: 117, 98
+  orig: 205, 205
+  offset: 52, 63
+  index: -1
+a0048
+  rotate: false
+  xy: 723, 66
+  size: 112, 113
+  orig: 205, 205
+  offset: 49, 44
+  index: -1
+a0050
+  rotate: false
+  xy: 233, 361
+  size: 123, 117
+  orig: 205, 205
+  offset: 42, 44
+  index: -1
+a0053
+  rotate: false
+  xy: 234, 480
+  size: 125, 113
+  orig: 205, 205
+  offset: 36, 45
+  index: -1
+a0058
+  rotate: true
+  xy: 837, 72
+  size: 107, 112
+  orig: 205, 205
+  offset: 46, 45
+  index: -1
+a0063
+  rotate: true
+  xy: 559, 229
+  size: 105, 115
+  orig: 205, 205
+  offset: 41, 45
+  index: -1
+fx/fx1
+  rotate: false
+  xy: 2, 707
+  size: 368, 242
+  orig: 448, 420
+  offset: 21, 104
+  index: -1
+fx/fx2
+  rotate: false
+  xy: 372, 743
+  size: 365, 206
+  orig: 448, 420
+  offset: 25, 96
+  index: -1
+fx/fx3
+  rotate: false
+  xy: 372, 540
+  size: 353, 201
+  orig: 448, 420
+  offset: 39, 104
+  index: -1
+fx/fx4
+  rotate: true
+  xy: 739, 612
+  size: 337, 204
+  orig: 448, 420
+  offset: 56, 107
+  index: -1

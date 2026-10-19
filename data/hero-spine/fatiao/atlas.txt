@@ -1,0 +1,111 @@
+
+fatiao.png
+size: 666,666
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+fatiao/a0000
+  rotate: true
+  xy: 365, 383
+  size: 186, 219
+  orig: 512, 512
+  offset: 150, 117
+  index: -1
+fatiao/a0004
+  rotate: true
+  xy: 2, 200
+  size: 186, 220
+  orig: 512, 512
+  offset: 151, 117
+  index: -1
+fatiao/a0008
+  rotate: true
+  xy: 441, 193
+  size: 188, 221
+  orig: 512, 512
+  offset: 151, 117
+  index: -1
+fatiao/a0012
+  rotate: true
+  xy: 2, 9
+  size: 189, 219
+  orig: 512, 512
+  offset: 151, 117
+  index: -1
+fatiao/a0016
+  rotate: true
+  xy: 440, 2
+  size: 189, 217
+  orig: 512, 512
+  offset: 150, 117
+  index: -1
+fatiao/a0020
+  rotate: true
+  xy: 223, 4
+  size: 189, 215
+  orig: 512, 512
+  offset: 149, 117
+  index: -1
+fatiao/a0024
+  rotate: true
+  xy: 224, 195
+  size: 186, 215
+  orig: 512, 512
+  offset: 149, 117
+  index: -1
+fatiao/a0028
+  rotate: true
+  xy: 146, 388
+  size: 184, 217
+  orig: 512, 512
+  offset: 150, 117
+  index: -1
+fatiao/a0037
+  rotate: true
+  xy: 409, 571
+  size: 93, 105
+  orig: 256, 256
+  offset: 81, 58
+  index: -1
+fatiao/a0041
+  rotate: true
+  xy: 2, 480
+  size: 94, 142
+  orig: 256, 256
+  offset: 87, 58
+  index: -1
+fatiao/a0045
+  rotate: true
+  xy: 107, 576
+  size: 88, 90
+  orig: 256, 256
+  offset: 93, 58
+  index: -1
+fatiao/a0049
+  rotate: true
+  xy: 199, 575
+  size: 89, 104
+  orig: 256, 256
+  offset: 93, 58
+  index: -1
+fatiao/a0053
+  rotate: true
+  xy: 516, 571
+  size: 93, 96
+  orig: 256, 256
+  offset: 93, 57
+  index: -1
+fatiao/a0057
+  rotate: true
+  xy: 305, 574
+  size: 90, 102
+  orig: 256, 256
+  offset: 94, 54
+  index: -1
+fatiao/a0061
+  rotate: true
+  xy: 2, 578
+  size: 86, 103
+  orig: 256, 256
+  offset: 92, 58
+  index: -1

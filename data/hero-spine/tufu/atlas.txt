@@ -1,0 +1,160 @@
+
+tufu.png
+size: 985,985
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+tufu/a0000
+  rotate: false
+  xy: 512, 576
+  size: 246, 201
+  orig: 512, 512
+  offset: 180, 118
+  index: -1
+tufu/a0004
+  rotate: false
+  xy: 728, 781
+  size: 248, 202
+  orig: 512, 512
+  offset: 180, 118
+  index: -1
+tufu/a0008
+  rotate: true
+  xy: 2, 175
+  size: 252, 205
+  orig: 512, 512
+  offset: 180, 118
+  index: -1
+tufu/a0012
+  rotate: true
+  xy: 2, 429
+  size: 253, 206
+  orig: 512, 512
+  offset: 180, 118
+  index: -1
+tufu/a0016
+  rotate: false
+  xy: 221, 778
+  size: 253, 205
+  orig: 512, 512
+  offset: 179, 118
+  index: -1
+tufu/a0020
+  rotate: false
+  xy: 476, 779
+  size: 250, 204
+  orig: 512, 512
+  offset: 179, 118
+  index: -1
+tufu/a0024
+  rotate: true
+  xy: 760, 532
+  size: 247, 202
+  orig: 512, 512
+  offset: 179, 118
+  index: -1
+tufu/a0028
+  rotate: false
+  xy: 730, 328
+  size: 246, 202
+  orig: 512, 512
+  offset: 180, 118
+  index: -1
+tufu/a0037
+  rotate: false
+  xy: 210, 254
+  size: 246, 182
+  orig: 512, 512
+  offset: 178, 118
+  index: -1
+tufu/a0041
+  rotate: true
+  xy: 250, 28
+  size: 224, 180
+  orig: 512, 512
+  offset: 166, 117
+  index: -1
+tufu/a0045
+  rotate: true
+  xy: 479, 378
+  size: 196, 249
+  orig: 512, 512
+  offset: 142, 117
+  index: -1
+tufu/a0049
+  rotate: false
+  xy: 2, 684
+  size: 217, 299
+  orig: 512, 512
+  offset: 121, 117
+  index: -1
+tufu/a0053
+  rotate: false
+  xy: 221, 616
+  size: 289, 160
+  orig: 512, 512
+  offset: 192, 113
+  index: -1
+tufu/a0057
+  rotate: false
+  xy: 458, 229
+  size: 200, 147
+  orig: 512, 512
+  offset: 191, 114
+  index: -1
+tufu/a0061
+  rotate: false
+  xy: 432, 69
+  size: 190, 158
+  orig: 512, 512
+  offset: 188, 116
+  index: -1
+tufu/dadaoguang/dadaoguang_00012
+  rotate: false
+  xy: 210, 438
+  size: 267, 176
+  orig: 289, 197
+  offset: 9, 12
+  index: -1
+tufu/dadaoguang/dadaoguang_00013
+  rotate: false
+  xy: 2, 11
+  size: 246, 162
+  orig: 289, 197
+  offset: 35, 13
+  index: -1
+tufu/dadaoguang/dadaoguang_00014
+  rotate: false
+  xy: 660, 160
+  size: 181, 166
+  orig: 289, 197
+  offset: 95, 9
+  index: -1
+tufu/dadaoguang/dadaoguang_00015
+  rotate: false
+  xy: 624, 2
+  size: 141, 156
+  orig: 289, 197
+  offset: 124, 10
+  index: -1
+tufu/dadaoguang/dadaoguang_00016
+  rotate: true
+  xy: 843, 187
+  size: 139, 136
+  orig: 289, 197
+  offset: 124, 11
+  index: -1
+tufu/dadaoguang/dadaoguang_00017
+  rotate: true
+  xy: 767, 79
+  size: 79, 45
+  orig: 289, 197
+  offset: 121, 17
+  index: -1
+tufu/dadaoguang/dadaoguang_00018
+  rotate: false
+  xy: 458, 420
+  size: 19, 16
+  orig: 289, 197
+  offset: 120, 30
+  index: -1

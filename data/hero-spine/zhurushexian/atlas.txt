@@ -1,0 +1,132 @@
+
+zhurushexian.png
+size: 615,615
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+fx/fx_00
+  rotate: false
+  xy: 459, 292
+  size: 154, 153
+  orig: 918, 345
+  offset: 278, 95
+  index: -1
+fx/fx_01
+  rotate: true
+  xy: 459, 129
+  size: 161, 150
+  orig: 918, 345
+  offset: 299, 98
+  index: -1
+fx/fx_02
+  rotate: true
+  xy: 174, 118
+  size: 159, 145
+  orig: 918, 345
+  offset: 324, 102
+  index: -1
+fx/fx_03
+  rotate: true
+  xy: 321, 121
+  size: 156, 136
+  orig: 918, 345
+  offset: 346, 108
+  index: -1
+fx/fx_04
+  rotate: false
+  xy: 459, 3
+  size: 150, 124
+  orig: 918, 345
+  offset: 364, 115
+  index: -1
+fx/fx_05
+  rotate: false
+  xy: 2, 4
+  size: 142, 112
+  orig: 918, 345
+  offset: 375, 122
+  index: -1
+idle/a_00
+  rotate: true
+  xy: 2, 118
+  size: 169, 170
+  orig: 196, 176
+  offset: 4, 0
+  index: -1
+idle/a_01
+  rotate: false
+  xy: 178, 279
+  size: 171, 168
+  orig: 196, 176
+  offset: 4, 0
+  index: -1
+idle/a_02
+  rotate: false
+  xy: 356, 447
+  size: 172, 166
+  orig: 196, 176
+  offset: 4, 0
+  index: -1
+idle/a_03
+  rotate: false
+  xy: 180, 449
+  size: 174, 164
+  orig: 196, 176
+  offset: 4, 0
+  index: -1
+idle/a_04
+  rotate: false
+  xy: 2, 289
+  size: 174, 162
+  orig: 196, 176
+  offset: 4, 0
+  index: -1
+idle/a_05
+  rotate: false
+  xy: 2, 453
+  size: 176, 160
+  orig: 196, 176
+  offset: 4, 0
+  index: -1
+ld01
+  rotate: true
+  xy: 299, 4
+  size: 15, 41
+  orig: 15, 41
+  offset: 0, 0
+  index: -1
+ld02
+  rotate: false
+  xy: 299, 21
+  size: 36, 95
+  orig: 36, 95
+  offset: 0, 0
+  index: -1
+ld03
+  rotate: true
+  xy: 530, 583
+  size: 30, 56
+  orig: 30, 56
+  offset: 0, 0
+  index: -1
+ld04
+  rotate: true
+  xy: 146, 7
+  size: 109, 68
+  orig: 109, 68
+  offset: 0, 0
+  index: -1
+ld05
+  rotate: false
+  xy: 216, 7
+  size: 43, 109
+  orig: 43, 109
+  offset: 0, 0
+  index: -1
+ld06
+  rotate: false
+  xy: 261, 9
+  size: 36, 107
+  orig: 36, 107
+  offset: 0, 0
+  index: -1

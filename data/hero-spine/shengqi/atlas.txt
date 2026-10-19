@@ -1,0 +1,167 @@
+
+shengqishi.png
+size: 512,512
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/FX/guang
+  rotate: false
+  xy: 46, 470
+  size: 40, 40
+  orig: 44, 44
+  offset: 2, 2
+  index: -1
+images/FX/honglianbafengpao_40
+  rotate: true
+  xy: 2, 425
+  size: 43, 66
+  orig: 51, 81
+  offset: 4, 6
+  index: -1
+images/FX/honglianbafengpao_41
+  rotate: true
+  xy: 70, 424
+  size: 43, 65
+  orig: 51, 81
+  offset: 3, 6
+  index: -1
+images/FX/honglianbafengpao_42
+  rotate: true
+  xy: 137, 423
+  size: 44, 65
+  orig: 51, 81
+  offset: 3, 6
+  index: -1
+images/FX/honglianbafengpao_43
+  rotate: true
+  xy: 216, 468
+  size: 42, 64
+  orig: 51, 81
+  offset: 4, 7
+  index: -1
+images/FX/honglianbafengpao_44
+  rotate: true
+  xy: 88, 469
+  size: 41, 63
+  orig: 51, 81
+  offset: 4, 8
+  index: -1
+images/FX/honglianbafengpao_45
+  rotate: true
+  xy: 153, 469
+  size: 41, 61
+  orig: 51, 81
+  offset: 4, 10
+  index: -1
+images/FX/honglianbafengpao_46
+  rotate: true
+  xy: 2, 472
+  size: 38, 42
+  orig: 51, 81
+  offset: 6, 13
+  index: -1
+images/idle/a0000
+  rotate: true
+  xy: 170, 282
+  size: 124, 168
+  orig: 358, 358
+  offset: 103, 83
+  index: -1
+images/idle/a0004
+  rotate: false
+  xy: 2, 174
+  size: 126, 168
+  orig: 358, 358
+  offset: 102, 83
+  index: -1
+images/idle/a0008
+  rotate: true
+  xy: 130, 154
+  size: 126, 168
+  orig: 358, 358
+  offset: 102, 83
+  index: -1
+images/idle/a0012
+  rotate: true
+  xy: 342, 15
+  size: 127, 168
+  orig: 358, 358
+  offset: 102, 83
+  index: -1
+images/idle/a0016
+  rotate: true
+  xy: 300, 144
+  size: 126, 168
+  orig: 358, 358
+  offset: 103, 83
+  index: -1
+images/idle/a0020
+  rotate: true
+  xy: 2, 26
+  size: 126, 168
+  orig: 358, 358
+  offset: 103, 83
+  index: -1
+images/idle/a0024
+  rotate: true
+  xy: 172, 16
+  size: 126, 168
+  orig: 358, 358
+  offset: 102, 83
+  index: -1
+images/idle/a0028
+  rotate: true
+  xy: 340, 272
+  size: 125, 168
+  orig: 358, 358
+  offset: 103, 83
+  index: -1
+images/idle/a0038
+  rotate: true
+  xy: 2, 348
+  size: 74, 83
+  orig: 179, 179
+  offset: 44, 41
+  index: -1
+images/idle/a0042
+  rotate: true
+  xy: 87, 344
+  size: 77, 81
+  orig: 179, 179
+  offset: 44, 41
+  index: -1
+images/idle/a0046
+  rotate: true
+  xy: 404, 399
+  size: 67, 83
+  orig: 179, 179
+  offset: 45, 41
+  index: -1
+images/idle/a0049
+  rotate: true
+  xy: 204, 418
+  size: 48, 104
+  orig: 179, 179
+  offset: 58, 40
+  index: -1
+images/idle/a0051
+  rotate: true
+  xy: 282, 468
+  size: 42, 108
+  orig: 179, 179
+  offset: 63, 39
+  index: -1
+images/idle/a0054
+  rotate: true
+  xy: 392, 468
+  size: 42, 106
+  orig: 179, 179
+  offset: 63, 40
+  index: -1
+images/idle/a0060
+  rotate: true
+  xy: 310, 408
+  size: 58, 92
+  orig: 179, 179
+  offset: 50, 41
+  index: -1

@@ -1,0 +1,139 @@
+
+wushi.png
+size: 577,577
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/CC/CC_000
+  rotate: true
+  xy: 390, 517
+  size: 58, 185
+  orig: 77, 307
+  offset: 7, 2
+  index: -1
+images/CC/CC_001
+  rotate: false
+  xy: 2, 73
+  size: 75, 250
+  orig: 77, 307
+  offset: 2, 14
+  index: -1
+images/CC/CC_002
+  rotate: false
+  xy: 2, 325
+  size: 77, 250
+  orig: 77, 307
+  offset: 0, 31
+  index: -1
+images/CC/CC_003
+  rotate: true
+  xy: 220, 85
+  size: 77, 226
+  orig: 77, 307
+  offset: 0, 55
+  index: -1
+images/a0000
+  rotate: true
+  xy: 223, 299
+  size: 135, 165
+  orig: 307, 307
+  offset: 64, 84
+  index: -1
+images/a0004
+  rotate: true
+  xy: 390, 244
+  size: 137, 165
+  orig: 307, 307
+  offset: 62, 84
+  index: -1
+images/a0008
+  rotate: false
+  xy: 79, 78
+  size: 139, 164
+  orig: 307, 307
+  offset: 60, 84
+  index: -1
+images/a0012
+  rotate: false
+  xy: 81, 411
+  size: 140, 164
+  orig: 307, 307
+  offset: 59, 84
+  index: -1
+images/a0016
+  rotate: true
+  xy: 223, 436
+  size: 139, 165
+  orig: 307, 307
+  offset: 60, 84
+  index: -1
+images/a0020
+  rotate: false
+  xy: 86, 244
+  size: 135, 165
+  orig: 307, 307
+  offset: 63, 84
+  index: -1
+images/a0024
+  rotate: true
+  xy: 223, 164
+  size: 133, 165
+  orig: 307, 307
+  offset: 65, 84
+  index: -1
+images/a0028
+  rotate: true
+  xy: 390, 383
+  size: 132, 171
+  orig: 307, 307
+  offset: 66, 79
+  index: -1
+images/a0039
+  rotate: true
+  xy: 2, 2
+  size: 69, 82
+  orig: 154, 154
+  offset: 31, 42
+  index: -1
+images/a0043
+  rotate: false
+  xy: 469, 138
+  size: 92, 104
+  orig: 154, 154
+  offset: 9, 38
+  index: -1
+images/a0047
+  rotate: false
+  xy: 448, 52
+  size: 97, 84
+  orig: 154, 154
+  offset: 19, 38
+  index: -1
+images/a0049
+  rotate: false
+  xy: 170, 2
+  size: 77, 74
+  orig: 154, 154
+  offset: 42, 41
+  index: -1
+images/a0053
+  rotate: false
+  xy: 390, 174
+  size: 77, 68
+  orig: 154, 154
+  offset: 38, 42
+  index: -1
+images/a0057
+  rotate: false
+  xy: 86, 2
+  size: 82, 74
+  orig: 154, 154
+  offset: 36, 41
+  index: -1
+images/a0062
+  rotate: true
+  xy: 249, 20
+  size: 63, 82
+  orig: 154, 154
+  offset: 40, 42
+  index: -1

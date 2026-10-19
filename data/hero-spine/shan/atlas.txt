@@ -1,0 +1,300 @@
+
+shan.png
+size: 731,731
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/a0000
+  rotate: true
+  xy: 380, 566
+  size: 163, 201
+  orig: 358, 358
+  offset: 84, 83
+  index: -1
+images/a0004
+  rotate: true
+  xy: 375, 391
+  size: 166, 199
+  orig: 358, 358
+  offset: 85, 83
+  index: -1
+images/a0008
+  rotate: false
+  xy: 2, 149
+  size: 168, 198
+  orig: 358, 358
+  offset: 86, 83
+  index: -1
+images/a0012
+  rotate: true
+  xy: 207, 181
+  size: 169, 200
+  orig: 358, 358
+  offset: 87, 83
+  index: -1
+images/a0016
+  rotate: true
+  xy: 2, 349
+  size: 171, 203
+  orig: 358, 358
+  offset: 87, 83
+  index: -1
+images/a0020
+  rotate: true
+  xy: 172, 559
+  size: 170, 206
+  orig: 358, 358
+  offset: 86, 83
+  index: -1
+images/a0024
+  rotate: false
+  xy: 2, 522
+  size: 168, 207
+  orig: 358, 358
+  offset: 86, 83
+  index: -1
+images/a0028
+  rotate: false
+  xy: 207, 352
+  size: 166, 205
+  orig: 358, 358
+  offset: 85, 83
+  index: -1
+images/a0039
+  rotate: true
+  xy: 395, 14
+  size: 94, 111
+  orig: 179, 179
+  offset: 34, 34
+  index: -1
+images/a0043
+  rotate: false
+  xy: 528, 116
+  size: 114, 111
+  orig: 179, 179
+  offset: 18, 31
+  index: -1
+images/a0047
+  rotate: false
+  xy: 158, 3
+  size: 104, 104
+  orig: 179, 179
+  offset: 22, 41
+  index: -1
+images/a0051
+  rotate: false
+  xy: 264, 2
+  size: 83, 105
+  orig: 179, 179
+  offset: 57, 41
+  index: -1
+images/a0055
+  rotate: true
+  xy: 508, 15
+  size: 93, 104
+  orig: 179, 179
+  offset: 45, 41
+  index: -1
+images/a0059
+  rotate: false
+  xy: 576, 458
+  size: 85, 106
+  orig: 179, 179
+  offset: 41, 41
+  index: -1
+images/a0063
+  rotate: false
+  xy: 663, 503
+  size: 59, 104
+  orig: 179, 179
+  offset: 65, 41
+  index: -1
+images/fx/Electricity 002 Shot Ray Up_00001
+  rotate: true
+  xy: 422, 353
+  size: 36, 116
+  orig: 140, 140
+  offset: 55, 4
+  index: -1
+images/fx/Electricity 002 Shot Ray Up_00003
+  rotate: false
+  xy: 583, 607
+  size: 54, 122
+  orig: 140, 140
+  offset: 49, 15
+  index: -1
+images/fx/Electricity 002 Shot Ray Up_00005
+  rotate: false
+  xy: 639, 609
+  size: 66, 120
+  orig: 140, 140
+  offset: 43, 16
+  index: -1
+images/fx/Electricity 002 Shot Ray Up_00007
+  rotate: false
+  xy: 643, 265
+  size: 70, 116
+  orig: 140, 140
+  offset: 42, 22
+  index: -1
+images/fx/Electricity 002 Shot Ray Up_00009
+  rotate: true
+  xy: 576, 383
+  size: 73, 110
+  orig: 140, 140
+  offset: 43, 27
+  index: -1
+images/fx/Electricity 002 Shot Ray Up_00011
+  rotate: false
+  xy: 644, 177
+  size: 68, 86
+  orig: 140, 140
+  offset: 48, 32
+  index: -1
+images/fx/Electricity 006 Impact Ray Up_00001
+  rotate: false
+  xy: 375, 352
+  size: 45, 37
+  orig: 98, 98
+  offset: 40, 5
+  index: -1
+images/fx/Electricity 006 Impact Ray Up_00002
+  rotate: true
+  xy: 354, 88
+  size: 45, 39
+  orig: 98, 98
+  offset: 42, 6
+  index: -1
+images/fx/Electricity 006 Impact Ray Up_00004
+  rotate: false
+  xy: 172, 318
+  size: 22, 29
+  orig: 98, 98
+  offset: 68, 21
+  index: -1
+images/fx/Electricity 006 Impact Ray Up_00006
+  rotate: false
+  xy: 172, 288
+  size: 20, 28
+  orig: 98, 98
+  offset: 71, 25
+  index: -1
+images/fx/Electricity 006 Impact Ray Up_00007
+  rotate: false
+  xy: 186, 529
+  size: 18, 28
+  orig: 98, 98
+  offset: 73, 25
+  index: -1
+images/fx/Electricity 019 Ray Impact Up_00008
+  rotate: false
+  xy: 2, 65
+  size: 154, 82
+  orig: 210, 210
+  offset: 45, 8
+  index: -1
+images/fx/Electricity 019 Ray Impact Up_00011
+  rotate: false
+  xy: 184, 109
+  size: 168, 70
+  orig: 210, 210
+  offset: 35, 16
+  index: -1
+images/fx/Electricity 019 Ray Impact Up_00012
+  rotate: false
+  xy: 2, 4
+  size: 154, 59
+  orig: 210, 210
+  offset: 41, 25
+  index: -1
+images/fx/a0000
+  rotate: true
+  xy: 184, 220
+  size: 31, 10
+  orig: 358, 358
+  offset: 169, 216
+  index: -1
+images/fx/a0004
+  rotate: true
+  xy: 184, 187
+  size: 31, 10
+  orig: 358, 358
+  offset: 170, 217
+  index: -1
+images/fx/a0008
+  rotate: true
+  xy: 185, 253
+  size: 33, 9
+  orig: 358, 358
+  offset: 170, 218
+  index: -1
+images/fx/a0012
+  rotate: true
+  xy: 172, 218
+  size: 33, 10
+  orig: 358, 358
+  offset: 171, 216
+  index: -1
+images/fx/a0016
+  rotate: true
+  xy: 172, 253
+  size: 33, 11
+  orig: 358, 358
+  offset: 172, 214
+  index: -1
+images/fx/a0020
+  rotate: true
+  xy: 172, 183
+  size: 33, 10
+  orig: 358, 358
+  offset: 172, 213
+  index: -1
+images/fx/a0024
+  rotate: true
+  xy: 172, 524
+  size: 33, 12
+  orig: 358, 358
+  offset: 172, 212
+  index: -1
+images/fx/a0028
+  rotate: true
+  xy: 172, 149
+  size: 32, 10
+  orig: 358, 358
+  offset: 171, 214
+  index: -1
+images/fx/b7_001
+  rotate: true
+  xy: 614, 6
+  size: 108, 112
+  orig: 154, 154
+  offset: 16, 28
+  index: -1
+images/fx/b7_002
+  rotate: true
+  xy: 409, 110
+  size: 116, 117
+  orig: 154, 154
+  offset: 10, 26
+  index: -1
+images/fx/b7_003
+  rotate: false
+  xy: 409, 228
+  size: 117, 122
+  orig: 154, 154
+  offset: 8, 25
+  index: -1
+images/fx/b7_004
+  rotate: false
+  xy: 528, 229
+  size: 113, 122
+  orig: 154, 154
+  offset: 7, 25
+  index: -1
+images/fx/light
+  rotate: false
+  xy: 354, 135
+  size: 44, 44
+  orig: 50, 50
+  offset: 3, 3
+  index: -1
