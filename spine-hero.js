@@ -11,6 +11,7 @@
 ;(function () {
   let spinePromise = null
   const assetCache = {} // folder -> { skData, atlas }（骨架/图集跨卡片共享，避免重复 fetch+解析）
+  const vbCache = {}    // folder@model -> { off, size }（按真实不透明像素测得的紧包围盒）
   let playTokenSeq = 0  // 同一 canvas 连续 play 时，仅最后一次生效（按画布各自计时）
 
   function baseUrl() {
@@ -68,6 +69,49 @@
       }
     }
     return { off: new spine.Vector2(minX, minY), size: new spine.Vector2(maxX - minX, maxY - minY) }
+  }
+
+  // 按真实不透明像素测量紧凑包围盒（骨架 getBounds 会含大量空白附属/离屏附件，
+  // 直接用会导致角色偏小且偏离中心）。把整块网格渲染到小画布，扫 alpha 求紧边界再换算回世界坐标。
+  function measureVisualBounds(spine, skeleton, vb) {
+    try {
+      const sw = vb.size.x, sh = vb.size.y
+      if (!(sw > 0 && sh > 0)) return null
+      const N = 320
+      const s = Math.min((N - 6) / sw, (N - 6) / sh)
+      const oc = document.createElement('canvas')
+      oc.width = N; oc.height = N
+      const c2 = oc.getContext('2d', { willReadFrequently: true })
+      const cx = vb.off.x + sw / 2, cy = vb.off.y + sh / 2
+      c2.save()
+      c2.translate(N / 2, N / 2)
+      c2.scale(s, -s)
+      c2.translate(-cx, -cy)
+      const r2 = new spine.canvas.SkeletonRenderer(c2)
+      r2.triangleRendering = true
+      r2.draw(skeleton)
+      c2.restore()
+      const data = c2.getImageData(0, 0, N, N).data
+      let minX = 1e9, minY = 1e9, maxX = -1, maxY = -1
+      for (let y = 0; y < N; y++) {
+        const row = y * N
+        for (let x = 0; x < N; x++) {
+          if (data[(row + x) * 4 + 3] > 24) {
+            if (x < minX) minX = x
+            if (x > maxX) maxX = x
+            if (y < minY) minY = y
+            if (y > maxY) maxY = y
+          }
+        }
+      }
+      if (maxX < 0) return null
+      const toWx = function (px) { return (px - N / 2) / s + cx }
+      const toWy = function (py) { return -(py - N / 2) / s + cy }
+      const wx1 = toWx(minX), wx2 = toWx(maxX + 1)
+      const wy1 = toWy(maxY + 1), wy2 = toWy(minY) // canvas y 向下，世界 y 向上
+      if (!(wx2 > wx1) || !(wy2 > wy1)) return null
+      return { off: new spine.Vector2(wx1, wy1), size: new spine.Vector2(wx2 - wx1, wy2 - wy1) }
+    } catch (e) { return null }
   }
 
   // 加载并解析 folder 的骨架资源（带缓存；失败返回 null，由调用方展示状态）
@@ -136,6 +180,18 @@
       state.setAnimation(0, idle, true)
       state.update(0); state.apply(skeleton); skeleton.updateWorldTransform()
 
+      // 真实不透明像素的紧包围盒（缓存）：修正骨架 getBounds 空白过多导致的偏小/偏心
+      // 仅 opts.tight 时启用（详情大图用），避免改变战场小卡/图鉴既有观感
+      const vbKey = folder + '@' + (opts.model || '')
+      let vbVis = vb
+      if (opts.tight) {
+        vbVis = vbCache[vbKey]
+        if (!vbVis) {
+          vbVis = measureVisualBounds(spine, skeleton, vb) || vb
+          if (vbVis !== vb) vbCache[vbKey] = vbVis
+        }
+      }
+
       // 画布尺寸随容器 + dpr
       function fit() {
         const parent = canvas.parentElement
@@ -163,14 +219,22 @@
         const ctx = canvas.getContext('2d')
         const w = canvas.width, h = canvas.height
         ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, w, h)
-        const sw = vb.size.x, sh = vb.size.y
+        const sw = vbVis.size.x, sh = vbVis.size.y
         if (!(sw > 0 && sh > 0)) return
         const fitScale = Math.min(w / sw, h / sh) * (opts.fitPadding != null ? opts.fitPadding : 0.9)
-        const cx = vb.off.x + sw / 2, cy = vb.off.y + sh / 2
+        const cx = vbVis.off.x + sw / 2
         ctx.save()
-        ctx.translate(w / 2, h / 2)
-        ctx.scale(fitScale, -fitScale)
-        ctx.translate(-cx, -cy)
+        if (opts.anchorFeet != null) {
+          // 底边中点对齐锚点：横向居中、纵向落在石台面（角色详情用）
+          ctx.translate(w / 2, h * opts.anchorFeet)
+          ctx.scale(fitScale, -fitScale)
+          ctx.translate(-cx, -vbVis.off.y)
+        } else {
+          const cy = vbVis.off.y + sh / 2
+          ctx.translate(w / 2, h / 2)
+          ctx.scale(fitScale, -fitScale)
+          ctx.translate(-cx, -cy)
+        }
         renderer.draw(skeleton)
         ctx.restore()
       }
