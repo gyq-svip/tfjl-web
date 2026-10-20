@@ -1611,7 +1611,8 @@
       "baokupifu02": 1,
       "baoxiangui": 1
     },
-    "updated": "2026-10-19"
+    "updated": "2026-10-19",
+    "scale": 0.62
   },
   "zhurushexian": {
     "hero": "侏儒射线",
