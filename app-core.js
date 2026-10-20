@@ -11571,9 +11571,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             '<span>等级</span><b style="color:#ffd75e;min-width:2ch;text-align:center;" id="hdFuseSubLv">' + levels[lvIdx] + '</b>' +
                             '<input type="range" min="0" max="' + (levels.length - 1) + '" step="1" value="' + lvIdx + '" style="flex:1;accent-color:#e8a91c;" id="hdFuseSubSlider">' +
                             '</div>' +
-                            '<div id="hdFuseSubStats" style="margin-bottom:8px;padding:6px 7px;background:rgba(0,0,0,0.28);border-radius:8px;">' + subStatRows(levels[lvIdx]) + '</div>' +
-                            '<div style="margin-bottom:4px;">皮肤</div>' +
-                            '<div id="hdFuseSubSkins" style="display:flex;flex-wrap:wrap;gap:4px;max-height:150px;overflow-y:auto;"></div>'
+                            '<div id="hdFuseSubStats" style="margin-bottom:8px;padding:6px 7px;background:rgba(0,0,0,0.28);border-radius:8px;">' + subStatRows(levels[lvIdx]) + '</div>'
                         const slider = subBoxR.querySelector('#hdFuseSubSlider')
                         slider.oninput = () => {
                             const lvNow = levels[Number(slider.value)]
@@ -11634,22 +11632,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                                 varList.appendChild(item)
                             })
                         }
-                        const wrap = subBox.querySelector('#hdFuseSubSkins')
-                        skinList.forEach((sk) => {
-                            const b = document.createElement('button')
-                            b.textContent = sk
-                            b.dataset.skin = sk
-                            b.style.cssText = 'padding:3px 7px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid ' + (sk === curSkin ? '#ffd75e' : 'rgba(255,220,150,0.3)') + ';background:' + (sk === curSkin ? 'rgba(255,215,94,0.2)' : 'transparent') + ';color:#ffe9c9;'
-                            b.onclick = async () => {
-                                if (typeof setFusionSkin === 'function') { try { await setFusionSkin(sub, sk === '默认' ? '' : sk) } catch (e) {} }
-                                if (typeof invalidateFusionHalfCache === 'function') { try { await invalidateFusionHalfCache(sub) } catch (e) {} }
-                                paintCircles()      // 左圆：换成新皮肤的副卡立绘
-                                refreshStrip()      // 底部变体缩略图同步换皮
-                                paintSubSettings()  // 刷新选中态
-                                await reapplyPreviewCard()
-                            }
-                            wrap.appendChild(b)
-                        })
                     }
                     paintSubSettings()
 
@@ -11682,31 +11664,30 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     fuseSkinRow.style.cssText = 'position:absolute;left:224px;right:236px;bottom:10px;max-height:92px;overflow-y:auto;display:flex;flex-wrap:wrap;gap:4px;justify-content:center;align-items:flex-start;align-content:flex-start;z-index:5;'
                     sh.body.appendChild(fuseSkinRow)
                     function paintFuseSkinRow() {
-                        const fm = (window.heroesOfficialMap || {})[preview] || {}
-                        const notes = ((fm.skins) || []).map((s) => s.note).filter(Boolean)
+                        // 🔴 2026-10-21 中底部显示「被融合卡（副卡）」的皮肤列表，点击换副卡皮肤
+                        const sub = heroOf(preview) === preview ? '' : heroOf(preview)
                         fuseSkinRow.innerHTML = ''
-                        if (!notes.length) { fuseSkinRow.style.display = 'none'; return }
+                        if (!sub) { fuseSkinRow.style.display = 'none'; return }
+                        const skinsApp = (typeof getAvailableSkins === 'function') ? getAvailableSkins(sub) : []
+                        const sm2 = (window.heroesOfficialMap || {})[sub] || {}
+                        const list = (skinsApp && skinsApp.length) ? skinsApp : ['默认'].concat((sm2.skins || []).map((s) => s.note).filter(Boolean))
+                        if (!list.length) { fuseSkinRow.style.display = 'none'; return }
                         fuseSkinRow.style.display = 'flex'
                         const cap = document.createElement('span')
-                        cap.textContent = '融合皮肤'
-                        cap.style.cssText = 'font-size:10px;color:#c9b28a;font-weight:700;margin-right:2px;'
+                        cap.textContent = '皮肤'
+                        cap.style.cssText = 'font-size:10px;color:#c9b28a;font-weight:700;margin-right:2px;align-self:center;'
                         fuseSkinRow.appendChild(cap)
-                        let cur = '默认'
-                        try { cur = (typeof getCardSkin === 'function') ? (getCardSkin(cardId, preview, handType) || '默认') : '默认' } catch (e) {}
-                        ;['默认'].concat(notes).forEach((sk) => {
+                        const cur = (typeof getFusionComponentSkin === 'function') ? (getFusionComponentSkin(sub) || '默认') : '默认'
+                        list.forEach((sk) => {
                             const b = document.createElement('button')
                             b.textContent = sk
-                            b.style.cssText = 'padding:2px 8px;border-radius:10px;font-size:10px;cursor:pointer;border:1px solid ' + (sk === cur ? '#ffd75e' : 'rgba(255,220,150,0.3)') + ';background:' + (sk === cur ? 'rgba(255,215,94,0.2)' : 'transparent') + ';color:#ffe9c9;'
+                            b.style.cssText = 'padding:3px 8px;border-radius:8px;font-size:10.5px;cursor:pointer;border:1px solid ' + (sk === cur ? '#ffd75e' : 'rgba(255,220,150,0.3)') + ';background:' + (sk === cur ? 'rgba(255,215,94,0.2)' : 'transparent') + ';color:#ffe9c9;'
                             b.onclick = async () => {
-                                if (libSlot && typeof window._llSet === 'function') {
-                                    const lt = libSlot.getAttribute('data-tab'), ll = libSlot.getAttribute('data-lid'), lsd = libSlot.getAttribute('data-side') || 'my'
-                                    window._llSet(lt, ll, 'skin', (baseHero || preview) + '#' + lsd, sk)
-                                    if (typeof window._llReapplySlot === 'function') { try { await window._llReapplySlot(libSlot) } catch (e) {} }
-                                } else if (typeof setCardSkin === 'function') {
-                                    try { await setCardSkin(cardId, sk, handType) } catch (e) {}
-                                }
-                                try { updateAllCardLevelBadges() } catch (e) {}
-                                paintFuseSkinRow()
+                                if (typeof setFusionSkin === 'function') { try { await setFusionSkin(sub, sk === '默认' ? '' : sk) } catch (e) {} }
+                                if (typeof invalidateFusionHalfCache === 'function') { try { await invalidateFusionHalfCache(sub) } catch (e) {} }
+                                paintCircles()      // 左圆：换成新皮肤的副卡立绘
+                                paintFuseSkinRow()  // 刷新选中态
+                                await reapplyPreviewCard()
                             }
                             fuseSkinRow.appendChild(b)
                         })
