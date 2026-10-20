@@ -10759,10 +10759,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             // —— Spine 动画层（铺满整卡，石台居中偏右下）——
             const stage = document.createElement('div')
             stage.style.cssText = 'position:absolute;inset:0;pointer-events:none;'
-            // 🔴 2026-10-20 静态立绘占位：spine 资产加载完成前先显示主页同款立绘（英雄"秒出"），动画就绪后隐藏
-            const hdPhEl = document.createElement('img')
-            hdPhEl.style.cssText = 'position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);max-height:58%;max-width:46%;object-fit:contain;filter:drop-shadow(0 10px 18px rgba(0,0,0,0.5));display:none;'
-            stage.appendChild(hdPhEl)
             const cv = document.createElement('canvas')
             cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;'
             stage.appendChild(cv)
@@ -11324,7 +11320,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
 
             // ② 魔化（官方版式：左原形态 / 右魔化形态 + 被动预览 + 底部切换）
-            const mohuaBtn = actions.children[1]
+            const mohuaBtn = actions.children[2]
             if (mohuaBtn) {
                 mohuaBtn.onclick = () => {
                     if (card.querySelector('.hd-sub-mohua')) { card.querySelector('.hd-sub-mohua').remove(); return }
@@ -11377,7 +11373,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
 
             // ③ 融合（官方版式：左副卡 / 右主卡 + 底部变体切换 + 副卡等级/皮肤设置）
-            const fuseBtn = actions.children[2]
+            const fuseBtn = actions.children[3]
             if (fuseBtn) {
                 fuseBtn.onclick = () => {
                     if (card.querySelector('.hd-sub-fuse')) { card.querySelector('.hd-sub-fuse').remove(); return }
@@ -11417,6 +11413,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     row.appendChild(left)
                     row.appendChild(right)
                     sh.body.appendChild(row)
+                    // 🔴 2026-10-20 融合对象切换行（副卡可选项，如 小野→酋长/土灵；云端融合数据晚到时自动重建）
+                    const pRow = document.createElement('div')
+                    pRow.style.cssText = 'position:absolute;top:12px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px;z-index:5;'
+                    sh.body.appendChild(pRow)
                     // 副卡品质 → 卡牌类型（优先取卡池真实 data-type，回退按官方 heroColor 推断）
                     const subCardTypeOf = (name) => {
                         try {
@@ -11624,7 +11624,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     }
                     paintSubSettings()
 
-                    stripEl = hdThumbStrip(sh.body, baseHero, [baseHero].concat(variants), cardName, async (opt) => {
+                    async function applyPreviewOpt(opt) {
                         preview = opt
                         paintCircles()
                         paintSubSettings()
@@ -11646,7 +11646,28 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             if (typeof autoSaveProject === 'function') autoSaveProject()
                         }
                         try { updateAllCardLevelBadges() } catch (e) {}
-                    }, function (label) { var h = heroOf(label); return hdPortraitUrl(h, h) })
+                    }
+                    // 🔴 融合对象切换：每个可融合副卡一个按钮（酋长/土灵…），点击切预览并写回卡牌
+                    function paintPartnerRow() {
+                        let vs = []
+                        try { vs = (typeof getFusionVariantsForBase === 'function') ? getFusionVariantsForBase(baseHero) : [] } catch (e) {}
+                        if (!vs.length) { pRow.style.display = 'none'; return }
+                        pRow.style.display = ''
+                        pRow.innerHTML = '<span style="font-size:11px;color:#c9b28a;font-weight:700;">融合对象</span>'
+                        vs.forEach((fn) => {
+                            const parts = (typeof getFusionParts === 'function') ? getFusionParts(fn) : null
+                            const partner = (parts && parts.length >= 2) ? parts[1] : fn
+                            const b = document.createElement('button')
+                            b.textContent = partner
+                            b.style.cssText = 'padding:2px 10px;border-radius:12px;font-size:11px;cursor:pointer;border:1px solid ' + (preview === fn ? '#ffd75e' : 'rgba(255,220,150,0.35)') + ';background:' + (preview === fn ? 'rgba(255,215,94,0.25)' : 'transparent') + ';color:' + (preview === fn ? '#ffd75e' : '#e8d9bd') + ';'
+                            b.onclick = async () => { if (preview !== fn) { await applyPreviewOpt(fn); paintPartnerRow() } }
+                            pRow.appendChild(b)
+                        })
+                    }
+                    paintPartnerRow()
+                    // 云端融合定义(fusions.json)晚到时重建（页面启动先用 localStorage 旧缓存，新加融合会漏）
+                    window.__hdFuseRefreshPartnerRow = () => { try { if (pRow && pRow.isConnected) paintPartnerRow() } catch (e) {} }
+                    stripEl = hdThumbStrip(sh.body, baseHero, [baseHero].concat(variants), cardName, applyPreviewOpt, function (label) { var h = heroOf(label); return hdPortraitUrl(h, h) })
                     syncStripOffset()
                 }
             }
@@ -11725,16 +11746,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (!man) return
                     const model = hdSkinModel(curSkin) || (meta.spineModel || '')
                     const pngs = model ? ((man.modelPngs && man.modelPngs[model]) || 0) : (man.pngs || 0)
-                    // 🔴 占位：加载期间显示静态立绘，spine 就绪（play promise resolve）后隐藏
-                    if (hdPhEl) {
-                        hdPhEl.style.display = ''
-                        hdPortraitUrl(mainName, curSkin === '默认' ? mainName : curSkin)
-                            .then((u) => { if (u && hdPhEl) hdPhEl.src = u }).catch(() => {})
-                    }
-                    const p = window.spineHero.play(cv, meta.spine, { fitPadding: 0.58, pngs, model, anchorFeet: 0.71, tight: true, fitByHeight: true, scale: (man && man.scale) || 1 })
-                    Promise.resolve(p && p.then ? p : null)
-                        .then(() => { setTimeout(() => { if (hdPhEl) hdPhEl.style.display = 'none' }, 300) })
-                        .catch(() => { if (hdPhEl) hdPhEl.style.display = 'none' })
+                    window.spineHero.play(cv, meta.spine, { fitPadding: 0.58, pngs, model, anchorFeet: 0.71, tight: true, fitByHeight: true, scale: (man && man.scale) || 1 })
                 } catch (e) {}
             }
 
