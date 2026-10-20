@@ -11470,9 +11470,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     subFoot.innerHTML = '<div style="margin-bottom:4px;font-weight:900;color:#ffd75e;">被融合卡列表</div><div id="hdFuseVarList" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;"></div>'
                     subBox.appendChild(subFoot)
                     sh.body.appendChild(subBox)
-                    // 🔴 2026-10-20 右栏：等级+数值+皮肤（与左栏技能/被动/魔化分列，对齐主卡"左信息右数值"版式）
+                    // 🔴 2026-10-20 右栏：数值在上段滚动；等级控件（主卡同款：等级+进度条+下一档+滑条+快捷档）钉底
                     const subBoxR = document.createElement('div')
-                    subBoxR.style.cssText = 'position:absolute;right:12px;top:10px;bottom:10px;width:210px;overflow-y:auto;background:rgba(20,14,6,0.85);border:1px solid rgba(255,200,120,0.4);border-radius:10px;padding:10px;color:#ffe9c9;font-size:12px;display:none;'
+                    subBoxR.style.cssText = 'position:absolute;right:12px;top:10px;bottom:10px;width:210px;background:rgba(20,14,6,0.85);border:1px solid rgba(255,200,120,0.4);border-radius:10px;padding:10px;color:#ffe9c9;font-size:12px;display:none;flex-direction:column;'
+                    const subMainR = document.createElement('div')
+                    subMainR.style.cssText = 'flex:1;min-height:0;overflow-y:auto;'
+                    subBoxR.appendChild(subMainR)
+                    const subFootR = document.createElement('div')
+                    subFootR.style.cssText = 'flex-shrink:0;border-top:1px solid rgba(255,200,120,0.3);margin-top:8px;padding-top:6px;'
+                    subBoxR.appendChild(subFootR)
                     sh.body.appendChild(subBoxR)
                     // 把「当前预览的融合形态」写回卡牌（图库槽位 / 战场槽位 / 手牌）；皮肤或等级改动后同样要重刷
                     const reapplyPreviewCard = async () => {
@@ -11541,9 +11547,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             const skinRow = (subMeta.skins || []).find((s) => s.note === curSkin)
                             const skinHp = skinRow && Number(skinRow.heroSkinHp) > 0 ? Number(skinRow.heroSkinHp) : 0
                             const row = (ico, t, v) =>
-                                '<div style="display:flex;gap:5px;align-items:center;font-size:11px;line-height:1.6;">' +
-                                '<span style="width:12px;">' + ico + '</span><span style="flex:1;color:#b9cde6;">' + t + '</span>' +
-                                '<b style="color:#fff;">' + v + '</b></div>'
+                                '<div style="display:flex;align-items:center;gap:8px;background:rgba(20,60,110,0.55);border-radius:8px;padding:7px 9px;margin-bottom:6px;">' +
+                                '<span style="width:20px;text-align:center;font-size:13px;">' + ico + '</span>' +
+                                '<span style="flex:1;font-size:11px;color:#9fc7ff;">' + t + '</span>' +
+                                '<span style="font-size:12.5px;font-weight:900;color:#fff;">' + v + '</span></div>'
                             return row('⚔️', '攻击力', srow.attack != null ? srow.attack : '—') +
                                 row('🔧', '攻击类型', sdt) +
                                 row('⚡', '攻速', sp) +
@@ -11570,18 +11577,69 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             '<div id="hdFuseSubSkill" style="margin-bottom:8px;padding:6px 7px;background:rgba(0,0,0,0.28);border-radius:8px;">' + subSkillBlock(levels[lvIdx]) + '</div>' +
                             '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><span>魔化</span><label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:#e9b8ff;"><input type="checkbox" id="hdFuseSubMhChk" ' + (subMhOn ? 'checked' : '') + ' style="accent-color:#c77dff;"><span>开启魔化</span></label></div>' +
                             '<div id="hdFuseSubMh" style="padding:6px 7px;background:rgba(40,10,46,0.6);border-radius:8px;font-size:11px;line-height:1.5;color:#e9b8ff;' + (subMhOn ? '' : 'display:none;') + '"></div>'
-                        // 右栏：等级 + 数值 + 皮肤
-                        subBoxR.innerHTML =
-                            '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">' +
-                            '<span>等级</span><b style="color:#ffd75e;min-width:2ch;text-align:center;" id="hdFuseSubLv">' + levels[lvIdx] + '</b>' +
-                            '<input type="range" min="0" max="' + (levels.length - 1) + '" step="1" value="' + lvIdx + '" style="flex:1;accent-color:#e8a91c;" id="hdFuseSubSlider">' +
+                        // 右栏：数值在上段滚动区（主卡同款深蓝圆角行）；等级控件复用主卡样式，钉在底部
+                        subMainR.innerHTML = '<div id="hdFuseSubStats">' + subStatRows(levels[lvIdx]) + '</div>'
+                        // 🔴 2026-10-21 底部等级区（主卡同款：等级框 + 进度条 + 下一档 + 滑条 + tier 快捷档钮）
+                        const tiersLvR = ((subMeta.tiers) || []).map((t) => Number(t.level)).filter((n) => n > 1 && levels.indexOf(n) >= 0)
+                        const curLvR = levels[lvIdx]
+                        const nextR = tiersLvR.find((n) => n > Number(curLvR))
+                        const prevR = tiersLvR.filter((n) => n <= Number(curLvR)).pop() || 1
+                        const spanR = (nextR || Number(levels[levels.length - 1]) || 1) - prevR
+                        const pctR = spanR > 0 ? Math.max(0, Math.min(100, ((Number(curLvR) - prevR) / spanR) * 100)) : 100
+                        subFootR.innerHTML =
+                            '<div style="display:flex;align-items:center;gap:7px;padding:2px 0 5px;">' +
+                            '<span style="font-size:11px;color:#9fc7ff;font-weight:800;">等级</span>' +
+                            '<b id="hdFuseSubLv" style="font-size:15px;font-weight:900;color:#ffd75e;min-width:2ch;text-align:center;text-shadow:0 2px 0 #000;">' + curLvR + '</b>' +
+                            '<div style="flex:1;min-width:30px;height:9px;border-radius:5px;background:rgba(0,0,0,0.45);border:1px solid rgba(120,190,255,0.35);overflow:hidden;"><div id="hdFuseLvFill" style="height:100%;width:' + pctR.toFixed(1) + '%;background:linear-gradient(90deg,#ffd75e,#e8891c);"></div></div>' +
+                            '<span id="hdFuseLvNext" style="font-size:9.5px;color:#8fb4e8;font-weight:800;white-space:nowrap;">' + (nextR ? ('下一档 ' + nextR) : '已满级') + '</span>' +
+                            '<input type="range" min="0" max="' + (levels.length - 1) + '" step="1" value="' + lvIdx + '" style="flex:1;min-width:50px;accent-color:#e8a91c;cursor:pointer;" id="hdFuseSubSlider">' +
                             '</div>' +
-                            '<div id="hdFuseSubStats" style="margin-bottom:8px;padding:6px 7px;background:rgba(0,0,0,0.28);border-radius:8px;">' + subStatRows(levels[lvIdx]) + '</div>'
-                        const slider = subBoxR.querySelector('#hdFuseSubSlider')
+                            '<div id="hdFuseLvChips" style="display:flex;flex-wrap:wrap;gap:4px;"></div>'
+                        const chipsLvR = Array.from(new Set(tiersLvR.concat([Number(curLvR)]))).sort((a, b) => a - b)
+                        function paintSubLv(lvNow) {
+                            const lvEl = subFootR.querySelector('#hdFuseSubLv')
+                            if (lvEl) lvEl.textContent = String(lvNow)
+                            const n2 = tiersLvR.find((n) => n > Number(lvNow))
+                            const p2 = tiersLvR.filter((n) => n <= Number(lvNow)).pop() || 1
+                            const s2 = (n2 || Number(levels[levels.length - 1]) || 1) - p2
+                            const pct2 = s2 > 0 ? Math.max(0, Math.min(100, ((Number(lvNow) - p2) / s2) * 100)) : 100
+                            const fill = subFootR.querySelector('#hdFuseLvFill')
+                            if (fill) fill.style.width = pct2.toFixed(1) + '%'
+                            const nx = subFootR.querySelector('#hdFuseLvNext')
+                            if (nx) nx.textContent = n2 ? ('下一档 ' + n2) : '已满级'
+                            subFootR.querySelectorAll('#hdFuseLvChips button').forEach((b) => {
+                                const on = Number(b.dataset.lv) === Number(lvNow)
+                                b.style.border = '1px solid ' + (on ? '#ffd75e' : 'rgba(255,255,255,0.22)')
+                                b.style.background = on ? 'linear-gradient(180deg,#ffd75e,#e8a91c)' : 'rgba(20,60,110,0.55)'
+                                b.style.color = on ? '#3d2600' : '#cfe6ff'
+                            })
+                        }
+                        const chipsBoxR = subFootR.querySelector('#hdFuseLvChips')
+                        chipsLvR.forEach((lv) => {
+                            const b = document.createElement('button')
+                            b.textContent = String(lv)
+                            b.dataset.lv = String(lv)
+                            b.style.cssText = 'padding:2px 7px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:800;border:1px solid rgba(255,255,255,0.22);background:rgba(20,60,110,0.55);color:#cfe6ff;'
+                            b.onclick = async () => {
+                                const sl = subFootR.querySelector('#hdFuseSubSlider')
+                                if (sl) sl.value = String(levels.indexOf(lv))
+                                paintSubLv(lv)
+                                const statBox = subMainR.querySelector('#hdFuseSubStats')
+                                if (statBox) statBox.innerHTML = subStatRows(lv)
+                                const skillBox = subBox.querySelector('#hdFuseSubSkill')
+                                if (skillBox) skillBox.innerHTML = subSkillBlock(lv)
+                                if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(sub, lv)
+                                await reapplyPreviewCard()
+                            }
+                            chipsBoxR.appendChild(b)
+                        })
+                        paintSubLv(curLvR)
+                        const slider = subFootR.querySelector('#hdFuseSubSlider')
                         slider.oninput = () => {
                             const lvNow = levels[Number(slider.value)]
-                            subBoxR.querySelector('#hdFuseSubLv').textContent = lvNow
-                            const statBox = subBoxR.querySelector('#hdFuseSubStats')
+                            if (lvNow == null) return
+                            paintSubLv(lvNow)
+                            const statBox = subMainR.querySelector('#hdFuseSubStats')
                             if (statBox) statBox.innerHTML = subStatRows(lvNow)
                             const skillBox = subBox.querySelector('#hdFuseSubSkill')
                             if (skillBox) skillBox.innerHTML = subSkillBlock(lvNow)
@@ -11618,6 +11676,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         // 🔴 2026-10-20 被融合卡列表（左侧底部）：所有可融合卡缩略图，点击切换融合对象
                         const varList = subBox.querySelector('#hdFuseVarList')
                         if (varList) {
+                            varList.innerHTML = '' // 🔴 2026-10-21 先清空再填，修复每次切换重复追加
                             let vs = []
                             try { vs = (typeof getFusionVariantsForBase === 'function') ? getFusionVariantsForBase(baseHero) : [] } catch (e) {}
                             vs.forEach((fn) => {
