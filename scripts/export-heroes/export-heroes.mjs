@@ -587,7 +587,7 @@ function buildTiers(maps, hid, npcId, heroSkillName, heroSkillDesc, heroPassiveI
     skinsByHero.set(hid, arr)
   }
   // 跳过脏行（英雄表 CSV 末尾偶发空 id/name 行，会让前端多出无名英雄卡）
-  const heroes = (heroRows || [])
+  let heroes = (heroRows || [])
     .filter((h) => String(h.id || '').trim() && String(h.name || '').trim())
     .map((h) => {
     const npc = npcById.get(String(h.npc_id)) || {}
@@ -671,7 +671,17 @@ function buildTiers(maps, hid, npcId, heroSkillName, heroSkillDesc, heroPassiveI
       })
     }
   }
+  // 🔴 2026-10-21 同名去重：游戏每个英雄一条，官方表存在 id=31xx 的占位桩条目（0 皮肤/1 档位），
+  // 按名字合并 —— 保留 tiers 最多者（其次 skins 最多，再次 id 最小），避免图鉴出现重复卡。
+  const uniqByName = new Map()
+  for (const h of heroes) {
+    const prev = uniqByName.get(h.name)
+    if (!prev) { uniqByName.set(h.name, h); continue }
+    const score = (x) => (x.tiers ? x.tiers.length : 0) * 1000 + (x.skins ? x.skins.length : 0) * 10 - Number(x.id || 0) / 1e6
+    if (score(h) > score(prev)) uniqByName.set(h.name, h)
+  }
+  heroes = Array.from(uniqByName.values())
   fs.mkdirSync(path.dirname(OUT), { recursive: true })
   fs.writeFileSync(OUT, JSON.stringify(heroes, null, 2))
-  console.log(`✅ 写入 ${heroes.length} 个英雄 -> ${OUT}`)
+  console.log(`✅ 写入 ${heroes.length} 个英雄（同名去重后） -> ${OUT}`)
 })()
