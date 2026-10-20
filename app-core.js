@@ -11072,7 +11072,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 { key: '攻击', computed: false, unit: '%' },
                 { key: '法强', computed: false, unit: '%' }
             ]
-            actions.appendChild(roundBtn('hero-ui/icon-wash.png', '减伤', () => {
+            actions.appendChild(roundBtn('hero-ui/icon-wash2.png', '减伤', () => {
                 if (pop.dataset.mode === 'dr') { pop.style.display = 'none'; pop.dataset.mode = ''; return }
                 pop.dataset.mode = 'dr'
                 pop.style.display = 'block'
@@ -11113,7 +11113,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
             // 魔化
             if (hasMoHuaData(mainName)) {
-            actions.appendChild(roundBtn('hero-ui/icon-wake.png', '魔化', async () => {
+            actions.appendChild(roundBtn('hero-ui/icon-wake2.png', '魔化', async () => {
                 const on = !getCardMoHua(cardId, handType)
                 setCardMoHua(cardId, on, handType)
                 paintMoHuaAura()
@@ -11131,7 +11131,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const baseHero = (typeof getBaseHeroName === 'function') ? getBaseHeroName(mainName).heroName : mainName
             const variants = (typeof getFusionVariantsForBase === 'function') ? getFusionVariantsForBase(baseHero) : []
             if (variants && variants.length) {
-                actions.appendChild(roundBtn('hero-ui/icon-fuse.png', '融合', () => {
+                actions.appendChild(roundBtn('hero-ui/icon-fuse2.png', '融合', () => {
                     if (pop.dataset.mode === 'fuse') { pop.style.display = 'none'; pop.dataset.mode = ''; return }
                     pop.dataset.mode = 'fuse'
                     pop.style.display = 'block'
@@ -11458,6 +11458,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     const subBox = document.createElement('div')
                     subBox.style.cssText = 'position:absolute;left:12px;top:10px;bottom:10px;width:200px;overflow-y:auto;background:rgba(20,14,6,0.85);border:1px solid rgba(255,200,120,0.4);border-radius:10px;padding:10px;color:#ffe9c9;font-size:12px;display:none;'
                     sh.body.appendChild(subBox)
+                    // 🔴 2026-10-20 右栏：等级+数值+皮肤（与左栏技能/被动/魔化分列，对齐主卡"左信息右数值"版式）
+                    const subBoxR = document.createElement('div')
+                    subBoxR.style.cssText = 'position:absolute;right:12px;top:10px;bottom:10px;width:210px;overflow-y:auto;background:rgba(20,14,6,0.85);border:1px solid rgba(255,200,120,0.4);border-radius:10px;padding:10px;color:#ffe9c9;font-size:12px;display:none;'
+                    sh.body.appendChild(subBoxR)
                     // 把「当前预览的融合形态」写回卡牌（图库槽位 / 战场槽位 / 手牌）；皮肤或等级改动后同样要重刷
                     const reapplyPreviewCard = async () => {
                         const slotEl = badge && badge.closest ? badge.closest('.battle-slot') : null
@@ -11481,7 +11485,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     // 🔴 2026-10-20 副卡设置区占左侧整列时，缩略条右移避开；副卡隐藏（不融合）时回正
                     function syncStripOffset() {
                         if (!stripEl) return
-                        stripEl.style.left = (subBox && subBox.style.display !== 'none') ? '224px' : '0px'
+                        const shown = subBox && subBox.style.display !== 'none' && subBoxR && subBoxR.style.display !== 'none'
+                        stripEl.style.left = shown ? '224px' : '0px'
+                        stripEl.style.right = shown ? '236px' : '0px'
                     }
                     function refreshStrip() {
                         if (!stripEl) return
@@ -11498,8 +11504,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     }
                     function paintSubSettings() {
                         const sub = heroOf(preview) === preview ? '' : heroOf(preview)
-                        if (!sub) { subBox.style.display = 'none'; syncStripOffset(); return }
+                        if (!sub) { subBox.style.display = 'none'; subBoxR.style.display = 'none'; syncStripOffset(); return }
                         subBox.style.display = 'block'
+                        subBoxR.style.display = 'block'
                         syncStripOffset()
                         const lv = (typeof getFusionComponentLevel === 'function') ? getFusionComponentLevel(sub) : 1
                         // 等级档位按「被融合卡自身的品质」走，与卡牌设置一致（紫卡 1/4/8…，金卡 1/3/6/9…）
@@ -11511,8 +11518,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         const skinList = (skinsApp && skinsApp.length) ? skinsApp : ['默认'].concat((subMeta.skins || []).map((s) => s.note).filter(Boolean))
                         const curSkin = (typeof getFusionComponentSkin === 'function') ? (getFusionComponentSkin(sub) || '默认') : '默认'
                         const subMhOn = (typeof getFusionComponentMoHua === 'function') ? getFusionComponentMoHua(sub) : false
-                        // 副卡属性（跟随等级与皮肤实时变化）
-                        const subStatHtml = (lvNow) => {
+                        // 副卡属性（跟随等级/皮肤实时变化）—— 左栏：技能/被动/魔化；右栏：等级+数值
+                        const subStatRows = (lvNow) => {
                             const srow = (typeof hdRowAt === 'function' ? hdRowAt(subMeta.stats, lvNow) : null) || {}
                             const sdtRaw = (srow.damageType != null && srow.damageType !== '')
                                 ? srow.damageType
@@ -11525,41 +11532,49 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                                 '<div style="display:flex;gap:5px;align-items:center;font-size:11px;line-height:1.6;">' +
                                 '<span style="width:12px;">' + ico + '</span><span style="flex:1;color:#b9cde6;">' + t + '</span>' +
                                 '<b style="color:#fff;">' + v + '</b></div>'
-                            // 🔴 2026-10-20 副卡技能/被动：与主卡 paintAll 同数据路径（official tiers 按等级取档）
+                            return row('⚔️', '攻击力', srow.attack != null ? srow.attack : '—') +
+                                row('🔧', '攻击类型', sdt) +
+                                row('⚡', '攻速', sp) +
+                                row('❤️', '生命', srow.hp != null ? srow.hp : '—') +
+                                (skinHp ? row('✨', '皮肤生命', '+' + skinHp) : '')
+                        }
+                        // 🔴 2026-10-20 左栏技能/被动：与主卡 paintAll 同数据路径（official tiers 按等级取档）
+                        const subSkillBlock = (lvNow) => {
                             const st = (subMeta.tiers || []).filter((t) => Number(t.level) <= Number(lvNow)).pop() || (subMeta.tiers || [])[0] || {}
                             const subSkill = (st.skillDesc && String(st.skillDesc).trim()) || subMeta.skillDesc || ''
                             const subPInit = (st.passiveInitial && String(st.passiveInitial).trim()) || String(subMeta.passiveDesc || '').replace(/^(初始被动|满星被动)\s*/, '')
                             const subPFull = (st.passiveFull && String(st.passiveFull).trim()) || String(subMeta.passiveDesc2 || '').replace(/^(初始被动|满星被动)\s*/, '')
-                            let html = row('⚔️', '攻击力', srow.attack != null ? srow.attack : '—') +
-                                row('🔧', '攻击类型', sdt) +
-                                row('⚡', '攻速', sp) +
-                                row('❤️', '生命', srow.hp != null ? srow.hp : '—') +
-                                (skinHp ? row('✨', '皮肤生命', '+' + skinHp) : '') +
-                                (skinRow && skinRow.describe
-                                    ? '<div style="margin-top:4px;font-size:10px;line-height:1.45;color:#9fb6cf;">' + esc(skinRow.describe) + '</div>'
-                                    : '')
-                            if (subSkill) html += '<div style="margin-top:6px;padding-top:5px;border-top:1px solid rgba(255,220,150,0.3);font-size:10.5px;line-height:1.5;"><b style="color:#ffd75e;">技能：</b>' + esc(subSkill) + '</div>'
+                            const skinRow = (subMeta.skins || []).find((s) => s.note === curSkin)
+                            let html = ''
+                            if (subSkill) html += '<div style="margin-top:2px;font-size:10.5px;line-height:1.5;"><b style="color:#ffd75e;">技能：</b>' + esc(subSkill) + '</div>'
+                            if (skinRow && skinRow.describe) html += '<div style="margin-top:4px;font-size:10.5px;line-height:1.5;"><b style="color:#8ef58a;">额外被动：</b>' + esc(skinRow.describe) + '</div>'
                             if (subPInit) html += '<div style="margin-top:4px;font-size:10.5px;line-height:1.5;"><b style="color:#8ef58a;">初始被动：</b>' + esc(subPInit) + '</div>'
                             if (subPFull) html += '<div style="margin-top:3px;font-size:10.5px;line-height:1.5;"><b style="color:#ffd75e;">满星被动：</b>' + esc(subPFull) + '</div>'
                             return html
                         }
+                        // 左栏：副卡名 + 技能/被动/魔化（信息类）
                         subBox.innerHTML =
                             '<div style="font-weight:900;color:#ffd75e;margin-bottom:6px;">副卡：' + esc(sub) + '</div>' +
+                            '<div id="hdFuseSubSkill" style="margin-bottom:8px;padding:6px 7px;background:rgba(0,0,0,0.28);border-radius:8px;">' + subSkillBlock(levels[lvIdx]) + '</div>' +
+                            '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><span>魔化</span><label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:#e9b8ff;"><input type="checkbox" id="hdFuseSubMhChk" ' + (subMhOn ? 'checked' : '') + ' style="accent-color:#c77dff;"><span>开启魔化</span></label></div>' +
+                            '<div id="hdFuseSubMh" style="padding:6px 7px;background:rgba(40,10,46,0.6);border-radius:8px;font-size:11px;line-height:1.5;color:#e9b8ff;' + (subMhOn ? '' : 'display:none;') + '"></div>'
+                        // 右栏：等级 + 数值 + 皮肤
+                        subBoxR.innerHTML =
                             '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">' +
                             '<span>等级</span><b style="color:#ffd75e;min-width:2ch;text-align:center;" id="hdFuseSubLv">' + levels[lvIdx] + '</b>' +
                             '<input type="range" min="0" max="' + (levels.length - 1) + '" step="1" value="' + lvIdx + '" style="flex:1;accent-color:#e8a91c;" id="hdFuseSubSlider">' +
                             '</div>' +
-                            '<div id="hdFuseSubStats" style="margin-bottom:8px;padding:6px 7px;background:rgba(0,0,0,0.28);border-radius:8px;">' + subStatHtml(levels[lvIdx]) + '</div>' +
-                            '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><span>魔化</span><label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:#e9b8ff;"><input type="checkbox" id="hdFuseSubMhChk" ' + (subMhOn ? 'checked' : '') + ' style="accent-color:#c77dff;"><span>开启魔化</span></label></div>' +
-                            '<div id="hdFuseSubMh" style="margin-bottom:8px;padding:6px 7px;background:rgba(40,10,46,0.6);border-radius:8px;font-size:11px;line-height:1.5;color:#e9b8ff;' + (subMhOn ? '' : 'display:none;') + '"></div>' +
+                            '<div id="hdFuseSubStats" style="margin-bottom:8px;padding:6px 7px;background:rgba(0,0,0,0.28);border-radius:8px;">' + subStatRows(levels[lvIdx]) + '</div>' +
                             '<div style="margin-bottom:4px;">皮肤</div>' +
-                            '<div id="hdFuseSubSkins" style="display:flex;flex-wrap:wrap;gap:4px;max-height:96px;overflow-y:auto;"></div>'
-                        const slider = subBox.querySelector('#hdFuseSubSlider')
+                            '<div id="hdFuseSubSkins" style="display:flex;flex-wrap:wrap;gap:4px;max-height:150px;overflow-y:auto;"></div>'
+                        const slider = subBoxR.querySelector('#hdFuseSubSlider')
                         slider.oninput = () => {
                             const lvNow = levels[Number(slider.value)]
-                            subBox.querySelector('#hdFuseSubLv').textContent = lvNow
-                            const statBox = subBox.querySelector('#hdFuseSubStats')
-                            if (statBox) statBox.innerHTML = subStatHtml(lvNow)
+                            subBoxR.querySelector('#hdFuseSubLv').textContent = lvNow
+                            const statBox = subBoxR.querySelector('#hdFuseSubStats')
+                            if (statBox) statBox.innerHTML = subStatRows(lvNow)
+                            const skillBox = subBox.querySelector('#hdFuseSubSkill')
+                            if (skillBox) skillBox.innerHTML = subSkillBlock(lvNow)
                         }
                         slider.onchange = async () => {
                             const newLv = levels[Number(slider.value)]
