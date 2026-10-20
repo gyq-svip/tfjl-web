@@ -11465,10 +11465,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     const subMain = document.createElement('div')
                     subMain.style.cssText = 'flex:1;min-height:0;overflow-y:auto;'
                     subBox.appendChild(subMain)
-                    const subFoot = document.createElement('div')
-                    subFoot.style.cssText = 'flex-shrink:0;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,200,120,0.3);'
-                    subFoot.innerHTML = '<div style="margin-bottom:4px;font-weight:900;color:#ffd75e;">被融合卡列表</div><div id="hdFuseVarList" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;"></div>'
-                    subBox.appendChild(subFoot)
                     sh.body.appendChild(subBox)
                     // 🔴 2026-10-20 右栏：数值在上段滚动；等级控件（主卡同款：等级+进度条+下一档+滑条+快捷档）钉底
                     const subBoxR = document.createElement('div')
@@ -11594,7 +11590,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             '<span id="hdFuseLvNext" style="font-size:9.5px;color:#8fb4e8;font-weight:800;white-space:nowrap;">' + (nextR ? ('下一档 ' + nextR) : '已满级') + '</span>' +
                             '<input type="range" min="0" max="' + (levels.length - 1) + '" step="1" value="' + lvIdx + '" style="flex:1;min-width:50px;accent-color:#e8a91c;cursor:pointer;" id="hdFuseSubSlider">' +
                             '</div>' +
-                            '<div id="hdFuseLvChips" style="display:flex;flex-wrap:wrap;gap:4px;"></div>'
+                            '<div id="hdFuseLvChips" style="display:flex;flex-wrap:wrap;gap:4px;"></div>' +
+                            // 🔴 2026-10-21 被融合卡列表固定在右栏最底部（等级控件下方），位置稳定不随左栏文字浮动
+                            '<div style="margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,200,120,0.3);">' +
+                            '<div style="margin-bottom:4px;font-weight:900;color:#ffd75e;">被融合卡列表</div>' +
+                            '<div id="hdFuseVarList" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;"></div>' +
+                            '</div>'
                         const chipsLvR = Array.from(new Set(tiersLvR.concat([Number(curLvR)]))).sort((a, b) => a - b)
                         function paintSubLv(lvNow) {
                             const lvEl = subFootR.querySelector('#hdFuseSubLv')
@@ -11674,7 +11675,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             }
                         }
                         // 🔴 2026-10-20 被融合卡列表（左侧底部）：所有可融合卡缩略图，点击切换融合对象
-                        const varList = subBox.querySelector('#hdFuseVarList')
+                        const varList = subBoxR.querySelector('#hdFuseVarList')
                         if (varList) {
                             varList.innerHTML = '' // 🔴 2026-10-21 先清空再填，修复每次切换重复追加
                             let vs = []
