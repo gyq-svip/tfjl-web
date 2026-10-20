@@ -33885,7 +33885,12 @@ ${maSection}
             window._syncSelSideCtrls = function () {
                 const ssc = document.getElementById('selSideCtrls');
                 if (!ssc) return;
+                // 🔴 纠正旧缓存 index.html 里遗留的高 z-index（曾置顶，比菜单还高）：强制压回常规层级
+                if (ssc.style.zIndex !== '900') ssc.style.zIndex = '900';
                 let covered = false;
+                // 顶部「☰ 菜单」下拉展开时也隐藏，绝不挡菜单
+                const bm = document.getElementById('backupMenu');
+                if (bm && bm.style.display && bm.style.display !== 'none') covered = true;
                 for (let i = 0; i < OVERLAY_IDS.length; i++) {
                     const el = document.getElementById(OVERLAY_IDS[i]);
                     if (el && el.style.display && el.style.display !== 'none') { covered = true; break; }
@@ -33900,6 +33905,8 @@ ${maSection}
                 if (ssc.style.display !== want) ssc.style.display = want;
             };
             setInterval(window._syncSelSideCtrls, 400);
+            if (document.readyState !== 'loading') window._syncSelSideCtrls();
+            else document.addEventListener('DOMContentLoaded', window._syncSelSideCtrls);
         })();
 
         function logoutToLogin() {
