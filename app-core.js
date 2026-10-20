@@ -11584,8 +11584,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 try {
                     await ensureOfficialHeroes()
                     meta = (window.heroesOfficialMap || {})[mainName] || null
-                    // 🔴 卡名被 splitIntoHeroes 拆成碎片（如"邪能火炮"→"火炮"）时，按唯一子串匹配回官方英雄名，
-                    //    否则 meta 为空 → 属性全"—"、技能/被动永远停在"加载中"
+                    // 🔴 老马库名(火炮) → 官方显示名(邪能火炮) 的明确映射：工程类两套命名不一致，
+                    //    优先按表转换（避免模糊子串误匹配），否则 meta 空 → 属性全"—"、技能/被动永远"加载中"
+                    const LAMA_TO_OFFICIAL = { '火炮':'邪能火炮', '宝库':'地精宝库', '潜艇':'微型潜艇', '射线':'侏儒射线', '咬人娃娃':'咬人娃娃' }
+                    if (!meta && mainName && LAMA_TO_OFFICIAL[mainName]) {
+                        mainName = LAMA_TO_OFFICIAL[mainName]
+                        meta = (window.heroesOfficialMap || {})[mainName] || null
+                    }
+                    // 其余被 splitIntoHeroes 拆碎、不在上表中的名字，按唯一子串兜底匹配回官方英雄名
                     if (!meta && mainName) {
                         const _map = window.heroesOfficialMap || {}
                         const _hits = Object.keys(_map).filter((k) => k.indexOf(mainName) >= 0)
