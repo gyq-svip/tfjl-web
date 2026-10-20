@@ -22,6 +22,12 @@
     const p = location.pathname
     return p.endsWith('/') ? p : p.slice(0, p.lastIndexOf('/') + 1)
   }
+  // 🔴 2026-10-21 动画资源可单独指向「本地皮肤包解压目录」（桌面版离线秒开）；
+  //    vendor/ 运行时脚本仍走 baseUrl()（站点），只有骨骼/图集/贴图走 assetBase()。
+  function assetBase() {
+    if (window.__HERO_SPINE_ASSET_BASE) return window.__HERO_SPINE_ASSET_BASE
+    return baseUrl() + 'data/hero-spine/'
+  }
   function ensureSpine() {
     if (window.spine) return Promise.resolve()
     if (spinePromise) return spinePromise
@@ -138,7 +144,7 @@
   async function loadAssets(folder, pngCount, model) {
     const key = folder + '@' + (model || '')
     if (assetCache[key]) return assetCache[key]
-    const base = baseUrl() + 'data/hero-spine/' + folder + (model ? '/models/' + model : '') + '/'
+    const base = assetBase() + folder + (model ? '/models/' + model : '') + '/'
     // 🔴 2026-10-20 并行加载：骨架/图集/贴图同时拉（原为串行逐个等 RTT，首次打开每英雄多等数秒）
     //    贴图仍保持「从 p0 起连续」语义：跳过缺失页之后的不连续页，与原逐页试错的截断行为一致
     const maxPages = pngCount > 0 ? pngCount : 9
@@ -346,9 +352,9 @@
       try {
         const p = location.pathname
         const b = p.endsWith('/') ? p : (p.lastIndexOf('/') >= 0 ? p.slice(0, p.lastIndexOf('/') + 1) : '/')
-        window.__heroSpineIndex = await (await fetch(b + 'data/hero-spine/index.json')).json()
-      } catch (e) { return }
-    }
+        window.__heroSpineIndex = await (await fetch(assetBase() + 'index.json')).json()
+        } catch (e) { return }
+        }
     const idx = window.__heroSpineIndex || {}
     const jobs = []
     Object.keys(idx).forEach(function (f) {

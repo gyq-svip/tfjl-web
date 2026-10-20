@@ -15,6 +15,7 @@
 #>
 param(
     [switch]$SkipUpload,
+    [switch]$SkipSpine,
     [string]$GiteeToken = ""
 )
 
@@ -64,6 +65,22 @@ foreach ($j in @('registry.json', 'fusions.json', 'cards.json', 'skin-attributes
     if (Test-Path $p) { $files.Add($p) }
 }
 
+# ---------------- 1c. 附带英雄骨骼动画资源（data/hero-spine/**，客户端本地化后离线秒开） ----------------
+# 🔴 2026-10-21 与皮肤同包发布：桌面版「更新皮肤资源」解压后即本地可用，不再走 github.io 拉动画（国内慢）。
+#    包内相对路径保持 data/hero-spine/... 与仓库一致，客户端只需把 base 切到本地皮肤根目录即可。
+$spineDir   = Join-Path $RootDir "data\hero-spine"
+$spineFiles = @()
+$spineMB    = 0
+if (-not $SkipSpine) {
+    if (Test-Path $spineDir) {
+        $spineFiles = @(Get-ChildItem -Path $spineDir -Recurse -File | Where-Object { @('.json', '.txt', '.png') -contains $_.Extension.ToLower() })
+        $spineMB = [math]::Round((($spineFiles | Measure-Object -Property Length -Sum).Sum) / 1MB, 2)
+        Write-Step "附带动画资源：$($spineFiles.Count) 个文件 / $spineMB MB"
+    } else {
+        Write-Host "[SKIN-PUB] WARN: 未找到 $spineDir，本次不含动画资源" -ForegroundColor Yellow
+    }
+}
+
 # ---------------- 2. 生成 manifest 并打包 ----------------
 $stamp   = (Get-Date).ToUniversalTime().ToString("yyyyMMdd-HHmmss")
 $pkgName = "skins-$stamp.zip"
@@ -73,11 +90,13 @@ if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 $tmpDir = Join-Path $env:TEMP ("tfjl_skinpack_" + [guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null
 $manifest = [ordered]@{
-    version  = 1
-    packaged = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-    heroes   = $heroCount
-    skins    = $skinCount
-    format   = ".skin"
+    version   = 1
+    packaged  = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+    heroes    = $heroCount
+    skins     = $skinCount
+    format    = ".skin"
+    spine     = $spineFiles.Count
+    spineMB   = $spineMB
 } | ConvertTo-Json -Depth 5
 $mfPath = Join-Path $tmpDir "manifest.json"
 [System.IO.File]::WriteAllText($mfPath, $manifest, [System.Text.UTF8Encoding]::new($false))
@@ -96,7 +115,31 @@ try {
     Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 $zipSize = (Get-Item $zipPath).Length
-Write-Step "打包完成：$( [math]::Round($zipSize/1MB, 2) ) MB"
+Write-Step "皮肤包完成：$( [math]::Round($zipSize/1MB, 2) ) MB"
+
+# ---------------- 2b. 动画资源【单独打包】（不并入皮肤包，避免突破 Gitee 附件体积上限） ----------------
+#    包内路径保持 data/hero-spine/... —— 客户端解压到皮肤根目录后，
+#    <皮肤根>\data\hero-spine\... 与原站点路径一致，前端只需把资源 base 切到本地即可。
+$spinePkgName = $null; $spineZipPath = $null; $spineZipSize = 0
+if ($spineFiles.Count -gt 0) {
+    $spinePkgName = "spine-$stamp.zip"
+    $spineZipPath = Join-Path $RootDir $spinePkgName
+    if (Test-Path $spineZipPath) { Remove-Item $spineZipPath -Force }
+    Write-Step "打包动画资源 $($spineFiles.Count) 个文件 -> $spinePkgName ..."
+    $z2 = [System.IO.Compression.ZipFile]::Open($spineZipPath, 'Create')
+    try {
+        foreach ($f in $spineFiles) {
+            $rel = "data/hero-spine/" + $f.FullName.Substring($spineDir.Length).TrimStart('\', '/')
+            # PNG 已压缩、json/txt 很小：NoCompression 换打包速度
+            [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($z2, $f.FullName, $rel, 'NoCompression') | Out-Null
+        }
+    } finally { $z2.Dispose() }
+    $spineZipSize = (Get-Item $spineZipPath).Length
+    Write-Step "动画包完成：$( [math]::Round($spineZipSize/1MB, 2) ) MB"
+    if ($spineZipSize -gt 95MB) {
+        Write-Host "[SKIN-PUB] WARN: 动画包 $( [math]::Round($spineZipSize/1MB,2) ) MB 接近 Gitee 附件上限，若上传失败需分卷" -ForegroundColor Yellow
+    }
+}
 
 if ($SkipUpload) {
     Write-Host "[SKIN-PUB] SkipUpload 已指定，仅打包不上传。包路径: $zipPath" -ForegroundColor Yellow
@@ -138,40 +181,47 @@ if (-not $rel) {
 if (-not $rel) { Write-Host "[SKIN-PUB] ERROR: 无法创建/获取 Gitee release $Tag，已中止（索引未改动，用户仍用旧包）" -ForegroundColor Red; exit 1 }
 
 $rid = $rel.id
-if ($rel.assets -and ($rel.assets | Where-Object { $_.name -eq $pkgName })) {
-    Write-Step "$pkgName 已存在于 Gitee release，跳过上传"
-} else {
-    Write-Step "上传 $pkgName 到 Gitee release $Tag（约 $( [math]::Round($zipSize/1MB,2) ) MB，请稍候）..."
-    # curl.exe 进度条走 stderr，在 Stop 模式下会被当成错误中断脚本（publish_update.ps1 踩过的坑），故临时降级
-    $prevEAP = $ErrorActionPreference
-    $ErrorActionPreference = "Continue"
-    & curl.exe -X POST "https://gitee.com/api/v5/repos/$Owner/$Repo/releases/$rid/attach_files?access_token=$tok" -F ("file=@" + $zipPath) 2>$null
-    $curlExit = $LASTEXITCODE
-    $ErrorActionPreference = $prevEAP
-    if ($curlExit -ne 0) {
-        Write-Host "[SKIN-PUB] ❌ 上传失败 (curl exit=$curlExit)" -ForegroundColor Red
-        Write-Host "[SKIN-PUB]    影响范围：索引未改动，客户端仍用上一个好包，功能不受影响。" -ForegroundColor Red
-        Write-Host "[SKIN-PUB]    如何补救：检查网络后重新点一次「📦 一键打包发布到 Gitee」；若反复失败可检查 Gitee Token 是否有效。" -ForegroundColor Red
+# 上传 + 直链校验（皮肤包 / 动画包复用同一套：任一失败即中止，索引不动，用户仍用上一个好包）
+function Publish-Pack([string]$name, [string]$path, [int64]$size) {
+    if ($rel.assets -and ($rel.assets | Where-Object { $_.name -eq $name })) {
+        Write-Step "$name 已存在于 Gitee release，跳过上传"
+    } else {
+        Write-Step "上传 $name（约 $( [math]::Round($size/1MB,2) ) MB，请稍候）..."
+        # curl.exe 进度条走 stderr，在 Stop 模式下会被当成错误中断脚本（publish_update.ps1 踩过的坑），故临时降级
+        $prevEAP = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        # 🔴 curl 的响应体会进 stdout；函数里必须 Out-Null，否则会污染返回值（$dlUrl 变成数组）
+        & curl.exe -X POST "https://gitee.com/api/v5/repos/$Owner/$Repo/releases/$rid/attach_files?access_token=$tok" -F ("file=@" + $path) 2>$null | Out-Null
+        $curlExit = $LASTEXITCODE
+        $ErrorActionPreference = $prevEAP
+        if ($curlExit -ne 0) {
+            Write-Host "[SKIN-PUB] ❌ 上传失败 ($name, curl exit=$curlExit)" -ForegroundColor Red
+            Write-Host "[SKIN-PUB]    影响范围：索引未改动，客户端仍用上一个好包，功能不受影响。" -ForegroundColor Red
+            Write-Host "[SKIN-PUB]    如何补救：检查网络后重新点一次「📦 一键打包发布到 Gitee」；若反复失败可检查 Gitee Token 是否有效。" -ForegroundColor Red
+            exit 1
+        }
+        Write-Step "$name 上传完成"
+    }
+    $u = "https://gitee.com/$Owner/$Repo/releases/download/$Tag/$name"
+    Write-Step "校验直链 $name ..."
+    try {
+        $resp = Invoke-WebRequest -Uri $u -Method Head -TimeoutSec 60 -ErrorAction Stop
+        $remoteSize = [int64]$resp.Headers['Content-Length']
+        if ($remoteSize -ne $size) {
+            Write-Host "[SKIN-PUB] ERROR: 直链大小不一致（$name：远程 $remoteSize / 本地 $size），已中止（索引未改动）" -ForegroundColor Red
+            exit 1
+        }
+        Write-Step "$name 直链校验通过（$( [math]::Round($remoteSize/1MB,2) ) MB，与本地一致）"
+    } catch {
+        Write-Host "[SKIN-PUB] ERROR: 直链校验失败 ($name): $($_.Exception.Message)。索引未改动，用户仍用旧包。" -ForegroundColor Red
         exit 1
     }
-    Write-Step "上传完成"
+    return $u
 }
 
-# ---------------- 4. 校验下载直链（必须大小一致，防止拿到旧包/坏包） ----------------
-Write-Step "校验 Gitee 下载直链..."
-$dlUrl = "https://gitee.com/$Owner/$Repo/releases/download/$Tag/$pkgName"
-try {
-    $resp = Invoke-WebRequest -Uri $dlUrl -Method Head -TimeoutSec 60 -ErrorAction Stop
-    $remoteSize = [int64]$resp.Headers['Content-Length']
-    if ($remoteSize -ne $zipSize) {
-        Write-Host "[SKIN-PUB] ERROR: 直链大小不一致（远程 $remoteSize / 本地 $zipSize），已中止（索引未改动）" -ForegroundColor Red
-        exit 1
-    }
-    Write-Step "直链校验通过（$( [math]::Round($remoteSize/1MB,2) ) MB，与本地一致）"
-} catch {
-    Write-Host "[SKIN-PUB] ERROR: 直链校验失败: $($_.Exception.Message)。索引未改动，用户仍用旧包。" -ForegroundColor Red
-    exit 1
-}
+$dlUrl = Publish-Pack $pkgName $zipPath $zipSize
+$spineUrl = $null
+if ($spinePkgName) { $spineUrl = Publish-Pack $spinePkgName $spineZipPath $spineZipSize }
 
 # ---------------- 5. 全部成功后才更新索引并推送 ----------------
 Write-Step "更新 skins-index.json 并推送 GitHub Pages..."
@@ -183,6 +233,13 @@ $indexObj = [ordered]@{
     skins   = $skinCount
     size    = $zipSize
     url     = $dlUrl
+}
+# 动画资源包（与皮肤包同 release，独立文件；客户端解压到同一皮肤根目录）
+if ($spinePkgName) {
+    $indexObj.spinePackage = $spinePkgName
+    $indexObj.spineSize    = $spineZipSize
+    $indexObj.spineUrl     = $spineUrl
+    $indexObj.spineFiles   = $spineFiles.Count
 }
 [System.IO.File]::WriteAllText($indexPath, ($indexObj | ConvertTo-Json -Depth 5), [System.Text.UTF8Encoding]::new($false))
 
@@ -207,5 +264,11 @@ if ($gitExit -ne 0) {
 }
 
 Write-Host "[SKIN-PUB] ✅ 发布完成：$pkgName（$skinCount 个皮肤，$( [math]::Round($zipSize/1MB,2) ) MB）" -ForegroundColor Green
+if ($spinePkgName) {
+    Write-Host "[SKIN-PUB]    动画包：$spinePkgName（$($spineFiles.Count) 个文件，$( [math]::Round($spineZipSize/1MB,2) ) MB）" -ForegroundColor Green
+}
 Write-Host "[SKIN-PUB]    索引: https://gyq-svip.github.io/tfjl-web/skins-index.json" -ForegroundColor Green
 Write-Host "[SKIN-PUB]    包:   $dlUrl" -ForegroundColor Green
+# 本地压缩包只是中间产物，发布成功后清掉（避免仓库目录里堆几十上百 MB）
+Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
+if ($spineZipPath) { Remove-Item $spineZipPath -Force -ErrorAction SilentlyContinue }

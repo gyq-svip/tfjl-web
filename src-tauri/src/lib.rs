@@ -1516,7 +1516,9 @@ async fn download_skins(app: tauri::AppHandle, force: Option<bool>) -> Result<St
     let client = reqwest::Client::builder()
         .no_proxy()
         .connect_timeout(std::time::Duration::from_secs(20))
-        .timeout(std::time::Duration::from_secs(300))
+        // 🔴 2026-10-21 皮肤包外又多了动画资源包（约 84MB），总下载量可能上百 MB，
+        //    原 300s 在慢网下会把正常下载判成超时，放宽到 900s。
+        .timeout(std::time::Duration::from_secs(900))
         .build()
         .map_err(|e| format!("创建下载客户端失败: {}", e))?;
 
@@ -1534,16 +1536,25 @@ async fn download_skins(app: tauri::AppHandle, force: Option<bool>) -> Result<St
     let remote_updated = idx.get("updated").and_then(|v| v.as_str()).unwrap_or("").to_string();
     let remote_skins = idx.get("skins").and_then(|v| v.as_u64()).unwrap_or(0);
     let remote_size = idx.get("size").and_then(|v| v.as_u64()).unwrap_or(0);
+    // 🔴 2026-10-21 动画资源包（与皮肤包同 release 的另一个附件，索引可选字段）
+    let spine_pkg = idx.get("spinePackage").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let spine_size = idx.get("spineSize").and_then(|v| v.as_u64()).unwrap_or(0);
+    let spine_files = idx.get("spineFiles").and_then(|v| v.as_u64()).unwrap_or(0);
 
     // ===== 2. 已装同版本 + 本地确实有图 + 非强制 -> 才跳过下载（省流量、秒开）=====
     // 🔴 关键：本地皮肤被手动删空时，即使 installed 记录说"已装"也必须重下。
     //    否则会出现「记录已装但磁盘没图」→ 界面一片空白且永远不自动恢复。
+    // 🔴 2026-10-21 动画包同理：索引声明了动画包但本地没有 -> 必须重下（否则动画永远走在线）。
+    let spine_needed = !spine_pkg.is_empty();
+    let local_has_spine = std::path::Path::new(&format!("{}\\data\\hero-spine\\index.json", base)).exists();
+    let spine_ok = !spine_needed || local_has_spine;
     let installed_pkg = std::fs::read_to_string(&installed_path).unwrap_or_default();
     let local_has_skin = has_skin_files(base);
-    if force != Some(true) && local_has_skin && !installed_pkg.is_empty() {
+    if force != Some(true) && local_has_skin && spine_ok && !installed_pkg.is_empty() {
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(&installed_pkg) {
             let p = v.get("package").and_then(|x| x.as_str()).unwrap_or("");
-            if p == pkg && !pkg.is_empty() {
+            let sp = v.get("spinePackage").and_then(|x| x.as_str()).unwrap_or("");
+            if p == pkg && !pkg.is_empty() && sp == spine_pkg {
                 let _ = app.emit("skin-download-progress", serde_json::json!({"stage":"uptodate","package":pkg}));
                 return Ok(format!("皮肤已是最新（{}，{} 张），无需重新下载", pkg, remote_skins));
             }
@@ -1592,6 +1603,38 @@ async fn download_skins(app: tauri::AppHandle, force: Option<bool>) -> Result<St
         return Err("当前仅支持 Windows 解压皮肤包".into());
     }
 
+    // ===== 4b. 动画资源包（索引声明时才下）：解压到同一皮肤根目录 -> <base>\data\hero-spine\... =====
+    //    前端会把动画资源 base 切到本地该目录，之后离线也能秒开；下载/解压失败不影响皮肤。
+    let mut spine_note = String::new();
+    if !spine_pkg.is_empty() {
+        let _ = app.emit("skin-download-progress", serde_json::json!({"stage":"spine-start","package":spine_pkg}));
+        let spine_zip = format!("{}\\spine_download_tmp.zip", tmp_dir);
+        let spine_url = format!("https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/{}/{}", gitee_tag, spine_pkg);
+        let sdata = fetch_to_vec(&client, &spine_url, &app, 0, 0, "spine").await
+            .map_err(|e| format!("下载动画资源包失败: {}（皮肤已更新，不受影响）", e))?;
+        if spine_size > 0 && sdata.len() as u64 != spine_size {
+            return Err(format!("动画资源包大小不一致（下载 {} 字节，索引声明 {} 字节），已中止（皮肤已更新，动画回退在线加载）", sdata.len(), spine_size));
+        }
+        tokio::fs::write(&spine_zip, &sdata).await.map_err(|e| e.to_string())?;
+        let _ = app.emit("skin-download-progress", serde_json::json!({"stage":"spine-extract"}));
+        #[cfg(windows)] {
+            use std::os::windows::process::CommandExt;
+            let ps = format!("Expand-Archive -Path '{}' -DestinationPath '{}' -Force", spine_zip, base);
+            let out = std::process::Command::new("powershell")
+                .args(["-NoProfile", "-Command", &ps])
+                .creation_flags(0x08000000)
+                .output()
+                .map_err(|e| format!("解压动画包失败: {}", e))?;
+            if !out.status.success() {
+                let msg = String::from_utf8_lossy(&out.stderr);
+                return Err(format!("解压动画资源包失败: {}（皮肤已更新，动画将回退在线加载）", msg));
+            }
+        }
+        let _ = std::fs::remove_file(&spine_zip);
+        spine_note = format!("，动画资源 {} 个文件已本地化", spine_files);
+        let _ = app.emit("skin-download-progress", serde_json::json!({"stage":"spine-done","files":spine_files}));
+    }
+
     // ===== 5. 记录已装版本，下次启动直接跳过下载 =====
     let installed_at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -1599,6 +1642,7 @@ async fn download_skins(app: tauri::AppHandle, force: Option<bool>) -> Result<St
         .unwrap_or(0);
     let rec = serde_json::json!({
         "package": pkg,
+        "spinePackage": spine_pkg,
         "updated": remote_updated,
         "skins": remote_skins,
         "installedAt": installed_at,
@@ -1606,7 +1650,7 @@ async fn download_skins(app: tauri::AppHandle, force: Option<bool>) -> Result<St
     let _ = std::fs::write(&installed_path, rec.to_string());
     let _ = std::fs::remove_file(&zip_path);
     let _ = app.emit("skin-download-progress", serde_json::json!({"stage":"done","package":pkg,"skins":remote_skins}));
-    Ok(format!("皮肤包 {} 已解压到 {}（{} 张皮肤）", pkg, base, remote_skins))
+    Ok(format!("皮肤包 {} 已解压到 {}（{} 张皮肤）{}", pkg, base, remote_skins, spine_note))
 }
 
 // ==================== 游戏窗口监控（波数播报 / 自动截图识别底座） ====================
