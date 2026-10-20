@@ -237,12 +237,16 @@
         }
         if (opts.scale != null && opts.scale > 0) fitScale *= opts.scale
         else if (window.__heroSpineIndex && folder && window.__heroSpineIndex[folder] && window.__heroSpineIndex[folder].scale > 0) fitScale *= window.__heroSpineIndex[folder].scale
-        // 🔴 2026-10-21 横向以「骨架包围盒中心」为准（模型作者坐标系）：
-        //    紧包围盒含武器/披风/特效等单侧内容，按它居中会把人物本体挤偏（死神等）；
-        //    纵向/高度仍用紧包围盒（保证各英雄大小一致）。offsetX 为逐英雄微调（画布宽比例）。
-        const cx = (opts.tight && opts.centerByVisualX !== true)
-            ? (vb.off.x + vb.size.x / 2)
-            : (vbVis.off.x + sw / 2)
+        // 🔴 2026-10-21 横向居中：目标为「骨架包围盒中心」（人物本体，武器/披风不会把人挤偏），
+        //    但缩放松弛按可见内容宽度算、偏移受可见余量限制 —— 否则带 fx/特效骨的模型（萌萌 bingdundun2
+        //    含 fx/bingjing* 冰晶骨）骨架盒被撑得极大，人物会被缩成一点点并挤到角落。offsetX 为逐英雄微调。
+        const visCx = vbVis.off.x + sw / 2
+        let cx = visCx
+        if (opts.tight && opts.centerByVisualX !== true) {
+            const targetCx = vb.off.x + vb.size.x / 2
+            const slack = Math.max(0, (w / fitScale - sw) / 2)
+            cx = visCx + Math.max(-slack, Math.min(slack, targetCx - visCx))
+        }
         ctx.save()
         if (opts.offsetX) ctx.translate(w * Number(opts.offsetX), 0)
         if (opts.anchorFeet != null) {
