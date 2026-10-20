@@ -11456,7 +11456,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
                     // —— 副卡设置区（等级 / 皮肤 / 魔化）：被融合卡的设置 ——
                     const subBox = document.createElement('div')
-                    subBox.style.cssText = 'position:absolute;right:12px;top:10px;width:200px;max-height:calc(100% - 118px);overflow-y:auto;background:rgba(20,14,6,0.85);border:1px solid rgba(255,200,120,0.4);border-radius:10px;padding:10px;color:#ffe9c9;font-size:12px;display:none;'
+                    subBox.style.cssText = 'position:absolute;left:12px;top:10px;bottom:10px;width:200px;overflow-y:auto;background:rgba(20,14,6,0.85);border:1px solid rgba(255,200,120,0.4);border-radius:10px;padding:10px;color:#ffe9c9;font-size:12px;display:none;'
                     sh.body.appendChild(subBox)
                     // 把「当前预览的融合形态」写回卡牌（图库槽位 / 战场槽位 / 手牌）；皮肤或等级改动后同样要重刷
                     const reapplyPreviewCard = async () => {
@@ -11478,6 +11478,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     }
                     // 底部变体缩略图重刷（副卡换皮后立绘同步）
                     let stripEl = null
+                    // 🔴 2026-10-20 副卡设置区占左侧整列时，缩略条右移避开；副卡隐藏（不融合）时回正
+                    function syncStripOffset() {
+                        if (!stripEl) return
+                        stripEl.style.left = (subBox && subBox.style.display !== 'none') ? '224px' : '0px'
+                    }
                     function refreshStrip() {
                         if (!stripEl) return
                         stripEl.querySelectorAll('button[data-skin]').forEach((b) => {
@@ -11493,8 +11498,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     }
                     function paintSubSettings() {
                         const sub = heroOf(preview) === preview ? '' : heroOf(preview)
-                        if (!sub) { subBox.style.display = 'none'; return }
+                        if (!sub) { subBox.style.display = 'none'; syncStripOffset(); return }
                         subBox.style.display = 'block'
+                        syncStripOffset()
                         const lv = (typeof getFusionComponentLevel === 'function') ? getFusionComponentLevel(sub) : 1
                         // 等级档位按「被融合卡自身的品质」走，与卡牌设置一致（紫卡 1/4/8…，金卡 1/3/6/9…）
                         const levels = (typeof getAvailableLevels === 'function') ? getAvailableLevels(subCardTypeOf(sub)) : [1]
@@ -11603,7 +11609,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     }
                     paintSubSettings()
 
-                    hdThumbStrip(sh.body, baseHero, [baseHero].concat(variants), cardName, async (opt) => {
+                    stripEl = hdThumbStrip(sh.body, baseHero, [baseHero].concat(variants), cardName, async (opt) => {
                         preview = opt
                         paintCircles()
                         paintSubSettings()
@@ -11626,6 +11632,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         }
                         try { updateAllCardLevelBadges() } catch (e) {}
                     }, function (label) { var h = heroOf(label); return hdPortraitUrl(h, h) })
+                    syncStripOffset()
                 }
             }
 
