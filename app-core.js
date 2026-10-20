@@ -10175,12 +10175,50 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         function getFusionComponentLevel(heroName) {
             return (window.fusionLevels && window.fusionLevels[heroName] !== undefined) ? Number(window.fusionLevels[heroName]) : 1;
         }
+        // 🔴 2026-10-21 副卡等级/魔化变更后：失效融合徽章缓存 + 重渲染相关卡槽与手牌
+        //    此前只写 localStorage，主页不重绘，导致「融合里设好了，回去却没变」。
+        async function refreshFusionComponentViews(heroName) {
+            if (!heroName) return;
+            const isTarget = (nm) => {
+                const p = (typeof getFusionParts === 'function') ? getFusionParts(nm) : null;
+                return !!(p && p.length >= 2 && p[1] === heroName);
+            };
+            try { await invalidateFusionHalfCache(heroName); } catch (e) {}
+            // 战场卡槽（副卡等级角标 / 魔化图标在渲染时读取）
+            try {
+                [[myPlacedCards, 'my'], [teammatePlacedCards, 'teammate']].forEach((pair) => {
+                    (pair[0] || []).forEach((c) => {
+                        if (!c || !isTarget(c.name)) return;
+                        const slot = document.querySelector('.battle-slot[data-slot="' + c.slot + '"]');
+                        if (slot && typeof applySkinBgToSlot === 'function') {
+                            Promise.resolve(applySkinBgToSlot(slot, c.name, c.id, pair[1])).catch(() => {});
+                        }
+                    });
+                });
+            } catch (e) {}
+            // 手牌（卡池列表）
+            try {
+                [[myHandCards, 'my'], [teammateHandCards, 'teammate']].forEach((pair) => {
+                    (pair[0] || []).forEach((c) => {
+                        if (!c || !isTarget(c.name)) return;
+                        const card = document.querySelector('.collapsible-section .card-item[data-id="' + c.id + '"]');
+                        if (card && typeof reapplySingleHandCard === 'function') {
+                            Promise.resolve(reapplySingleHandCard(card, c.id, pair[1])).catch(() => {});
+                        }
+                    });
+                });
+            } catch (e) {}
+            try { if (typeof updateAllCardLevelBadges === 'function') updateAllCardLevelBadges(); } catch (e) {}
+        }
+        try { window.refreshFusionComponentViews = refreshFusionComponentViews; } catch (e) {}
         function setFusionComponentLevel(heroName, level) {
             if (!heroName) return;
             if (typeof window.fusionLevels === 'undefined') window.fusionLevels = {};
             window.fusionLevels[heroName] = Number(level) || 1;
             try { localStorage.setItem('tdjl_fusion_levels', JSON.stringify(window.fusionLevels)); } catch (e) {}
             if (typeof autoSaveProject === 'function') autoSaveProject();
+            // 🔴 2026-10-21 写存储后立刻重渲染主页（此前只落盘，卡槽/手牌角标不刷新）
+            try { refreshFusionComponentViews(heroName) } catch (e) {}
         }
         // 被融合卡（副卡）魔化：仅当主卡已魔化时才允许开启；全局存储
         function getFusionComponentMoHua(heroName) {
@@ -10193,6 +10231,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             else delete window.fusionMoHua[heroName];
             try { localStorage.setItem('tdjl_fusion_mohua', JSON.stringify(window.fusionMoHua)); } catch (e) {}
             if (typeof autoSaveProject === 'function') autoSaveProject();
+            // 🔴 2026-10-21 写存储后立刻重渲染主页（此前只落盘，魔化图标/角标不刷新）
+            try { refreshFusionComponentViews(heroName) } catch (e) {}
         }
         // 立即把副卡皮肤偏好落盘到当前项目记录（与 persistProjectSkins 对称）
         async function persistFusionSkins() {
@@ -11841,7 +11881,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (!man) return
                     const model = hdSkinModel(curSkin) || (meta.spineModel || '')
                     const pngs = model ? ((man.modelPngs && man.modelPngs[model]) || 0) : (man.pngs || 0)
-                    window.spineHero.play(cv, meta.spine, { fitPadding: 0.58, pngs, model, anchorFeet: 0.71, tight: true, fitByHeight: true, scale: (man && man.scale) || 1 })
+                    window.spineHero.play(cv, meta.spine, { fitPadding: 0.58, pngs, model, anchorFeet: 0.71, tight: true, fitByHeight: true, scale: (man && man.scale) || 1, offsetX: (man && man.offsetX) || 0 })
                 } catch (e) {}
             }
 
@@ -29638,6 +29678,7 @@ ${maSection}
                             tight: true,
                             fitByHeight: true,
                             scale: _spMan.scale || 1,
+                            offsetX: _spMan.offsetX || 0,
                             model: (stage.getAttribute('data-model') || (_spHero && _spHero.spineModel) || ''),
                             pngs: _spMan.pngs || 0,
                             onStatus: function (s) {

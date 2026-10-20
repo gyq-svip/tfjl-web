@@ -237,8 +237,14 @@
         }
         if (opts.scale != null && opts.scale > 0) fitScale *= opts.scale
         else if (window.__heroSpineIndex && folder && window.__heroSpineIndex[folder] && window.__heroSpineIndex[folder].scale > 0) fitScale *= window.__heroSpineIndex[folder].scale
-        const cx = vbVis.off.x + sw / 2
+        // 🔴 2026-10-21 横向以「骨架包围盒中心」为准（模型作者坐标系）：
+        //    紧包围盒含武器/披风/特效等单侧内容，按它居中会把人物本体挤偏（死神等）；
+        //    纵向/高度仍用紧包围盒（保证各英雄大小一致）。offsetX 为逐英雄微调（画布宽比例）。
+        const cx = (opts.tight && opts.centerByVisualX !== true)
+            ? (vb.off.x + vb.size.x / 2)
+            : (vbVis.off.x + sw / 2)
         ctx.save()
+        if (opts.offsetX) ctx.translate(w * Number(opts.offsetX), 0)
         if (opts.anchorFeet != null) {
           // 底边中点对齐锚点：横向居中、纵向落在石台面（角色详情用）
           ctx.translate(w / 2, h * opts.anchorFeet)
