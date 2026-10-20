@@ -33869,6 +33869,8 @@ ${maSection}
 
         function closeAdminPanel() {
             document.getElementById('adminPanelOverlay').style.display = 'none';
+            // 🔴 2026-10-21 关闭管理面板后恢复右侧悬浮工具条（仅主页显示）
+            try { const ssc = document.getElementById('selSideCtrls'); if (ssc) ssc.style.display = 'flex'; } catch (e) {}
             // 清除 session 级别验证状态（关闭面板后下次进入需要重新验证）
             // 但如果 localStorage 有保存密码，openAdminPanel 会自动验证
             sessionStorage.removeItem(ADMIN_VERIFY_KEY);
