@@ -11886,9 +11886,28 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
 
             // 起播动画 + 拉官方数据
+            // 🔴 2026-10-21 预热：Spine 运行时 / 骨骼清单 / 官方数据 三路并行（原为串行等待，首次打开要干等几秒）
+            try { if (window.spineHero && window.spineHero.warm) window.spineHero.warm() } catch (e) {}
+            // 若官方数据已在缓存（第二次以后打开），立刻并行预拉该英雄的骨骼资源
+            try {
+                const _pre = (window.heroesOfficialMap || {})[mainName]
+                if (_pre && _pre.spine && window.spineHero && window.spineHero.preload) {
+                    const _pm = window.__heroSpineIndex && window.__heroSpineIndex[_pre.spine]
+                    window.spineHero.preload(_pre.spine, { pngs: (_pm && _pm.pngs) || 0, model: _pre.spineModel || '' })
+                }
+            } catch (e) {}
+            const _idxPromise = (async () => {
+                try {
+                    if (window.__heroSpineIndex) return window.__heroSpineIndex
+                    const p = location.pathname
+                    const b = p.endsWith('/') ? p : (p.lastIndexOf('/') >= 0 ? p.slice(0, p.lastIndexOf('/') + 1) : '/')
+                    window.__heroSpineIndex = await (await fetch(b + 'data/hero-spine/index.json')).json()
+                } catch (e) { window.__heroSpineIndex = window.__heroSpineIndex || {} }
+                return window.__heroSpineIndex
+            })()
             ;(async function () {
                 try {
-                    await ensureOfficialHeroes()
+                    await Promise.all([ensureOfficialHeroes(), _idxPromise])
                     meta = (window.heroesOfficialMap || {})[mainName] || null
                     // 🔴 老马库名(火炮) → 官方显示名(邪能火炮) 的明确映射：工程类两套命名不一致，
                     //    优先按表转换（避免模糊子串误匹配），否则 meta 空 → 属性全"—"、技能/被动永远"加载中"
@@ -11908,13 +11927,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     color = HD_COLOR[meta && meta.heroColor] || color
                     // 动画：按当前皮肤的独立骨骼播（官方每皮肤一套模型），仅清单内已导出的英雄
                     if (window.spineHero && meta && meta.spine) {
-                        if (!window.__heroSpineIndex) {
-                            try {
-                                const p = location.pathname
-                                const b = p.endsWith('/') ? p : (p.lastIndexOf('/') >= 0 ? p.slice(0, p.lastIndexOf('/') + 1) : '/')
-                                window.__heroSpineIndex = await (await fetch(b + 'data/hero-spine/index.json')).json()
-                            } catch (e) { window.__heroSpineIndex = {} }
-                        }
+                        await _idxPromise  // 清单已在并行拉取，这里只等结果（通常已就绪）
                         hdPlaySpine()
                     }
                 } catch (e) { /* 数据失败保留骨架 */ }
