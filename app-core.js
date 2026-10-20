@@ -33871,11 +33871,36 @@ ${maSection}
             document.getElementById('adminPanelOverlay').style.display = 'none';
             // 🔴 2026-10-21 关闭管理面板后恢复右侧悬浮工具条（仅主页显示）
             try { const ssc = document.getElementById('selSideCtrls'); if (ssc) ssc.style.display = 'flex'; } catch (e) {}
+            try { if (typeof window._syncSelSideCtrls === 'function') window._syncSelSideCtrls(); } catch (e) {}
             // 清除 session 级别验证状态（关闭面板后下次进入需要重新验证）
             // 但如果 localStorage 有保存密码，openAdminPanel 会自动验证
             sessionStorage.removeItem(ADMIN_VERIFY_KEY);
             hideAdminStatus();
         }
+
+        // 🔴 2026-10-21 右侧悬浮工具条只在主页显示：任何全屏弹层（管理面板/管理子页如读写诊断/子页iframe）
+        //    打开时自动隐藏，全部关闭后恢复。轮询兜底（400ms，开销极小），不依赖各处手动调用。
+        (function () {
+            const OVERLAY_IDS = ['adminPanelOverlay', 'subpageModal'];
+            window._syncSelSideCtrls = function () {
+                const ssc = document.getElementById('selSideCtrls');
+                if (!ssc) return;
+                let covered = false;
+                for (let i = 0; i < OVERLAY_IDS.length; i++) {
+                    const el = document.getElementById(OVERLAY_IDS[i]);
+                    if (el && el.style.display && el.style.display !== 'none') { covered = true; break; }
+                }
+                if (!covered) {
+                    const pages = document.querySelectorAll('[id^="adminPage"]');
+                    for (let i = 0; i < pages.length; i++) {
+                        if (pages[i].style.display && pages[i].style.display !== 'none') { covered = true; break; }
+                    }
+                }
+                const want = covered ? 'none' : 'flex';
+                if (ssc.style.display !== want) ssc.style.display = want;
+            };
+            setInterval(window._syncSelSideCtrls, 400);
+        })();
 
         function logoutToLogin() {
             if (!confirm('确定要退出登录吗？')) return;
