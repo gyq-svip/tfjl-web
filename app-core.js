@@ -10707,7 +10707,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             document.querySelectorAll('.hero-detail-root').forEach((el) => { try { el.remove(); } catch (e) {} })
             if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('打开英雄详情弹窗')
 
-            const mainName = typeof getMainCardName === 'function' ? getMainCardName(cardName) : cardName
+            let mainName = typeof getMainCardName === 'function' ? getMainCardName(cardName) : cardName
             // 等级档位：优先按卡类型取；取不到（空/单档）时回退 1..30（官方英雄上限 30，与 stats 行一致）
             let levels = getAvailableLevels(cardType)
             if (!levels || levels.length < 2) levels = Array.from({ length: 30 }, (_, i) => i + 1)
