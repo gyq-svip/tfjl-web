@@ -11584,6 +11584,13 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 try {
                     await ensureOfficialHeroes()
                     meta = (window.heroesOfficialMap || {})[mainName] || null
+                    // 🔴 卡名被 splitIntoHeroes 拆成碎片（如"邪能火炮"→"火炮"）时，按唯一子串匹配回官方英雄名，
+                    //    否则 meta 为空 → 属性全"—"、技能/被动永远停在"加载中"
+                    if (!meta && mainName) {
+                        const _map = window.heroesOfficialMap || {}
+                        const _hits = Object.keys(_map).filter((k) => k.indexOf(mainName) >= 0)
+                        if (_hits.length === 1) { mainName = _hits[0]; meta = _map[mainName] || null }
+                    }
                     if (!card.isConnected) return
                     paintAll()
                     color = HD_COLOR[meta && meta.heroColor] || color
