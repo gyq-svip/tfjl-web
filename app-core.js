@@ -11456,7 +11456,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
                     // —— 副卡设置区（等级 / 皮肤 / 魔化）：被融合卡的设置 ——
                     const subBox = document.createElement('div')
-                    subBox.style.cssText = 'position:absolute;left:12px;top:10px;width:200px;max-height:calc(100% - 118px);overflow-y:auto;background:rgba(20,14,6,0.85);border:1px solid rgba(255,200,120,0.4);border-radius:10px;padding:10px;color:#ffe9c9;font-size:12px;display:none;'
+                    subBox.style.cssText = 'position:absolute;right:12px;top:10px;width:200px;max-height:calc(100% - 118px);overflow-y:auto;background:rgba(20,14,6,0.85);border:1px solid rgba(255,200,120,0.4);border-radius:10px;padding:10px;color:#ffe9c9;font-size:12px;display:none;'
                     sh.body.appendChild(subBox)
                     // 把「当前预览的融合形态」写回卡牌（图库槽位 / 战场槽位 / 手牌）；皮肤或等级改动后同样要重刷
                     const reapplyPreviewCard = async () => {
