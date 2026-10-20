@@ -11944,6 +11944,43 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             } catch (e) {}
         }, 8000)
 
+        // 🔴 2026-10-21 桌面版：皮肤包已内含 data/hero-spine/（同包发布），自动切到本地源（离线秒开）；
+        //    探测失败就继续用 GitHub，不影响任何现有功能。
+        ;(function () {
+            try {
+                const isTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__ || location.protocol === 'tauri:' || location.protocol === 'asset:')
+                if (!isTauri) return
+                let tries = 0
+                const timer = setInterval(async function () {
+                    tries++
+                    try {
+                        const reg = window.skinRegistry || {}
+                        let sample = ''
+                        for (const h of Object.keys(reg)) {
+                            const arr = reg[h] || []
+                            for (const s of arr) { if (s && s.path) { sample = s.path; break } }
+                            if (sample) break
+                        }
+                        if (sample && typeof window.convertFileSrc === 'function') {
+                            const sep = (sample.indexOf('\\') >= 0) ? '\\' : '/'
+                            const parts = sample.split(/[\\/]/)
+                            parts.pop(); parts.pop()   // 去掉 <英雄>/<文件.skin>
+                            const root = parts.join(sep)
+                            const probe = window.convertFileSrc(root + sep + 'data' + sep + 'hero-spine' + sep + 'index.json')
+                            const r = await fetch(probe, { cache: 'no-store' })
+                            const j = await r.json()
+                            if (j && typeof j === 'object' && Object.keys(j).length) {
+                                window.__HERO_SPINE_ASSET_BASE = probe.replace(/index\.json$/, '')
+                                window.__heroSpineIndex = j
+                                clearInterval(timer)
+                            }
+                        }
+                    } catch (e) {}
+                    if (tries >= 8) clearInterval(timer)
+                }, 5000)
+            } catch (e) {}
+        })()
+
         // ===== 动画资源缓存：菜单/诊断页进度展示 + 详情弹窗 =====
         function _spineStats() {
             try { return (window.spineHero && window.spineHero.preloadStats) ? window.spineHero.preloadStats() : null } catch (e) { return null }
