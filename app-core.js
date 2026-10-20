@@ -11342,13 +11342,22 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     cap.style.cssText = 'position:absolute;left:0;right:0;top:12px;text-align:center;color:#ffd7d0;font-size:12px;font-weight:800;line-height:1.6;padding:0 20px;'
                     let mhDesc = ''
                     try {
-                        const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[mainName]
-                        const t = d && d.talents ? Object.values(d.talents).map((x) => x.mohuaPassive).filter(Boolean).pop() : null
-                        mhDesc = (t && t.desc) || ''
+                        // 🔴 2026-10-20 与主卡/副卡魔化属性同数据链：本地硬编码 → 自定义 → 云端 → heroAttrsData（兼容字符串/对象两种形态）
+                        const cloud = window.skinAttributesCloud
+                        if (SKIN_ATTRIBUTES[mainName] && SKIN_ATTRIBUTES[mainName]['魔化']) mhDesc = SKIN_ATTRIBUTES[mainName]['魔化'].desc || ''
+                        else if (customSkinAttributes[mainName] && customSkinAttributes[mainName]['魔化']) mhDesc = customSkinAttributes[mainName]['魔化'].desc || ''
+                        else if (cloud && cloud[mainName] && cloud[mainName]['魔化']) mhDesc = cloud[mainName]['魔化'].desc || ''
+                        if (!mhDesc) {
+                            const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[mainName]
+                            const t = d && d.talents ? Object.values(d.talents).map((x) => x.mohuaPassive).filter(Boolean).pop() : null
+                            mhDesc = (t && typeof t === 'object' && t.desc) ? t.desc : (typeof t === 'string' ? t : '') || (d && d.mohuaPassive) || ''
+                            if (mhDesc && typeof mhDesc === 'object') mhDesc = mhDesc.desc || ''
+                        }
+                        mhDesc = String(mhDesc || '').replace(/^【魔化(被动)?】\s*/, '')
                     } catch (e) {}
                     cap.innerHTML = '<div style="color:#ff8f7f;font-size:14px;font-weight:900;">魔化预览</div>' +
                         '<div style="margin-top:4px;">最高星级提升至 <span style="color:#ffd75e;">★★</span></div>' +
-                        (mhDesc ? '<div style="margin-top:4px;">魔化被动：' + esc(mhDesc) + '</div>' : '')
+                        (mhDesc ? '<div style="margin-top:6px;display:inline-block;padding:4px 12px;background:rgba(120,30,50,0.55);border:1px solid rgba(255,140,120,0.4);border-radius:8px;"><b style="color:#ffb3a3;">魔化属性：</b>' + esc(mhDesc) + '</div>' : '')
                     sh.body.appendChild(cap)
                     Promise.all([
                         hdPortraitUrl(mainName, curSkin === '默认' ? mainName : curSkin),
@@ -11413,10 +11422,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     row.appendChild(left)
                     row.appendChild(right)
                     sh.body.appendChild(row)
-                    // 🔴 2026-10-20 融合对象切换行（副卡可选项，如 小野→酋长/土灵；云端融合数据晚到时自动重建）
-                    const pRow = document.createElement('div')
-                    pRow.style.cssText = 'position:absolute;top:12px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px;z-index:5;'
-                    sh.body.appendChild(pRow)
                     // 副卡品质 → 卡牌类型（优先取卡池真实 data-type，回退按官方 heroColor 推断）
                     const subCardTypeOf = (name) => {
                         try {
@@ -11557,7 +11562,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             '<div style="font-weight:900;color:#ffd75e;margin-bottom:6px;">副卡：' + esc(sub) + '</div>' +
                             '<div id="hdFuseSubSkill" style="margin-bottom:8px;padding:6px 7px;background:rgba(0,0,0,0.28);border-radius:8px;">' + subSkillBlock(levels[lvIdx]) + '</div>' +
                             '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><span>魔化</span><label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:#e9b8ff;"><input type="checkbox" id="hdFuseSubMhChk" ' + (subMhOn ? 'checked' : '') + ' style="accent-color:#c77dff;"><span>开启魔化</span></label></div>' +
-                            '<div id="hdFuseSubMh" style="padding:6px 7px;background:rgba(40,10,46,0.6);border-radius:8px;font-size:11px;line-height:1.5;color:#e9b8ff;' + (subMhOn ? '' : 'display:none;') + '"></div>'
+                            '<div id="hdFuseSubMh" style="padding:6px 7px;background:rgba(40,10,46,0.6);border-radius:8px;font-size:11px;line-height:1.5;color:#e9b8ff;' + (subMhOn ? '' : 'display:none;') + '"></div>' +
+                            '<div style="margin-top:8px;margin-bottom:4px;font-weight:900;color:#ffd75e;">被融合卡列表</div>' +
+                            '<div id="hdFuseVarList" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;"></div>'
                         // 右栏：等级 + 数值 + 皮肤
                         subBoxR.innerHTML =
                             '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">' +
@@ -11605,6 +11612,28 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                                 await reapplyPreviewCard()
                             }
                         }
+                        // 🔴 2026-10-20 被融合卡列表（左侧底部）：所有可融合卡缩略图，点击切换融合对象
+                        const varList = subBox.querySelector('#hdFuseVarList')
+                        if (varList) {
+                            let vs = []
+                            try { vs = (typeof getFusionVariantsForBase === 'function') ? getFusionVariantsForBase(baseHero) : [] } catch (e) {}
+                            vs.forEach((fn) => {
+                                const parts = (typeof getFusionParts === 'function') ? getFusionParts(fn) : null
+                                const partner = (parts && parts.length >= 2) ? parts[1] : fn
+                                const item = document.createElement('div')
+                                item.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;'
+                                const im = document.createElement('img')
+                                im.style.cssText = 'width:44px;height:44px;border-radius:8px;object-fit:cover;background:rgba(0,0,0,0.4);border:2px solid ' + (preview === fn ? '#ffd75e' : 'rgba(255,220,150,0.3)') + ';'
+                                const lb = document.createElement('div')
+                                lb.textContent = fn
+                                lb.style.cssText = 'font-size:9.5px;color:' + (preview === fn ? '#ffd75e' : '#c9b28a') + ';max-width:64px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
+                                item.appendChild(im)
+                                item.appendChild(lb)
+                                item.onclick = async () => { if (preview !== fn) await applyPreviewOpt(fn) }
+                                hdPortraitUrl(partner, partner).then((u) => { if (u) im.src = u }).catch(() => {})
+                                varList.appendChild(item)
+                            })
+                        }
                         const wrap = subBox.querySelector('#hdFuseSubSkins')
                         skinList.forEach((sk) => {
                             const b = document.createElement('button')
@@ -11628,7 +11657,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         preview = opt
                         paintCircles()
                         paintSubSettings()
-                        paintFuseRow()
                         paintFuseSkinRow()
                         const slotEl = badge && badge.closest ? badge.closest('.battle-slot') : null
                         if (libSlot) {
@@ -11649,54 +11677,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         }
                         try { updateAllCardLevelBadges() } catch (e) {}
                     }
-                    // 🔴 顶部快捷切换：每个可融合副卡一个按钮（酋长/土灵…）
-                    function paintPartnerRow() {
-                        let vs = []
-                        try { vs = (typeof getFusionVariantsForBase === 'function') ? getFusionVariantsForBase(baseHero) : [] } catch (e) {}
-                        if (!vs.length) { pRow.style.display = 'none'; return }
-                        pRow.style.display = ''
-                        pRow.innerHTML = '<span style="font-size:11px;color:#c9b28a;font-weight:700;">融合对象</span>'
-                        vs.forEach((fn) => {
-                            const parts = (typeof getFusionParts === 'function') ? getFusionParts(fn) : null
-                            const partner = (parts && parts.length >= 2) ? parts[1] : fn
-                            const b = document.createElement('button')
-                            b.textContent = partner
-                            b.style.cssText = 'padding:2px 10px;border-radius:12px;font-size:11px;cursor:pointer;border:1px solid ' + (preview === fn ? '#ffd75e' : 'rgba(255,220,150,0.35)') + ';background:' + (preview === fn ? 'rgba(255,215,94,0.25)' : 'transparent') + ';color:' + (preview === fn ? '#ffd75e' : '#e8d9bd') + ';'
-                            b.onclick = async () => { if (preview !== fn) { await applyPreviewOpt(fn); paintPartnerRow() } }
-                            pRow.appendChild(b)
-                        })
-                    }
-                    paintPartnerRow()
-                    // 🔴 底部：所有可融合卡缩略图（点击切换融合卡）+ 当前融合卡皮肤切换
-                    const fuseRow = document.createElement('div')
-                    fuseRow.style.cssText = 'position:absolute;left:224px;right:236px;bottom:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;justify-content:center;z-index:5;'
-                    sh.body.appendChild(fuseRow)
+                    // 🔴 底部中间：当前融合卡的皮肤切换（限高防向上溢出遮挡立绘）
                     const fuseSkinRow = document.createElement('div')
-                    fuseSkinRow.style.cssText = 'position:absolute;left:224px;right:236px;bottom:98px;display:flex;flex-wrap:wrap;gap:4px;justify-content:center;align-items:center;z-index:5;'
+                    fuseSkinRow.style.cssText = 'position:absolute;left:224px;right:236px;bottom:10px;max-height:92px;overflow-y:auto;display:flex;flex-wrap:wrap;gap:4px;justify-content:center;align-items:flex-start;align-content:flex-start;z-index:5;'
                     sh.body.appendChild(fuseSkinRow)
-                    function paintFuseRow() {
-                        let vs = []
-                        try { vs = (typeof getFusionVariantsForBase === 'function') ? getFusionVariantsForBase(baseHero) : [] } catch (e) {}
-                        fuseRow.innerHTML = ''
-                        if (!vs.length) { fuseRow.style.display = 'none'; return }
-                        fuseRow.style.display = 'flex'
-                        vs.forEach((fn) => {
-                            const parts = (typeof getFusionParts === 'function') ? getFusionParts(fn) : null
-                            const partner = (parts && parts.length >= 2) ? parts[1] : fn
-                            const item = document.createElement('div')
-                            item.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;'
-                            const im = document.createElement('img')
-                            im.style.cssText = 'width:54px;height:54px;border-radius:10px;object-fit:cover;background:rgba(0,0,0,0.4);border:2px solid ' + (preview === fn ? '#ffd75e' : 'rgba(255,220,150,0.3)') + ';'
-                            const lb = document.createElement('div')
-                            lb.textContent = fn
-                            lb.style.cssText = 'font-size:10px;color:' + (preview === fn ? '#ffd75e' : '#c9b28a') + ';max-width:78px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
-                            item.appendChild(im)
-                            item.appendChild(lb)
-                            item.onclick = async () => { if (preview !== fn) await applyPreviewOpt(fn) }
-                            hdPortraitUrl(partner, partner).then((u) => { if (u) im.src = u }).catch(() => {})
-                            fuseRow.appendChild(item)
-                        })
-                    }
                     function paintFuseSkinRow() {
                         const fm = (window.heroesOfficialMap || {})[preview] || {}
                         const notes = ((fm.skins) || []).map((s) => s.note).filter(Boolean)
@@ -11727,10 +11711,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             fuseSkinRow.appendChild(b)
                         })
                     }
-                    paintFuseRow()
                     paintFuseSkinRow()
                     // 云端融合定义(fusions.json)晚到时重建（页面启动先用 localStorage 旧缓存，新加融合会漏）
-                    window.__hdFuseRefreshPartnerRow = () => { try { if (pRow && pRow.isConnected) { paintPartnerRow(); paintFuseRow(); paintFuseSkinRow() } } catch (e) {} }
+                    window.__hdFuseRefreshPartnerRow = () => { try { if (sh && sh.body && sh.body.isConnected) { paintSubSettings(); paintFuseSkinRow() } } catch (e) {} }
                 }
             }
 
