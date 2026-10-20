@@ -12,6 +12,8 @@
   let spinePromise = null
   const assetCache = {} // folder -> { skData, atlas }（骨架/图集跨卡片共享，避免重复 fetch+解析）
   const vbCache = {}    // folder@model -> { off, size }（按真实不透明像素测得的紧包围盒）
+  const vbBoundsCache = {}  // 🔴 2026-10-21 folder@model -> 骨架包围盒（首次测量后复用，省一次动画采样）
+  const vbFxCache = {}      // 🔴 2026-10-21 folder@model -> 排除特效骨的本体包围盒
   let playTokenSeq = 0  // 同一 canvas 连续 play 时，仅最后一次生效（按画布各自计时）
 
   function baseUrl() {
@@ -199,15 +201,16 @@
       renderer.triangleRendering = true
       const anims = skData.animations.map(function (a) { return a.name })
       const idle = anims.find(function (a) { return /idle/i.test(a) }) || anims[0]
-      const vb = computeBounds(spine, skData, idle)
+      // 🔴 2026-10-21 包围盒按模型缓存（首次测量后复用），避免每次打开都重复采样动画
+      const vbKey = folder + '@' + (opts.model || '')
+      const vb = vbBoundsCache[vbKey] || (vbBoundsCache[vbKey] = computeBounds(spine, skData, idle))
       // 🔴 2026-10-21 排除特效骨的「人物本体」包围盒：用于居中目标（冰晶/光效不会把人挤偏）
-      const vbFx = computeBounds(spine, skData, idle, true)
+      const vbFx = vbFxCache[vbKey] || (vbFxCache[vbKey] = computeBounds(spine, skData, idle, true))
       state.setAnimation(0, idle, true)
       state.update(0); state.apply(skeleton); skeleton.updateWorldTransform()
 
       // 真实不透明像素的紧包围盒（缓存）：修正骨架 getBounds 空白过多导致的偏小/偏心
       // 仅 opts.tight 时启用（详情大图用），避免改变战场小卡/图鉴既有观感
-      const vbKey = folder + '@' + (opts.model || '')
       let vbVis = vb
       if (opts.tight) {
         vbVis = vbCache[vbKey]
@@ -307,5 +310,19 @@
     }
   }
 
-  window.spineHero = { play: play, stop: stop }
+  // 🔴 2026-10-21 预热接口：提前把 Spine 运行时 + 某模型的骨骼/图集/贴图拉进缓存，
+  //    弹窗真正 play 时直接命中缓存，首次打开不用干等（loadAssets 内部按 folder@model 缓存）。
+  function warm() {
+    try { ensureSpine() } catch (e) {}
+  }
+  function preload(folder, opts) {
+    opts = opts || {}
+    if (!folder) return
+    try {
+      ensureSpine().then(function () {
+        return loadAssets(folder, opts.pngs, opts.model)
+      }).catch(function () {})
+    } catch (e) {}
+  }
+  window.spineHero = { play: play, stop: stop, warm: warm, preload: preload }
 })()
