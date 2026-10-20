@@ -11663,7 +11663,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     fuseSkinRow.style.cssText = 'position:absolute;left:224px;right:236px;bottom:10px;max-height:92px;overflow-y:auto;display:flex;flex-wrap:wrap;gap:4px;justify-content:center;align-items:flex-start;align-content:flex-start;z-index:5;'
                     sh.body.appendChild(fuseSkinRow)
                     function paintFuseSkinRow() {
-                        // 🔴 2026-10-21 中底部显示「被融合卡（副卡）」的皮肤列表，点击换副卡皮肤
+                        // 🔴 2026-10-21 中底部显示「被融合卡（副卡）」的皮肤缩略图（图而非文字），点击换副卡皮肤
                         const sub = heroOf(preview) === preview ? '' : heroOf(preview)
                         fuseSkinRow.innerHTML = ''
                         if (!sub) { fuseSkinRow.style.display = 'none'; return }
@@ -11672,23 +11672,27 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         const list = (skinsApp && skinsApp.length) ? skinsApp : ['默认'].concat((sm2.skins || []).map((s) => s.note).filter(Boolean))
                         if (!list.length) { fuseSkinRow.style.display = 'none'; return }
                         fuseSkinRow.style.display = 'flex'
-                        const cap = document.createElement('span')
-                        cap.textContent = '皮肤'
-                        cap.style.cssText = 'font-size:10px;color:#c9b28a;font-weight:700;margin-right:2px;align-self:center;'
-                        fuseSkinRow.appendChild(cap)
                         const cur = (typeof getFusionComponentSkin === 'function') ? (getFusionComponentSkin(sub) || '默认') : '默认'
                         list.forEach((sk) => {
-                            const b = document.createElement('button')
-                            b.textContent = sk
-                            b.style.cssText = 'padding:3px 8px;border-radius:8px;font-size:10.5px;cursor:pointer;border:1px solid ' + (sk === cur ? '#ffd75e' : 'rgba(255,220,150,0.3)') + ';background:' + (sk === cur ? 'rgba(255,215,94,0.2)' : 'transparent') + ';color:#ffe9c9;'
-                            b.onclick = async () => {
+                            const item = document.createElement('div')
+                            item.title = sub + ' · ' + sk
+                            item.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;'
+                            const im = document.createElement('img')
+                            im.style.cssText = 'width:52px;height:52px;border-radius:10px;object-fit:cover;background:rgba(0,0,0,0.4);border:2px solid ' + (sk === cur ? '#ffd75e' : 'rgba(255,220,150,0.3)') + ';'
+                            item.appendChild(im)
+                            const lb = document.createElement('div')
+                            lb.textContent = sk
+                            lb.style.cssText = 'font-size:9.5px;color:' + (sk === cur ? '#ffd75e' : '#c9b28a') + ';max-width:70px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
+                            item.appendChild(lb)
+                            item.onclick = async () => {
                                 if (typeof setFusionSkin === 'function') { try { await setFusionSkin(sub, sk === '默认' ? '' : sk) } catch (e) {} }
                                 if (typeof invalidateFusionHalfCache === 'function') { try { await invalidateFusionHalfCache(sub) } catch (e) {} }
                                 paintCircles()      // 左圆：换成新皮肤的副卡立绘
                                 paintFuseSkinRow()  // 刷新选中态
                                 await reapplyPreviewCard()
                             }
-                            fuseSkinRow.appendChild(b)
+                            hdPortraitUrl(sub, sk === '默认' ? sub : sk).then((u) => { if (u) im.src = u }).catch(() => {})
+                            fuseSkinRow.appendChild(item)
                         })
                     }
                     paintFuseSkinRow()
