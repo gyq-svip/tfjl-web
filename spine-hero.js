@@ -385,5 +385,21 @@
   function preloadStatus() {
     return { running: _pl.running, done: Object.keys(_pl.done || {}).length, total: _pl.total }
   }
-  window.spineHero = { play: play, stop: stop, warm: warm, preload: preload, preloadAll: preloadAll, preloadStop: preloadStop, preloadReset: preloadReset, preloadStatus: preloadStatus }
+  // 🔴 2026-10-21 统计：默认模型 / 皮肤模型 各拉了多少（用于菜单与诊断页展示）
+  function preloadStats() {
+    const idx = window.__heroSpineIndex || {}
+    const done = _plLoad()
+    let base = 0, baseDone = 0, skin = 0, skinDone = 0
+    Object.keys(idx).forEach(function (f) {
+      const e = idx[f] || {}
+      base++; if (done[f + '@' + (e.model || '')]) baseDone++
+      Object.keys(e.models || {}).forEach(function (sn) {
+        const m = e.models[sn]
+        if (!m) return
+        skin++; if (done[f + '@' + m]) skinDone++
+      })
+    })
+    return { base: base, baseDone: baseDone, skin: skin, skinDone: skinDone, running: _pl.running }
+  }
+  window.spineHero = { play: play, stop: stop, warm: warm, preload: preload, preloadAll: preloadAll, preloadStop: preloadStop, preloadReset: preloadReset, preloadStatus: preloadStatus, preloadStats: preloadStats }
 })()
