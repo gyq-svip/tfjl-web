@@ -47,8 +47,24 @@
       i.src = src
     })
   }
-  // 采样 idle 动画求 tight 包围盒（世界坐标）
-  function computeBounds(spine, skData, animName) {
+  // 隐藏/恢复「特效骨」挂件：冰晶/光效(fx/*)会把包围盒撑大，使人物被算小、站偏
+  function hideFxSlots(sk) {
+    let n = 0
+    for (let i = 0; i < sk.slots.length; i++) {
+      const s = sk.slots[i]
+      const bn = (s.bone && s.bone.data && s.bone.data.name) || ''
+      if (/fx|特效|texiao|guangxiao/i.test(bn)) { s._fxAtt = s.attachment; s.attachment = null; n++ }
+    }
+    return n
+  }
+  function restoreFxSlots(sk) {
+    for (let i = 0; i < sk.slots.length; i++) {
+      const s = sk.slots[i]
+      if (s._fxAtt !== undefined) { s.attachment = s._fxAtt; delete s._fxAtt }
+    }
+  }
+  // 采样 idle 动画求 tight 包围盒（世界坐标）；hideFx=true 时排除特效骨，得到「人物本体」范围
+  function computeBounds(spine, skData, animName, hideFx) {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
     const off = new spine.Vector2(), sz = new spine.Vector2()
     const tmp = new spine.Skeleton(skData)
@@ -58,14 +74,14 @@
       minX = Math.min(minX, o.x); minY = Math.min(minY, o.y)
       maxX = Math.max(maxX, o.x + s.x); maxY = Math.max(maxY, o.y + s.y)
     }
-    tmp.setToSetupPose(); tmp.updateWorldTransform(); tmp.getBounds(off, sz); merge(off, sz)
+    tmp.setToSetupPose(); if (hideFx) hideFxSlots(tmp); tmp.updateWorldTransform(); tmp.getBounds(off, sz); merge(off, sz)
     const anim = animName ? skData.findAnimation(animName) : null
     if (anim) {
       const dur = anim.duration || 1
       const n = Math.max(24, Math.ceil(dur * 30))
       for (let i = 0; i <= n; i++) {
         tmp.setToSetupPose(); stt.clearTracks(); stt.setAnimation(0, anim.name, false)
-        stt.update((dur * i) / n); stt.apply(tmp); tmp.updateWorldTransform(); tmp.getBounds(off, sz); merge(off, sz)
+        stt.update((dur * i) / n); stt.apply(tmp); if (hideFx) hideFxSlots(tmp); tmp.updateWorldTransform(); tmp.getBounds(off, sz); merge(off, sz)
       }
     }
     return { off: new spine.Vector2(minX, minY), size: new spine.Vector2(maxX - minX, maxY - minY) }
@@ -184,6 +200,8 @@
       const anims = skData.animations.map(function (a) { return a.name })
       const idle = anims.find(function (a) { return /idle/i.test(a) }) || anims[0]
       const vb = computeBounds(spine, skData, idle)
+      // 🔴 2026-10-21 排除特效骨的「人物本体」包围盒：用于居中目标（冰晶/光效不会把人挤偏）
+      const vbFx = computeBounds(spine, skData, idle, true)
       state.setAnimation(0, idle, true)
       state.update(0); state.apply(skeleton); skeleton.updateWorldTransform()
 
@@ -194,7 +212,17 @@
       if (opts.tight) {
         vbVis = vbCache[vbKey]
         if (!vbVis) {
-          vbVis = measureVisualBounds(spine, skeleton, vb) || vb
+          const mFull = measureVisualBounds(spine, skeleton, vb)
+          let mFx = null
+          const nFx = hideFxSlots(skeleton)
+          if (nFx > 0) {
+            skeleton.updateWorldTransform()
+            mFx = measureVisualBounds(spine, skeleton, vbFx)
+            restoreFxSlots(skeleton); skeleton.updateWorldTransform()
+          }
+          // 安全兜底：排除特效后可见内容过小（说明特效本身就是主体）则退回全量
+          if (mFx && mFull && (mFx.size.x * mFx.size.y) < 0.25 * (mFull.size.x * mFull.size.y)) mFx = null
+          vbVis = mFx || mFull || vb
           if (vbVis !== vb) vbCache[vbKey] = vbVis
         }
       }
@@ -243,7 +271,8 @@
         const visCx = vbVis.off.x + sw / 2
         let cx = visCx
         if (opts.tight && opts.centerByVisualX !== true) {
-            const targetCx = vb.off.x + vb.size.x / 2
+            const vbBody = vbFx || vb
+            const targetCx = vbBody.off.x + vbBody.size.x / 2
             const slack = Math.max(0, (w / fitScale - sw) / 2)
             cx = visCx + Math.max(-slack, Math.min(slack, targetCx - visCx))
         }
