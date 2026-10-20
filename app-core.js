@@ -10721,7 +10721,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 }
             } catch (e) {}
             const auraEl = document.createElement('div')
-            auraEl.style.cssText = 'position:absolute;left:50%;top:56%;width:min(46%,420px);aspect-ratio:1/1;background:url(hero-ui/aura.png) center/contain no-repeat;pointer-events:none;z-index:1;display:none;animation:hdAuraSpin 16s linear infinite;filter:drop-shadow(0 0 12px rgba(120,0,0,0.55));'
+            auraEl.style.cssText = 'position:absolute;left:50%;top:62%;width:min(27%,240px);aspect-ratio:1/1;background:url(hero-ui/aura.png) center/contain no-repeat;pointer-events:none;z-index:1;display:none;animation:hdAuraSpin 16s linear infinite;filter:drop-shadow(0 0 8px rgba(120,0,0,0.5));'
             card.appendChild(auraEl)
             const shadowEl = document.createElement('div')
             shadowEl.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);bottom:11%;width:30%;height:8%;background:url(hero-ui/shadow.png) center/contain no-repeat;opacity:0.5;pointer-events:none;z-index:1;'
