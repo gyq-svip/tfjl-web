@@ -149,6 +149,7 @@ tools/
 !/data/heroes.json
 # 英雄 Spine 动画资源（官方导出，图鉴面板播放用；目录清单 index.json + 各英雄 skeleton/atlas/png）
 !/data/hero-spine/
+!/data/hero-spine/**
 # 图标等静态资源（Tauri 图标已编译进二进制，网页用 src-tauri/icons）
 /assets/
 # 安装包 + 签名（本地保留，下载源在 Gitee 发行版附件）

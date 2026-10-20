@@ -228,6 +228,8 @@
           // 此前用 min(w/sw, h/sh) 会让偏宽的模型被整体压小，导致各卡角色大小不一。
           fitScale = Math.min((h / sh) * pad, (w * 0.96) / sw)
         }
+        if (opts.scale != null && opts.scale > 0) fitScale *= opts.scale
+        else if (window.__heroSpineIndex && folder && window.__heroSpineIndex[folder] && window.__heroSpineIndex[folder].scale > 0) fitScale *= window.__heroSpineIndex[folder].scale
         const cx = vbVis.off.x + sw / 2
         ctx.save()
         if (opts.anchorFeet != null) {

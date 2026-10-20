@@ -10810,6 +10810,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const passiveCard = document.createElement('div')
             passiveCard.style.cssText = 'margin-top:2%;background:rgba(8,32,66,0.82);border:1px solid rgba(120,190,255,0.35);border-radius:10px;padding:8px 10px;color:#eaf4ff;font-size:clamp(10px,1.1vw,13px);line-height:1.55;'
             left.appendChild(passiveCard)
+            // 魔化属性卡（开启魔化时显示，红圈界面里展示魔化专属属性）
+            const mohuaCard = document.createElement('div')
+            mohuaCard.style.cssText = 'margin-top:2%;background:rgba(40,10,46,0.92);border:1px solid rgba(192,132,252,0.6);border-radius:10px;padding:8px 10px;color:#f3e8ff;font-size:clamp(10px,1.1vw,13px);line-height:1.55;display:none;'
+            left.appendChild(mohuaCard)
 
             // —— 右列：属性详情 / 升级预览 ——
             const right = document.createElement('div')
@@ -11043,11 +11047,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
             // 魔化
             if (hasMoHuaData(mainName)) {
-                actions.appendChild(roundBtn('hero-ui/icon-wake.png', '魔化', async () => {
-                    const on = !getCardMoHua(cardId, handType)
-                    setCardMoHua(cardId, on, handType)
-                    paintMoHuaAura()
-                    if (libSlot && typeof window._llReapplySlot === 'function') { try { await window._llReapplySlot(libSlot) } catch (e) {} }
+            actions.appendChild(roundBtn('hero-ui/icon-wake.png', '魔化', async () => {
+                const on = !getCardMoHua(cardId, handType)
+                setCardMoHua(cardId, on, handType)
+                paintMoHuaAura()
+                paintAll()
+                if (libSlot && typeof window._llReapplySlot === 'function') { try { await window._llReapplySlot(libSlot) } catch (e) {} }
                     else { try { updateAllCardLevelBadges() } catch (e) {} }
                     pop.dataset.mode = ''
                     pop.style.display = 'block'
@@ -11558,6 +11563,22 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 if (pInit) ph += '<div style="display:flex;gap:6px;align-items:flex-start;"><img src="hero-ui/star-initial.png" alt="" style="width:14px;height:14px;margin-top:2px;"><span><b style="color:#8ef58a;">初始被动</b> ' + esc(pInit) + '</span></div>'
                 if (pFull) ph += '<div style="display:flex;gap:6px;align-items:flex-start;margin-top:4px;"><img src="hero-ui/star-full.png" alt="" style="width:14px;height:14px;margin-top:2px;"><span><b style="color:#ffd75e;">满星被动</b> ' + esc(pFull) + '</span></div>'
                 passiveCard.innerHTML = ph || '—'
+                // 魔化属性：开启魔化时展示其专属属性文本（先取 SKIN_ATTRIBUTES 魔化静态文案，再回落等级化 mohuaPassive）
+                try {
+                    const mhOn = (typeof getCardMoHua === 'function') ? getCardMoHua(cardId, handType) : false
+                    if (mhOn && (typeof hasMoHuaData !== 'function' || hasMoHuaData(mainName))) {
+                        mohuaCard.style.display = ''
+                        let mhTxt = ''
+                        const mhAttr = (typeof getSkinAttribute === 'function') ? getSkinAttribute(mainName, '魔化', false, curLevel) : null
+                        if (mhAttr && mhAttr.desc && mhAttr.desc !== '无特殊属性') mhTxt = mhAttr.desc.replace(/^【魔化】\s*/, '')
+                        if (!mhTxt && window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[mainName] && window.heroAttrsData.heroes[mainName].mohuaPassive) {
+                            mhTxt = window.heroAttrsData.heroes[mainName].mohuaPassive
+                        }
+                        mohuaCard.innerHTML = '<span style="color:#e9b8ff;font-weight:900;">魔化属性：</span>' + esc(mhTxt || '—')
+                    } else {
+                        mohuaCard.style.display = 'none'
+                    }
+                } catch (e) { mohuaCard.style.display = 'none' }
                 paintLevel()
                 renderBody()
             }
@@ -11575,7 +11596,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (!man) return
                     const model = hdSkinModel(curSkin) || (meta.spineModel || '')
                     const pngs = model ? ((man.modelPngs && man.modelPngs[model]) || 0) : (man.pngs || 0)
-                    window.spineHero.play(cv, meta.spine, { fitPadding: 0.58, pngs, model, anchorFeet: 0.71, tight: true, fitByHeight: true })
+                    window.spineHero.play(cv, meta.spine, { fitPadding: 0.58, pngs, model, anchorFeet: 0.71, tight: true, fitByHeight: true, scale: (man && man.scale) || 1 })
                 } catch (e) {}
             }
 
@@ -12033,6 +12054,31 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 fTitle.textContent = '🔗 融合副卡：' + _subHero;
                 sec.appendChild(fTitle);
 
+                // 副卡主动技能（跟随等级；官方数据无则回落皮肤静态属性里的技能文案）
+                const _esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); };
+                const subSkillTitle = document.createElement('div');
+                subSkillTitle.style.cssText = 'color:#ffd75e;margin:6px 0 4px;font-size:0.78rem;';
+                subSkillTitle.textContent = '⚔️ 副卡主动技能';
+                sec.appendChild(subSkillTitle);
+                const subSkillInfo = document.createElement('div');
+                subSkillInfo.id = 'csSubSkill';
+                subSkillInfo.style.cssText = 'font-size:0.68rem;line-height:1.55;color:rgba(255,255,255,0.85);background:rgba(255,215,94,0.08);border:1px solid rgba(255,215,94,0.22);border-radius:6px;padding:5px 7px;';
+                function _renderSubSkill(curLv) {
+                    let sk = '';
+                    try {
+                        if (typeof getOfficialHeroTip === 'function') {
+                            const tip = getOfficialHeroTip(_subHero, curLv);
+                            if (tip) { const m = tip.split('\n').find(function (l) { return l.indexOf('【技能】') === 0; }); if (m) sk = m.slice('【技能】'.length); }
+                        }
+                        if (!sk && typeof getSkinAttribute === 'function') {
+                            const sa = getSkinAttribute(_subHero, '默认', false, curLv);
+                            if (sa && sa.desc) { const dm = sa.desc.split('\n').map(function (s) { return s.trim(); }).find(function (s) { return s.indexOf('技能:') === 0 || s.indexOf('技能：') === 0; }); if (dm) sk = dm.replace(/^技能[:：]/, ''); }
+                        }
+                    } catch (e) {}
+                    subSkillInfo.innerHTML = sk ? ('<span style="color:#ffd75e;font-weight:600;">主动技能：</span>' + _esc(sk)) : '<span style="opacity:0.5">暂无技能信息</span>';
+                }
+                sec.appendChild(subSkillInfo);
+
                 const subSkinTitle = document.createElement('div');
                 subSkinTitle.style.cssText = 'color:#ff9800;margin:6px 0 4px;font-size:0.78rem;';
                 subSkinTitle.textContent = '🎨 副卡皮肤';
@@ -12099,11 +12145,13 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 subLvInput.oninput = () => {
                     const el = document.getElementById('csSubLvVal'); if (el) el.textContent = subLevels[Number(subLvInput.value)];
                     _renderSubLevelInfo(subLevels[Number(subLvInput.value)]);
+                    _renderSubSkill(subLevels[Number(subLvInput.value)]);
                 };
                 subLvInput.onchange = async () => {
                     const newLv = subLevels[Number(subLvInput.value)];
                     if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(_subHero, newLv);
                     _renderSubLevelInfo(newLv);
+                    _renderSubSkill(newLv);
                     // 🔴 2026-10-14 性能：图库槽位跳过全卡池角标重铺
                     const _libSlot = badge.closest('.ll-slot');
                     if (_libSlot && typeof window._llReapplySlot === 'function') { await window._llReapplySlot(_libSlot); }
@@ -12114,6 +12162,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 subLvWrap.appendChild(subLvInfo);
                 sec.appendChild(subLvWrap);
                 _renderSubLevelInfo(subLevels[subLvIndex]);
+                _renderSubSkill(subLevels[subLvIndex]);
 
                 const subMhTitle = document.createElement('div');
                 subMhTitle.style.cssText = 'color:#a855f7;margin:8px 0 4px;font-size:0.78rem;';
