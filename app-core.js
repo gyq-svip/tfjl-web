@@ -29738,6 +29738,8 @@ ${maSection}
                 html += '</div>';
                 html += '<div style="font-size:1.02rem;font-weight:700;color:#60a5fa;margin-bottom:4px;">🎨 ' + _esc(name) + '</div>';
                 html += '<div style="font-size:0.72rem;color:#fbbf24;margin-bottom:6px;">所属英雄：' + _esc(x.heroName) + '</div>';
+                if (sk.describe) html += '<div style="font-size:0.7rem;color:rgba(255,255,255,0.82);line-height:1.4;margin-bottom:4px;">' + _esc(sk.describe) + '</div>';
+                if (sk.extraParam) html += '<div style="font-size:0.66rem;color:rgba(255,255,255,0.5);line-height:1.4;">获取：' + _esc(sk.extraParam) + '</div>';
                 html += '</div>';
             });
             html += '</div>';
