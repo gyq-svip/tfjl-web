@@ -10934,6 +10934,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
             lvSlider.onchange = () => applyLevel(curLevel)
 
+            const drSide = handType === 'my' ? '我的' : '队友'
             function statRowsHtml() {
                 const row = hdRowAt(meta && meta.stats, curLevel) || {}
                 // stats 缺该级数据时回落到英雄级 attrs.damageType（部分英雄无分档 stats）
@@ -10948,11 +10949,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     '<span style="flex:1;font-size:clamp(10px,1.05vw,13px);color:#9fc7ff;">' + label.t + '</span>' +
                     '<span style="font-size:clamp(11px,1.2vw,14px);font-weight:900;color:#fff;">' + val + '</span>' +
                     '</div>'
+                // 🔴 2026-10-20 减伤读数：与主页「减伤」弹窗同一套 drTables，实时一致
+                const drT = getDrTable(drSide)
+                const drVal = (drT.洗炼 && drT.洗炼[mainName] != null) ? drT.洗炼[mainName] : null
                 return (
                     mk({ ico: '⚔️', t: '攻击力' }, row.attack != null ? row.attack : '—') +
                     mk({ ico: '🔧', t: '攻击类型' }, dtype) +
                     mk({ ico: '⚡', t: '攻速' }, speed) +
-                    mk({ ico: '❤️', t: '生命' }, row.hp != null ? row.hp : '—')
+                    mk({ ico: '❤️', t: '生命' }, row.hp != null ? row.hp : '—') +
+                    mk({ ico: '🛡', t: '减伤' }, drVal != null ? drVal + '%' : '—')
                 )
             }
 
@@ -11043,6 +11048,62 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     wrap.appendChild(b)
                 })
                 pop.appendChild(wrap)
+            }))
+
+            // 减伤 / 洗炼（第 2 个按钮，对齐官方洗炼图标位）
+            const ensureWashExtras = () => {
+                if (typeof window.cardWashExtras === 'undefined') {
+                    try { window.cardWashExtras = JSON.parse(localStorage.getItem('tdjl_card_wash_extras') || '{}') || {} } catch (e) { window.cardWashExtras = {} }
+                }
+                return window.cardWashExtras
+            }
+            const saveWashExtras = () => { try { localStorage.setItem('tdjl_card_wash_extras', JSON.stringify(window.cardWashExtras)) } catch (e) {} }
+            // 🔴 洗炼词条：减伤参与计算（与主页减伤弹窗同一套 drTables），其余仅展示、不参与计算
+            const WASH_TYPES = [
+                { key: '减伤', computed: true, unit: '%' },
+                { key: '暴击', computed: false, unit: '%' },
+                { key: '攻速', computed: false, unit: '%' },
+                { key: '生命', computed: false, unit: '%' },
+                { key: '攻击', computed: false, unit: '%' },
+                { key: '法强', computed: false, unit: '%' }
+            ]
+            actions.appendChild(roundBtn(null, '减伤', () => {
+                if (pop.dataset.mode === 'dr') { pop.style.display = 'none'; pop.dataset.mode = ''; return }
+                pop.dataset.mode = 'dr'
+                pop.style.display = 'block'
+                const extras = ensureWashExtras()
+                const ex = extras[mainName] || {}
+                let rows = ''
+                WASH_TYPES.forEach((w) => {
+                    let val = ''
+                    if (w.computed) { const tb = getDrTable(drSide); val = (tb.洗炼 && tb.洗炼[mainName] != null) ? tb.洗炼[mainName] : '' }
+                    else { val = (ex[w.key] != null) ? ex[w.key] : '' }
+                    rows += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
+                        '<span style="flex:1;font-size:12px;color:#eaf4ff;">' + w.key + (w.computed ? ' <span style="color:#ffd75e;">(计算)</span>' : ' <span style="color:#8a9bb5;">(展示)</span>') + '</span>' +
+                        '<input type="number" step="0.1" min="0" data-wash="' + w.key + '" value="' + val + '" style="width:72px;padding:4px 6px;border-radius:6px;border:1px solid rgba(120,190,255,0.4);background:rgba(0,0,0,0.3);color:#fff;font-size:12px;">' +
+                        '<span style="font-size:11px;color:#9fc7ff;width:14px;">' + w.unit + '</span></div>'
+                })
+                pop.innerHTML = '<div style="font-size:12px;color:#9fc7ff;font-weight:800;margin-bottom:6px;">洗炼（减伤与词条）</div>' + rows +
+                    '<div style="margin-top:4px;font-size:10.5px;line-height:1.5;color:#8a9bb5;">减伤数值与主页「减伤」弹窗实时同步、参与计算；其余词条仅展示，不参与计算（模拟逼真）。</div>'
+                pop.querySelectorAll('input[data-wash]').forEach((inp) => {
+                    inp.oninput = () => {
+                        const key = inp.dataset.wash
+                        const v = parseFloat(inp.value) || 0
+                        const wt = WASH_TYPES.find((x) => x.key === key)
+                        if (wt.computed) {
+                            const tb = getDrTable(drSide)
+                            tb.洗炼 = tb.洗炼 || {}
+                            if (v > 0) tb.洗炼[mainName] = v; else delete tb.洗炼[mainName]
+                            if (typeof saveDamageReductionData === 'function') saveDamageReductionData()
+                            if (typeof updateDamageReductionDisplay === 'function') updateDamageReductionDisplay()
+                        } else {
+                            const e2 = (extras[mainName] = extras[mainName] || {})
+                            if (v > 0) e2[key] = v; else delete e2[key]
+                            saveWashExtras()
+                        }
+                        if (typeof renderBody === 'function') renderBody()
+                    }
+                })
             }))
 
             // 魔化
