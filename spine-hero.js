@@ -221,7 +221,13 @@
         ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, w, h)
         const sw = vbVis.size.x, sh = vbVis.size.y
         if (!(sw > 0 && sh > 0)) return
-        const fitScale = Math.min(w / sw, h / sh) * (opts.fitPadding != null ? opts.fitPadding : 0.9)
+        const pad = (opts.fitPadding != null ? opts.fitPadding : 0.9)
+        let fitScale = Math.min(w / sw, h / sh) * pad
+        if (opts.fitByHeight) {
+          // 统一视觉高度：以「可见高度 = 画布高 × pad」为基准缩放，宽度只做溢出保护。
+          // 此前用 min(w/sw, h/sh) 会让偏宽的模型被整体压小，导致各卡角色大小不一。
+          fitScale = Math.min((h / sh) * pad, (w * 0.96) / sw)
+        }
         const cx = vbVis.off.x + sw / 2
         ctx.save()
         if (opts.anchorFeet != null) {

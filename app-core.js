@@ -7980,6 +7980,18 @@
             return parts;
         }
 
+        // 🔴 2026-10-20 工程类官方卡名都是 4 字（邪能火炮/地精宝库/微型潜艇/侏儒射线/咬人娃娃）。
+        //    其中「地精宝库」前两字「地精」恰是已知英雄，会被 splitIntoHeroes 误拆成融合卡 [地精,宝库]，
+        //    导致工程卡皮肤/等级/融合判定全错。判定为「官方英雄整名」时一律按单卡处理：
+        //    静态名单兜底（heroes.json 尚未加载时也安全）+ 官方英雄表动态校验。
+        const ENGINEER_4CHAR_CARDS = ['邪能火炮', '地精宝库', '微型潜艇', '侏儒射线', '咬人娃娃'];
+        function isOfficialSingleCard(name) {
+            if (!name) return false;
+            if (ENGINEER_4CHAR_CARDS.indexOf(name) >= 0) return true;
+            try { if (window.heroesOfficialMap && window.heroesOfficialMap[name]) return true; } catch (e) {}
+            return false;
+        }
+
         function getMainCardName(cardName) {
             if (!cardName) return cardName;
             // 云端已启用(有≥1条融合定义)时，严格只认云端：云端定义的融合卡取主卡(part[0])，
@@ -8003,6 +8015,8 @@
                 return cardName.substring(0, 2);
             }
             const heroSet = getAllHeroNames();
+            // 官方英雄整名（含工程类 4 字卡）→ 单卡
+            if (isOfficialSingleCard(cardName)) return cardName;
             // 单卡：直接返回
             if (heroSet.has(cardName)) return cardName;
             // 通用融合检测：术士等"1字英雄组成的2字融合"(如 影魇) 也能识别，返回第一个英雄
@@ -8060,6 +8074,7 @@
             //    真单卡（如 咬人娃娃）整名已录入 DEFAULT_CARD_SKINS / cloudCards（二者都进 heroSet），
             //    一旦在 heroSet 中即直接判单卡返回 null，避免 splitIntoHeroes 按前缀把它拆成 [咬人,娃娃] 误判融合。
             //    即便某真单卡意外没进 heroSet，也显式再查一次 DEFAULT_CARD_SKINS / cloudCards 兜底拦截。
+            if (isOfficialSingleCard(cardName)) return null;
             if (heroSet.has(cardName)) return null;
             if (DEFAULT_CARD_SKINS[cardName] || (window.cloudCards && window.cloudCards[cardName])) return null;
             const parts = splitIntoHeroes(cardName, heroSet);
@@ -10721,9 +10736,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 }
             } catch (e) {}
             const auraEl = document.createElement('div')
-            // 官方版式：光环环绕角色躯干（不是平铺在脚下），直径约角色可见高度的 0.7 倍、中心落在腰腹；
-            // top 即圆心（动画 transform 带 translate(-50%,-50%)）；z-index 压在 Spine 之上，环带可见穿过身体两侧
-            auraEl.style.cssText = 'position:absolute;left:50%;top:38%;width:min(21%,210px);aspect-ratio:1/1;background:url(hero-ui/aura.png) center/contain no-repeat;pointer-events:none;z-index:2;display:none;animation:hdAuraSpin 16s linear infinite;filter:drop-shadow(0 0 6px rgba(140,0,0,0.55));'
+            // 官方版式：光环环绕角色躯干（不是平铺在脚下），直径略大于角色肩宽、中心落在腰腹；
+            // top 即圆心（动画 transform 带 translate(-50%,-50%)）；z-index 低于 Spine 画布 → 环从角色身后透出，不遮挡人物
+            auraEl.style.cssText = 'position:absolute;left:50%;top:40%;width:min(27%,270px);aspect-ratio:1/1;background:url(hero-ui/aura.png) center/contain no-repeat;pointer-events:none;z-index:0;display:none;animation:hdAuraSpin 16s linear infinite;filter:drop-shadow(0 0 6px rgba(140,0,0,0.55));'
             card.appendChild(auraEl)
             const shadowEl = document.createElement('div')
             shadowEl.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);bottom:11%;width:30%;height:8%;background:url(hero-ui/shadow.png) center/contain no-repeat;opacity:0.5;pointer-events:none;z-index:1;'
@@ -10913,7 +10928,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
             function statRowsHtml() {
                 const row = hdRowAt(meta && meta.stats, curLevel) || {}
-                const dtype = row.damageType != null ? (HD_DTYPE[row.damageType] || '—') : '—'
+                // stats 缺该级数据时回落到英雄级 attrs.damageType（部分英雄无分档 stats）
+                const dtypeRaw = (row.damageType != null && row.damageType !== '')
+                    ? row.damageType
+                    : (meta && meta.attrs ? meta.attrs.damageType : null)
+                const dtype = (dtypeRaw != null && dtypeRaw !== '') ? (HD_DTYPE[dtypeRaw] || '—') : '—'
                 const speed = row.cd ? (Number(row.cd) / 1000).toFixed(2) + '秒/次' : '—'
                 const mk = (label, val) =>
                     '<div style="display:flex;align-items:center;gap:8px;background:rgba(20,60,110,0.55);border-radius:8px;padding:7px 9px;margin-bottom:6px;">' +
@@ -11410,16 +11429,45 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         const subMeta = (window.heroesOfficialMap || {})[sub] || {}
                         const skinList = (skinsApp && skinsApp.length) ? skinsApp : ['默认'].concat((subMeta.skins || []).map((s) => s.note).filter(Boolean))
                         const curSkin = (typeof getFusionComponentSkin === 'function') ? (getFusionComponentSkin(sub) || '默认') : '默认'
+                        // 副卡属性（跟随等级与皮肤实时变化）
+                        const subStatHtml = (lvNow) => {
+                            const srow = (typeof hdRowAt === 'function' ? hdRowAt(subMeta.stats, lvNow) : null) || {}
+                            const sdtRaw = (srow.damageType != null && srow.damageType !== '')
+                                ? srow.damageType
+                                : (subMeta.attrs ? subMeta.attrs.damageType : null)
+                            const sdt = (sdtRaw != null && sdtRaw !== '') ? (HD_DTYPE[sdtRaw] || '—') : '—'
+                            const sp = srow.cd ? (Number(srow.cd) / 1000).toFixed(2) + '秒/次' : '—'
+                            const skinRow = (subMeta.skins || []).find((s) => s.note === curSkin)
+                            const skinHp = skinRow && Number(skinRow.heroSkinHp) > 0 ? Number(skinRow.heroSkinHp) : 0
+                            const row = (ico, t, v) =>
+                                '<div style="display:flex;gap:5px;align-items:center;font-size:11px;line-height:1.6;">' +
+                                '<span style="width:12px;">' + ico + '</span><span style="flex:1;color:#b9cde6;">' + t + '</span>' +
+                                '<b style="color:#fff;">' + v + '</b></div>'
+                            return row('⚔️', '攻击力', srow.attack != null ? srow.attack : '—') +
+                                row('🔧', '攻击类型', sdt) +
+                                row('⚡', '攻速', sp) +
+                                row('❤️', '生命', srow.hp != null ? srow.hp : '—') +
+                                (skinHp ? row('✨', '皮肤生命', '+' + skinHp) : '') +
+                                (skinRow && skinRow.describe
+                                    ? '<div style="margin-top:4px;font-size:10px;line-height:1.45;color:#9fb6cf;">' + esc(skinRow.describe) + '</div>'
+                                    : '')
+                        }
                         subBox.innerHTML =
                             '<div style="font-weight:900;color:#ffd75e;margin-bottom:6px;">副卡：' + esc(sub) + '</div>' +
                             '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">' +
                             '<span>等级</span><b style="color:#ffd75e;min-width:2ch;text-align:center;" id="hdFuseSubLv">' + levels[lvIdx] + '</b>' +
                             '<input type="range" min="0" max="' + (levels.length - 1) + '" step="1" value="' + lvIdx + '" style="flex:1;accent-color:#e8a91c;" id="hdFuseSubSlider">' +
                             '</div>' +
+                            '<div id="hdFuseSubStats" style="margin-bottom:8px;padding:6px 7px;background:rgba(0,0,0,0.28);border-radius:8px;">' + subStatHtml(levels[lvIdx]) + '</div>' +
                             '<div style="margin-bottom:4px;">皮肤</div>' +
                             '<div id="hdFuseSubSkins" style="display:flex;flex-wrap:wrap;gap:4px;max-height:96px;overflow-y:auto;"></div>'
                         const slider = subBox.querySelector('#hdFuseSubSlider')
-                        slider.oninput = () => { subBox.querySelector('#hdFuseSubLv').textContent = levels[Number(slider.value)] }
+                        slider.oninput = () => {
+                            const lvNow = levels[Number(slider.value)]
+                            subBox.querySelector('#hdFuseSubLv').textContent = lvNow
+                            const statBox = subBox.querySelector('#hdFuseSubStats')
+                            if (statBox) statBox.innerHTML = subStatHtml(lvNow)
+                        }
                         slider.onchange = async () => {
                             const newLv = levels[Number(slider.value)]
                             if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(sub, newLv)
@@ -11520,7 +11568,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (!man) return
                     const model = hdSkinModel(curSkin) || (meta.spineModel || '')
                     const pngs = model ? ((man.modelPngs && man.modelPngs[model]) || 0) : (man.pngs || 0)
-                    window.spineHero.play(cv, meta.spine, { fitPadding: 0.58, pngs, model, anchorFeet: 0.71, tight: true })
+                    window.spineHero.play(cv, meta.spine, { fitPadding: 0.58, pngs, model, anchorFeet: 0.71, tight: true, fitByHeight: true })
                 } catch (e) {}
             }
 
