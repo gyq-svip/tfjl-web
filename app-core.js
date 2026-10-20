@@ -11937,7 +11937,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         window.showHeroDetailModal = showHeroDetailModal
         // 🔴 2026-10-21 页面加载 8 秒后在空闲时段后台预热全部英雄动画资源（进度存 localStorage，可断点续传）
         setTimeout(function () {
-            try { if (window.spineHero && window.spineHero.preloadAll) window.spineHero.preloadAll() } catch (e) {}
+            try {
+                let inc = false
+                try { inc = localStorage.getItem('tfjl_spine_preload_skins') === '1' } catch (e) {}
+                if (window.spineHero && window.spineHero.preloadAll) window.spineHero.preloadAll({ includeSkins: inc })
+            } catch (e) {}
         }, 8000)
 
         // ===== 动画资源缓存：菜单/诊断页进度展示 + 详情弹窗 =====
@@ -11980,7 +11984,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             h += '<button onclick="window.spineHero&&window.spineHero.preloadStop();setTimeout(refreshSpineCacheInfo,300)" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">⏸ 停止</button>'
             h += '<button onclick="if(confirm(\'清空动画预热记录？缓存文件仍在，只会重新开始统计并按需重拉。\')){window.spineHero&&window.spineHero.preloadReset();setTimeout(refreshSpineCacheInfo,300)}" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">🔄 重置进度</button>'
             h += '</div>'
-            h += '<div style="margin-top:10px;font-size:0.72rem;color:rgba(255,255,255,0.45);line-height:1.7;">说明：默认只预热各英雄的默认造型（约 20-30MB），皮肤模型按需（打开皮肤时才拉）。点击「连皮肤一起预热」会把全部皮肤骨骼也拉下来（体积较大，建议在 WiFi 下、且不着急时用）。</div>'
+            let _skinsOn = false
+            try { _skinsOn = localStorage.getItem('tfjl_spine_preload_skins') === '1' } catch (e) {}
+            h += '<label style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:0.76rem;color:#d1c4e9;cursor:pointer;user-select:none;">' +
+                '<input type="checkbox" ' + (_skinsOn ? 'checked' : '') + ' onchange="try{localStorage.setItem(\'tfjl_spine_preload_skins\',this.checked?\'1\':\'0\');if(this.checked&&window.spineHero)window.spineHero.preloadAll({includeSkins:true});setTimeout(refreshSpineCacheInfo,300)}catch(e){}" style="accent-color:#b39ddb;">' +
+                ' 空闲时自动预热皮肤模型（默认关：默认模型约 22MB，皮肤再 +约 62MB）</label>'
+            h += '<div style="margin-top:10px;font-size:0.72rem;color:rgba(255,255,255,0.45);line-height:1.7;">说明：默认只预热各英雄的默认造型（98 个 ≈22MB，点开任何英雄都秒出）；皮肤模型共 275 个 ≈62MB，默认按需（打开皮肤时才拉那一个，之后也秒开）。勾上开关或点「连皮肤一起预热」会在空闲时段把全部皮肤骨骼也拉下来，建议在 WiFi 且不急时挂着跑。</div>'
             return h
         }
         window.showSpineCacheInfo = function () {
