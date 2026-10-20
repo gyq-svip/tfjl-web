@@ -11952,7 +11952,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 if (mi) {
                     mi.textContent = !s || !s.base
                         ? '🎬 动画资源：—'
-                        : '🎬 动画资源：' + s.baseDone + '/' + s.base + (s.running ? ' ⏳预热中' : (s.baseDone >= s.base ? ' ✅' : ''))
+                        : '🎬 动画资源:' + s.baseDone + '/' + s.base + (s.running ? ' ⏳' : (s.baseDone >= s.base ? ' ✅' : ''))
                 }
                 const dg = document.getElementById('spineCacheDiag')
                 if (dg && s && s.base) {
