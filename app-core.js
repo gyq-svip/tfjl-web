@@ -10941,7 +10941,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const dtypeRaw = (row.damageType != null && row.damageType !== '')
                     ? row.damageType
                     : (meta && meta.attrs ? meta.attrs.damageType : null)
-                const dtype = (dtypeRaw != null && dtypeRaw !== '') ? (HD_DTYPE[dtypeRaw] || '—') : '—'
+                // 🔴 2026-10-20 攻击类型按职业推导（用户提供的职业→类型映射：覆盖 legacy damageType，避免熊猫等被错算成物理）
+                const dtype = HD_OCC_DTYPE[Number(meta && meta.occupation)] || ((dtypeRaw != null && dtypeRaw !== '') ? (HD_DTYPE[dtypeRaw] || '—') : '—')
                 const speed = row.cd ? (Number(row.cd) / 1000).toFixed(2) + '秒/次' : '—'
                 const mk = (label, val) =>
                     '<div style="display:flex;align-items:center;gap:8px;background:rgba(20,60,110,0.55);border-radius:8px;padding:7px 9px;margin-bottom:6px;">' +
@@ -11067,7 +11068,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 { key: '攻击', computed: false, unit: '%' },
                 { key: '法强', computed: false, unit: '%' }
             ]
-            actions.appendChild(roundBtn(null, '减伤', () => {
+            actions.appendChild(roundBtn('hero-ui/icon-wash.png', '减伤', () => {
                 if (pop.dataset.mode === 'dr') { pop.style.display = 'none'; pop.dataset.mode = ''; return }
                 pop.dataset.mode = 'dr'
                 pop.style.display = 'block'
@@ -11451,7 +11452,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
                     // —— 副卡设置区（等级 / 皮肤 / 魔化）：被融合卡的设置 ——
                     const subBox = document.createElement('div')
-                    subBox.style.cssText = 'position:absolute;left:12px;top:10px;width:200px;max-height:calc(100% - 24px);overflow-y:auto;background:rgba(20,14,6,0.85);border:1px solid rgba(255,200,120,0.4);border-radius:10px;padding:10px;color:#ffe9c9;font-size:12px;display:none;'
+                    subBox.style.cssText = 'position:absolute;left:12px;top:10px;width:200px;max-height:calc(100% - 118px);overflow-y:auto;background:rgba(20,14,6,0.85);border:1px solid rgba(255,200,120,0.4);border-radius:10px;padding:10px;color:#ffe9c9;font-size:12px;display:none;'
                     sh.body.appendChild(subBox)
                     // 把「当前预览的融合形态」写回卡牌（图库槽位 / 战场槽位 / 手牌）；皮肤或等级改动后同样要重刷
                     const reapplyPreviewCard = async () => {
