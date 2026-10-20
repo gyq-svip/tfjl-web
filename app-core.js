@@ -10692,7 +10692,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         // 🔴 攻击类型按职业推导（覆盖 heroes.json 逐英雄手写的 damageType，避免同一职业几种值不一致）
         //    来源：用户提供的职业→攻击类型映射（战士纯粹/猎人物理/法师魔法/牧师治疗/召唤召唤/熊猫元素/工程真实/术士真实）
         //    精灵(6)/龙族(10) 未提供，走下方 HD_DTYPE[damageType] 兜底
-        const HD_OCC_DTYPE = { 1: '纯粹伤害', 2: '物理伤害', 3: '魔法伤害', 4: '治疗', 5: '召唤', 7: '元素', 8: '真实伤害', 9: '真实伤害' }
+        const HD_OCC_DTYPE = { 1: '纯粹伤害', 2: '物理伤害', 3: '魔法伤害', 4: '治疗', 5: '召唤', 6: '特殊', 7: '元素', 8: '真实伤害', 9: '真实伤害' }
 
         // 取当前等级生效行（与官方同口径：取 level ≤ 当前等级的最后一行）
         function hdRowAt(stats, lv) {
