@@ -29556,13 +29556,20 @@ ${maSection}
                     if (!cv) return;
                     if (en.isIntersecting && en.intersectionRatio >= 0.25) {
                         if (playing.has(cv)) return;
-                        playing.add(cv);
                         const _spFolder = stage.getAttribute('data-spine')
+                        if (!_spFolder) return; // 无动画占位舞台
+                        playing.add(cv);
+                        // 🔴 2026-10-21 播放参数与主面板对齐（fitByHeight/tight/anchorFeet/逐英雄scale），修复不同英雄忽大忽小
+                        const _spMan = (window.__heroSpineIndex && window.__heroSpineIndex[_spFolder]) || {}
                         const _spHero = (window.__heroCodexCache || []).find(function (x) { return x.spine === _spFolder && (!x.spineModel || !stage.getAttribute('data-model') || x.spineModel === stage.getAttribute('data-model')) })
                         window.spineHero.play(cv, _spFolder, {
-                            fitPadding: 0.92,
+                            fitPadding: 0.58,
+                            anchorFeet: 0.71,
+                            tight: true,
+                            fitByHeight: true,
+                            scale: _spMan.scale || 1,
                             model: (stage.getAttribute('data-model') || (_spHero && _spHero.spineModel) || ''),
-                            pngs: (window.__heroSpineIndex && window.__heroSpineIndex[_spFolder] || {}).pngs || 0,
+                            pngs: _spMan.pngs || 0,
                             onStatus: function (s) {
                                 const el = stage.querySelector('.codex-spine-status');
                                 if (el) el.textContent = s || '';
@@ -29645,14 +29652,16 @@ ${maSection}
                 html += '<span style="font-size:1.05rem;font-weight:700;color:' + c + ';">' + _esc(h.name) + '</span>';
                 html += '<span style="font-size:0.62rem;padding:2px 6px;border-radius:6px;background:' + c + '22;color:' + c + ';">' + (colorName[h.heroColor] || h.heroColor) + '</span>';
                 html += '</div>';
-                // spine 动画舞台：仅清单内已导出的英雄；canvas 由 setupHeroCodexSpine 按可见性懒播放
+                // spine 动画舞台：所有英雄统一 150px 舞台（无动画的显示占位），保证卡片尺寸一致
                 const spineFolder = (h.spine && spineIndex[h.spine]) ? h.spine : '';
+                html += '<div class="codex-spine-stage"' + (spineFolder ? ' data-spine="' + _esc(spineFolder) + '" data-model="' + _esc(h.spineModel || '') + '"' : '') + ' style="position:relative;height:150px;margin:2px 0 8px;border-radius:8px;overflow:hidden;background:linear-gradient(160deg,rgba(20,26,50,0.55),rgba(13,27,42,0.55));border:1px solid ' + c + '33;">';
                 if (spineFolder) {
-                    html += '<div class="codex-spine-stage" data-spine="' + _esc(spineFolder) + '" data-model="' + _esc(h.spineModel || '') + '" style="position:relative;height:150px;margin:2px 0 8px;border-radius:8px;overflow:hidden;background:linear-gradient(160deg,rgba(20,26,50,0.55),rgba(13,27,42,0.55));border:1px solid ' + c + '33;">';
                     html += '<canvas style="position:absolute;inset:0;width:100%;height:100%;"></canvas>';
                     html += '<div class="codex-spine-status" style="position:absolute;left:50%;bottom:5px;transform:translateX(-50%);font-size:0.6rem;color:rgba(255,255,255,0.5);pointer-events:none;white-space:nowrap;"></div>';
-                    html += '</div>';
+                } else {
+                    html += '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.68rem;color:rgba(255,255,255,0.35);pointer-events:none;">暂无动画</div>';
                 }
+                html += '</div>';
                 html += '<div style="font-size:0.7rem;color:rgba(255,255,255,0.6);margin-bottom:6px;">职业：' + (occName[h.occupation] || h.occupation) + '</div>';
                 if (h.heroDesc) html += '<div style="font-size:0.72rem;color:rgba(255,255,255,0.8);margin-bottom:6px;">' + _esc(h.heroDesc) + '</div>';
                 if (h.passiveName) html += '<div style="font-size:0.72rem;margin-bottom:4px;"><b style="color:#fbbf24;">' + _esc(h.passiveName) + '</b></div>';
