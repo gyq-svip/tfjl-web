@@ -352,6 +352,10 @@
           localSkins.push({ name: skinName, url: url, path: null, loaded: true, remote: true, stale: !!opts.stale });
           addedCount++;
         }
+        // 🔴 2026-10-20 修复：刚发布的皮肤在发布前曾被 404 → 负缓存会永久挡住它（_getCachedSkinUrl 直接返回 null）。
+        //    同步成功确认该皮肤线上存在 → 清掉其 404 负缓存，允许后续正常加载入 IndexedDB。
+        var _sk404k = 'skin:' + hn + '/' + remoteSkin.file;
+        if (_skin404 && _skin404[_sk404k]) { delete _skin404[_sk404k]; try { _skin404Save(); } catch (e) {} }
       }
     }
     return addedCount;
@@ -544,6 +548,13 @@
     }
     if (target === null || target === undefined || target === '') return null;
     var skin = findSkin(skins, target);
+    if (!skin && _syncInFlight && _syncPromise) {
+      // 后台同步可能正把刚发布的皮肤（如新英雄/新皮肤首次上线）补进 registry：
+      // 等这次同步完成再解析一次，避免「弹窗缩略图用旧 registry 解析不到 → 回落默认皮」的时序问题。
+      try { await _syncPromise; } catch (e) {}
+      skins = window.skinRegistry[baseHero] || skins;
+      skin = findSkin(skins, target);
+    }
     var entry = skin || findSkin(skins, baseHero) || skins[0];
     if (!entry) return null;
     if (entry.url) {
