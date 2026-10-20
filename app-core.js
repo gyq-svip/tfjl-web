@@ -11628,6 +11628,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         preview = opt
                         paintCircles()
                         paintSubSettings()
+                        paintFuseRow()
+                        paintFuseSkinRow()
                         const slotEl = badge && badge.closest ? badge.closest('.battle-slot') : null
                         if (libSlot) {
                             const lt = libSlot.getAttribute('data-tab'), ll = libSlot.getAttribute('data-lid'), lsd = libSlot.getAttribute('data-side') || 'my'
@@ -11647,7 +11649,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         }
                         try { updateAllCardLevelBadges() } catch (e) {}
                     }
-                    // 🔴 融合对象切换：每个可融合副卡一个按钮（酋长/土灵…），点击切预览并写回卡牌
+                    // 🔴 顶部快捷切换：每个可融合副卡一个按钮（酋长/土灵…）
                     function paintPartnerRow() {
                         let vs = []
                         try { vs = (typeof getFusionVariantsForBase === 'function') ? getFusionVariantsForBase(baseHero) : [] } catch (e) {}
@@ -11665,10 +11667,70 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         })
                     }
                     paintPartnerRow()
+                    // 🔴 底部：所有可融合卡缩略图（点击切换融合卡）+ 当前融合卡皮肤切换
+                    const fuseRow = document.createElement('div')
+                    fuseRow.style.cssText = 'position:absolute;left:224px;right:236px;bottom:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;justify-content:center;z-index:5;'
+                    sh.body.appendChild(fuseRow)
+                    const fuseSkinRow = document.createElement('div')
+                    fuseSkinRow.style.cssText = 'position:absolute;left:224px;right:236px;bottom:98px;display:flex;flex-wrap:wrap;gap:4px;justify-content:center;align-items:center;z-index:5;'
+                    sh.body.appendChild(fuseSkinRow)
+                    function paintFuseRow() {
+                        let vs = []
+                        try { vs = (typeof getFusionVariantsForBase === 'function') ? getFusionVariantsForBase(baseHero) : [] } catch (e) {}
+                        fuseRow.innerHTML = ''
+                        if (!vs.length) { fuseRow.style.display = 'none'; return }
+                        fuseRow.style.display = 'flex'
+                        vs.forEach((fn) => {
+                            const parts = (typeof getFusionParts === 'function') ? getFusionParts(fn) : null
+                            const partner = (parts && parts.length >= 2) ? parts[1] : fn
+                            const item = document.createElement('div')
+                            item.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;'
+                            const im = document.createElement('img')
+                            im.style.cssText = 'width:54px;height:54px;border-radius:10px;object-fit:cover;background:rgba(0,0,0,0.4);border:2px solid ' + (preview === fn ? '#ffd75e' : 'rgba(255,220,150,0.3)') + ';'
+                            const lb = document.createElement('div')
+                            lb.textContent = fn
+                            lb.style.cssText = 'font-size:10px;color:' + (preview === fn ? '#ffd75e' : '#c9b28a') + ';max-width:78px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
+                            item.appendChild(im)
+                            item.appendChild(lb)
+                            item.onclick = async () => { if (preview !== fn) await applyPreviewOpt(fn) }
+                            hdPortraitUrl(partner, partner).then((u) => { if (u) im.src = u }).catch(() => {})
+                            fuseRow.appendChild(item)
+                        })
+                    }
+                    function paintFuseSkinRow() {
+                        const fm = (window.heroesOfficialMap || {})[preview] || {}
+                        const notes = ((fm.skins) || []).map((s) => s.note).filter(Boolean)
+                        fuseSkinRow.innerHTML = ''
+                        if (!notes.length) { fuseSkinRow.style.display = 'none'; return }
+                        fuseSkinRow.style.display = 'flex'
+                        const cap = document.createElement('span')
+                        cap.textContent = '融合皮肤'
+                        cap.style.cssText = 'font-size:10px;color:#c9b28a;font-weight:700;margin-right:2px;'
+                        fuseSkinRow.appendChild(cap)
+                        let cur = '默认'
+                        try { cur = (typeof getCardSkin === 'function') ? (getCardSkin(cardId, preview, handType) || '默认') : '默认' } catch (e) {}
+                        ;['默认'].concat(notes).forEach((sk) => {
+                            const b = document.createElement('button')
+                            b.textContent = sk
+                            b.style.cssText = 'padding:2px 8px;border-radius:10px;font-size:10px;cursor:pointer;border:1px solid ' + (sk === cur ? '#ffd75e' : 'rgba(255,220,150,0.3)') + ';background:' + (sk === cur ? 'rgba(255,215,94,0.2)' : 'transparent') + ';color:#ffe9c9;'
+                            b.onclick = async () => {
+                                if (libSlot && typeof window._llSet === 'function') {
+                                    const lt = libSlot.getAttribute('data-tab'), ll = libSlot.getAttribute('data-lid'), lsd = libSlot.getAttribute('data-side') || 'my'
+                                    window._llSet(lt, ll, 'skin', (baseHero || preview) + '#' + lsd, sk)
+                                    if (typeof window._llReapplySlot === 'function') { try { await window._llReapplySlot(libSlot) } catch (e) {} }
+                                } else if (typeof setCardSkin === 'function') {
+                                    try { await setCardSkin(cardId, sk, handType) } catch (e) {}
+                                }
+                                try { updateAllCardLevelBadges() } catch (e) {}
+                                paintFuseSkinRow()
+                            }
+                            fuseSkinRow.appendChild(b)
+                        })
+                    }
+                    paintFuseRow()
+                    paintFuseSkinRow()
                     // 云端融合定义(fusions.json)晚到时重建（页面启动先用 localStorage 旧缓存，新加融合会漏）
-                    window.__hdFuseRefreshPartnerRow = () => { try { if (pRow && pRow.isConnected) paintPartnerRow() } catch (e) {} }
-                    stripEl = hdThumbStrip(sh.body, baseHero, [baseHero].concat(variants), cardName, applyPreviewOpt, function (label) { var h = heroOf(label); return hdPortraitUrl(h, h) })
-                    syncStripOffset()
+                    window.__hdFuseRefreshPartnerRow = () => { try { if (pRow && pRow.isConnected) { paintPartnerRow(); paintFuseRow(); paintFuseSkinRow() } } catch (e) {} }
                 }
             }
 
