@@ -11390,7 +11390,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
                     // —— 副卡设置区（等级 / 皮肤 / 魔化）：被融合卡的设置 ——
                     const subBox = document.createElement('div')
-                    subBox.style.cssText = 'position:absolute;left:12px;top:10px;width:200px;background:rgba(20,14,6,0.85);border:1px solid rgba(255,200,120,0.4);border-radius:10px;padding:10px;color:#ffe9c9;font-size:12px;display:none;'
+                    subBox.style.cssText = 'position:absolute;left:12px;top:10px;width:200px;max-height:calc(100% - 24px);overflow-y:auto;background:rgba(20,14,6,0.85);border:1px solid rgba(255,200,120,0.4);border-radius:10px;padding:10px;color:#ffe9c9;font-size:12px;display:none;'
                     sh.body.appendChild(subBox)
                     // 把「当前预览的融合形态」写回卡牌（图库槽位 / 战场槽位 / 手牌）；皮肤或等级改动后同样要重刷
                     const reapplyPreviewCard = async () => {
@@ -11453,7 +11453,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                                 '<div style="display:flex;gap:5px;align-items:center;font-size:11px;line-height:1.6;">' +
                                 '<span style="width:12px;">' + ico + '</span><span style="flex:1;color:#b9cde6;">' + t + '</span>' +
                                 '<b style="color:#fff;">' + v + '</b></div>'
-                            return row('⚔️', '攻击力', srow.attack != null ? srow.attack : '—') +
+                            // 🔴 2026-10-20 副卡技能/被动：与主卡 paintAll 同数据路径（official tiers 按等级取档）
+                            const st = (subMeta.tiers || []).filter((t) => Number(t.level) <= Number(lvNow)).pop() || (subMeta.tiers || [])[0] || {}
+                            const subSkill = (st.skillDesc && String(st.skillDesc).trim()) || subMeta.skillDesc || ''
+                            const subPInit = (st.passiveInitial && String(st.passiveInitial).trim()) || String(subMeta.passiveDesc || '').replace(/^(初始被动|满星被动)\s*/, '')
+                            const subPFull = (st.passiveFull && String(st.passiveFull).trim()) || String(subMeta.passiveDesc2 || '').replace(/^(初始被动|满星被动)\s*/, '')
+                            let html = row('⚔️', '攻击力', srow.attack != null ? srow.attack : '—') +
                                 row('🔧', '攻击类型', sdt) +
                                 row('⚡', '攻速', sp) +
                                 row('❤️', '生命', srow.hp != null ? srow.hp : '—') +
@@ -11461,6 +11466,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                                 (skinRow && skinRow.describe
                                     ? '<div style="margin-top:4px;font-size:10px;line-height:1.45;color:#9fb6cf;">' + esc(skinRow.describe) + '</div>'
                                     : '')
+                            if (subSkill) html += '<div style="margin-top:6px;padding-top:5px;border-top:1px solid rgba(255,220,150,0.3);font-size:10.5px;line-height:1.5;"><b style="color:#ffd75e;">技能：</b>' + esc(subSkill) + '</div>'
+                            if (subPInit) html += '<div style="margin-top:4px;font-size:10.5px;line-height:1.5;"><b style="color:#8ef58a;">初始被动：</b>' + esc(subPInit) + '</div>'
+                            if (subPFull) html += '<div style="margin-top:3px;font-size:10.5px;line-height:1.5;"><b style="color:#ffd75e;">满星被动：</b>' + esc(subPFull) + '</div>'
+                            return html
                         }
                         subBox.innerHTML =
                             '<div style="font-weight:900;color:#ffd75e;margin-bottom:6px;">副卡：' + esc(sub) + '</div>' +
