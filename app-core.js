@@ -11563,17 +11563,22 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 if (pInit) ph += '<div style="display:flex;gap:6px;align-items:flex-start;"><img src="hero-ui/star-initial.png" alt="" style="width:14px;height:14px;margin-top:2px;"><span><b style="color:#8ef58a;">初始被动</b> ' + esc(pInit) + '</span></div>'
                 if (pFull) ph += '<div style="display:flex;gap:6px;align-items:flex-start;margin-top:4px;"><img src="hero-ui/star-full.png" alt="" style="width:14px;height:14px;margin-top:2px;"><span><b style="color:#ffd75e;">满星被动</b> ' + esc(pFull) + '</span></div>'
                 passiveCard.innerHTML = ph || '—'
-                // 魔化属性：开启魔化时展示其专属属性文本（先取 SKIN_ATTRIBUTES 魔化静态文案，再回落等级化 mohuaPassive）
+                // 魔化属性：开启魔化时展示其专属属性文本
+                // 🔴 2026-10-20 修复重复：不再走 getSkinAttribute（其优先返回动态属性全文，会把职业/技能/
+                //    初始被动/满星被动/当前等级整段重复一遍）——只取「魔化专属」文案：本地硬编码 → 自定义 → 云端 → heroAttrsData
                 try {
                     const mhOn = (typeof getCardMoHua === 'function') ? getCardMoHua(cardId, handType) : false
                     if (mhOn && (typeof hasMoHuaData !== 'function' || hasMoHuaData(mainName))) {
                         mohuaCard.style.display = ''
+                        const cloud = (typeof window !== 'undefined' && window.skinAttributesCloud) ? window.skinAttributesCloud : null
                         let mhTxt = ''
-                        const mhAttr = (typeof getSkinAttribute === 'function') ? getSkinAttribute(mainName, '魔化', false, curLevel) : null
-                        if (mhAttr && mhAttr.desc && mhAttr.desc !== '无特殊属性') mhTxt = mhAttr.desc.replace(/^【魔化】\s*/, '')
+                        if (SKIN_ATTRIBUTES[mainName] && SKIN_ATTRIBUTES[mainName]['魔化']) mhTxt = SKIN_ATTRIBUTES[mainName]['魔化'].desc || ''
+                        else if (customSkinAttributes[mainName] && customSkinAttributes[mainName]['魔化']) mhTxt = customSkinAttributes[mainName]['魔化'].desc || ''
+                        else if (cloud && cloud[mainName] && cloud[mainName]['魔化']) mhTxt = cloud[mainName]['魔化'].desc || ''
                         if (!mhTxt && window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[mainName] && window.heroAttrsData.heroes[mainName].mohuaPassive) {
                             mhTxt = window.heroAttrsData.heroes[mainName].mohuaPassive
                         }
+                        mhTxt = String(mhTxt || '').replace(/^【魔化(被动)?】\s*/, '')
                         mohuaCard.innerHTML = '<span style="color:#e9b8ff;font-weight:900;">魔化属性：</span>' + esc(mhTxt || '—')
                     } else {
                         mohuaCard.style.display = 'none'
