@@ -3137,8 +3137,8 @@
     </div>
     <!-- 🔴 2026-10-19 出战选择次要控件移到右边缘竖排悬浮（显示融合/悬浮提示/全队合计），让中间卡槽区更清爽、整体上移 -->
     <!-- 🔴 2026-10-19 右侧紧凑：总减伤常驻 + 卡组工具折叠(分享/减伤/重置/显示融合/悬浮提示 竖排)，中间卡槽区最大化 -->
-    <!-- 🔴 2026-10-20 层级提到全局最高：全队合计 + 卡组工具 永远浮在所有界面（顶部菜单/弹窗/子页面）最前，不被任何弹层遮挡。位置在右侧边缘不与中央密码框/加载屏重叠，不影响操作 -->
-    <div id="selSideCtrls" style="position:fixed;right:12px;top:150px;z-index:2147483647;display:flex;flex-direction:column;align-items:stretch;gap:6px;width:132px;">
+    <!-- 🔴 2026-10-20 还原：撤销置顶，回到常规层级 z-index:9988（低于顶部菜单/弹窗，会被正常遮挡，不压在最上层） -->
+    <div id="selSideCtrls" style="position:fixed;right:12px;top:150px;z-index:9988;display:flex;flex-direction:column;align-items:stretch;gap:6px;width:132px;">
         <span id="teamTotalDr" data-tip="全队合计减伤 = 我方总减伤 + 队友总减伤（每边已各自含自己的马车：我的=我方卡+我方马车，队友的=队友卡+队友马车，直接相加不重复）。鼠标悬停可看拆分。" style="background:rgba(255,215,0,0.14);border:1px solid rgba(255,215,0,0.45);color:#ffd700;padding:4px 10px;border-radius:6px;font-size:0.75rem;white-space:nowrap;cursor:help;">🛡 全队合计:0</span>
         <button id="selSideToggle" onclick="var pp=document.getElementById('selSidePanel'),aa=document.getElementById('selSideArrow');var open=pp.style.display!=='none';pp.style.display=open?'none':'flex';if(aa)aa.textContent=open?'▼':'▲';" style="background:linear-gradient(135deg,#ffd700,#ff6b6b);border:none;color:#1a1a2e;padding:5px 10px;border-radius:7px;cursor:pointer;font-size:0.78rem;font-weight:bold;width:100%;text-align:left;">⚙️ 卡组工具 <span id="selSideArrow" style="float:right;">▼</span></button>
         <div id="selSidePanel" style="display:none;flex-direction:column;gap:6px;background:rgba(26,26,46,0.92);border:1px solid rgba(255,215,0,0.28);border-radius:9px;padding:8px;">
