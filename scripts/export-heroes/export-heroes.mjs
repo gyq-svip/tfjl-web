@@ -671,6 +671,9 @@ function buildTiers(maps, hid, npcId, heroSkillName, heroSkillDesc, heroPassiveI
       })
     }
   }
+  // 🔴 2026-10-21 排除非游戏英雄（官方配置表里的测试/未上线条目，用户确认：幽鬼/艾斯/赛文/泰罗）
+  const EXCLUDE_NAMES = ['幽鬼', '艾斯', '赛文', '泰罗']
+  heroes = heroes.filter((h) => !EXCLUDE_NAMES.includes(h.name))
   // 🔴 2026-10-21 同名去重：游戏每个英雄一条，官方表存在 id=31xx 的占位桩条目（0 皮肤/1 档位），
   // 按名字合并 —— 保留 tiers 最多者（其次 skins 最多，再次 id 最小），避免图鉴出现重复卡。
   const uniqByName = new Map()
