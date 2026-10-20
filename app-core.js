@@ -11356,7 +11356,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         mhDesc = String(mhDesc || '').replace(/^【魔化(被动)?】\s*/, '')
                     } catch (e) {}
                     cap.innerHTML = '<div style="color:#ff8f7f;font-size:14px;font-weight:900;">魔化预览</div>' +
-                        '<div style="margin-top:4px;">最高星级提升至 <span style="color:#ffd75e;">★★</span></div>' +
                         (mhDesc ? '<div style="margin-top:6px;display:inline-block;padding:4px 12px;background:rgba(120,30,50,0.55);border:1px solid rgba(255,140,120,0.4);border-radius:8px;"><b style="color:#ffb3a3;">魔化属性：</b>' + esc(mhDesc) + '</div>' : '')
                     sh.body.appendChild(cap)
                     Promise.all([
