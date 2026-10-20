@@ -324,5 +324,66 @@
       }).catch(function () {})
     } catch (e) {}
   }
-  window.spineHero = { play: play, stop: stop, warm: warm, preload: preload }
+  // 🔴 2026-10-21 空闲批量预热：把清单内所有模型（默认只拉各英雄默认模型；includeSkins=true 连皮肤模型一起）
+  //    逐个在浏览器空闲时段拉进缓存（HTTP/SW 缓存 + 内存 assetCache），进度写入 localStorage 断点续传；
+  //    省流量模式 / 2g3g 网络自动跳过；失败也标记，避免反复重试拖垮网络。
+  const PL_KEY = 'tfjl_spine_preload_done_v1'
+  const _pl = { running: false, abort: false, done: {}, total: 0 }
+  function _plLoad() { try { return JSON.parse(localStorage.getItem(PL_KEY) || '{}') || {} } catch (e) { return {} } }
+  function _plSave() { try { localStorage.setItem(PL_KEY, JSON.stringify(_pl.done)) } catch (e) {} }
+  function _plIdle(fn) {
+    if (window.requestIdleCallback) return window.requestIdleCallback(fn, { timeout: 2500 })
+    return setTimeout(fn, 80)
+  }
+  async function preloadAll(opts) {
+    opts = opts || {}
+    if (_pl.running) return
+    try {
+      const c = navigator.connection
+      if (c && (c.saveData || /(^|-)2g$|3g/.test(c.effectiveType || ''))) return
+    } catch (e) {}
+    if (!window.__heroSpineIndex) {
+      try {
+        const p = location.pathname
+        const b = p.endsWith('/') ? p : (p.lastIndexOf('/') >= 0 ? p.slice(0, p.lastIndexOf('/') + 1) : '/')
+        window.__heroSpineIndex = await (await fetch(b + 'data/hero-spine/index.json')).json()
+      } catch (e) { return }
+    }
+    const idx = window.__heroSpineIndex || {}
+    const jobs = []
+    Object.keys(idx).forEach(function (f) {
+      const e = idx[f] || {}
+      jobs.push({ folder: f, model: e.model || '', pngs: e.pngs || 0, key: f + '@' + (e.model || '') })
+      if (opts.includeSkins) {
+        Object.keys(e.models || {}).forEach(function (sn) {
+          const m = e.models[sn]
+          if (!m) return
+          jobs.push({ folder: f, model: m, pngs: (e.modelPngs && e.modelPngs[m]) || 0, key: f + '@' + m })
+        })
+      }
+    })
+    _pl.done = _plLoad()
+    const pend = jobs.filter(function (j) { return !_pl.done[j.key] })
+    _pl.total = jobs.length
+    if (!pend.length) return
+    _pl.running = true
+    _pl.abort = false
+    try { await ensureSpine() } catch (e) {}
+    for (let i = 0; i < pend.length; i++) {
+      if (_pl.abort) break
+      await new Promise(function (res) { _plIdle(function () { res() }) })
+      const j = pend[i]
+      try { await loadAssets(j.folder, j.pngs, j.model) } catch (e) {}
+      _pl.done[j.key] = 1
+      if (i % 4 === 0) _plSave()
+    }
+    _plSave()
+    _pl.running = false
+  }
+  function preloadStop() { _pl.abort = true }
+  function preloadReset() { try { localStorage.removeItem(PL_KEY) } catch (e) {} _pl.done = {} }
+  function preloadStatus() {
+    return { running: _pl.running, done: Object.keys(_pl.done || {}).length, total: _pl.total }
+  }
+  window.spineHero = { play: play, stop: stop, warm: warm, preload: preload, preloadAll: preloadAll, preloadStop: preloadStop, preloadReset: preloadReset, preloadStatus: preloadStatus }
 })()

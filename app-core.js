@@ -11935,6 +11935,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         }
         // 供阵容图库等外部入口复用同一套英雄详情面板
         window.showHeroDetailModal = showHeroDetailModal
+        // 🔴 2026-10-21 页面加载 8 秒后在空闲时段后台预热全部英雄动画资源（进度存 localStorage，可断点续传）
+        setTimeout(function () {
+            try { if (window.spineHero && window.spineHero.preloadAll) window.spineHero.preloadAll() } catch (e) {}
+        }, 8000)
 
         // 显示等级下拉选择器
         // 🔴 2026-09-28：角标点击弹出的「一窗搞定」卡片设置面板
