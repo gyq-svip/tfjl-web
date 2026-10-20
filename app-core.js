@@ -11438,6 +11438,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         const subMeta = (window.heroesOfficialMap || {})[sub] || {}
                         const skinList = (skinsApp && skinsApp.length) ? skinsApp : ['默认'].concat((subMeta.skins || []).map((s) => s.note).filter(Boolean))
                         const curSkin = (typeof getFusionComponentSkin === 'function') ? (getFusionComponentSkin(sub) || '默认') : '默认'
+                        const subMhOn = (typeof getFusionComponentMoHua === 'function') ? getFusionComponentMoHua(sub) : false
                         // 副卡属性（跟随等级与皮肤实时变化）
                         const subStatHtml = (lvNow) => {
                             const srow = (typeof hdRowAt === 'function' ? hdRowAt(subMeta.stats, lvNow) : null) || {}
@@ -11468,6 +11469,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             '<input type="range" min="0" max="' + (levels.length - 1) + '" step="1" value="' + lvIdx + '" style="flex:1;accent-color:#e8a91c;" id="hdFuseSubSlider">' +
                             '</div>' +
                             '<div id="hdFuseSubStats" style="margin-bottom:8px;padding:6px 7px;background:rgba(0,0,0,0.28);border-radius:8px;">' + subStatHtml(levels[lvIdx]) + '</div>' +
+                            '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><span>魔化</span><label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:#e9b8ff;"><input type="checkbox" id="hdFuseSubMhChk" ' + (subMhOn ? 'checked' : '') + ' style="accent-color:#c77dff;"><span>开启魔化</span></label></div>' +
+                            '<div id="hdFuseSubMh" style="margin-bottom:8px;padding:6px 7px;background:rgba(40,10,46,0.6);border-radius:8px;font-size:11px;line-height:1.5;color:#e9b8ff;' + (subMhOn ? '' : 'display:none;') + '"></div>' +
                             '<div style="margin-bottom:4px;">皮肤</div>' +
                             '<div id="hdFuseSubSkins" style="display:flex;flex-wrap:wrap;gap:4px;max-height:96px;overflow-y:auto;"></div>'
                         const slider = subBox.querySelector('#hdFuseSubSlider')
@@ -11481,6 +11484,30 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             const newLv = levels[Number(slider.value)]
                             if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(sub, newLv)
                             await reapplyPreviewCard()
+                        }
+                        // —— 副卡魔化开关：与主卡一致，开启后展示魔化专属属性，并写回卡牌 ——
+                        const mhChk = subBox.querySelector('#hdFuseSubMhChk')
+                        const mhBox = subBox.querySelector('#hdFuseSubMh')
+                        const subMhTxt = () => {
+                            const cloud = window.skinAttributesCloud
+                            let t = ''
+                            if (SKIN_ATTRIBUTES[sub] && SKIN_ATTRIBUTES[sub]['魔化']) t = SKIN_ATTRIBUTES[sub]['魔化'].desc || ''
+                            else if (customSkinAttributes[sub] && customSkinAttributes[sub]['魔化']) t = customSkinAttributes[sub]['魔化'].desc || ''
+                            else if (cloud && cloud[sub] && cloud[sub]['魔化']) t = cloud[sub]['魔化'].desc || ''
+                            if (!t && window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[sub] && window.heroAttrsData.heroes[sub].mohuaPassive) t = window.heroAttrsData.heroes[sub].mohuaPassive
+                            return String(t || '').replace(/^【魔化(被动)?】\s*/, '')
+                        }
+                        if (mhChk) {
+                            if (subMhOn && mhBox) mhBox.innerHTML = '<span style="font-weight:900;">魔化属性：</span>' + esc(subMhTxt() || '—')
+                            mhChk.onchange = async () => {
+                                const on = mhChk.checked
+                                if (typeof setFusionComponentMoHua === 'function') setFusionComponentMoHua(sub, on)
+                                if (mhBox) {
+                                    if (on) { mhBox.style.display = ''; mhBox.innerHTML = '<span style="font-weight:900;">魔化属性：</span>' + esc(subMhTxt() || '—') }
+                                    else { mhBox.style.display = 'none' }
+                                }
+                                await reapplyPreviewCard()
+                            }
                         }
                         const wrap = subBox.querySelector('#hdFuseSubSkins')
                         skinList.forEach((sk) => {
