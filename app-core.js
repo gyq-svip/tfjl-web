@@ -11940,6 +11940,81 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             try { if (window.spineHero && window.spineHero.preloadAll) window.spineHero.preloadAll() } catch (e) {}
         }, 8000)
 
+        // ===== 动画资源缓存：菜单/诊断页进度展示 + 详情弹窗 =====
+        function _spineStats() {
+            try { return (window.spineHero && window.spineHero.preloadStats) ? window.spineHero.preloadStats() : null } catch (e) { return null }
+        }
+        function _spinePct(a, b) { return (b > 0 ? Math.round((a / b) * 100) : 0) + '%' }
+        function refreshSpineCacheInfo() {
+            try {
+                const s = _spineStats()
+                const mi = document.getElementById('menuSpineCacheItem')
+                if (mi) {
+                    mi.textContent = !s || !s.base
+                        ? '🎬 动画资源：—'
+                        : '🎬 动画资源：' + s.baseDone + '/' + s.base + (s.running ? ' ⏳预热中' : (s.baseDone >= s.base ? ' ✅' : ''))
+                }
+                const dg = document.getElementById('spineCacheDiag')
+                if (dg && s && s.base) {
+                    dg.innerHTML = '🎬 <b>动画资源缓存</b>：默认模型 ' + s.baseDone + '/' + s.base + '（' + _spinePct(s.baseDone, s.base) + '）'
+                        + ' ｜ 皮肤模型 ' + s.skinDone + '/' + s.skin
+                        + (s.running ? ' ｜ <span style="color:#fbbf24;">⏳ 正在空闲预热…</span>' : '')
+                        + '<div style="color:rgba(255,255,255,0.5);margin-top:2px;">缓存位置：ServiceWorker 持久缓存(tfjl-assets)，跨版本保留、重启电脑不丢；只有「清理缓存重建」或手动清站点数据才会清空。</div>'
+                }
+                const mb = document.getElementById('spineCacheModalBody')
+                if (mb) mb.innerHTML = _spineCacheDetailHtml()
+            } catch (e) {}
+        }
+        function _spineCacheDetailHtml() {
+            const s = _spineStats()
+            if (!s || !s.base) return '<div style="color:#fbbf24;">骨骼清单还没加载，稍等几秒再打开（或先打开过一次英雄详情）。</div>'
+            let h = '<div style="line-height:1.9;">'
+            h += '<div>默认模型（各英雄默认造型）：<b style="color:#ffd75e;">' + s.baseDone + ' / ' + s.base + '</b>（' + _spinePct(s.baseDone, s.base) + '）</div>'
+            h += '<div>皮肤模型（每个皮肤的独立骨骼）：<b style="color:#ffd75e;">' + s.skinDone + ' / ' + s.skin + '</b>（' + _spinePct(s.skinDone, s.skin) + '）</div>'
+            h += '<div>状态：' + (s.running ? '<span style="color:#fbbf24;">⏳ 空闲预热进行中</span>' : '<span style="color:#81c784;">空闲（开页面 8 秒后自动继续）</span>') + '</div>'
+            h += '<div id="spineCacheQuota" style="color:rgba(255,255,255,0.55);">存储占用：读取中…</div>'
+            h += '</div>'
+            h += '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">'
+            h += '<button onclick="window.spineHero&&window.spineHero.preloadAll();setTimeout(refreshSpineCacheInfo,300)" style="background:linear-gradient(135deg,#7e57c2,#5e35b1);border:none;color:#fff;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">▶ 继续预热（默认）</button>'
+            h += '<button onclick="window.spineHero&&window.spineHero.preloadAll({includeSkins:true});setTimeout(refreshSpineCacheInfo,300)" style="background:rgba(179,157,219,0.2);border:1px solid rgba(179,157,219,0.5);color:#d1c4e9;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">▶ 连皮肤一起预热（较大）</button>'
+            h += '<button onclick="window.spineHero&&window.spineHero.preloadStop();setTimeout(refreshSpineCacheInfo,300)" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">⏸ 停止</button>'
+            h += '<button onclick="if(confirm(\'清空动画预热记录？缓存文件仍在，只会重新开始统计并按需重拉。\')){window.spineHero&&window.spineHero.preloadReset();setTimeout(refreshSpineCacheInfo,300)}" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">🔄 重置进度</button>'
+            h += '</div>'
+            h += '<div style="margin-top:10px;font-size:0.72rem;color:rgba(255,255,255,0.45);line-height:1.7;">说明：默认只预热各英雄的默认造型（约 20-30MB），皮肤模型按需（打开皮肤时才拉）。点击「连皮肤一起预热」会把全部皮肤骨骼也拉下来（体积较大，建议在 WiFi 下、且不着急时用）。</div>'
+            return h
+        }
+        window.showSpineCacheInfo = function () {
+            try {
+                const old = document.getElementById('spineCacheModal')
+                if (old) old.remove()
+                const ov = document.createElement('div')
+                ov.id = 'spineCacheModal'
+                ov.style.cssText = 'position:fixed;inset:0;z-index:200001;background:rgba(0,0,0,0.72);display:flex;align-items:center;justify-content:center;'
+                ov.innerHTML =
+                    '<div style="width:min(560px,94%);max-height:86vh;overflow-y:auto;background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid rgba(179,157,219,0.4);border-radius:12px;padding:18px;color:#fff;">' +
+                    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+                    '<h3 style="margin:0;font-size:1rem;color:#d1c4e9;">🎬 英雄动画资源缓存</h3>' +
+                    '<button onclick="document.getElementById(\'spineCacheModal\').remove()" style="background:none;border:none;color:rgba(255,255,255,0.6);font-size:1.4rem;cursor:pointer;">✕</button>' +
+                    '</div>' +
+                    '<div id="spineCacheModalBody">' + _spineCacheDetailHtml() + '</div>' +
+                    '</div>'
+                ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove() })
+                document.body.appendChild(ov)
+                try {
+                    if (navigator.storage && navigator.storage.estimate) {
+                        navigator.storage.estimate().then(function (est) {
+                            const q = document.getElementById('spineCacheQuota')
+                            if (!q) return
+                            const mb = function (n) { return (Number(n || 0) / 1048576).toFixed(1) + ' MB' }
+                            q.textContent = '本站存储占用：约 ' + mb(est.usage) + ' / 可用 ' + mb(est.quota)
+                        })
+                    }
+                } catch (e) {}
+            } catch (e) {}
+        }
+        setInterval(refreshSpineCacheInfo, 3000)
+        setTimeout(refreshSpineCacheInfo, 3000)
+
         // 显示等级下拉选择器
         // 🔴 2026-09-28：角标点击弹出的「一窗搞定」卡片设置面板
         // 含：等级(进度条) / 皮肤 / 主卡魔化 / 融合副卡(皮肤+等级+魔化，副卡魔化需主卡先开) / 减伤值(同步减伤记录表)
