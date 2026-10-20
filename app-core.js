@@ -10689,6 +10689,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         // 职业（官方枚举：1战士 2猎人 3法师 4牧师 5召唤 6精灵 7熊猫 8工程 9术士 10龙族）
         const HD_OCC = { 1: '战士', 2: '猎人', 3: '法师', 4: '牧师', 5: '召唤', 6: '精灵', 7: '熊猫', 8: '工程', 9: '术士', 10: '龙族' }
         const HD_DTYPE = { 1: '物理伤害', 2: '魔法伤害', 3: '真实伤害', 4: '治疗', 5: '其他' }
+        // 🔴 攻击类型按职业推导（覆盖 heroes.json 逐英雄手写的 damageType，避免同一职业几种值不一致）
+        //    来源：用户提供的职业→攻击类型映射（战士纯粹/猎人物理/法师魔法/牧师治疗/召唤召唤/熊猫元素/工程真实/术士真实）
+        //    精灵(6)/龙族(10) 未提供，走下方 HD_DTYPE[damageType] 兜底
+        const HD_OCC_DTYPE = { 1: '纯粹伤害', 2: '物理伤害', 3: '魔法伤害', 4: '治疗', 5: '召唤', 7: '元素', 8: '真实伤害', 9: '真实伤害' }
 
         // 取当前等级生效行（与官方同口径：取 level ≤ 当前等级的最后一行）
         function hdRowAt(stats, lv) {
@@ -11435,7 +11439,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             const sdtRaw = (srow.damageType != null && srow.damageType !== '')
                                 ? srow.damageType
                                 : (subMeta.attrs ? subMeta.attrs.damageType : null)
-                            const sdt = (sdtRaw != null && sdtRaw !== '') ? (HD_DTYPE[sdtRaw] || '—') : '—'
+                            const sdt = (subMeta && HD_OCC_DTYPE[Number(subMeta.occupation)]) || ((sdtRaw != null && sdtRaw !== '') ? (HD_DTYPE[sdtRaw] || '—') : '—')
                             const sp = srow.cd ? (Number(srow.cd) / 1000).toFixed(2) + '秒/次' : '—'
                             const skinRow = (subMeta.skins || []).find((s) => s.note === curSkin)
                             const skinHp = skinRow && Number(skinRow.heroSkinHp) > 0 ? Number(skinRow.heroSkinHp) : 0
@@ -11522,6 +11526,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             document.body.appendChild(root)
 
             // 先渲染骨架文字（官方数据未到也能出结构），数据到位后补全
+            // 🔴 工程4字卡（邪能火炮/地精宝库/微型潜艇/侏儒射线/咬人娃娃）会被 splitIntoHeroes 误拆成「邪能/火炮」等，
+            // 整名才是官方英雄名；不修正则 heroesOfficialMap[mainName] 查不到 → 动图/资料不显示
+            if (ENGINEER_4CHAR_CARDS.indexOf(cardName) >= 0) mainName = cardName
             nameEl.textContent = mainName || cardName || '英雄'
             jobEl.innerHTML = '<span style="display:inline-flex;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.28);align-items:center;justify-content:center;font-size:10px;">◈</span>'
             skillCard.textContent = '技能加载中…'
