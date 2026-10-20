@@ -4551,6 +4551,8 @@ if (true) {
                         _cacheCloudJson('tfjl_cloud_fusions', fData.fusions);
                         console.log('[SKIN] cloud fusions loaded:', Object.keys(fData.fusions).length);
                         if (typeof window.renderFusionCardsToPool === 'function') window.renderFusionCardsToPool();
+                        // 🔴 2026-10-20 云端融合定义更新 → 英雄面板「融合对象」切换行重建（新加融合立即可见）
+                        if (typeof window.__hdFuseRefreshPartnerRow === 'function') { try { window.__hdFuseRefreshPartnerRow(); } catch (e2) {} }
                     }
                 } else {
                     _restoreCloudConfigs();
