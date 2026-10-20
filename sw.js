@@ -415,6 +415,15 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // 🔴 英雄 Spine 动画资源（data/hero-spine/ skeleton.json/atlas.txt/p*.png/index.json）：
+    // 内容随版本稳定，但 request.destination 为空会被下方「其他 GET」归入 networkFirst，
+    // 导致每次打开详情都重新联网拉（github.io 国内慢 → 几秒延迟）。改为 cacheFirst，
+    // 首次拉取后永久缓存、毫秒级回；部署时 CACHE_VERSION 变化会清空旧 -runtime 缓存 → 自动重新拉新。
+    if (url.pathname.indexOf('/data/hero-spine/') >= 0) {
+        event.respondWith(cacheFirst(request, CACHE_RUNTIME, _offline));
+        return;
+    }
+
     // 🔴 P0 修复（2026-08-27 白屏事故）：HTML/JS/CSS 改为 networkFirst，
     // 不再 staleWhileRevalidate 先返回可能损坏的旧缓存（旧缓存 app-core.js 缺失 HB_JITTER 导致白屏）。
     // 网络优先 + 超时(8s)回退缓存，保证用户永远拿到线上正确文件。
