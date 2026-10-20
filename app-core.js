@@ -11460,7 +11460,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
                     // —— 副卡设置区（等级 / 皮肤 / 魔化）：被融合卡的设置 ——
                     const subBox = document.createElement('div')
-                    subBox.style.cssText = 'position:absolute;left:12px;top:10px;bottom:10px;width:200px;overflow-y:auto;background:rgba(20,14,6,0.85);border:1px solid rgba(255,200,120,0.4);border-radius:10px;padding:10px;color:#ffe9c9;font-size:12px;display:none;'
+                    subBox.style.cssText = 'position:absolute;left:12px;top:10px;bottom:10px;width:200px;background:rgba(20,14,6,0.85);border:1px solid rgba(255,200,120,0.4);border-radius:10px;padding:10px;color:#ffe9c9;font-size:12px;display:none;flex-direction:column;'
+                    // 🔴 2026-10-21 左栏改上下两段：上段滚动内容 + 底部固定「被融合卡列表」（不随上方文字多少上下浮动）
+                    const subMain = document.createElement('div')
+                    subMain.style.cssText = 'flex:1;min-height:0;overflow-y:auto;'
+                    subBox.appendChild(subMain)
+                    const subFoot = document.createElement('div')
+                    subFoot.style.cssText = 'flex-shrink:0;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,200,120,0.3);'
+                    subFoot.innerHTML = '<div style="margin-bottom:4px;font-weight:900;color:#ffd75e;">被融合卡列表</div><div id="hdFuseVarList" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;"></div>'
+                    subBox.appendChild(subFoot)
                     sh.body.appendChild(subBox)
                     // 🔴 2026-10-20 右栏：等级+数值+皮肤（与左栏技能/被动/魔化分列，对齐主卡"左信息右数值"版式）
                     const subBoxR = document.createElement('div')
@@ -11556,14 +11564,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             if (subPFull) html += '<div style="margin-top:3px;font-size:10.5px;line-height:1.5;"><b style="color:#ffd75e;">满星被动：</b>' + esc(subPFull) + '</div>'
                             return html
                         }
-                        // 左栏：副卡名 + 技能/被动/魔化（信息类）
-                        subBox.innerHTML =
+                        // 左栏：副卡名 + 技能/被动/魔化（信息类），填入上段滚动区；被融合卡列表固定在底部 subFoot
+                        subMain.innerHTML =
                             '<div style="font-weight:900;color:#ffd75e;margin-bottom:6px;">副卡：' + esc(sub) + '</div>' +
                             '<div id="hdFuseSubSkill" style="margin-bottom:8px;padding:6px 7px;background:rgba(0,0,0,0.28);border-radius:8px;">' + subSkillBlock(levels[lvIdx]) + '</div>' +
                             '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><span>魔化</span><label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:#e9b8ff;"><input type="checkbox" id="hdFuseSubMhChk" ' + (subMhOn ? 'checked' : '') + ' style="accent-color:#c77dff;"><span>开启魔化</span></label></div>' +
-                            '<div id="hdFuseSubMh" style="padding:6px 7px;background:rgba(40,10,46,0.6);border-radius:8px;font-size:11px;line-height:1.5;color:#e9b8ff;' + (subMhOn ? '' : 'display:none;') + '"></div>' +
-                            '<div style="margin-top:8px;margin-bottom:4px;font-weight:900;color:#ffd75e;">被融合卡列表</div>' +
-                            '<div id="hdFuseVarList" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;"></div>'
+                            '<div id="hdFuseSubMh" style="padding:6px 7px;background:rgba(40,10,46,0.6);border-radius:8px;font-size:11px;line-height:1.5;color:#e9b8ff;' + (subMhOn ? '' : 'display:none;') + '"></div>'
                         // 右栏：等级 + 数值 + 皮肤
                         subBoxR.innerHTML =
                             '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">' +
