@@ -10759,6 +10759,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             // —— Spine 动画层（铺满整卡，石台居中偏右下）——
             const stage = document.createElement('div')
             stage.style.cssText = 'position:absolute;inset:0;pointer-events:none;'
+            // 🔴 2026-10-20 静态立绘占位：spine 资产加载完成前先显示主页同款立绘（英雄"秒出"），动画就绪后隐藏
+            const hdPhEl = document.createElement('img')
+            hdPhEl.style.cssText = 'position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);max-height:58%;max-width:46%;object-fit:contain;filter:drop-shadow(0 10px 18px rgba(0,0,0,0.5));display:none;'
+            stage.appendChild(hdPhEl)
             const cv = document.createElement('canvas')
             cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;'
             stage.appendChild(cv)
@@ -11699,7 +11703,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (!man) return
                     const model = hdSkinModel(curSkin) || (meta.spineModel || '')
                     const pngs = model ? ((man.modelPngs && man.modelPngs[model]) || 0) : (man.pngs || 0)
-                    window.spineHero.play(cv, meta.spine, { fitPadding: 0.58, pngs, model, anchorFeet: 0.71, tight: true, fitByHeight: true, scale: (man && man.scale) || 1 })
+                    // 🔴 占位：加载期间显示静态立绘，spine 就绪（play promise resolve）后隐藏
+                    if (hdPhEl) {
+                        hdPhEl.style.display = ''
+                        hdPortraitUrl(mainName, curSkin === '默认' ? mainName : curSkin)
+                            .then((u) => { if (u && hdPhEl) hdPhEl.src = u }).catch(() => {})
+                    }
+                    const p = window.spineHero.play(cv, meta.spine, { fitPadding: 0.58, pngs, model, anchorFeet: 0.71, tight: true, fitByHeight: true, scale: (man && man.scale) || 1 })
+                    Promise.resolve(p && p.then ? p : null)
+                        .then(() => { setTimeout(() => { if (hdPhEl) hdPhEl.style.display = 'none' }, 300) })
+                        .catch(() => { if (hdPhEl) hdPhEl.style.display = 'none' })
                 } catch (e) {}
             }
 

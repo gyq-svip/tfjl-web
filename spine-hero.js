@@ -121,15 +121,22 @@
     const key = folder + '@' + (model || '')
     if (assetCache[key]) return assetCache[key]
     const base = baseUrl() + 'data/hero-spine/' + folder + (model ? '/models/' + model : '') + '/'
-    let skeletonJson, atlasText
-    skeletonJson = await (await fetch(base + 'skeleton.json')).json()
-    atlasText = await (await fetch(base + 'atlas.txt')).text()
-    // 贴图按页序加载（p0..p8，逐个试直到失败）
-    const imgs = []
+    // 🔴 2026-10-20 并行加载：骨架/图集/贴图同时拉（原为串行逐个等 RTT，首次打开每英雄多等数秒）
+    //    贴图仍保持「从 p0 起连续」语义：跳过缺失页之后的不连续页，与原逐页试错的截断行为一致
     const maxPages = pngCount > 0 ? pngCount : 9
-    for (let i = 0; i < maxPages; i++) {
-      try { imgs.push(await loadImage(base + 'p' + i + '.png')) } catch (e) { break }
-    }
+    const results = await Promise.all([
+      fetch(base + 'skeleton.json').then(function (r) { return r.json() }),
+      fetch(base + 'atlas.txt').then(function (r) { return r.text() }),
+      Promise.all(Array.from({ length: maxPages }, function (_, i) {
+        return loadImage(base + 'p' + i + '.png').then(function (im) { return { i: i, im: im } }, function () { return null })
+      })).then(function (rs) {
+        const ok = rs.filter(Boolean).sort(function (a, b) { return a.i - b.i })
+        const out = []
+        for (let k = 0; k < ok.length; k++) { if (ok[k].i !== k) break; out.push(ok[k].im) }
+        return out
+      })
+    ])
+    const skeletonJson = results[0], atlasText = results[1], imgs = results[2]
     if (!imgs.length) throw new Error('无贴图')
     let pi = 0
     const atlas = new spine.TextureAtlas(atlasText, function () {

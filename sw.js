@@ -417,10 +417,10 @@ self.addEventListener('fetch', (event) => {
 
     // 🔴 英雄 Spine 动画资源（data/hero-spine/ skeleton.json/atlas.txt/p*.png/index.json）：
     // 内容随版本稳定，但 request.destination 为空会被下方「其他 GET」归入 networkFirst，
-    // 导致每次打开详情都重新联网拉（github.io 国内慢 → 几秒延迟）。改为 cacheFirst，
-    // 首次拉取后永久缓存、毫秒级回；部署时 CACHE_VERSION 变化会清空旧 -runtime 缓存 → 自动重新拉新。
+    // 导致每次打开详情都重新联网拉（github.io 国内慢 → 几秒延迟）。资产走 cacheFirst + 持久 assets 缓存
+    // （跨部署保留，不再因每次 CACHE_VERSION+1 清空而全部重下）；index.json 清单走 runtime 跟部署更新。
     if (url.pathname.indexOf('/data/hero-spine/') >= 0) {
-        event.respondWith(cacheFirst(request, CACHE_RUNTIME, _offline));
+        event.respondWith(cacheFirst(request, url.pathname.endsWith('/index.json') ? CACHE_RUNTIME : CACHE_ASSETS, _offline));
         return;
     }
 
