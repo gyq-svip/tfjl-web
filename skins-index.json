@@ -1,8 +1,12 @@
 {
-    "package":  "skins-20261020-101858.zip",
-    "updated":  "2026-10-20T10:19:06Z",
+    "package":  "skins-20261021-181035.zip",
+    "updated":  "2026-10-21T18:11:04Z",
     "heroes":  110,
     "skins":  393,
-    "size":  20500013,
-    "url":  "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v-skins/skins-20261020-101858.zip"
+    "size":  20500034,
+    "url":  "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v-skins/skins-20261021-181035.zip",
+    "spinePackage":  "spine-20261021-181035.zip",
+    "spineSize":  88573057,
+    "spineUrl":  "https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/releases/download/v-skins/spine-20261021-181035.zip",
+    "spineFiles":  1132
 }
