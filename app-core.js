@@ -8043,6 +8043,17 @@
         refreshFusionLockIcons();
 
         // 融合卡拆分：返回各英雄名数组（≥2 视为融合卡），否则 null
+        // 🔴 2026-10-22 内置融合表（游戏原生融合卡，双方向各算一张）。政策修订：融合名单 = 云端 fusions.json ∪ 内置表。
+        //   旧政策"严格只认云端"导致 fusions.json 为空时所有英雄都没有融合按钮/变体列表，
+        //   拖单卡完全无法融合（2026-10-22 用户反馈）。云端管理员定义仍然全部叠加、优先解析。
+        const BUILTIN_FUSION_CARDS = [
+            '火炮射线', '射线潜艇', '火炮潜艇', '宝库射线', '宝库潜艇', '宝库火炮',
+            '潜艇射线', '潜艇火炮', '射线火炮',
+            '水灵刀客', '刀客水灵', '蛇女爱神', '爱神蛇女',
+            '咕咕天使', '天使咕咕', '圣骑天使', '天使圣骑',
+            '战将鱼人', '鱼人战将', '电法冰法', '冰法电法',
+            '萌萌水灵', '水灵萌萌', '火灵风灵', '风灵火灵'
+        ];
         function getFusionParts(cardName) {
             if (!cardName) return null;
             // 云端融合定义优先（管理员维护，含2基础卡校验）
@@ -8052,14 +8063,7 @@
             // 云端优先，但云端未收录的内置/兜底融合卡回退内置识别（fusionCards 表 + splitIntoHeroes）。
             // 若云端只收录部分融合卡仍"严格只认云端"，其余内置融合卡(死神海妖/小野酋长/咕咕萨满等)
             // 会被当单卡 → 融合皮肤全丢(2026-08-08 用户反馈回归)。内置识别即云端未启用时的既有可靠逻辑。
-            const fusionCards = [
-                '火炮射线', '射线潜艇', '火炮潜艇', '宝库射线', '宝库潜艇', '宝库火炮',
-                '潜艇射线', '潜艇火炮', '射线火炮',
-                '水灵刀客', '刀客水灵', '蛇女爱神', '爱神蛇女',
-                '咕咕天使', '天使咕咕', '圣骑天使', '天使圣骑',
-                '战将鱼人', '鱼人战将', '电法冰法', '冰法电法',
-                '萌萌水灵', '水灵萌萌', '火灵风灵', '风灵火灵'
-            ];
+            const fusionCards = BUILTIN_FUSION_CARDS;
             if (fusionCards.includes(cardName)) {
                 return [cardName.substring(0, 2), cardName.substring(2)];
             }
@@ -8134,13 +8138,12 @@
         }
 
         // ===== 上阵卡"融合卡切换"角标：基础英雄 → 可融合变体 =====
-        // 已知融合卡名：以云端(管理员维护的 fusions.json)为准，避免硬编码污染；
-        // 仅当云端为空（管理员尚未添加任何融合）才回退内置表，保证老功能不失效
-        // 融合卡名：严格只认云端(管理员维护的 fusions.json = window.cloudFusions)。
-        // 不再内置任何硬编码回退表——管理员没加过的卡绝不显示「融合」按钮，杜绝数据污染。
+        // 🔴 2026-10-22 政策修订：融合名单 = 云端 fusions.json ∪ 内置表 BUILTIN_FUSION_CARDS（见上）。
+        //   云端管理员定义仍然全部叠加（并集），解析顺序云端优先不变。
         function getAllFusionNames() {
             const names = new Set();
             if (window.cloudFusions) Object.keys(window.cloudFusions).forEach(n => names.add(n));
+            BUILTIN_FUSION_CARDS.forEach(n => names.add(n));
             return [...names];
         }
         // 🔴 2026-09-22 阵容图库复用主页融合体系（现成数据，用户要求"直接拿过来用"）：只暴露，不改逻辑
@@ -11750,6 +11753,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         paintCircles()
                         paintSubSettings()
                         paintFuseSkinRow()
+                        paintFusePickRow()
                         const slotEl = badge && badge.closest ? badge.closest('.battle-slot') : null
                         if (libSlot) {
                             const lt = libSlot.getAttribute('data-tab'), ll = libSlot.getAttribute('data-lid'), lsd = libSlot.getAttribute('data-side') || 'my'
@@ -11807,8 +11811,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         })
                     }
                     paintFuseSkinRow()
+                    paintFusePickRow()
                     // 云端融合定义(fusions.json)晚到时重建（页面启动先用 localStorage 旧缓存，新加融合会漏）
-                    window.__hdFuseRefreshPartnerRow = () => { try { if (sh && sh.body && sh.body.isConnected) { paintSubSettings(); paintFuseSkinRow() } } catch (e) {} }
+                    window.__hdFuseRefreshPartnerRow = () => { try { if (sh && sh.body && sh.body.isConnected) { paintSubSettings(); paintFuseSkinRow(); paintFusePickRow() } } catch (e) {} }
                 }
             }
 
