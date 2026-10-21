@@ -11999,11 +11999,31 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 if (dg && s && s.base) {
                     dg.innerHTML = '🎬 <b>动画资源缓存</b>：默认模型 ' + s.baseDone + '/' + s.base + '（' + _spinePct(s.baseDone, s.base) + '）'
                         + ' ｜ 皮肤模型 ' + s.skinDone + '/' + s.skin
-                        + (s.running ? ' ｜ <span style="color:#fbbf24;">⏳ 正在空闲预热…</span>' : '')
+                        + (s.running ? ' ｜ <span style="color:#fbbf24;">⏳ 正在下载…</span>' : '')
                         + '<div style="color:rgba(255,255,255,0.5);margin-top:2px;">缓存位置：ServiceWorker 持久缓存(tfjl-assets)，跨版本保留、重启电脑不丢；只有「清理缓存重建」或手动清站点数据才会清空。</div>'
                 }
                 const mb = document.getElementById('spineCacheModalBody')
-                if (mb) mb.innerHTML = _spineCacheDetailHtml()
+                if (mb) {
+                    mb.innerHTML = _spineCacheDetailHtml()
+                    // 🔴 修复：存储占用每次重建弹窗后重查当前节点（原写法只在开弹窗时查一次，3s 重建后写到已销毁节点→一直“读取中…”）
+                    try {
+                        if (navigator.storage && navigator.storage.estimate) {
+                            navigator.storage.estimate().then(function (est) {
+                                const q = document.getElementById('spineCacheQuota')
+                                if (!q) return
+                                const mbf = function (n) { return (Number(n || 0) / 1048576).toFixed(1) + ' MB' }
+                                if (!est || !est.quota) { q.textContent = '本站存储占用：（当前环境暂无法读取）'; return }
+                                q.textContent = '本站存储占用：约 ' + mbf(est.usage) + ' / 可用 ' + mbf(est.quota)
+                            }).catch(function () {
+                                const q = document.getElementById('spineCacheQuota')
+                                if (q) q.textContent = '本站存储占用：（当前环境暂无法读取）'
+                            })
+                        } else {
+                            const q = document.getElementById('spineCacheQuota')
+                            if (q) q.textContent = '本站存储占用：（当前环境暂无法读取）'
+                        }
+                    } catch (e) {}
+                }
             } catch (e) {}
         }
         function _spineCacheDetailHtml() {
@@ -12012,7 +12032,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             let h = '<div style="line-height:1.9;">'
             h += '<div>默认模型（各英雄默认造型）：<b style="color:#ffd75e;">' + s.baseDone + ' / ' + s.base + '</b>（' + _spinePct(s.baseDone, s.base) + '）</div>'
             h += '<div>皮肤模型（每个皮肤的独立骨骼）：<b style="color:#ffd75e;">' + s.skinDone + ' / ' + s.skin + '</b>（' + _spinePct(s.skinDone, s.skin) + '）</div>'
-            h += '<div>状态：' + (s.running ? '<span style="color:#fbbf24;">⏳ 空闲预热进行中</span>' : '<span style="color:#81c784;">空闲（开页面 8 秒后自动继续）</span>') + '</div>'
+            h += '<div>状态：' + (s.running ? '<span style="color:#fbbf24;">⏳ 下载进行中</span>' : '<span style="color:#81c784;">空闲（开页面 8 秒后自动继续下载）</span>') + '</div>'
             h += '<div id="spineCacheQuota" style="color:rgba(255,255,255,0.55);">存储占用：读取中…</div>'
             h += '</div>'
             // 🔴 2026-10-22 版本提示：动画/皮肤「整包下载」需桌面版 ≥2.1.9（5158089e 起的 download_skins 才会拉 spine 包）。
@@ -12026,23 +12046,23 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 if (_exeVer && _verCmp(_exeVer, '2.1.9') < 0) {
                     h += '<div style="margin-top:10px;padding:9px 12px;border:1px solid rgba(239,83,80,0.45);background:rgba(239,83,80,0.10);border-radius:8px;font-size:0.76rem;line-height:1.7;color:#ef9a9a;">⚠️ 当前桌面版 <b>' + _exeVer + '</b> 还不支持「更新皮肤资源」下载动画整包（需 <b style="color:#ffd75e;">≥ 2.1.9</b>）——旧版点了也只会更新皮肤包、动画仍在线逐个加载。请先升级桌面版到 2.1.9 及以上，再点更新一次即可。</div>'
                 } else {
-                    h += '<div style="margin-top:10px;padding:9px 12px;border:1px solid rgba(129,199,132,0.35);background:rgba(129,199,132,0.08);border-radius:8px;font-size:0.76rem;line-height:1.7;color:rgba(255,255,255,0.78);">💾 桌面版 ' + (_exeVer || '') + '：可以不逐个预热 —— 直接点「更新皮肤资源」，会一次性下载 皮肤+动画 两个整包（≈20MB + ≈84MB）解压到本地，之后动画/皮肤模型全部秒开（断网也能看）。上面的预热按钮是给不想下整包的人用的。</div>'
+                    h += '<div style="margin-top:10px;padding:9px 12px;border:1px solid rgba(129,199,132,0.35);background:rgba(129,199,132,0.08);border-radius:8px;font-size:0.76rem;line-height:1.7;color:rgba(255,255,255,0.78);">💾 桌面版 ' + (_exeVer || '') + '：可以不逐个下载 —— 直接点「更新皮肤资源」，会一次性下载 皮肤+动画 两个整包（≈20MB + ≈84MB）解压到本地，之后动画/皮肤模型全部秒开（断网也能看）。下面的下载按钮是给不想下整包的人用的。</div>'
                 }
             } else {
-                h += '<div style="margin-top:10px;padding:9px 12px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);border-radius:8px;font-size:0.76rem;line-height:1.7;color:rgba(255,255,255,0.55);">🌐 网页版没有「整包下载」通道（那是桌面版能力），继续用下面的预热 / 按需加载即可。</div>'
+                h += '<div style="margin-top:10px;padding:9px 12px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);border-radius:8px;font-size:0.76rem;line-height:1.7;color:rgba(255,255,255,0.55);">🌐 网页版没有「整包下载」通道（那是桌面版能力），继续用下面的下载 / 按需加载即可。</div>'
             }
             h += '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">'
-            h += '<button onclick="window.spineHero&&window.spineHero.preloadAll();setTimeout(refreshSpineCacheInfo,300)" style="background:linear-gradient(135deg,#7e57c2,#5e35b1);border:none;color:#fff;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">▶ 继续预热（默认）</button>'
-            h += '<button onclick="window.spineHero&&window.spineHero.preloadAll({includeSkins:true});setTimeout(refreshSpineCacheInfo,300)" style="background:rgba(179,157,219,0.2);border:1px solid rgba(179,157,219,0.5);color:#d1c4e9;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">▶ 连皮肤一起预热（较大）</button>'
+            h += '<button onclick="window.spineHero&&window.spineHero.preloadAll();setTimeout(refreshSpineCacheInfo,300)" style="background:linear-gradient(135deg,#7e57c2,#5e35b1);border:none;color:#fff;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">▶ 继续下载（默认）</button>'
+            h += '<button onclick="window.spineHero&&window.spineHero.preloadAll({includeSkins:true});setTimeout(refreshSpineCacheInfo,300)" style="background:rgba(179,157,219,0.2);border:1px solid rgba(179,157,219,0.5);color:#d1c4e9;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">⚡ 立即下载全部（含皮肤）</button>'
             h += '<button onclick="window.spineHero&&window.spineHero.preloadStop();setTimeout(refreshSpineCacheInfo,300)" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">⏸ 停止</button>'
-            h += '<button onclick="if(confirm(\'清空动画预热记录？缓存文件仍在，只会重新开始统计并按需重拉。\')){window.spineHero&&window.spineHero.preloadReset();setTimeout(refreshSpineCacheInfo,300)}" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">🔄 重置进度</button>'
+            h += '<button onclick="if(confirm(\'清空动画下载记录？缓存文件仍在，只会重新开始统计并按需重拉。\')){window.spineHero&&window.spineHero.preloadReset();setTimeout(refreshSpineCacheInfo,300)}" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">🔄 重置进度</button>'
             h += '</div>'
             let _skinsOn = false
             try { _skinsOn = localStorage.getItem('tfjl_spine_preload_skins') === '1' } catch (e) {}
             h += '<label style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:0.76rem;color:#d1c4e9;cursor:pointer;user-select:none;">' +
                 '<input type="checkbox" ' + (_skinsOn ? 'checked' : '') + ' onchange="try{localStorage.setItem(\'tfjl_spine_preload_skins\',this.checked?\'1\':\'0\');if(this.checked&&window.spineHero)window.spineHero.preloadAll({includeSkins:true});setTimeout(refreshSpineCacheInfo,300)}catch(e){}" style="accent-color:#b39ddb;">' +
-                ' 空闲时自动预热皮肤模型（默认关：默认模型约 22MB，皮肤再 +约 62MB）</label>'
-            h += '<div style="margin-top:10px;font-size:0.72rem;color:rgba(255,255,255,0.45);line-height:1.7;">说明：默认只预热各英雄的默认造型（98 个 ≈22MB，点开任何英雄都秒出）；皮肤模型共 275 个 ≈62MB，默认按需（打开皮肤时才拉那一个，之后也秒开）。勾上开关或点「连皮肤一起预热」会在空闲时段把全部皮肤骨骼也拉下来，建议在 WiFi 且不急时挂着跑。</div>'
+                ' 空闲时自动下载皮肤模型（默认关：默认模型约 22MB，皮肤再 +约 62MB）</label>'
+            h += '<div style="margin-top:10px;font-size:0.72rem;color:rgba(255,255,255,0.45);line-height:1.7;">说明：默认只下载各英雄的默认造型（98 个 ≈22MB，点开任意英雄都秒出）；皮肤模型共 275 个 ≈62MB，默认按需（打开皮肤时才拉那一个，之后也秒开）。勾上开关或点「立即下载全部（含皮肤）」会一次性把全部皮肤骨骼也拉到本地，建议在 WiFi 且不急时挂着跑。</div>'
             return h
         }
         window.showSpineCacheInfo = function () {
@@ -12062,16 +12082,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     '</div>'
                 ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove() })
                 document.body.appendChild(ov)
-                try {
-                    if (navigator.storage && navigator.storage.estimate) {
-                        navigator.storage.estimate().then(function (est) {
-                            const q = document.getElementById('spineCacheQuota')
-                            if (!q) return
-                            const mb = function (n) { return (Number(n || 0) / 1048576).toFixed(1) + ' MB' }
-                            q.textContent = '本站存储占用：约 ' + mb(est.usage) + ' / 可用 ' + mb(est.quota)
-                        })
-                    }
-                } catch (e) {}
+                try { refreshSpineCacheInfo() } catch (e) {}
+                // 存储占用已由 refreshSpineCacheInfo 在每次重建弹窗后重查当前节点（避免写到已销毁节点→一直“读取中…”）
             } catch (e) {}
         }
         setInterval(refreshSpineCacheInfo, 3000)
