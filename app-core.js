@@ -11777,6 +11777,40 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     const fuseSkinRow = document.createElement('div')
                     fuseSkinRow.style.cssText = 'position:absolute;left:224px;right:236px;bottom:10px;max-height:92px;overflow-y:auto;display:flex;flex-wrap:wrap;gap:4px;justify-content:center;align-items:flex-start;align-content:flex-start;z-index:5;'
                     sh.body.appendChild(fuseSkinRow)
+                    // 🔴 2026-10-22 拖单卡也能融合：尚未选副卡（preview 还是基础英雄）时，中底部直接铺出
+                    //   「可融合副卡列表」（读融合定义：云端 fusions.json 的 30 组官方融合），点一个即完成融合；
+                    //   已是融合形态时隐藏（那时用右栏「被融合卡列表」切换其它形态）。
+                    const fusePickRow = document.createElement('div')
+                    fusePickRow.style.cssText = 'position:absolute;left:224px;right:276px;bottom:10px;max-height:120px;overflow-y:auto;display:none;flex-wrap:wrap;gap:8px;justify-content:center;align-items:flex-start;align-content:flex-start;z-index:6;'
+                    sh.body.appendChild(fusePickRow)
+                    function paintFusePickRow() {
+                        const isBase = heroOf(preview) === preview
+                        let vs = []
+                        if (isBase) { try { vs = (typeof getFusionVariantsForBase === 'function') ? getFusionVariantsForBase(baseHero) : [] } catch (e) {} }
+                        fusePickRow.innerHTML = ''
+                        if (!isBase || !vs.length) { fusePickRow.style.display = 'none'; return }
+                        fusePickRow.style.display = 'flex'
+                        const tip = document.createElement('div')
+                        tip.textContent = '👇 选择要融合的副卡'
+                        tip.style.cssText = 'flex:1 1 100%;text-align:center;font-size:10.5px;color:#ffd75e;font-weight:800;'
+                        fusePickRow.appendChild(tip)
+                        vs.forEach((fn) => {
+                            const parts = (typeof getFusionParts === 'function') ? getFusionParts(fn) : null
+                            const partner = (parts && parts.length >= 2) ? parts[1] : fn
+                            const item = document.createElement('div')
+                            item.title = '融合为「' + fn + '」（副卡：' + partner + '）'
+                            item.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;'
+                            const im = document.createElement('img')
+                            im.style.cssText = 'width:52px;height:52px;border-radius:10px;object-fit:cover;background:rgba(0,0,0,0.4);border:2px solid rgba(255,220,150,0.3);'
+                            const lb = document.createElement('div')
+                            lb.textContent = partner
+                            lb.style.cssText = 'font-size:9.5px;color:#c9b28a;max-width:70px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
+                            item.appendChild(im); item.appendChild(lb)
+                            item.onclick = async () => { if (preview !== fn) await applyPreviewOpt(fn) }
+                            hdPortraitUrl(partner, partner).then((u) => { if (u) im.src = u }).catch(() => {})
+                            fusePickRow.appendChild(item)
+                        })
+                    }
                     function paintFuseSkinRow() {
                         // 🔴 2026-10-21 中底部显示「被融合卡（副卡）」的皮肤缩略图（图而非文字），点击换副卡皮肤
                         const sub = heroOf(preview) === preview ? '' : heroOf(preview)
