@@ -612,7 +612,8 @@
       "fengbaoshengqi": 1,
       "shengqishi": 1
     },
-    "updated": "2026-10-19"
+    "updated": "2026-10-19",
+    "scale": 0.7
   },
   "wuyi": {
     "hero": "巫医",
@@ -1037,7 +1038,8 @@
       "bodaerduo": 1,
       "houyi": 1
     },
-    "updated": "2026-10-19"
+    "updated": "2026-10-19",
+    "scale": 2.2
   },
   "songshu": {
     "hero": "松鼠",
@@ -1216,7 +1218,8 @@
       "baoyouwei": 1,
       "woailuo": 1
     },
-    "updated": "2026-10-19"
+    "updated": "2026-10-19",
+    "scale": 0.76
   },
   "shangjin": {
     "hero": "孤星",
@@ -1400,7 +1403,8 @@
       "aishenpifu": 1,
       "aishen": 1
     },
-    "updated": "2026-10-19"
+    "updated": "2026-10-19",
+    "scale": 1.21
   },
   "ying": {
     "hero": "影",
@@ -1438,7 +1442,8 @@
       "nezha": 1,
       "qiuwang": 1
     },
-    "updated": "2026-10-19"
+    "updated": "2026-10-19",
+    "scale": 1.21
   },
   "gangquan": {
     "hero": "龙拳",
@@ -1460,7 +1465,8 @@
       "guijiaoqi": 1,
       "gangquan": 1
     },
-    "updated": "2026-10-19"
+    "updated": "2026-10-19",
+    "scale": 1.6
   },
   "gangbei": {
     "hero": "钢鬃",
@@ -1612,7 +1618,7 @@
       "baoxiangui": 1
     },
     "updated": "2026-10-19",
-    "scale": 0.62
+    "scale": 1.2
   },
   "zhurushexian": {
     "hero": "侏儒射线",
@@ -1675,7 +1681,8 @@
       "ligonggong": 1,
       "daocaoren": 1
     },
-    "updated": "2026-10-19"
+    "updated": "2026-10-19",
+    "scale": 1.6
   },
   "hongkai": {
     "hero": "火神",
@@ -1692,7 +1699,8 @@
       "huoshenpifu": 1,
       "hongkai": 1
     },
-    "updated": "2026-10-19"
+    "updated": "2026-10-19",
+    "scale": 0.81
   },
   "xie": {
     "hero": "邪",
@@ -1744,7 +1752,8 @@
       "dashengtaipingle": 1,
       "qitiandasheng1": 1
     },
-    "updated": "2026-10-19"
+    "updated": "2026-10-19",
+    "scale": 1.6
   },
   "dazui": {
     "hero": "咬人娃娃",
@@ -1788,7 +1797,8 @@
       "wudujiaozhu": 1,
       "fenghuang": 1
     },
-    "updated": "2026-10-19"
+    "updated": "2026-10-19",
+    "scale": 1.21
   },
   "xiaoyuren": {
     "hero": "鱼人",

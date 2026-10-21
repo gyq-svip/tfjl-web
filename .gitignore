@@ -159,3 +159,5 @@ tools/
 # 本地发布工具的运行时文件（端口 + 一次性 token，供 AI/CLI 调用，严禁入库）
 # ====================
 /.release-server.json
+
+docs/panel-audit/shots/
