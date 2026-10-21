@@ -390,11 +390,11 @@
               <details open style="background:rgba(79,195,247,0.08);border:1px solid rgba(79,195,247,0.35);border-radius:10px;padding:10px 12px;margin-bottom:14px;">
                 <summary style="cursor:pointer;color:#4fc3f7;font-size:0.85rem;font-weight:600;">📖 皮肤制作与发布流程（点开/收起）</summary>
                 <div style="color:rgba(255,255,255,0.82);font-size:0.78rem;line-height:1.75;margin-top:8px;">
-                  <div><b style="color:#ffd700;">① 制作</b>：左侧上传原图 → 调参 → 点 <b>💾 保存并登记</b><br>
+                  <div><b style="color:#ffd700;">① 制作</b>：左侧上传原图 → 调参 → 点 <b>【B-1】💾 保存并登记</b>（把图入库到 skins/，这是后续所有发布的前提）<br>
                     <span style="color:rgba(255,255,255,0.55);">→ 写入 <code style="color:#4fc3f7;">skins/英雄名/皮肤名.skin</code> 并登记 registry.json（此时仅本机可见）</span></div>
-                  <div style="margin-top:6px;"><b style="color:#ffd700;">② 网页版生效</b>：点 <b>🚀 一键推送到 GitHub / Gitee</b><br>
-                    <span style="color:rgba(255,255,255,0.55);">→ 推 skins/ 散文件到 GitHub，网页端立即可见</span></div>
-                  <div style="margin-top:6px;"><b style="color:#ffd700;">③ 客户端生效</b>：先点 <b>⬇️ 一键拉取资源（本地预览）</b> 确认两个包大小无误 → 再点 <b>📦 一键打包发布到 Gitee</b><br>
+                  <div style="margin-top:6px;"><b style="color:#ffd700;">② 网页版生效</b>：先 <b>【B-1】保存登记</b> → 再点 <b>【B-2】🚀 一键推送到 GitHub / Gitee</b><br>
+                    <span style="color:rgba(255,255,255,0.55);">→ 推 skins/ 散文件到 GitHub / Gitee，网页端立即可见</span></div>
+                  <div style="margin-top:6px;"><b style="color:#ffd700;">③ 客户端生效（用户点「更新皮肤资源」能拉到）</b>：先点 <b>【A-1】⬇️ 一键拉取资源（本地预览）</b> 确认两个包大小无误 → 再点 <b>【A-2】📦 一键打包发布到 Gitee</b><br>
                     <span style="color:rgba(255,255,255,0.55);">→ 把整个 skins/ + 动画资源重新打成两个 zip 传 Gitee，用户点「更新皮肤资源」即可拉取</span></div>
                   <div style="margin-top:8px;padding-top:7px;border-top:1px dashed rgba(255,255,255,0.18);color:rgba(255,255,255,0.6);">
                     ⚠️ <b>②③ 互相独立</b>，各管一端，可分别执行、失败单独重试。<br>
@@ -456,11 +456,11 @@
               <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;">
                 <button id="smDownload" style="flex:1 1 200px;min-width:180px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">⬇️ 下载 PNG</button>
                 <button onclick="smSaveShareImage()" style="flex:1 1 220px;min-width:200px;background:rgba(79,195,247,0.15);border:1px solid rgba(79,195,247,0.45);color:#4fc3f7;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">🏷️ 复制分享图(带水印)</button>
-                <button id="smSave" style="flex:1 1 220px;min-width:200px;background:linear-gradient(135deg,#ffd700,#ff9800);border:none;color:#1a1a2e;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">💾 保存并登记到 skins 目录</button>
+                <button id="smSave" style="flex:1 1 220px;min-width:200px;background:linear-gradient(135deg,#ffd700,#ff9800);border:none;color:#1a1a2e;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">【B-1】💾 保存并登记到 skins 目录</button>
                 <button onclick="smCreateDefaultSkin()" title="兜底用：仅当该英雄一张皮肤都没有时才生成极简纯色块占位；若画布已上传真实立绘则直接存为默认皮肤；若已有皮肤会引导你去上传真实图，不再覆盖成纯色" style="flex:1 1 220px;min-width:200px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">➕ 新建英雄默认皮肤(兜底)</button>
-                <button id="smPush" style="flex:1 1 220px;min-width:200px;background:linear-gradient(135deg,#4caf50,#2e7d32);border:none;color:#fff;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">🚀 一键推送到 GitHub / Gitee</button>
-                <button id="smPrepack" title="仅把 skins/ + 动画资源本地打包预览（不联网、不上传），确认两个包大小正确后，再点「📦 一键打包发布到 Gitee」上传" style="flex:1 1 240px;min-width:220px;background:rgba(79,195,247,0.15);border:1px solid rgba(79,195,247,0.45);color:#4fc3f7;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">⬇️ 一键拉取资源（本地预览）</button>
-                <button id="smPublish" title="把 skins/ 内全部已登记皮肤打包上传到 Gitee 发行版（用户端从 Gitee 秒下，不走 GitHub 慢速源）；索引同步到 GitHub Pages。上传+校验成功后才更新索引，任一步失败都不影响现有用户" style="flex:1 1 240px;min-width:220px;background:linear-gradient(135deg,#9c27b0,#6a1b9a);border:none;color:#fff;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">📦 一键打包发布到 Gitee</button>
+                <button id="smPush" style="flex:1 1 220px;min-width:200px;background:linear-gradient(135deg,#4caf50,#2e7d32);border:none;color:#fff;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">【B-2】🚀 一键推送到 GitHub / Gitee</button>
+                <button id="smPrepack" title="仅把 skins/ + 动画资源本地打包预览（不联网、不上传），确认两个包大小正确后，再点「📦 一键打包发布到 Gitee」上传" style="flex:1 1 240px;min-width:220px;background:rgba(79,195,247,0.15);border:1px solid rgba(79,195,247,0.45);color:#4fc3f7;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">【A-1】⬇️ 一键拉取资源（本地预览）</button>
+                <button id="smPublish" title="把 skins/ 内全部已登记皮肤打包上传到 Gitee 发行版（用户端从 Gitee 秒下，不走 GitHub 慢速源）；索引同步到 GitHub Pages。上传+校验成功后才更新索引，任一步失败都不影响现有用户" style="flex:1 1 240px;min-width:220px;background:linear-gradient(135deg,#9c27b0,#6a1b9a);border:none;color:#fff;border-radius:10px;padding:12px;cursor:pointer;font-size:0.9rem;font-weight:600;">【A-2】📦 一键打包发布到 Gitee</button>
                 <input id="smGiteeToken" type="password" placeholder="Gitee Token（仅首次填，存本机不上传）" style="flex:1 1 200px;min-width:180px;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.08);color:#fff;font-size:0.82rem;">
                 <div id="smStatus" style="flex:2 1 300px;min-width:240px;font-size:0.78rem;color:rgba(255,255,255,0.7);line-height:1.5;white-space:pre-line;"></div>
               </div>
