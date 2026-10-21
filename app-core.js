@@ -12017,6 +12017,24 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             const j = await r.json()
                             if (j && typeof j === 'object' && Object.keys(j).length) {
                                 window.__HERO_SPINE_ASSET_BASE = probe.replace(/index\.json$/, '')
+                                // 🔴 2026-10-22 本地索引补配置：桌面端解压的动画整包可能是旧版
+                                //   （缺 scale/offsetX 逐英雄配置 → 大小修正不生效）。用线上索引的
+                                //   同名配置覆盖本地副本（资源 URL 仍走本地 base，只同步数值）。
+                                try {
+                                    const _p = location.pathname
+                                    const _siteBase = _p.endsWith('/') ? _p : _p.slice(0, _p.lastIndexOf('/') + 1)
+                                    const ro = await fetch(_siteBase + 'data/hero-spine/index.json', { cache: 'no-store' })
+                                    if (ro && ro.ok) {
+                                        const jo = await ro.json()
+                                        for (const k of Object.keys(j)) {
+                                            const o = jo && jo[k]
+                                            if (o && typeof o === 'object') {
+                                                if (o.scale != null) j[k].scale = o.scale
+                                                if (o.offsetX != null) j[k].offsetX = o.offsetX
+                                            }
+                                        }
+                                    }
+                                } catch (e) {}
                                 window.__heroSpineIndex = j
                                 clearInterval(timer)
                             }
