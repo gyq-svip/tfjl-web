@@ -11925,7 +11925,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (!man) return
                     const model = hdSkinModel(curSkin) || (meta.spineModel || '')
                     const pngs = model ? ((man.modelPngs && man.modelPngs[model]) || 0) : (man.pngs || 0)
-                    window.spineHero.play(cv, meta.spine, { fitPadding: 0.58, pngs, model, anchorFeet: 0.71, tight: true, fitByHeight: true, scale: (man && man.scale) || 1, offsetX: (man && man.offsetX) || 0 })
+                    // 🔴 2026-10-22 修正：原写法固定传 scale:1，会把索引里逐英雄的 scale 顶掉（永远不生效）。
+                    //    索引未配 scale 时传 undefined，交给 spine-hero 回退读 __heroSpineIndex[folder].scale。
+                    window.spineHero.play(cv, meta.spine, { fitPadding: 0.58, pngs, model, anchorFeet: 0.71, tight: true, fitByHeight: true, scale: (man && man.scale > 0) ? man.scale : undefined, offsetX: (man && man.offsetX) || 0 })
                 } catch (e) {}
             }
 

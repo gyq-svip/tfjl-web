@@ -1,0 +1,44 @@
+[
+ {
+  "hero": "咕咕",
+  "w": 992,
+  "h": 496,
+  "cnt": 50939,
+  "hFrac": 0.804,
+  "wFrac": 0.514,
+  "cyFrac": 0.536,
+  "comps": 4,
+  "fuse": {
+   "btn": true,
+   "items": 1
+  }
+ },
+ {
+  "hero": "电法",
+  "w": 992,
+  "h": 496,
+  "cnt": 37997,
+  "hFrac": 0.579,
+  "wFrac": 0.207,
+  "cyFrac": 0.419,
+  "comps": 1,
+  "fuse": {
+   "btn": true,
+   "items": 1
+  }
+ },
+ {
+  "hero": "死神",
+  "w": 992,
+  "h": 496,
+  "cnt": 30497,
+  "hFrac": 0.556,
+  "wFrac": 0.164,
+  "cyFrac": 0.43,
+  "comps": 1,
+  "fuse": {
+   "btn": true,
+   "items": 3
+  }
+ }
+]
