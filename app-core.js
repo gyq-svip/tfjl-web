@@ -12015,7 +12015,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             h += '<div>状态：' + (s.running ? '<span style="color:#fbbf24;">⏳ 空闲预热进行中</span>' : '<span style="color:#81c784;">空闲（开页面 8 秒后自动继续）</span>') + '</div>'
             h += '<div id="spineCacheQuota" style="color:rgba(255,255,255,0.55);">存储占用：读取中…</div>'
             h += '</div>'
-            // 🔴 2026-10-22 版本提示：动画/皮肤「整包下载」需桌面版 ≥2.1.8（5158089e 起的 download_skins 才会拉 spine 包）。
+            // 🔴 2026-10-22 版本提示：动画/皮肤「整包下载」需桌面版 ≥2.1.9（5158089e 起的 download_skins 才会拉 spine 包）。
             // 旧版 exe 点「更新皮肤资源」只会拉皮肤包、动画仍在线加载——用户会以为坏了，这里按版本直接提示出来。
             let _exeVer = ''
             try { if (typeof window.__APP_VERSION === 'string' && /^\d+\.\d+/.test(window.__APP_VERSION)) _exeVer = window.__APP_VERSION.replace(/^v/, '') } catch (e) {}
@@ -12023,8 +12023,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const _verCmp = function (a, b) { const p = String(a || '').split('.'), q = String(b || '').split('.'); for (let i = 0; i < 3; i++) { const x = +p[i] || 0, y = +q[i] || 0; if (x !== y) return x < y ? -1 : 1 } return 0 }
             const _isApp = !!(window.__TAURI_INTERNALS__ || window.__TAURI__ || (navigator.userAgent || '').indexOf('Tauri') !== -1)
             if (_isApp) {
-                if (_exeVer && _verCmp(_exeVer, '2.1.8') < 0) {
-                    h += '<div style="margin-top:10px;padding:9px 12px;border:1px solid rgba(239,83,80,0.45);background:rgba(239,83,80,0.10);border-radius:8px;font-size:0.76rem;line-height:1.7;color:#ef9a9a;">⚠️ 当前桌面版 <b>' + _exeVer + '</b> 还不支持「更新皮肤资源」下载动画整包（需 <b style="color:#ffd75e;">≥ 2.1.8</b>）——旧版点了也只会更新皮肤包、动画仍在线逐个加载。请先升级桌面版到 2.1.8 及以上，再点更新一次即可。</div>'
+                if (_exeVer && _verCmp(_exeVer, '2.1.9') < 0) {
+                    h += '<div style="margin-top:10px;padding:9px 12px;border:1px solid rgba(239,83,80,0.45);background:rgba(239,83,80,0.10);border-radius:8px;font-size:0.76rem;line-height:1.7;color:#ef9a9a;">⚠️ 当前桌面版 <b>' + _exeVer + '</b> 还不支持「更新皮肤资源」下载动画整包（需 <b style="color:#ffd75e;">≥ 2.1.9</b>）——旧版点了也只会更新皮肤包、动画仍在线逐个加载。请先升级桌面版到 2.1.9 及以上，再点更新一次即可。</div>'
                 } else {
                     h += '<div style="margin-top:10px;padding:9px 12px;border:1px solid rgba(129,199,132,0.35);background:rgba(129,199,132,0.08);border-radius:8px;font-size:0.76rem;line-height:1.7;color:rgba(255,255,255,0.78);">💾 桌面版 ' + (_exeVer || '') + '：可以不逐个预热 —— 直接点「更新皮肤资源」，会一次性下载 皮肤+动画 两个整包（≈20MB + ≈84MB）解压到本地，之后动画/皮肤模型全部秒开（断网也能看）。上面的预热按钮是给不想下整包的人用的。</div>'
                 }
