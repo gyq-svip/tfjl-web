@@ -142,7 +142,12 @@ if ($spineFiles.Count -gt 0) {
 }
 
 if ($SkipUpload) {
-    Write-Host "[SKIN-PUB] SkipUpload 已指定，仅打包不上传。包路径: $zipPath" -ForegroundColor Yellow
+    $msg = "SkipUpload 已指定，仅打包不上传（本地预览）。"
+    if ($spinePkgName) { $msg += "`n  皮肤包：$zipPath（$( [math]::Round($zipSize/1MB,2) ) MB，$heroCount 英雄/$skinCount 皮肤）" }
+    else { $msg += "`n  皮肤包：$zipPath（$( [math]::Round($zipSize/1MB,2) ) MB，$heroCount 英雄/$skinCount 皮肤）" }
+    $msg += "`n  动画包：$spineZipPath（$( [math]::Round($spineZipSize/1MB,2) ) MB，$($spineFiles.Count) 个文件）"
+    $msg += "`n确认无误后，去掉 SkipUpload 重新运行即可上传发布（或在管理面板点「📦 一键打包发布到 Gitee」）。"
+    Write-Host "[SKIN-PUB] $msg" -ForegroundColor Yellow
     exit 0
 }
 

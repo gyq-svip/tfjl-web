@@ -794,6 +794,13 @@ fn publish_skins(token: Option<String>) -> Result<String, String> {
     }
 }
 
+/// 🔴 2026-10-21 一键拉取/打包预览：仅把 skins/ + 动画资源本地打包（不上传），管理员确认大小正确后再点「一键上传」。
+/// 复用 publish_skins.ps1 -SkipUpload，成功后返回两个包的本地大小与路径。
+fn prepackage_skins() -> Result<String, String> {
+    let repo = "d:\\tfjl-web";
+    run_ps(repo, "publish_skins.ps1", &["-SkipUpload"])
+}
+
 /// 自增前端版本号（sw.js 的 CACHE_VERSION）
 /// 🔴 2026-09-21 修「小版本不自动 +1（皮肤制作一键推送 → 版本号自增跳过）」：
 ///    ① index.html 的 versionTag 本地现在是占位符 **`dev`**（真实版本号由 app-picker.js 启动后从
@@ -3346,6 +3353,7 @@ pub fn run() {
             download_skins,
             download_installer,
             publish_skins,
+            prepackage_skins,
             find_game_windows,
             capture_window_region,
             speak_text,

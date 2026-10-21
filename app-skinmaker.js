@@ -343,6 +343,18 @@
         smStatus('✅ 推送完成：\n'+res+'\n刷新 App 即可看到新皮肤。');
       }).catch(function(err){ smStatus('推送失败：'+smErrMsg(err),true); });
     }
+    // 一键拉取/打包预览：仅本地打包（不联网、不上传）——管理员确认两个包大小正确后再点上传
+    // 复用 Rust prepackage_skins（= publish_skins.ps1 -SkipUpload）
+    function smPrepackageSkins(){
+      var fn=smGetInvoke();
+      if(!fn){ smStatus('当前环境无法拉取：需在桌面App内。',true); return; }
+      smStatus('📦 本地打包预览中（皮肤包 + 动画包，约 1 分钟，勿关闭）…');
+      fn('prepackage_skins').then(function(res){
+        smStatus('✅ 拉取/打包完成（仅本地预览，未上传）\n\n'+res+'\n\n确认无误后，点「📦 一键打包发布到 Gitee」即可上传。');
+      }).catch(function(err){
+        smStatus('❌ 打包预览失败\n'+smErrMsg(err)+'\n\n补救：检查本地 data/hero-spine/ 与 skins/ 是否完整后重试。', true);
+      });
+    }
     // 一键打包发布：skins/ 全部已登记皮肤 -> Gitee 发行版（用户端秒下），索引 -> GitHub Pages
     // 安全顺序由 publish_skins.ps1 保证：上传+校验成功后才更新索引，失败不影响现有用户
     function smPublishSkins(){
@@ -393,6 +405,7 @@
       var dl=document.getElementById('smDownload'); if(dl) dl.addEventListener('click', smDownload);
       var sv=document.getElementById('smSave'); if(sv) sv.addEventListener('click', smSave);
       var pb=document.getElementById('smPush'); if(pb) pb.addEventListener('click', function(){ smPush(); });
+      var pre=document.getElementById('smPrepack'); if(pre) pre.addEventListener('click', function(){ smPrepackageSkins(); });
       var pub=document.getElementById('smPublish'); if(pub) pub.addEventListener('click', function(){ smPublishSkins(); });
       // 回填上次保存的 Gitee Token（仅存本机 localStorage，不上传、不入库）
       try{ var tk=localStorage.getItem('tfjl_gitee_token'); if(tk){ var te=document.getElementById('smGiteeToken'); if(te) te.value=tk; } }catch(e){}
