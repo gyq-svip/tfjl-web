@@ -12015,6 +12015,22 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             h += '<div>状态：' + (s.running ? '<span style="color:#fbbf24;">⏳ 空闲预热进行中</span>' : '<span style="color:#81c784;">空闲（开页面 8 秒后自动继续）</span>') + '</div>'
             h += '<div id="spineCacheQuota" style="color:rgba(255,255,255,0.55);">存储占用：读取中…</div>'
             h += '</div>'
+            // 🔴 2026-10-22 版本提示：动画/皮肤「整包下载」需桌面版 ≥2.1.8（5158089e 起的 download_skins 才会拉 spine 包）。
+            // 旧版 exe 点「更新皮肤资源」只会拉皮肤包、动画仍在线加载——用户会以为坏了，这里按版本直接提示出来。
+            let _exeVer = ''
+            try { if (typeof window.__APP_VERSION === 'string' && /^\d+\.\d+/.test(window.__APP_VERSION)) _exeVer = window.__APP_VERSION.replace(/^v/, '') } catch (e) {}
+            if (!_exeVer) { try { _exeVer = localStorage.getItem('__tfjl_ver_override') || '' } catch (e) {} }
+            const _verCmp = function (a, b) { const p = String(a || '').split('.'), q = String(b || '').split('.'); for (let i = 0; i < 3; i++) { const x = +p[i] || 0, y = +q[i] || 0; if (x !== y) return x < y ? -1 : 1 } return 0 }
+            const _isApp = !!(window.__TAURI_INTERNALS__ || window.__TAURI__ || (navigator.userAgent || '').indexOf('Tauri') !== -1)
+            if (_isApp) {
+                if (_exeVer && _verCmp(_exeVer, '2.1.8') < 0) {
+                    h += '<div style="margin-top:10px;padding:9px 12px;border:1px solid rgba(239,83,80,0.45);background:rgba(239,83,80,0.10);border-radius:8px;font-size:0.76rem;line-height:1.7;color:#ef9a9a;">⚠️ 当前桌面版 <b>' + _exeVer + '</b> 还不支持「更新皮肤资源」下载动画整包（需 <b style="color:#ffd75e;">≥ 2.1.8</b>）——旧版点了也只会更新皮肤包、动画仍在线逐个加载。请先升级桌面版到 2.1.8 及以上，再点更新一次即可。</div>'
+                } else {
+                    h += '<div style="margin-top:10px;padding:9px 12px;border:1px solid rgba(129,199,132,0.35);background:rgba(129,199,132,0.08);border-radius:8px;font-size:0.76rem;line-height:1.7;color:rgba(255,255,255,0.78);">💾 桌面版 ' + (_exeVer || '') + '：可以不逐个预热 —— 直接点「更新皮肤资源」，会一次性下载 皮肤+动画 两个整包（≈20MB + ≈84MB）解压到本地，之后动画/皮肤模型全部秒开（断网也能看）。上面的预热按钮是给不想下整包的人用的。</div>'
+                }
+            } else {
+                h += '<div style="margin-top:10px;padding:9px 12px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);border-radius:8px;font-size:0.76rem;line-height:1.7;color:rgba(255,255,255,0.55);">🌐 网页版没有「整包下载」通道（那是桌面版能力），继续用下面的预热 / 按需加载即可。</div>'
+            }
             h += '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">'
             h += '<button onclick="window.spineHero&&window.spineHero.preloadAll();setTimeout(refreshSpineCacheInfo,300)" style="background:linear-gradient(135deg,#7e57c2,#5e35b1);border:none;color:#fff;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">▶ 继续预热（默认）</button>'
             h += '<button onclick="window.spineHero&&window.spineHero.preloadAll({includeSkins:true});setTimeout(refreshSpineCacheInfo,300)" style="background:rgba(179,157,219,0.2);border:1px solid rgba(179,157,219,0.5);color:#d1c4e9;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">▶ 连皮肤一起预热（较大）</button>'
