@@ -65,12 +65,6 @@
     }
     return n
   }
-  function restoreFxSlots(sk) {
-    for (let i = 0; i < sk.slots.length; i++) {
-      const s = sk.slots[i]
-      if (s._fxAtt !== undefined) { s.attachment = s._fxAtt; delete s._fxAtt }
-    }
-  }
   // 采样 idle 动画求 tight 包围盒（世界坐标）；hideFx=true 时排除特效骨，得到「人物本体」范围
   function computeBounds(spine, skData, animName, hideFx) {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -97,7 +91,11 @@
 
   // 按真实不透明像素测量紧凑包围盒（骨架 getBounds 会含大量空白附属/离屏附件，
   // 直接用会导致角色偏小且偏离中心）。把整块网格渲染到小画布，扫 alpha 求紧边界再换算回世界坐标。
-  function measureVisualBounds(spine, skeleton, vb) {
+  // 🔴 2026-10-22 升级为「idle 整周期采样取并集」：旧法只测传入骨架的当前单帧（调用方固定 t=0），
+  //    而 idle 起始帧几乎无内容的模型（萌萌 bingdundun2 实测 t0 仅 38px 冰晶残影、t0.5 起角色才完整出现）
+  // 会被测成极小包围盒 → 缩放爆炸 → 画成局部放大碎片（用户只见一小块绿影）。
+  //    现逐帧渲染到同一块 320px 累积画布取 alpha 并集，一次扫描得到整周期可见范围。
+  function measureVisualBounds(spine, skData, anim, vb, hideFx) {
     try {
       const sw = vb.size.x, sh = vb.size.y
       if (!(sw > 0 && sh > 0)) return null
@@ -107,20 +105,33 @@
       oc.width = N; oc.height = N
       const c2 = oc.getContext('2d', { willReadFrequently: true })
       const cx = vb.off.x + sw / 2, cy = vb.off.y + sh / 2
-      c2.save()
-      c2.translate(N / 2, N / 2)
-      c2.scale(s, -s)
-      c2.translate(-cx, -cy)
-      const r2 = new spine.canvas.SkeletonRenderer(c2)
-      r2.triangleRendering = true
-      r2.draw(skeleton)
-      c2.restore()
-      const data = c2.getImageData(0, 0, N, N).data
+      const stt = new spine.AnimationState(new spine.AnimationStateData(skData))
+      const dur = anim ? (anim.duration || 0) : 0
+      const steps = Math.max(6, Math.ceil(dur * 12))
+      const acc = new Uint8Array(N * N)
+      for (let i = 0; i <= steps; i++) {
+        const tmp = new spine.Skeleton(skData)
+        tmp.setToSetupPose()
+        if (anim) { stt.clearTracks(); stt.setAnimation(0, anim.name, false); stt.update((dur * i) / steps); stt.apply(tmp) }
+        if (hideFx) hideFxSlots(tmp)
+        tmp.updateWorldTransform()
+        c2.clearRect(0, 0, N, N)
+        c2.save()
+        c2.translate(N / 2, N / 2)
+        c2.scale(s, -s)
+        c2.translate(-cx, -cy)
+        const r2 = new spine.canvas.SkeletonRenderer(c2)
+        r2.triangleRendering = true
+        r2.draw(tmp)
+        c2.restore()
+        const data = c2.getImageData(0, 0, N, N).data
+        for (let p = 3, o = 0; o < N * N; p += 4, o++) { if (data[p] > 24) acc[o] = 1 }
+      }
       let minX = 1e9, minY = 1e9, maxX = -1, maxY = -1
       for (let y = 0; y < N; y++) {
         const row = y * N
         for (let x = 0; x < N; x++) {
-          if (data[(row + x) * 4 + 3] > 24) {
+          if (acc[row + x]) {
             if (x < minX) minX = x
             if (x > maxX) maxX = x
             if (y < minY) minY = y
@@ -200,6 +211,33 @@
     if (token !== st.token) return // 已被后续 play 抢占，避免双 raf
     try {
       const skData = assets.skData
+      // 🔴 2026-10-22 修复「萌萌只剩一团冰晶/部分模型身体不显示」：这类模型的插槽 setup attachmentName
+      //    为空（身体附件只存在于皮肤里，官方导出器把 "0" 皮肤改名为 default），标准运行时对
+      //    attachmentName 为空的插槽永远不从皮肤挂附件 → 身体从未被渲染过。
+      //    这里把皮肤中每个插槽的第一个附件名回填到 SlotData.attachmentName：
+      //    之后 setup 姿势、动画、computeBounds 全部自然生效（assetCache 缓存 skData，只补一次）。
+      try {
+        const skin0 = skData.defaultSkin || (skData.skins && skData.skins[0])
+        const pairs = []
+        if (skin0) {
+          if (typeof skin0.getAttachments === 'function') {
+            const es = skin0.getAttachments()
+            for (const e of es) pairs.push({ slotIndex: e.slotIndex, name: e.name })
+          } else if (skin0.attachments) {
+            const idx = {}
+            skData.slots.forEach(function (sd, i) { idx[sd.name] = i })
+            for (const sn in skin0.attachments) {
+              const m = skin0.attachments[sn]
+              for (const an in m) { if (idx[sn] !== undefined) pairs.push({ slotIndex: idx[sn], name: an }) }
+            }
+          }
+        }
+        const done = {}
+        for (const p of pairs) {
+          const sd = skData.slots[p.slotIndex]
+          if (sd && !sd.attachmentName && !done[p.slotIndex]) { sd.attachmentName = p.name; done[p.slotIndex] = 1 }
+        }
+      } catch (e) {}
       const skeleton = new spine.Skeleton(skData)
       skeleton.setToSetupPose()
       const state = new spine.AnimationState(new spine.AnimationStateData(skData))
@@ -207,6 +245,7 @@
       renderer.triangleRendering = true
       const anims = skData.animations.map(function (a) { return a.name })
       const idle = anims.find(function (a) { return /idle/i.test(a) }) || anims[0]
+      const animObj = idle ? skData.findAnimation(idle) : null
       // 🔴 2026-10-21 包围盒按模型缓存（首次测量后复用），避免每次打开都重复采样动画
       const vbKey = folder + '@' + (opts.model || '')
       const vb = vbBoundsCache[vbKey] || (vbBoundsCache[vbKey] = computeBounds(spine, skData, idle))
@@ -217,18 +256,15 @@
 
       // 真实不透明像素的紧包围盒（缓存）：修正骨架 getBounds 空白过多导致的偏小/偏心
       // 仅 opts.tight 时启用（详情大图用），避免改变战场小卡/图鉴既有观感
+      // 🔴 2026-10-22 改为整周期采样（见 measureVisualBounds 注释），并缓存
       let vbVis = vb
       if (opts.tight) {
         vbVis = vbCache[vbKey]
         if (!vbVis) {
-          const mFull = measureVisualBounds(spine, skeleton, vb)
+          const mFull = measureVisualBounds(spine, skData, animObj, vb, false)
           let mFx = null
-          const nFx = hideFxSlots(skeleton)
-          if (nFx > 0) {
-            skeleton.updateWorldTransform()
-            mFx = measureVisualBounds(spine, skeleton, vbFx)
-            restoreFxSlots(skeleton); skeleton.updateWorldTransform()
-          }
+          const nFx = hideFxSlots(new spine.Skeleton(skData))
+          if (nFx > 0) mFx = measureVisualBounds(spine, skData, animObj, vb, true)
           // 安全兜底：排除特效后可见内容过小（说明特效本身就是主体）则退回全量
           if (mFx && mFull && (mFx.size.x * mFx.size.y) < 0.25 * (mFull.size.x * mFull.size.y)) mFx = null
           vbVis = mFx || mFull || vb
