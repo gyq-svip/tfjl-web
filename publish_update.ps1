@@ -33,7 +33,10 @@ function Publish-GiteeRelease($ver, $exePath, $remoteName) {
     try { $list = Invoke-RestMethod -Uri ("https://gitee.com/api/v5/repos/$owner/$repo/releases?access_token=$tok") -Method Get } catch { Write-Host "WARN: 查 Gitee releases 失败: $($_.Exception.Message)" -ForegroundColor Yellow; return }
     $rel = $list | Where-Object { $_.tag_name -eq $tag }
     if (-not $rel) {
-        $body = @{ tag_name=$tag; target_commitish="main"; name=$tag; body="auto update $tag"; prerelease=$false } | ConvertTo-Json -Compress
+        # 🔴 target_commitish 必须填 Gitee 仓库真实存在的分支名。本仓库 Gitee 侧只有 master（没有 main），
+        #    写 "main" 会被 Gitee 直接 400 拒绝 → 发行版建不出来 → exe 漏传 → 用户点安装下不到包。
+        #    （2026-10-22 v2.1.9 发布踩过：一直被误判成"Gitee WAF 偶发拦截"，实为分支名不符。）
+        $body = @{ tag_name=$tag; target_commitish="master"; name=$tag; body="auto update $tag"; prerelease=$false } | ConvertTo-Json -Compress
         # 🔴 Gitee WAF 偶发把 POST /releases 拦成 400 假象（同版本 release 已存在也会 400）。
         # 先重试一次；若仍失败，再查一次 release 列表（可能其实已建好，只是返回被 WAF 干扰），
         # 仍查不到才放弃上传并告警，绝不直接 return 导致 exe 漏传。
