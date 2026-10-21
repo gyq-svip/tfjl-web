@@ -1,25 +1,361 @@
 [
  {
-  "hero": "咕咕",
+  "hero": "冰骑",
   "w": 992,
   "h": 496,
-  "cnt": 50939,
-  "hFrac": 0.804,
-  "wFrac": 0.514,
-  "cyFrac": 0.536,
-  "comps": 4,
+  "cnt": 42422,
+  "hFrac": 0.744,
+  "wFrac": 0.225,
+  "cyFrac": 0.502,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "恶魔",
+  "w": 992,
+  "h": 496,
+  "cnt": 43821,
+  "hFrac": 0.558,
+  "wFrac": 0.286,
+  "cyFrac": 0.429,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "火法",
+  "w": 992,
+  "h": 496,
+  "cnt": 43174,
+  "hFrac": 0.798,
+  "wFrac": 0.199,
+  "cyFrac": 0.398,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "剑客",
+  "w": 992,
+  "h": 496,
+  "cnt": 38859,
+  "hFrac": 0.732,
+  "wFrac": 0.241,
+  "cyFrac": 0.498,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "刺客",
+  "w": 992,
+  "h": 496,
+  "cnt": 31618,
+  "hFrac": 0.56,
+  "wFrac": 0.225,
+  "cyFrac": 0.428,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "小鹿",
+  "w": 992,
+  "h": 496,
+  "cnt": 77280,
+  "hFrac": 0.861,
+  "wFrac": 0.3,
+  "cyFrac": 0.563,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "冰法",
+  "w": 992,
+  "h": 496,
+  "cnt": 43131,
+  "hFrac": 0.55,
+  "wFrac": 0.579,
+  "cyFrac": 0.421,
+  "comps": 2,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "蛇女",
+  "w": 992,
+  "h": 496,
+  "cnt": 19692,
+  "hFrac": 0.567,
+  "wFrac": 0.255,
+  "cyFrac": 0.427,
+  "comps": 1,
+  "fuse": {
+   "btn": true,
+   "items": 2
+  }
+ },
+ {
+  "hero": "绿弓",
+  "w": 992,
+  "h": 496,
+  "cnt": 33192,
+  "hFrac": 0.575,
+  "wFrac": 0.233,
+  "cyFrac": 0.423,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "冰弓",
+  "w": 992,
+  "h": 496,
+  "cnt": 30708,
+  "hFrac": 0.579,
+  "wFrac": 0.193,
+  "cyFrac": 0.419,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "暗法",
+  "w": 992,
+  "h": 496,
+  "cnt": 55917,
+  "hFrac": 0.579,
+  "wFrac": 0.232,
+  "cyFrac": 0.419,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "雷神",
+  "w": 992,
+  "h": 496,
+  "cnt": 92804,
+  "hFrac": 0.75,
+  "wFrac": 0.308,
+  "cyFrac": 0.374,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "战将",
+  "w": 992,
+  "h": 496,
+  "cnt": 55229,
+  "hFrac": 0.764,
+  "wFrac": 0.244,
+  "cyFrac": 0.512,
+  "comps": 1,
+  "fuse": {
+   "btn": true,
+   "items": 3
+  }
+ },
+ {
+  "hero": "刀客",
+  "w": 992,
+  "h": 496,
+  "cnt": 34246,
+  "hFrac": 0.575,
+  "wFrac": 0.236,
+  "cyFrac": 0.421,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "海妖",
+  "w": 992,
+  "h": 496,
+  "cnt": 34296,
+  "hFrac": 0.546,
+  "wFrac": 0.257,
+  "cyFrac": 0.421,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "大树",
+  "w": 992,
+  "h": 496,
+  "cnt": 71108,
+  "hFrac": 0.81,
+  "wFrac": 0.244,
+  "cyFrac": 0.549,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "铁骑",
+  "w": 992,
+  "h": 496,
+  "cnt": 46018,
+  "hFrac": 0.857,
+  "wFrac": 0.236,
+  "cyFrac": 0.558,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "飞机",
+  "w": 992,
+  "h": 496,
+  "cnt": 45123,
+  "hFrac": 0.544,
+  "wFrac": 0.401,
+  "cyFrac": 0.473,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "炸弹",
+  "w": 992,
+  "h": 496,
+  "cnt": 46284,
+  "hFrac": 0.579,
+  "wFrac": 0.252,
+  "cyFrac": 0.419,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "谜云",
+  "w": 992,
+  "h": 496,
+  "cnt": 31830,
+  "hFrac": 0.575,
+  "wFrac": 0.2,
+  "cyFrac": 0.421,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "神龛",
+  "w": 992,
+  "h": 496,
+  "cnt": 31010,
+  "hFrac": 0.558,
+  "wFrac": 0.238,
+  "cyFrac": 0.415,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "骨弓",
+  "w": 992,
+  "h": 496,
+  "cnt": 23052,
+  "hFrac": 0.577,
+  "wFrac": 0.194,
+  "cyFrac": 0.42,
+  "comps": 1,
   "fuse": {
    "btn": true,
    "items": 1
   }
  },
  {
+  "hero": "祭司",
+  "w": 992,
+  "h": 496,
+  "cnt": 23159,
+  "hFrac": 0.577,
+  "wFrac": 0.12,
+  "cyFrac": 0.42,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "斧客",
+  "w": 992,
+  "h": 496,
+  "cnt": 47965,
+  "hFrac": 0.571,
+  "wFrac": 0.313,
+  "cyFrac": 0.423,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "死神",
+  "w": 992,
+  "h": 496,
+  "cnt": 61022,
+  "hFrac": 0.808,
+  "wFrac": 0.231,
+  "cyFrac": 0.534,
+  "comps": 1,
+  "fuse": {
+   "btn": true,
+   "items": 3
+  }
+ },
+ {
   "hero": "电法",
   "w": 992,
   "h": 496,
-  "cnt": 37997,
+  "cnt": 38140,
   "hFrac": 0.579,
-  "wFrac": 0.207,
+  "wFrac": 0.209,
   "cyFrac": 0.419,
   "comps": 1,
   "fuse": {
@@ -28,17 +364,1067 @@
   }
  },
  {
-  "hero": "死神",
+  "hero": "火枪",
   "w": 992,
   "h": 496,
-  "cnt": 30497,
-  "hFrac": 0.556,
-  "wFrac": 0.164,
-  "cyFrac": 0.43,
+  "cnt": 63364,
+  "hFrac": 0.569,
+  "wFrac": 0.381,
+  "cyFrac": 0.422,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "石头",
+  "w": 992,
+  "h": 496,
+  "cnt": 54072,
+  "hFrac": 0.56,
+  "wFrac": 0.263,
+  "cyFrac": 0.424,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "蜘蛛",
+  "w": 992,
+  "h": 496,
+  "cnt": 58060,
+  "hFrac": 0.54,
+  "wFrac": 0.479,
+  "cyFrac": 0.436,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "骨龙",
+  "w": 992,
+  "h": 496,
+  "cnt": 36747,
+  "hFrac": 0.563,
+  "wFrac": 0.269,
+  "cyFrac": 0.421,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "圣骑",
+  "w": 992,
+  "h": 496,
+  "cnt": 30090,
+  "hFrac": 0.55,
+  "wFrac": 0.138,
+  "cyFrac": 0.5,
   "comps": 1,
   "fuse": {
    "btn": true,
-   "items": 3
+   "items": 2
+  }
+ },
+ {
+  "hero": "巫医",
+  "w": 992,
+  "h": 496,
+  "cnt": 32597,
+  "hFrac": 0.573,
+  "wFrac": 0.252,
+  "cyFrac": 0.422,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "女王",
+  "w": 992,
+  "h": 496,
+  "cnt": 33654,
+  "hFrac": 0.573,
+  "wFrac": 0.248,
+  "cyFrac": 0.422,
+  "comps": 1,
+  "fuse": {
+   "btn": true,
+   "items": 2
+  }
+ },
+ {
+  "hero": "光精灵",
+  "w": 992,
+  "h": 496,
+  "cnt": 38807,
+  "hFrac": 0.508,
+  "wFrac": 0.249,
+  "cyFrac": 0.39,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "雷精灵",
+  "w": 992,
+  "h": 496,
+  "cnt": 43104,
+  "hFrac": 0.518,
+  "wFrac": 0.284,
+  "cyFrac": 0.446,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "悟空",
+  "w": 992,
+  "h": 496,
+  "cnt": 46732,
+  "hFrac": 0.819,
+  "wFrac": 0.207,
+  "cyFrac": 0.553,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "幽灵",
+  "w": 992,
+  "h": 496,
+  "cnt": 42108,
+  "hFrac": 0.536,
+  "wFrac": 0.611,
+  "cyFrac": 0.441,
+  "comps": 2,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "工匠",
+  "w": 992,
+  "h": 496,
+  "cnt": 39093,
+  "hFrac": 0.563,
+  "wFrac": 0.244,
+  "cyFrac": 0.427,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "幻精灵",
+  "w": 992,
+  "h": 496,
+  "cnt": 43685,
+  "hFrac": 0.504,
+  "wFrac": 0.251,
+  "cyFrac": 0.384,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "暗精灵",
+  "w": 992,
+  "h": 496,
+  "cnt": 49424,
+  "hFrac": 0.532,
+  "wFrac": 0.255,
+  "cyFrac": 0.424,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "萌萌",
+  "w": 992,
+  "h": 496,
+  "cnt": 35143,
+  "hFrac": 0.609,
+  "wFrac": 0.262,
+  "cyFrac": 0.404,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "恶匪",
+  "w": 992,
+  "h": 496,
+  "cnt": 48011,
+  "hFrac": 0.571,
+  "wFrac": 0.348,
+  "cyFrac": 0.425,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "虎弓",
+  "w": 992,
+  "h": 496,
+  "cnt": 27610,
+  "hFrac": 0.577,
+  "wFrac": 0.188,
+  "cyFrac": 0.42,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "木精灵",
+  "w": 992,
+  "h": 496,
+  "cnt": 47610,
+  "hFrac": 0.534,
+  "wFrac": 0.264,
+  "cyFrac": 0.411,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "霸王",
+  "w": 992,
+  "h": 496,
+  "cnt": 44809,
+  "hFrac": 0.71,
+  "wFrac": 0.271,
+  "cyFrac": 0.489,
+  "comps": 1,
+  "fuse": {
+   "btn": true,
+   "items": 2
+  }
+ },
+ {
+  "hero": "地精",
+  "w": 992,
+  "h": 496,
+  "cnt": 30081,
+  "hFrac": 0.573,
+  "wFrac": 0.167,
+  "cyFrac": 0.422,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "毒王",
+  "w": 992,
+  "h": 496,
+  "cnt": 62193,
+  "hFrac": 0.583,
+  "wFrac": 0.308,
+  "cyFrac": 0.419,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "萨满",
+  "w": 992,
+  "h": 496,
+  "cnt": 27453,
+  "hFrac": 0.573,
+  "wFrac": 0.207,
+  "cyFrac": 0.418,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "神龙",
+  "w": 992,
+  "h": 496,
+  "cnt": 38784,
+  "hFrac": 0.577,
+  "wFrac": 0.282,
+  "cyFrac": 0.418,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "魔精灵",
+  "w": 992,
+  "h": 496,
+  "cnt": 44291,
+  "hFrac": 0.522,
+  "wFrac": 0.246,
+  "cyFrac": 0.385,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "狂龙",
+  "w": 992,
+  "h": 496,
+  "cnt": 30107,
+  "hFrac": 0.571,
+  "wFrac": 0.228,
+  "cyFrac": 0.423,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "酋长",
+  "w": 992,
+  "h": 496,
+  "cnt": 46150,
+  "hFrac": 0.565,
+  "wFrac": 0.236,
+  "cyFrac": 0.426,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "后羿",
+  "w": 992,
+  "h": 496,
+  "cnt": 117871,
+  "hFrac": 0.702,
+  "wFrac": 0.465,
+  "cyFrac": 0.35,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "松鼠",
+  "w": 992,
+  "h": 496,
+  "cnt": 43023,
+  "hFrac": 0.528,
+  "wFrac": 0.243,
+  "cyFrac": 0.424,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "亡将",
+  "w": 992,
+  "h": 496,
+  "cnt": 38611,
+  "hFrac": 0.581,
+  "wFrac": 0.231,
+  "cyFrac": 0.418,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "炎魔",
+  "w": 992,
+  "h": 496,
+  "cnt": 38724,
+  "hFrac": 0.577,
+  "wFrac": 0.259,
+  "cyFrac": 0.42,
+  "comps": 2,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "小丑",
+  "w": 992,
+  "h": 496,
+  "cnt": 38417,
+  "hFrac": 0.573,
+  "wFrac": 0.401,
+  "cyFrac": 0.422,
+  "comps": 3,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "咕咕",
+  "w": 992,
+  "h": 496,
+  "cnt": 50932,
+  "hFrac": 0.802,
+  "wFrac": 0.514,
+  "cyFrac": 0.537,
+  "comps": 4,
+  "fuse": {
+   "btn": true,
+   "items": 1
+  }
+ },
+ {
+  "hero": "邪能火炮",
+  "w": 992,
+  "h": 496,
+  "cnt": 74772,
+  "hFrac": 0.708,
+  "wFrac": 0.324,
+  "cyFrac": 0.353,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "领主",
+  "w": 992,
+  "h": 496,
+  "cnt": 39066,
+  "hFrac": 0.575,
+  "wFrac": 0.32,
+  "cyFrac": 0.421,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "沙皇",
+  "w": 992,
+  "h": 496,
+  "cnt": 23283,
+  "hFrac": 0.468,
+  "wFrac": 0.18,
+  "cyFrac": 0.505,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "孤星",
+  "w": 992,
+  "h": 496,
+  "cnt": 84490,
+  "hFrac": 0.613,
+  "wFrac": 0.56,
+  "cyFrac": 0.451,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "彩精灵",
+  "w": 992,
+  "h": 496,
+  "cnt": 65941,
+  "hFrac": 0.558,
+  "wFrac": 0.337,
+  "cyFrac": 0.433,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "鲛女",
+  "w": 992,
+  "h": 496,
+  "cnt": 40165,
+  "hFrac": 0.577,
+  "wFrac": 0.269,
+  "cyFrac": 0.42,
+  "comps": 1,
+  "fuse": {
+   "btn": true,
+   "items": 2
+  }
+ },
+ {
+  "hero": "船长",
+  "w": 992,
+  "h": 496,
+  "cnt": 38947,
+  "hFrac": 0.571,
+  "wFrac": 0.315,
+  "cyFrac": 0.423,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "土精灵",
+  "w": 992,
+  "h": 496,
+  "cnt": 54970,
+  "hFrac": 0.571,
+  "wFrac": 0.291,
+  "cyFrac": 0.423,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "龟相",
+  "w": 992,
+  "h": 496,
+  "cnt": 85505,
+  "hFrac": 0.623,
+  "wFrac": 0.49,
+  "cyFrac": 0.399,
+  "comps": 2,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "龙王",
+  "w": 992,
+  "h": 496,
+  "cnt": 41173,
+  "hFrac": 0.581,
+  "wFrac": 0.265,
+  "cyFrac": 0.418,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "狂将",
+  "w": 992,
+  "h": 496,
+  "cnt": 32865,
+  "hFrac": 0.571,
+  "wFrac": 0.28,
+  "cyFrac": 0.421,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "爱神",
+  "w": 992,
+  "h": 496,
+  "cnt": 60308,
+  "hFrac": 0.728,
+  "wFrac": 0.9,
+  "cyFrac": 0.363,
+  "comps": 3,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "影",
+  "w": 992,
+  "h": 496,
+  "cnt": 62370,
+  "hFrac": 0.587,
+  "wFrac": 0.34,
+  "cyFrac": 0.429,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "小野",
+  "w": 992,
+  "h": 496,
+  "cnt": 44966,
+  "hFrac": 0.73,
+  "wFrac": 0.2,
+  "cyFrac": 0.499,
+  "comps": 1,
+  "fuse": {
+   "btn": true,
+   "items": 2
+  }
+ },
+ {
+  "hero": "阿翼",
+  "w": 992,
+  "h": 496,
+  "cnt": 71953,
+  "hFrac": 0.55,
+  "wFrac": 0.636,
+  "cyFrac": 0.431,
+  "comps": 2,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "龙拳",
+  "w": 992,
+  "h": 496,
+  "cnt": 77092,
+  "hFrac": 0.706,
+  "wFrac": 0.375,
+  "cyFrac": 0.352,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "钢鬃",
+  "w": 992,
+  "h": 496,
+  "cnt": 51568,
+  "hFrac": 0.871,
+  "wFrac": 0.633,
+  "cyFrac": 0.564,
+  "comps": 2,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "女妖",
+  "w": 992,
+  "h": 496,
+  "cnt": 33314,
+  "hFrac": 0.665,
+  "wFrac": 0.193,
+  "cyFrac": 0.39,
+  "comps": 2,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "猫咪",
+  "w": 992,
+  "h": 496,
+  "cnt": 37654,
+  "hFrac": 0.579,
+  "wFrac": 0.421,
+  "cyFrac": 0.419,
+  "comps": 2,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "魇",
+  "w": 992,
+  "h": 496,
+  "cnt": 34421,
+  "hFrac": 0.573,
+  "wFrac": 0.238,
+  "cyFrac": 0.42,
+  "comps": 1,
+  "fuse": {
+   "btn": true,
+   "items": 1
+  }
+ },
+ {
+  "hero": "闪",
+  "w": 992,
+  "h": 496,
+  "cnt": 49918,
+  "hFrac": 0.702,
+  "wFrac": 0.621,
+  "cyFrac": 0.483,
+  "comps": 3,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "葵",
+  "w": 992,
+  "h": 496,
+  "cnt": 41327,
+  "hFrac": 0.573,
+  "wFrac": 0.624,
+  "cyFrac": 0.422,
+  "comps": 2,
+  "fuse": {
+   "btn": true,
+   "items": 1
+  }
+ },
+ {
+  "hero": "地精宝库",
+  "w": 992,
+  "h": 496,
+  "cnt": 112004,
+  "hFrac": 0.698,
+  "wFrac": 0.335,
+  "cyFrac": 0.362,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "侏儒射线",
+  "w": 992,
+  "h": 496,
+  "cnt": 43187,
+  "hFrac": 0.575,
+  "wFrac": 0.286,
+  "cyFrac": 0.421,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "魂精灵",
+  "w": 992,
+  "h": 496,
+  "cnt": 47415,
+  "hFrac": 0.496,
+  "wFrac": 0.261,
+  "cyFrac": 0.392,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "傀",
+  "w": 992,
+  "h": 496,
+  "cnt": 96038,
+  "hFrac": 0.72,
+  "wFrac": 0.72,
+  "cyFrac": 0.359,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "火神",
+  "w": 992,
+  "h": 496,
+  "cnt": 49185,
+  "hFrac": 0.575,
+  "wFrac": 0.539,
+  "cyFrac": 0.46,
+  "comps": 2,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "邪",
+  "w": 992,
+  "h": 496,
+  "cnt": 36901,
+  "hFrac": 0.569,
+  "wFrac": 0.613,
+  "cyFrac": 0.412,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "大圣",
+  "w": 992,
+  "h": 496,
+  "cnt": 125656,
+  "hFrac": 0.738,
+  "wFrac": 0.82,
+  "cyFrac": 0.368,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "咬人娃娃",
+  "w": 992,
+  "h": 496,
+  "cnt": 65013,
+  "hFrac": 0.581,
+  "wFrac": 0.64,
+  "cyFrac": 0.42,
+  "comps": 2,
+  "fuse": {
+   "btn": true,
+   "items": 1
+  }
+ },
+ {
+  "hero": "凤凰",
+  "w": 992,
+  "h": 496,
+  "cnt": 34696,
+  "hFrac": 0.486,
+  "wFrac": 0.292,
+  "cyFrac": 0.323,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "鱼人",
+  "w": 992,
+  "h": 496,
+  "cnt": 51533,
+  "hFrac": 0.577,
+  "wFrac": 0.63,
+  "cyFrac": 0.42,
+  "comps": 3,
+  "fuse": {
+   "btn": true,
+   "items": 1
+  }
+ },
+ {
+  "hero": "冰精灵",
+  "w": 992,
+  "h": 496,
+  "cnt": 48014,
+  "hFrac": 0.546,
+  "wFrac": 0.307,
+  "cyFrac": 0.472,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "土灵",
+  "w": 992,
+  "h": 496,
+  "cnt": 63293,
+  "hFrac": 0.575,
+  "wFrac": 0.573,
+  "cyFrac": 0.421,
+  "comps": 2,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "水灵",
+  "w": 992,
+  "h": 496,
+  "cnt": 54208,
+  "hFrac": 0.579,
+  "wFrac": 0.554,
+  "cyFrac": 0.421,
+  "comps": 2,
+  "fuse": {
+   "btn": true,
+   "items": 1
+  }
+ },
+ {
+  "hero": "火灵",
+  "w": 992,
+  "h": 496,
+  "cnt": 64243,
+  "hFrac": 0.71,
+  "wFrac": 0.554,
+  "cyFrac": 0.354,
+  "comps": 2,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "钟馗",
+  "w": 992,
+  "h": 496,
+  "cnt": 67188,
+  "hFrac": 0.575,
+  "wFrac": 0.37,
+  "cyFrac": 0.421,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "小炮",
+  "w": 992,
+  "h": 496,
+  "cnt": 56365,
+  "hFrac": 0.577,
+  "wFrac": 0.638,
+  "cyFrac": 0.42,
+  "comps": 3,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "天使",
+  "w": 992,
+  "h": 496,
+  "cnt": 44464,
+  "hFrac": 0.563,
+  "wFrac": 0.247,
+  "cyFrac": 0.423,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "微型潜艇",
+  "w": 992,
+  "h": 496,
+  "cnt": 42678,
+  "hFrac": 0.506,
+  "wFrac": 0.276,
+  "cyFrac": 0.429,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "风灵",
+  "w": 992,
+  "h": 496,
+  "cnt": 50555,
+  "hFrac": 0.577,
+  "wFrac": 0.289,
+  "cyFrac": 0.422,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "冰鸟",
+  "w": 992,
+  "h": 496,
+  "cnt": 35241,
+  "hFrac": 0.558,
+  "wFrac": 0.468,
+  "cyFrac": 0.397,
+  "comps": 2,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "水人",
+  "w": 992,
+  "h": 496,
+  "cnt": 48708,
+  "hFrac": 0.609,
+  "wFrac": 0.327,
+  "cyFrac": 0.404,
+  "comps": 1,
+  "fuse": {
+   "btn": false,
+   "items": 0
+  }
+ },
+ {
+  "hero": "血魔",
+  "w": 992,
+  "h": 496,
+  "cnt": 46224,
+  "hFrac": 0.685,
+  "wFrac": 0.532,
+  "cyFrac": 0.346,
+  "comps": 2,
+  "fuse": {
+   "btn": false,
+   "items": 0
   }
  }
 ]

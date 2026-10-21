@@ -95,7 +95,7 @@
   //    而 idle 起始帧几乎无内容的模型（萌萌 bingdundun2 实测 t0 仅 38px 冰晶残影、t0.5 起角色才完整出现）
   // 会被测成极小包围盒 → 缩放爆炸 → 画成局部放大碎片（用户只见一小块绿影）。
   //    现逐帧渲染到同一块 320px 累积画布取 alpha 并集，一次扫描得到整周期可见范围。
-  function measureVisualBounds(spine, skData, anim, vb, hideFx) {
+  function measureVisualBounds(spine, skData, anim, vb, hideFx, hideIdx) {
     try {
       const sw = vb.size.x, sh = vb.size.y
       if (!(sw > 0 && sh > 0)) return null
@@ -114,6 +114,7 @@
         tmp.setToSetupPose()
         if (anim) { stt.clearTracks(); stt.setAnimation(0, anim.name, false); stt.update((dur * i) / steps); stt.apply(tmp) }
         if (hideFx) hideFxSlots(tmp)
+        if (hideIdx) { for (let k = 0; k < hideIdx.length; k++) { const _sl = tmp.slots[hideIdx[k]]; if (_sl) _sl.attachment = null } }
         tmp.updateWorldTransform()
         c2.clearRect(0, 0, N, N)
         c2.save()
@@ -146,6 +147,79 @@
       const wy1 = toWy(maxY + 1), wy2 = toWy(minY) // canvas y 向下，世界 y 向上
       if (!(wx2 > wx1) || !(wy2 > wy1)) return null
       return { off: new spine.Vector2(wx1, wy1), size: new spine.Vector2(wx2 - wx1, wy2 - wy1) }
+    } catch (e) { return null }
+  }
+
+  // 🔴 2026-10-22 「主槽校正」：逐槽独渲染（idle 采样并集）找出角色本体槽的像素包围盒。
+  //   背景：小野类模型，脚下的爱心/漂浮特效（独立槽）会把联合包围盒撑得比本体大 40%+，
+  //   导致 fitByHeight 把角色压小、anchorFeet 锚到特效底边 →「角色极小/脚不沾地」。
+  //   本函数只做测量，不改渲染（渲染照常画全部槽）。调用方仅在联合盒线性尺寸超过
+  //   本体盒 25% 时才采用其结果，正常模型零影响。
+  function measureDominantSlot(spine, skData, anim, vb) {
+    try {
+      const sw = vb.size.x, sh = vb.size.y
+      if (!(sw > 0 && sh > 0)) return null
+      const N = 200
+      const s = Math.min((N - 6) / sw, (N - 6) / sh)
+      const oc = document.createElement('canvas')
+      oc.width = N; oc.height = N
+      const c2 = oc.getContext('2d', { willReadFrequently: true })
+      const cx = vb.off.x + sw / 2, cy = vb.off.y + sh / 2
+      const stt = new spine.AnimationState(new spine.AnimationStateData(skData))
+      const dur = anim ? (anim.duration || 0) : 0
+      const steps = Math.max(4, Math.min(8, Math.ceil(dur * 6)))
+      const r2 = new spine.canvas.SkeletonRenderer(c2)
+      r2.triangleRendering = true
+      const boxes = skData.slots.map(function () { return null })
+      for (let i = 0; i <= steps; i++) {
+        const tmp = new spine.Skeleton(skData)
+        tmp.setToSetupPose()
+        if (anim) { stt.clearTracks(); stt.setAnimation(0, anim.name, false); stt.update((dur * i) / steps); stt.apply(tmp) }
+        const atts = tmp.slots.map(function (sl) { return sl.attachment })
+        for (let k = 0; k < tmp.slots.length; k++) {
+          if (!atts[k]) continue
+          for (let j = 0; j < tmp.slots.length; j++) tmp.slots[j].attachment = (j === k) ? atts[j] : null
+          tmp.updateWorldTransform()
+          c2.setTransform(1, 0, 0, 1, 0, 0)
+          c2.clearRect(0, 0, N, N)
+          c2.save(); c2.translate(N / 2, N / 2); c2.scale(s, -s); c2.translate(-cx, -cy)
+          r2.draw(tmp); c2.restore()
+          const data = c2.getImageData(0, 0, N, N).data
+          let mnx = 1e9, mny = 1e9, mxx = -1, mxy = -1
+          for (let y = 0; y < N; y++) { const row = y * N; for (let x = 0; x < N; x++) { if (data[(row + x) * 4 + 3] > 24) { if (x < mnx) mnx = x; if (x > mxx) mxx = x; if (y < mny) mny = y; if (y > mxy) mxy = y } } }
+          if (mxx < 0) continue
+          const wx0 = (mnx - N / 2) / s + cx, wx1 = (mxx + 1 - N / 2) / s + cx
+          const wy1 = -(mny - N / 2) / s + cy, wy0 = -(mxy + 1 - N / 2) / s + cy
+          const b = boxes[k]
+          if (!b) boxes[k] = { x0: wx0, y0: wy0, x1: wx1, y1: wy1, px: (mxx - mnx + 1) * (mxy - mny + 1) }
+          else {
+            if (wx0 < b.x0) b.x0 = wx0; if (wy0 < b.y0) b.y0 = wy0
+            if (wx1 > b.x1) b.x1 = wx1; if (wy1 > b.y1) b.y1 = wy1
+            b.px += (mxx - mnx + 1) * (mxy - mny + 1)
+          }
+        }
+      }
+      // 主槽 = 累计像素量最大的槽（角色本体必然是视觉主体）
+      let dom = -1, domPx = 0
+      for (let k = 0; k < boxes.length; k++) { if (boxes[k] && boxes[k].px > domPx) { domPx = boxes[k].px; dom = k } }
+      if (dom < 0) return null
+      const d = boxes[dom]
+      // 合并「贴着本体」的槽（其盒 60% 以上落在本体盒内，如手中的武器/身前披风）；
+      // 环绕特效（光环圈）的盒只与本体盒交叠一小部分，不会并入 → 定标不被撑大
+      let x0 = d.x0, y0 = d.y0, x1 = d.x1, y1 = d.y1
+      for (let k = 0; k < boxes.length; k++) {
+        if (k === dom || !boxes[k]) continue
+        const b = boxes[k]
+        const ox = Math.max(0, Math.min(b.x1, x1) - Math.max(b.x0, x0))
+        const oy = Math.max(0, Math.min(b.y1, y1) - Math.max(b.y0, y0))
+        const area = Math.max(1e-6, (b.x1 - b.x0) * (b.y1 - b.y0))
+        if ((ox * oy) / area > 0.6) {
+          if (b.x0 < x0) x0 = b.x0; if (b.y0 < y0) y0 = b.y0
+          if (b.x1 > x1) x1 = b.x1; if (b.y1 > y1) y1 = b.y1
+        }
+      }
+      if (!(x1 > x0) || !(y1 > y0)) return null
+      return { off: new spine.Vector2(x0, y0), size: new spine.Vector2(x1 - x0, y1 - y0) }
     } catch (e) { return null }
   }
 
@@ -261,14 +335,44 @@
       if (opts.tight) {
         vbVis = vbCache[vbKey]
         if (!vbVis) {
-          const mFull = measureVisualBounds(spine, skData, animObj, vb, false)
+          // 🔴 2026-10-22 支持 index[folder].hideSlots：测量时剔除指定槽（渲染照常显示）。
+          //   用于「巨型空心光环」类特效：如小野(qiqi)的旋转刺圈是 512×512 序列帧、角色本体仅 256×256，
+          //   圈参与定标会把角色挤成小点、脚锚点跟着圈底走（用户见"角色极小+脚不沾地"）。
+          let hideIdx = null
+          try {
+            const _man = (typeof window !== 'undefined' && window.__heroSpineIndex) ? window.__heroSpineIndex[folder] : null
+            const _model = opts.model || ''
+            let _hs = _man && Array.isArray(_man.hideSlots) ? _man.hideSlots.slice() : null
+            if (_man && _man.modelHideSlots && _man.modelHideSlots[_model] && Array.isArray(_man.modelHideSlots[_model])) {
+              _hs = _hs ? _hs.concat(_man.modelHideSlots[_model]) : _man.modelHideSlots[_model].slice()
+            }
+            if (_hs && _hs.length) {
+              const _names = {}
+              skData.slots.forEach(function (sd, i) { _names[sd.name] = i })
+              hideIdx = []
+              for (const _n of _hs) { if (_names[_n] !== undefined) hideIdx.push(_names[_n]) }
+              if (!hideIdx.length) hideIdx = null
+            }
+          } catch (e) {}
+          const mFull = measureVisualBounds(spine, skData, animObj, vb, false, hideIdx)
           let mFx = null
           const nFx = hideFxSlots(new spine.Skeleton(skData))
-          if (nFx > 0) mFx = measureVisualBounds(spine, skData, animObj, vb, true)
+          if (nFx > 0) mFx = measureVisualBounds(spine, skData, animObj, vb, true, hideIdx)
           // 安全兜底：排除特效后可见内容过小（说明特效本身就是主体）则退回全量
           if (mFx && mFull && (mFx.size.x * mFx.size.y) < 0.25 * (mFull.size.x * mFull.size.y)) mFx = null
           vbVis = mFx || mFull || vb
+          // 🔴 主槽校正：联合盒（或特效盒）比「角色本体槽」线性尺寸大 25%+ 时（漂浮特效撑大定标，
+          //    小野的爱心/死神的技能圈等），改用本体盒做 fit 与脚锚点。渲染不变，只影响定标。
+          try {
+            const _ref = measureDominantSlot(spine, skData, animObj, vb)
+            if (_ref && _ref.size.x > 0 && _ref.size.y > 0) {
+              const _u = Math.max(vbVis.size.x, vbVis.size.y)
+              const _d = Math.max(_ref.size.x, _ref.size.y)
+              if (_u > _d * 1.25) vbVis = _ref
+            }
+          } catch (e) {}
           if (vbVis !== vb) vbCache[vbKey] = vbVis
+          try { window.__spineDbg = { folder: folder, model: opts.model || '', nFx: nFx, hideIdx: hideIdx, full: mFull ? { w: +mFull.size.x.toFixed(0), h: +mFull.size.y.toFixed(0) } : null, fx: mFx ? { w: +mFx.size.x.toFixed(0), h: +mFx.size.y.toFixed(0) } : null, chosen: vbVis === mFx ? 'fx' : (vbVis === mFull ? 'full' : (vbVis === vb ? 'vb' : 'dom')), dom: (vbVis !== mFx && vbVis !== mFull && vbVis !== vb) ? { w: +vbVis.size.x.toFixed(0), h: +vbVis.size.y.toFixed(0) } : null } } catch (e) {}
         }
       }
 
@@ -443,5 +547,58 @@
     })
     return { base: base, baseDone: baseDone, skin: skin, skinDone: skinDone, running: _pl.running }
   }
-  window.spineHero = { play: play, stop: stop, warm: warm, preload: preload, preloadAll: preloadAll, preloadStop: preloadStop, preloadReset: preloadReset, preloadStatus: preloadStatus, preloadStats: preloadStats }
+  // 🔍 调试测量（2026-10-22）：逐槽单独渲染测包围盒 + 中心密度，用于判定「巨型空心光环」槽。
+  //   返回 { full:{w,h}, slots:[{name,w,h,area,fill,centerFill}] }；供审计工具/排查用，不影响渲染。
+  async function dbgMeasure(folder, model) {
+    try {
+      const man = (window.__heroSpineIndex || {})[folder] || {}
+      const pngs = (man.modelPngs && man.modelPngs[model]) || man.pngs || 0
+      const assets = await loadAssets(folder, pngs, model)
+      const skData = assets.skData
+      const anims = skData.animations.map(function (a) { return a.name })
+      const idleName = anims.find(function (a) { return /idle/i.test(a) }) || anims[0]
+      const idle = idleName ? skData.findAnimation(idleName) : null
+      const vb = computeBounds(spine, skData, idleName, false)
+      if (!(vb.size.x > 0 && vb.size.y > 0)) return { err: 'no-bounds' }
+      const N = 200
+      const sw = vb.size.x, sh = vb.size.y
+      const s = Math.min((N - 6) / sw, (N - 6) / sh)
+      const oc = document.createElement('canvas'); oc.width = N; oc.height = N
+      const c2 = oc.getContext('2d', { willReadFrequently: true })
+      const cx = vb.off.x + sw / 2, cy = vb.off.y + sh / 2
+      const stt = new spine.AnimationState(new spine.AnimationStateData(skData))
+      const dur = idle ? (idle.duration || 0) : 0
+      const times = dur > 0 ? [0, dur / 3, (2 * dur) / 3] : [0]
+      const boxes = skData.slots.map(function () { return null })
+      const r2 = new spine.canvas.SkeletonRenderer(c2)
+      r2.triangleRendering = true
+      for (const t of times) {
+        const sk = new spine.Skeleton(skData)
+        sk.setToSetupPose()
+        if (idle) { stt.clearTracks(); stt.setAnimation(0, idle.name, false); stt.update(t); stt.apply(sk) }
+        const atts = sk.slots.map(function (sl) { return sl.attachment })
+        for (let i = 0; i < sk.slots.length; i++) {
+          if (!atts[i]) continue
+          for (let j = 0; j < sk.slots.length; j++) sk.slots[j].attachment = j === i ? atts[j] : null
+          sk.updateWorldTransform()
+          c2.clearRect(0, 0, N, N)
+          c2.save(); c2.translate(N / 2, N / 2); c2.scale(s, -s); c2.translate(-cx, -cy)
+          r2.draw(sk); c2.restore()
+          const d = c2.getImageData(0, 0, N, N).data
+          let mnx = 1e9, mny = 1e9, mxx = -1, mxy = -1
+          for (let y = 0; y < N; y++) { const row = y * N; for (let x = 0; x < N; x++) { if (d[(row + x) * 4 + 3] > 24) { if (x < mnx) mnx = x; if (x > mxx) mxx = x; if (y < mny) mny = y; if (y > mxy) mxy = y } } }
+          if (mxx < 0) continue
+          const w = mxx - mnx + 1, h = mxy - mny + 1
+          let cnt = 0, cc = 0, mid = 0
+          const wx1 = mnx + w * 0.32, wx2 = mnx + w * 0.68, wy1 = mny + h * 0.32, wy2 = mny + h * 0.68
+          for (let y = mny; y <= mxy; y++) { const row = y * N; for (let x = mnx; x <= mxx; x++) { const a = d[(row + x) * 4 + 3]; if (a > 24) { cnt++; if (a < 220) mid++; if (x >= wx1 && x <= wx2 && y >= wy1 && y <= wy2) cc++ } } }
+          const prev = boxes[i]
+          const b = { name: skData.slots[i].name, w: w, h: h, area: w * h, fill: +(cnt / (w * h)).toFixed(2), centerFill: +(cc / Math.max(1, (wx2 - wx1) * (wy2 - wy1))).toFixed(2), midAlpha: +(mid / Math.max(1, cnt)).toFixed(2) }
+          boxes[i] = (!prev || b.area > prev.area) ? b : prev
+        }
+      }
+      return { full: { w: +vb.size.x.toFixed(0), h: +vb.size.y.toFixed(0) }, slots: boxes.filter(Boolean) }
+    } catch (e) { return { err: String(e) } }
+  }
+  window.spineHero = { play: play, stop: stop, warm: warm, preload: preload, preloadAll: preloadAll, preloadStop: preloadStop, preloadReset: preloadReset, preloadStatus: preloadStatus, preloadStats: preloadStats, __dbgMeasure: dbgMeasure }
 })()
