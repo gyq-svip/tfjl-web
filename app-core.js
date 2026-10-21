@@ -11427,6 +11427,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (card.querySelector('.hd-sub-fuse')) { card.querySelector('.hd-sub-fuse').remove(); return }
                     const sh = hdSubShell('融合', '#c99a5b', 'linear-gradient(160deg,#4b3418,#241a0d)')
                     sh.ov.className = 'hd-sub-fuse'
+                    // 🔴 2026-10-22 融合弹窗整体放大一点（皮肤/魔化弹窗维持原尺寸不变）：
+                    //   配合右栏加宽，等级控件一行放得下不再竖排换行，被融合列表也不再被挤。
+                    //   用 min(…,98%/96%) 兜底，小窗口下也放得下不溢出。
+                    sh.box.style.width = 'min(900px,98%)'
+                    sh.box.style.height = 'min(640px,96%)'
                     // 融合变体：多路兜底（全局函数 → 本地函数 → 从融合名反查），避免闭包作用域取不到
                     let variants = []
                     try {
@@ -11508,7 +11513,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     sh.body.appendChild(subBox)
                     // 🔴 2026-10-20 右栏：数值在上段滚动；等级控件（主卡同款：等级+进度条+下一档+滑条+快捷档）钉底
                     const subBoxR = document.createElement('div')
-                    subBoxR.style.cssText = 'position:absolute;right:12px;top:10px;bottom:10px;width:210px;background:rgba(20,14,6,0.85);border:1px solid rgba(255,200,120,0.4);border-radius:10px;padding:10px;color:#ffe9c9;font-size:12px;display:none;flex-direction:column;'
+                    subBoxR.style.cssText = 'position:absolute;right:12px;top:10px;bottom:10px;width:250px;background:rgba(20,14,6,0.85);border:1px solid rgba(255,200,120,0.4);border-radius:10px;padding:10px;color:#ffe9c9;font-size:12px;display:none;flex-direction:column;'
                     const subMainR = document.createElement('div')
                     subMainR.style.cssText = 'flex:1;min-height:0;overflow-y:auto;'
                     subBoxR.appendChild(subMainR)
@@ -11624,7 +11629,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         const pctR = spanR > 0 ? Math.max(0, Math.min(100, ((Number(curLvR) - prevR) / spanR) * 100)) : 100
                         subFootR.innerHTML =
                             '<div style="display:flex;align-items:center;gap:7px;padding:2px 0 5px;">' +
-                            '<span style="font-size:11px;color:#9fc7ff;font-weight:800;">等级</span>' +
+                            '<span style="font-size:11px;color:#9fc7ff;font-weight:800;white-space:nowrap;">等级</span>' +
                             '<b id="hdFuseSubLv" style="font-size:15px;font-weight:900;color:#ffd75e;min-width:2ch;text-align:center;text-shadow:0 2px 0 #000;">' + curLvR + '</b>' +
                             '<div style="flex:1;min-width:30px;height:9px;border-radius:5px;background:rgba(0,0,0,0.45);border:1px solid rgba(120,190,255,0.35);overflow:hidden;"><div id="hdFuseLvFill" style="height:100%;width:' + pctR.toFixed(1) + '%;background:linear-gradient(90deg,#ffd75e,#e8891c);"></div></div>' +
                             '<span id="hdFuseLvNext" style="font-size:9.5px;color:#8fb4e8;font-weight:800;white-space:nowrap;">' + (nextR ? ('下一档 ' + nextR) : '已满级') + '</span>' +
