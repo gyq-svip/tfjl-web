@@ -12035,6 +12035,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             h += '<div>状态：' + (s.running ? '<span style="color:#fbbf24;">⏳ 下载进行中</span>' : '<span style="color:#81c784;">空闲（开页面 8 秒后自动继续下载）</span>') + '</div>'
             h += '<div id="spineCacheQuota" style="color:rgba(255,255,255,0.55);">存储占用：读取中…</div>'
             h += '</div>'
+            // 🔴 2026-10-22 资源来源显示：一眼看清当前动画走「本地整包」还是「在线」。
+            //   桌面版探测成功后 __HERO_SPINE_ASSET_BASE 含 asset（Windows WebView2 为 http://asset.localhost/...）。
+            let _srcBase = ''
+            try { _srcBase = String(window.__HERO_SPINE_ASSET_BASE || '') } catch (e) {}
+            if (/asset/i.test(_srcBase)) {
+                h += '<div style="margin-top:8px;font-size:0.76rem;color:#81c784;">✅ 资源来源：<b>本地整包</b>（已解压到桌面端本地，断网也能加载，首开只耗解析不耗网络）</div>'
+            } else {
+                h += '<div style="margin-top:8px;font-size:0.76rem;color:#fbbf24;">🌐 资源来源：<b>在线</b>（GitHub Pages）。桌面版点「更新皮肤资源」下载整包并重启后应变为「本地整包」；若一直「在线」= 本地整包没被识别到。</div>'
+            }
             // 🔴 2026-10-22 版本提示：动画/皮肤「整包下载」需桌面版 ≥2.1.9（5158089e 起的 download_skins 才会拉 spine 包）。
             // 旧版 exe 点「更新皮肤资源」只会拉皮肤包、动画仍在线加载——用户会以为坏了，这里按版本直接提示出来。
             let _exeVer = ''
@@ -12042,6 +12051,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (!_exeVer) { try { _exeVer = localStorage.getItem('__tfjl_ver_override') || '' } catch (e) {} }
             const _verCmp = function (a, b) { const p = String(a || '').split('.'), q = String(b || '').split('.'); for (let i = 0; i < 3; i++) { const x = +p[i] || 0, y = +q[i] || 0; if (x !== y) return x < y ? -1 : 1 } return 0 }
             const _isApp = !!(window.__TAURI_INTERNALS__ || window.__TAURI__ || (navigator.userAgent || '').indexOf('Tauri') !== -1)
+            // 🔴 2026-10-22 修复：__APP_VERSION 从未有任何地方赋值 → 版本号一直空白（绿框显示"桌面版 ："）。
+            //   改走 Tauri 全局 API 异步取真实版本号，取到后写回 __APP_VERSION 并立即刷新弹窗；网页版无此 API，静默跳过。
+            if (!_exeVer && _isApp && window.__TAURI__ && window.__TAURI__.app && typeof window.__TAURI__.app.getVersion === 'function') {
+                try {
+                    window.__TAURI__.app.getVersion().then(function (v) {
+                        if (v) { window.__APP_VERSION = String(v); try { refreshSpineCacheInfo() } catch (e) {} }
+                    }).catch(function () {})
+                } catch (e) {}
+            }
             if (_isApp) {
                 if (_exeVer && _verCmp(_exeVer, '2.1.9') < 0) {
                     h += '<div style="margin-top:10px;padding:9px 12px;border:1px solid rgba(239,83,80,0.45);background:rgba(239,83,80,0.10);border-radius:8px;font-size:0.76rem;line-height:1.7;color:#ef9a9a;">⚠️ 当前桌面版 <b>' + _exeVer + '</b> 还不支持「更新皮肤资源」下载动画整包（需 <b style="color:#ffd75e;">≥ 2.1.9</b>）——旧版点了也只会更新皮肤包、动画仍在线逐个加载。请先升级桌面版到 2.1.9 及以上，再点更新一次即可。</div>'
