@@ -8138,12 +8138,12 @@
         }
 
         // ===== 上阵卡"融合卡切换"角标：基础英雄 → 可融合变体 =====
-        // 🔴 2026-10-22 政策修订：融合名单 = 云端 fusions.json ∪ 内置表 BUILTIN_FUSION_CARDS（见上）。
-        //   云端管理员定义仍然全部叠加（并集），解析顺序云端优先不变。
+        // 🔴 融合名单严格只认云端(管理员维护的 skins/fusions.json = window.cloudFusions)。
+        //   管理员已维护 30 组官方融合（2026-10-22 核对），非官方组合一律不显示，杜绝数据污染。
+        //   注：BUILTIN_FUSION_CARDS 仅供 getFusionParts 解析历史融合名用，不参与名单枚举。
         function getAllFusionNames() {
             const names = new Set();
             if (window.cloudFusions) Object.keys(window.cloudFusions).forEach(n => names.add(n));
-            BUILTIN_FUSION_CARDS.forEach(n => names.add(n));
             return [...names];
         }
         // 🔴 2026-09-22 阵容图库复用主页融合体系（现成数据，用户要求"直接拿过来用"）：只暴露，不改逻辑
