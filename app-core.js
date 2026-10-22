@@ -11990,7 +11990,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     //   不再套官方 scale/x/y：那是给「特效撑大包围盒」的补偿，剔特效后反而不准
                     //   autoFxFallback idle 只动画特效槽的模型（萌萌）自动带特效重播
                     window.spineHero.play(cv, meta.spine, {
-                        fitPadding: 0.72, pngs, model, tight: true,
+                        fitPadding: 0.65, pngs, model, tight: true,
                         hideFx: true, dedupe: true,
                         hideSlots: (man.hideSlots || []).concat((man.modelHideSlots || {})[model] || []),
                         fitByHeight: true, anchorFeet: 0.87,
