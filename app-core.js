@@ -10785,7 +10785,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const auraEl = document.createElement('div')
             // 官方版式：光环环绕角色躯干（不是平铺在脚下），直径略大于角色肩宽、中心落在腰腹；
             // top 即圆心（动画 transform 带 translate(-50%,-50%)）；z-index 低于 Spine 画布 → 环从角色身后透出，不遮挡人物
-            auraEl.style.cssText = 'position:absolute;left:50%;top:40%;width:min(27%,270px);aspect-ratio:1/1;background:url(hero-ui/aura.png) center/contain no-repeat;pointer-events:none;z-index:0;display:none;animation:hdAuraSpin 16s linear infinite;filter:drop-shadow(0 0 6px rgba(140,0,0,0.55));'
+            auraEl.style.cssText = 'position:absolute;left:50%;top:40%;width:min(40%,380px);aspect-ratio:1/1;background:url(hero-ui/aura.png) center/contain no-repeat;pointer-events:none;z-index:0;display:none;animation:hdAuraSpin 16s linear infinite;filter:drop-shadow(0 0 6px rgba(140,0,0,0.55));'
             card.appendChild(auraEl)
             const shadowEl = document.createElement('div')
             shadowEl.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);bottom:11%;width:30%;height:8%;background:url(hero-ui/shadow.png) center/contain no-repeat;opacity:0.5;pointer-events:none;z-index:1;'
@@ -11927,7 +11927,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     const pngs = model ? ((man.modelPngs && man.modelPngs[model]) || 0) : (man.pngs || 0)
                     // 🔴 2026-10-22 修正：原写法固定传 scale:1，会把索引里逐英雄的 scale 顶掉（永远不生效）。
                     //    索引未配 scale 时传 undefined，交给 spine-hero 回退读 __heroSpineIndex[folder].scale。
-                    window.spineHero.play(cv, meta.spine, { fitPadding: 0.58, pngs, model, anchorFeet: 0.71, tight: true, fitByHeight: true, scale: (man && man.scale > 0) ? man.scale : undefined, offsetX: (man && man.offsetX) || 0 })
+                    window.spineHero.play(cv, meta.spine, { fitPadding: 0.58, pngs, model, anchorFeet: 0.80, tight: true, fitByHeight: true, scale: (man && man.scale > 0) ? man.scale : undefined, offsetX: (man && man.offsetX) || 0 })
                 } catch (e) {}
             }
 
