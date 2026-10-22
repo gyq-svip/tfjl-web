@@ -34,6 +34,7 @@
     snap = await r.json()
     allForms = snap.allForms || {}
     heroes = Object.values(snap.heroData || {})
+    await nameplateMeta()
     cache = true
     return heroes
   }
@@ -61,8 +62,8 @@
       background:linear-gradient(180deg,#e9a63b,#c97f16);padding:3px;cursor:pointer;transition:transform .12s;">
       <div style="position:relative;background:linear-gradient(180deg,#f8d878,#f0b43c);border-radius:8px;padding:18px 6px 0;display:flex;flex-direction:column;align-items:center;min-height:196px;">
         <div style="position:absolute;top:-9px;left:50%;transform:translateX(-50%);z-index:2;white-space:nowrap;
-          background:linear-gradient(180deg,#8f2412,#b23a1d);border:2px solid #ffd76b;border-radius:9px;padding:2px 12px;
-          color:#ffe6a8;font-weight:700;font-size:.82rem;text-shadow:0 1px 2px rgba(0,0,0,.6);">${esc(h.name)}</div>
+          background:linear-gradient(180deg,#ffc63f,#e89a12);border:2px solid #ffd76b;border-radius:9px;padding:2px 10px;
+          color:#5a2a08;font-weight:800;box-shadow:0 2px 6px rgba(0,0,0,.35);">${nameSpriteHTML(h, 24)}</div>
         <div style="position:absolute;top:4px;left:5px;z-index:2;width:26px;height:26px;border-radius:50%;
           background:radial-gradient(circle at 35% 30%,#3b4b66,#1c2637);border:2px solid #d9a441;
           display:flex;align-items:center;justify-content:center;font-size:.85rem;" title="${occ[0]}">${occ[1]}</div>
@@ -148,7 +149,7 @@
           <div style="pointer-events:none;">
             <div style="position:relative;display:inline-block;min-width:250px;padding:10px 18px 8px 52px;clip-path:polygon(0 0,100% 0,94% 100%,0 100%);background:linear-gradient(180deg,#ffc63f,#e89a12);box-shadow:0 2px 8px rgba(0,0,0,.4);">
               <span style="position:absolute;left:-4px;top:50%;transform:translateY(-50%);">${shield(n, 40)}</span>
-              <div style="font-size:1.35rem;font-weight:800;color:#fff;text-shadow:0 2px 0 rgba(140,60,0,.55),0 0 6px rgba(0,0,0,.35);">${esc(h.name)}</div>
+              <div style="font-size:1.35rem;font-weight:800;color:#fff;text-shadow:0 2px 0 rgba(140,60,0,.55),0 0 6px rgba(0,0,0,.35);">${nameSpriteHTML(h, 30)}</div>
             </div>
             <div style="display:flex;align-items:center;gap:7px;margin-top:7px;">
               <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#3b4b66,#1c2637);border:2px solid #d9a441;font-size:.95rem;">${occ[1]}</span>
@@ -343,6 +344,40 @@
       st.state.setAnimation(0, st.anims[st._animIdx], true)
       animBtn.textContent = st.anims[st._animIdx] === 'idle' ? '▶' : '⚔'
     })
+  }
+
+  /* —— 英雄铭牌图集（官方名字美术字，data/hero-deck/nameatlas/，随资源包同步）—— */
+  let npMeta = null
+  function nameplateMeta() {
+    if (npMeta) return Promise.resolve(npMeta)
+    return fetch(baseUrl() + 'data/hero-deck/nameatlas/meta.json')
+      .then((r) => r.json())
+      .then((j) => { npMeta = j; return j })
+      .catch(() => null)
+  }
+  // 名牌帧键：普通英雄 = id；80100+ 特殊英雄 = id - 80000（帧键规则与官方图鉴一致）
+  function nameImgKey(id) {
+    const n = Number(id)
+    return Number.isFinite(n) && n >= 80000 ? String(n - 80000) : String(id)
+  }
+  // 铭牌雪碧图：外层按自然宽高比撑开，内层图集切片；旋转帧绕中心转回（标准雪碧图内层对齐算法）
+  function nameSpriteHTML(h, boxH) {
+    const meta = npMeta
+    const frame = meta && meta.frames[nameImgKey(h.id)]
+    if (!frame) return `<span style="font-size:${Math.round(boxH * 0.85)}px;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(140,60,0,.6);">${esc(h.name)}</span>`
+    const rotated = frame.rotated === 1
+    const texW = rotated ? frame.h : frame.w
+    const texH = rotated ? frame.w : frame.h
+    const innerWpct = (texW / frame.w) * 100
+    const innerHpct = (texH / frame.h) * 100
+    const bgWpct = (meta.aw / texW) * 100
+    const bgHpct = (meta.ah / texH) * 100
+    const posX = (-frame.x / (texW - meta.aw)) * 100
+    const posY = (-frame.y / (texH - meta.ah)) * 100
+    const atlas = baseUrl() + 'data/hero-deck/nameatlas/atlas.png'
+    return `<span style="display:flex;align-items:center;justify-content:center;height:${boxH}px;width:auto;aspect-ratio:${frame.w} / ${frame.h};">` +
+      `<i style="display:block;width:${innerWpct}%;height:${innerHpct}%;background:url('${atlas}') no-repeat;` +
+      `background-size:${bgWpct}% ${bgHpct}%;background-position:${posX}% ${posY}%;${rotated ? 'transform:rotate(-90deg);' : ''}"></i></span>`
   }
 
   function buildUI() {

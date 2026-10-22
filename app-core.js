@@ -11981,11 +11981,42 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (!man) return
                     const model = hdSkinModel(curSkin) || (meta.spineModel || '')
                     const pngs = model ? ((man.modelPngs && man.modelPngs[model]) || 0) : (man.pngs || 0)
-                    // 🔴 2026-10-22 官方 1:1 复刻：整骨架联合盒 + fitPadding 0.6 + 官方 render-offsets
-                    //    逐模型 scale/x/y（已合并进 index[folder].modelOffsets[modelDir]），与官方
-                    //    官方渲染管线完全同一套定标居中算法，不再自创脚锚点/特效剔除。
-                    const moff = (man.modelOffsets && (man.modelOffsets[model] || man.modelOffsets[man.model])) || {}
-                    window.spineHero.play(cv, meta.spine, { fitPadding: 0.6, pngs, model, tight: true, scale: (moff.scale > 0) ? moff.scale : undefined, offsetX: moff.x || 0, offsetY: moff.y || 0 })
+                    // 🟢 2026-10-23 与「英雄图鉴」详情同一套修复（图鉴侧已全量遍历 102 英雄验证）：
+                    //   hideFx   剔 images/fx/* 特效槽——官方游戏里那些附件由引擎合成/时序呈现，
+                    //             普通播放器原样画出就是"杂质"（大团爆炸、身体残影拷贝…）
+                    //   dedupe   同家族身体去重——半尺寸拷贝槽（images/a0 之于 a0000）按面积比自动隐藏
+                    //   hideSlots index 里逐模型登记的隐藏槽
+                    //   fitByHeight + anchorFeet 统一高度、脚落影子处（bottom:11% → 87%）
+                    //   不再套官方 scale/x/y：那是给「特效撑大包围盒」的补偿，剔特效后反而不准
+                    //   autoFxFallback idle 只动画特效槽的模型（萌萌）自动带特效重播
+                    window.spineHero.play(cv, meta.spine, {
+                        fitPadding: 0.72, pngs, model, tight: true,
+                        hideFx: true, dedupe: true,
+                        hideSlots: (man.hideSlots || []).concat((man.modelHideSlots || {})[model] || []),
+                        fitByHeight: true, anchorFeet: 0.87,
+                        autoFxFallback: true
+                    })
+                    // 🟢 2026-10-23 空渲染兜底提示：个别模型（如龟相）主体是 PathAttachment，
+                    //   Spine canvas 运行时画不出路径附件 → 起播 6s 后画布仍全透明就提示一句，
+                    //   免得用户对着一座空石台。换皮肤/重播会重置计时。
+                    clearTimeout(cv._hdEmptyTip)
+                    cv._hdEmptyTip = setTimeout(function () {
+                        if (!cv.isConnected || !cv._spineSt || !cv._spineSt.playing) return
+                        try {
+                            const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data
+                            let px = 0
+                            for (let i = 3; i < d.length; i += 4) { if (d[i] > 30) { px++; if (px > 500) break } }
+                            if (px > 500) return
+                        } catch (e) { return }
+                        let tip = document.getElementById('hdSpineTip')
+                        if (!tip) {
+                            tip = document.createElement('div')
+                            tip.id = 'hdSpineTip'
+                            tip.style.cssText = 'position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);z-index:2;color:rgba(255,255,255,.75);font-size:13px;background:rgba(0,0,0,.4);padding:4px 12px;border-radius:8px;pointer-events:none;'
+                            stage.appendChild(tip)
+                        }
+                        tip.textContent = '该模型暂无法播放'
+                    }, 6000)
                 } catch (e) {}
             }
 

@@ -431,6 +431,33 @@
         ctx.restore()
       }
       st.raf = requestAnimationFrame(tick)
+      // 🟢 2026-10-23 autoFxFallback：像素级静止检测——「有画面但完全静止」说明该模型的
+      //   idle 只动画特效槽（如萌萌），剔 fx 后只剩静态身体 → 自动带特效重播一次。
+      //   图鉴详情与主页英雄面板共用。失败/无内容不重播（保持现状）。
+      if (opts.autoFxFallback && frameHide2 && frameHide2.length) {
+        let lastSum = null, tried = false
+        const t0 = Date.now()
+        const fxPoll = function () {
+          if (!st.playing || !document.body.contains(canvas)) return
+          let px = 0, sum = 0
+          try {
+            const d = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data
+            for (let i = 3; i < d.length; i += 4) { if (d[i] > 30) { px++; sum = (sum + d[i] * 31 + i) % 99999991 } }
+          } catch (e) {}
+          if (px > 500) {
+            if (!tried && lastSum !== null && lastSum === sum) {
+              tried = true
+              st.playing = false
+              if (st.raf) { cancelAnimationFrame(st.raf); st.raf = null }
+              play(canvas, folder, Object.assign({}, opts, { hideFx: false, autoFxFallback: false }))
+              return
+            }
+            lastSum = sum
+          }
+          if (Date.now() - t0 < 12000) setTimeout(fxPoll, 500)
+        }
+        setTimeout(fxPoll, 1200)
+      }
     } catch (e) {
       statusCb('解析失败: ' + (e && e.message))
     }
