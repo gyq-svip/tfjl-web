@@ -4041,11 +4041,8 @@
             _autoSaveTimer = setTimeout(function () {
                 _autoSaveTimer = null;
                 try {
-                    const data = buildProjectData();
-                    saveProjectToDB(currentProjectName, currentProjectCategory || '默认分类', data).then(function () {
-                        window.__tfjlProjectDirty = false;
-                        if (typeof updateSaveIndicator === 'function') updateSaveIndicator();
-                    }).catch(function () {});
+                    // 🔴 只补丁设置（皮肤/融合/等级/魔化），不覆盖卡组阵容（用户要求"不要自动保存覆盖"）
+                    persistSettings();
                 } catch (e) {}
             }, 900);
         }
@@ -10286,6 +10283,36 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 });
                 if (typeof persistProjectsToDisk === 'function') persistProjectsToDisk(false);
             } catch (e) { console.warn('[SKIN] persistFusionSkins failed:', e); }
+        }
+        // 🔴 2026-10-22 只补丁「设置类」字段（皮肤/融合/等级/魔化）到项目记录，保留原有卡组阵容不覆盖。
+        //    用途：自动保存只持久化设置，绝不把用户调好的卡组/手牌/上阵被自动存盘覆盖（尊重"不要自动保存覆盖"）。
+        //    卡组阵容仍须手动 💾 保存。
+        async function persistSettings() {
+            if (window.__sharedProjectReadOnly) return;
+            if (!db || !currentProjectName || currentProjectName === '默认项目') return;
+            const data = buildProjectData();
+            try {
+                await new Promise((resolve) => {
+                    const t = db.transaction([STORE_NAME], 'readwrite');
+                    const s = t.objectStore(STORE_NAME);
+                    const req = s.get(currentProjectName);
+                    req.onsuccess = () => {
+                        const p = req.result;
+                        if (p) {
+                            p.cardSkins = data.cardSkins;
+                            p.fusionSkins = data.fusionSkins;
+                            p.cardLevels = data.cardLevels;
+                            p.cardMoHua = data.cardMoHua;
+                            s.put(p);
+                        }
+                        resolve();
+                    };
+                    req.onerror = () => resolve();
+                    t.oncomplete = () => resolve();
+                    t.onerror = () => resolve();
+                });
+                if (typeof persistProjectsToDisk === 'function') persistProjectsToDisk(false);
+            } catch (e) { console.warn('[SKIN] persistSettings failed:', e); }
         }
         
         // 保存皮肤数据到localStorage
