@@ -295,10 +295,6 @@
           // 安全兜底：排除特效后可见内容过小（说明特效本身就是主体）则退回全量
           if (mFx && mFull && (mFx.size.x * mFx.size.y) < 0.25 * (mFull.size.x * mFull.size.y)) mFx = null
           vbVis = mFx || mFull || vb
-          // 🔴 2026-10-22 回退「主槽校正」：实测证明特效拖底（刀焰/云/绿爆/爱心）延伸到台面正是
-          //   「落地感」的来源——联合盒锚底 0.71 ≈ 石台顶。若按本体槽定标，角色变大、脚锚点上移，
-          //   特效垂到台面以下 → 全员悬空、风灵还被槽合并规则带偏中心。角色本体被特效撑大的
-          //   个例（小野）改用 index[folder].hideSlots 在测量时剔除指定槽（渲染照常）。
           if (vbVis !== vb) vbCache[vbKey] = vbVis
           try { window.__spineDbg = { folder: folder, model: opts.model || '', nFx: nFx, hideIdx: hideIdx, full: mFull ? { w: +mFull.size.x.toFixed(0), h: +mFull.size.y.toFixed(0) } : null, fx: mFx ? { w: +mFx.size.x.toFixed(0), h: +mFx.size.y.toFixed(0) } : null, chosen: vbVis === mFx ? 'fx' : (vbVis === mFull ? 'full' : 'vb') } } catch (e) {}
         }
@@ -345,14 +341,10 @@
         // 🔴 2026-10-21 横向居中：目标为「骨架包围盒中心」（人物本体，武器/披风不会把人挤偏），
         //    但缩放松弛按可见内容宽度算、偏移受可见余量限制 —— 否则带 fx/特效骨的模型（萌萌 bingdundun2
         //    含 fx/bingjing* 冰晶骨）骨架盒被撑得极大，人物会被缩成一点点并挤到角落。offsetX 为逐英雄微调。
-        const visCx = vbVis.off.x + sw / 2
-        let cx = visCx
-        if (opts.tight && opts.centerByVisualX !== true) {
-            const vbBody = vbFx || vb
-            const targetCx = vbBody.off.x + vbBody.size.x / 2
-            const slack = Math.max(0, (w / fitScale - sw) / 2)
-            cx = visCx + Math.max(-slack, Math.min(slack, targetCx - visCx))
-        }
+        // 🔴 2026-10-22 横向居中：vbVis 已是「fx 路径剔除 + 排除偏心特效」的本体盒，直接以其
+        //   中心居中即可（旧代码用 vbFx 骨名视觉中心微调，遇到风灵龙卷这类骨名未标识的偏心特效时
+        //   会把角色推离中心，已弃用）。offsetX 仍可逐英雄微调。
+        const cx = vbVis.off.x + sw / 2
         ctx.save()
         if (opts.offsetX) ctx.translate(w * Number(opts.offsetX), 0)
         if (opts.anchorFeet != null) {
