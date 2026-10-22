@@ -257,8 +257,6 @@
       // 🔴 2026-10-21 包围盒按模型缓存（首次测量后复用），避免每次打开都重复采样动画
       const vbKey = folder + '@' + (opts.model || '')
       const vb = vbBoundsCache[vbKey] || (vbBoundsCache[vbKey] = computeBounds(spine, skData, idle))
-      // 🔴 2026-10-21 排除特效骨的「人物本体」包围盒：用于居中目标（冰晶/光效不会把人挤偏）
-      const vbFx = vbFxCache[vbKey] || (vbFxCache[vbKey] = computeBounds(spine, skData, idle, true))
       state.setAnimation(0, idle, true)
       state.update(0); state.apply(skeleton); skeleton.updateWorldTransform()
 
@@ -269,9 +267,10 @@
       if (opts.tight) {
         vbVis = vbCache[vbKey]
         if (!vbVis) {
-          // 🔴 2026-10-22 支持 index[folder].hideSlots：测量时剔除指定槽（渲染照常显示）。
-          //   用于「巨型空心光环」类特效：如小野(qiqi)的旋转刺圈是 512×512 序列帧、角色本体仅 256×256，
-          //   圈参与定标会把角色挤成小点、脚锚点跟着圈底走（用户见"角色极小+脚不沾地"）。
+          // 🔴 2026-10-22 官方 1:1 复刻：整骨架联合盒（setup + idle 全周期采样），不做任何特效剔除。
+          //   官方 SpineViewer.updateViewBounds 即此算法，靠随包 render-offsets.json 的逐模型
+          //   scale/x/y 手调补偿特效撑盒与落台（已合并进 index[folder].modelOffsets）。
+          //   index[folder].hideSlots 仍可对个别英雄做测量剔除兜底（渲染照常）。
           let hideIdx = null
           try {
             const _man = (typeof window !== 'undefined' && window.__heroSpineIndex) ? window.__heroSpineIndex[folder] : null
@@ -288,15 +287,9 @@
               if (!hideIdx.length) hideIdx = null
             }
           } catch (e) {}
-          const mFull = measureVisualBounds(spine, skData, animObj, vb, false, hideIdx)
-          let mFx = null
-          const nFx = hideFxSlots(new spine.Skeleton(skData))
-          if (nFx > 0) mFx = measureVisualBounds(spine, skData, animObj, vb, true, hideIdx)
-          // 安全兜底：排除特效后可见内容过小（说明特效本身就是主体）则退回全量
-          if (mFx && mFull && (mFx.size.x * mFx.size.y) < 0.25 * (mFull.size.x * mFull.size.y)) mFx = null
-          vbVis = mFx || mFull || vb
-          if (vbVis !== vb) vbCache[vbKey] = vbVis
-          try { window.__spineDbg = { folder: folder, model: opts.model || '', nFx: nFx, hideIdx: hideIdx, full: mFull ? { w: +mFull.size.x.toFixed(0), h: +mFull.size.y.toFixed(0) } : null, fx: mFx ? { w: +mFx.size.x.toFixed(0), h: +mFx.size.y.toFixed(0) } : null, chosen: vbVis === mFx ? 'fx' : (vbVis === mFull ? 'full' : 'vb') } } catch (e) {}
+          vbVis = measureVisualBounds(spine, skData, animObj, vb, false, hideIdx) || vb
+          vbCache[vbKey] = vbVis
+          try { window.__spineDbg = { folder: folder, model: opts.model || '', hideIdx: hideIdx, union: { w: +vbVis.size.x.toFixed(0), h: +vbVis.size.y.toFixed(0) }, chosen: 'union' } } catch (e) {}
         }
       }
 
@@ -338,22 +331,18 @@
         }
         if (opts.scale != null && opts.scale > 0) fitScale *= opts.scale
         else if (window.__heroSpineIndex && folder && window.__heroSpineIndex[folder] && window.__heroSpineIndex[folder].scale > 0) fitScale *= window.__heroSpineIndex[folder].scale
-        // 🔴 2026-10-21 横向居中：目标为「骨架包围盒中心」（人物本体，武器/披风不会把人挤偏），
-        //    但缩放松弛按可见内容宽度算、偏移受可见余量限制 —— 否则带 fx/特效骨的模型（萌萌 bingdundun2
-        //    含 fx/bingjing* 冰晶骨）骨架盒被撑得极大，人物会被缩成一点点并挤到角落。offsetX 为逐英雄微调。
-        // 🔴 2026-10-22 横向居中：vbVis 已是「fx 路径剔除 + 排除偏心特效」的本体盒，直接以其
-        //   中心居中即可（旧代码用 vbFx 骨名视觉中心微调，遇到风灵龙卷这类骨名未标识的偏心特效时
-        //   会把角色推离中心，已弃用）。offsetX 仍可逐英雄微调。
-        const cx = vbVis.off.x + sw / 2
+        // 🔴 2026-10-22 官方 1:1：联合盒中心 + 官方 render-offsets 的世界单位 x/y 偏移后对准画布中心
+        //   （官方 SpineViewer：cx = viewBounds.offset.x + sw/2 + ox; cy = ... + oy）。
+        //   注：offsetX/offsetY 语义已从「画布比例」改为「世界单位」，与官方数据一致。
+        const cx = vbVis.off.x + sw / 2 + (Number(opts.offsetX) || 0)
+        const cy = vbVis.off.y + sh / 2 + (Number(opts.offsetY) || 0)
         ctx.save()
-        if (opts.offsetX) ctx.translate(w * Number(opts.offsetX), 0)
         if (opts.anchorFeet != null) {
-          // 底边中点对齐锚点：横向居中、纵向落在石台面（角色详情用）
+          // 底边中点对齐锚点：横向居中、纵向落在石台面（战场小卡等旧调用方仍可用）
           ctx.translate(w / 2, h * opts.anchorFeet)
           ctx.scale(fitScale, -fitScale)
-          ctx.translate(-cx, -vbVis.off.y)
+          ctx.translate(-(vbVis.off.x + sw / 2), -vbVis.off.y)
         } else {
-          const cy = vbVis.off.y + sh / 2
           ctx.translate(w / 2, h / 2)
           ctx.scale(fitScale, -fitScale)
           ctx.translate(-cx, -cy)

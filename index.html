@@ -1159,9 +1159,12 @@
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
                 <div style="display:flex;align-items:center;gap:10px;">
                     <h2 title="鼠标悬停有功能简介" style="margin:0;display:flex;align-items:center;gap:8px;">⚔️ 出战选择</h2>
-                    <span id="sharedReadOnlyBadge" style="display:none;background:linear-gradient(90deg,#ff9800,#ffc107);color:#1a1a2e;font-size:0.82rem;font-weight:800;padding:5px 13px;border-radius:10px;white-space:nowrap;box-shadow:0 3px 14px rgba(255,152,0,0.5);letter-spacing:0.3px;">📖 共享资源只读 · 请点「📥 导入到本地」可编辑</span>
                 </div>
 
+            </div>
+            <!-- 🔴 2026-10-22 共享只读徽章独占一行（原与标题同行会挤占/盖住右侧控件） -->
+            <div id="sharedReadOnlyRow" style="display:none;margin:0 0 4px 2px;">
+                <span id="sharedReadOnlyBadge" style="display:inline-block;background:linear-gradient(90deg,#ff9800,#ffc107);color:#1a1a2e;font-size:0.82rem;font-weight:800;padding:5px 13px;border-radius:10px;white-space:nowrap;box-shadow:0 3px 14px rgba(255,152,0,0.5);letter-spacing:0.3px;">📖 共享资源只读 · 请点「📥 导入到本地」可编辑</span>
             </div>
 
             <div class="battle-field">
