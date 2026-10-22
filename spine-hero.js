@@ -293,7 +293,7 @@
         try {
           const famBest = {}   // family -> { idx, area }
           const famMax = {}    // family -> 最大单附件面积
-          const famSlots = {}  // family -> { slotIndex: 槽内最大面积 }
+          const famSlots = {}  // family -> { slotIndex: { area, names:{} } }
           const skin0 = skData.defaultSkin || (skData.skins && skData.skins[0])
           const list = skin0 && skin0.getAttachments ? skin0.getAttachments() : []
           list.forEach(function (e) {
@@ -304,17 +304,28 @@
             const f = nm.replace(/\d+$/, '')
             const area = att.width * att.height
             famSlots[f] = famSlots[f] || {}
-            famSlots[f][e.slotIndex] = Math.max(famSlots[f][e.slotIndex] || 0, area)
+            const rec = famSlots[f][e.slotIndex] || (famSlots[f][e.slotIndex] = { area: 0, names: {} })
+            rec.area = Math.max(rec.area, area)
+            rec.names[nm] = 1
             if (!famMax[f] || area > famMax[f]) famMax[f] = area
           })
           const hideSet = {}
           Object.keys(famSlots).forEach(function (f) {
-            let best = -1, bestArea = 0
-            Object.keys(famSlots[f]).forEach(function (si) { if (famSlots[f][si] > bestArea) { bestArea = famSlots[f][si]; best = Number(si) } })
-            famBest[f] = best
-            Object.keys(famSlots[f]).forEach(function (si) {
-              if (Number(si) !== best && famSlots[f][si] < famMax[f] * 0.6) hideSet[Number(si)] = 1
-            })
+            const entries = Object.keys(famSlots[f]).map(function (si) { return { si: Number(si), rec: famSlots[f][si] } })
+            if (entries.length < 2) return
+            // 主槽：家族内附件面积最大（并列取附件名更多的）
+            entries.sort(function (a, b) { return (b.rec.area - a.rec.area) || (Object.keys(b.rec.names).length - Object.keys(a.rec.names).length) })
+            const best = entries[0]
+            const bestNames = new Set(Object.keys(best.rec.names))
+            for (let i = 1; i < entries.length; i++) {
+              const o = entries[i]
+              // ① 半尺寸拷贝（真身 vs 残影分身）：面积 < 家族最大 60%
+              if (o.rec.area < famMax[f] * 0.6) { hideSet[o.si] = 1; continue }
+              // ② 等大同名孪生（如精灵球 images/idle/a0 与 images/idle/a0000：附件集完全相同、
+              //    同样 512x512，游戏内按状态二选一）——附件名集合与主槽完全一致就隐藏
+              const names = Object.keys(o.rec.names)
+              if (names.length === bestNames.size && names.every(function (n) { return bestNames.has(n) })) hideSet[o.si] = 1
+            }
           })
           const arr = Object.keys(hideSet).map(Number)
           if (arr.length) dedupeHide = arr
