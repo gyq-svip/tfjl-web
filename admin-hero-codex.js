@@ -174,6 +174,7 @@
     return _spineIdxPromise
   }
   let _lastSpineCanvas = null
+  let _spineRetry = 0
   function playHeroSpine(h, model) {
     const canvas = document.getElementById('hdcSpine')
     const fb = document.getElementById('hdcSpineFallback')
@@ -200,15 +201,23 @@
         onStatus: (s) => {
           const el = document.getElementById('hdcSpineStatus')
           if (!el) return
+          // 运行时/资源加载失败自动重试（网络抖动兜底，最多 2 次）
+          if (s && /失败/.test(s) && _spineRetry < 2) {
+            _spineRetry++
+            el.style.display = 'block'
+            el.textContent = s + '，自动重试 ' + _spineRetry + '/2…'
+            setTimeout(() => { if (document.body.contains(canvas)) playHeroSpine(h, model) }, 1500)
+            return
+          }
           if (s) { el.style.display = 'block'; el.textContent = s } else { el.style.display = 'none'; el.textContent = '' }
         }
       })
-      // 播放起来后撤掉立绘回退；8s 仍未播则回退并提示
+      // 播放起来后撤掉立绘回退；超时仍未播则提示（含重试窗口）
       const t0 = Date.now()
       const poll = () => {
         if (!document.body.contains(canvas)) return
-        if (canvas._spineSt && canvas._spineSt.playing) { if (fb) fb.style.display = 'none'; return }
-        if (Date.now() - t0 > 8000) { if (st) { st.textContent = '该模型暂无法播放'; st.style.display = 'block' } return }
+        if (canvas._spineSt && canvas._spineSt.playing) { _spineRetry = 0; if (fb) fb.style.display = 'none'; return }
+        if (Date.now() - t0 > 15000) { if (st) { st.textContent = '该模型暂无法播放，可重进详情或刷新页面'; st.style.display = 'block' } return }
         setTimeout(poll, 300)
       }
       poll()
@@ -242,6 +251,7 @@
     ov.querySelector('#hdcDetailBody').innerHTML = detailHTML(h)
     ov.style.display = 'flex'
     _lastSpineCanvas = document.getElementById('hdcSpine')
+    _spineRetry = 0
     playHeroSpine(h)
     ov.querySelectorAll('.hdc-skinplay').forEach((btn) => {
       btn.addEventListener('click', () => playHeroSpine(h, btn.dataset.model))
