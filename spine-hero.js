@@ -272,7 +272,56 @@
         })
         if (!fxHide.length) fxHide = null
       }
-      const vbKey = folder + '@' + (opts.model || '') + (fxHide ? '@nofx' : '')
+      // 🟢 2026-10-23 渲染期槽位隐藏：如 yilidan/jietoubawang/duye 的 images/a0（半尺寸身体拷贝，
+      //   游戏里是召唤分身），动画一挂就「两个身体叠一起」。调用方传槽位名数组，每帧清空。
+      let slotHide = null
+      if (opts.hideSlots && opts.hideSlots.length) {
+        const nameIdx = {}
+        skeleton.slots.forEach(function (sl, i) { nameIdx[sl.data.name] = i })
+        slotHide = []
+        opts.hideSlots.forEach(function (n) { if (nameIdx[n] !== undefined) slotHide.push(nameIdx[n]) })
+        if (!slotHide.length) slotHide = null
+      }
+      const frameHide = (fxHide || slotHide) ? (fxHide || []).concat(slotHide || []) : null
+      // 🟢 2026-10-23 同家族身体去重（通用规则，全模型自动生效）：
+      //   官方骨架常带「半尺寸/残影拷贝」槽（images/a0 之于 images/a0000、images/idle/a0、槽位5…），
+      //   游戏内由引擎按状态二选一，普通播放器全部画出 → 两个/三个身体叠一起。
+      //   规则：非 fx 槽按附件名去尾号的「家族」分组，槽内最大附件面积 < 家族最大面积 60% 的槽隐藏
+      //   （真身 vs 半尺寸拷贝 = 25% 命中；并列摆放的小特效彼此等大，不受影响）。
+      let dedupeHide = null
+      if (opts.dedupe) {
+        try {
+          const famBest = {}   // family -> { idx, area }
+          const famMax = {}    // family -> 最大单附件面积
+          const famSlots = {}  // family -> { slotIndex: 槽内最大面积 }
+          const skin0 = skData.defaultSkin || (skData.skins && skData.skins[0])
+          const list = skin0 && skin0.getAttachments ? skin0.getAttachments() : []
+          list.forEach(function (e) {
+            const att = e.attachment
+            if (!att || !att.width || !att.height) return
+            const nm = e.name || ''
+            if (/(^|\/)fx(\/|$)/i.test(nm)) return
+            const f = nm.replace(/\d+$/, '')
+            const area = att.width * att.height
+            famSlots[f] = famSlots[f] || {}
+            famSlots[f][e.slotIndex] = Math.max(famSlots[f][e.slotIndex] || 0, area)
+            if (!famMax[f] || area > famMax[f]) famMax[f] = area
+          })
+          const hideSet = {}
+          Object.keys(famSlots).forEach(function (f) {
+            let best = -1, bestArea = 0
+            Object.keys(famSlots[f]).forEach(function (si) { if (famSlots[f][si] > bestArea) { bestArea = famSlots[f][si]; best = Number(si) } })
+            famBest[f] = best
+            Object.keys(famSlots[f]).forEach(function (si) {
+              if (Number(si) !== best && famSlots[f][si] < famMax[f] * 0.6) hideSet[Number(si)] = 1
+            })
+          })
+          const arr = Object.keys(hideSet).map(Number)
+          if (arr.length) dedupeHide = arr
+        } catch (e) {}
+      }
+      const frameHide2 = (dedupeHide && frameHide) ? frameHide.concat(dedupeHide) : (dedupeHide || frameHide)
+      const vbKey = folder + '@' + (opts.model || '') + (fxHide ? '@nofx' : '') + (slotHide ? '@hs' : '')
       let vb = vbBoundsCache[vbKey]
       if (!vb) {
         vb = computeBounds(spine, skData, idle, !!fxHide)
@@ -309,6 +358,14 @@
               if (!hideIdx.length) hideIdx = null
             }
           } catch (e) {}
+          if (opts.hideSlots && opts.hideSlots.length) {
+            const _n2 = {}
+            skData.slots.forEach(function (sd, i) { _n2[sd.name] = i })
+            const _extra = []
+            opts.hideSlots.forEach(function (n) { if (_n2[n] !== undefined) _extra.push(_n2[n]) })
+            if (_extra.length) hideIdx = hideIdx ? hideIdx.concat(_extra) : _extra
+          }
+          if (dedupeHide && dedupeHide.length) hideIdx = hideIdx ? hideIdx.concat(dedupeHide) : dedupeHide.slice()
           vbVis = measureVisualBounds(spine, skData, animObj, vb, !!fxHide, hideIdx) || vb
           vbCache[vbKey] = vbVis
           try { window.__spineDbg = { folder: folder, model: opts.model || '', hideIdx: hideIdx, union: { w: +vbVis.size.x.toFixed(0), h: +vbVis.size.y.toFixed(0) }, chosen: 'union' } } catch (e) {}
@@ -339,7 +396,7 @@
         st.raf = requestAnimationFrame(tick)
         const dt = Math.min((now - last) / 1000, 0.1); last = now
         state.update(dt); state.apply(skeleton); skeleton.updateWorldTransform()
-        if (fxHide) { for (let i = 0; i < fxHide.length; i++) { const _fs = skeleton.slots[fxHide[i]]; if (_fs) _fs.attachment = null } }
+        if (frameHide2) { for (let i = 0; i < frameHide2.length; i++) { const _fs = skeleton.slots[frameHide2[i]]; if (_fs) _fs.attachment = null } }
         const ctx = canvas.getContext('2d')
         const w = canvas.width, h = canvas.height
         ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, w, h)
