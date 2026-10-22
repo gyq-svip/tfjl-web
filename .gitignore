@@ -150,11 +150,13 @@ tools/
 # 英雄 Spine 动画资源（官方导出，图鉴面板播放用；目录清单 index.json + 各英雄 skeleton/atlas/png）
 !/data/hero-spine/
 !/data/hero-spine/**
-# 英雄卡组（工具箱同源新CDN导出）只需提交运行时数据，_tables/assets 可由 scripts/export-hero-deck.mjs 重新生成
+# 英雄图鉴：数据与立绘图集入库（avatar 17.9MB）；Spine 模型仅本地（scripts/sync-hero-deck.mjs 可重新同步）
 !/data/hero-deck/
 !/data/hero-deck/**
 /data/hero-deck/_tables/
-/data/hero-deck/assets/
+/data/hero-deck/_tmp/
+/data/hero-deck/assets/*
+!/data/hero-deck/assets/avatar/
 # 图标等静态资源（Tauri 图标已编译进二进制，网页用 src-tauri/icons）
 /assets/
 # 安装包 + 签名（本地保留，下载源在 Gitee 发行版附件）

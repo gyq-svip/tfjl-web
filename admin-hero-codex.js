@@ -1,20 +1,24 @@
-/* 英雄卡组 —— 独立模块，与 app-core.js 完全解耦。
- * 数据来自工具箱同源的新 CDN（scripts/export-hero-deck.mjs 导出到 data/hero-deck/heroes.json）。
- * 功能：英雄网格 + 搜索 + 职业/品质筛选 + 详情（技能/被动/分档/定位/攻击类型）。
- * 说明：头像图集与 Spine 纹理在本游戏版本的 Cocos 紧凑打包下暂无法从 CDN 取回（图集纹理 404），
- *       故卡片用「品质色 + 职业」呈现；数据/分档/技能/被动均为官方原始内容。
+/* 英雄图鉴 —— 独立模块，与 app-core.js 完全解耦。
+ * 数据源：塔防精灵工具箱「更新中心→游戏资源更新」产出的 hero-snapshot.json / hero-assets.json
+ *         （scripts/sync-hero-deck.mjs 同步到 data/hero-deck/，版本随工具箱 e9937+）。
+ * 还原工具箱「英雄图鉴」页面：金框卡片 + 图集切片立绘 + 搜索/排序/按品质 + 详情。
+ * 说明：Spine 模型（105MB）仅本地同步不入库，部署站上详情面板自动回退为立绘展示。
  */
 (function () {
-  const OCCUPATION = { 1: '战士', 2: '猎人', 3: '法师', 4: '牧师', 5: '召唤', 6: '精灵', 7: '熊猫', 8: '工程', 9: '术士', 10: '龙族' }
-  const ATTACK_TYPE = { 1: '纯粹伤害', 2: '物理伤害', 3: '魔法伤害', 4: '治疗', 5: '召唤', 6: '特殊', 7: '元素', 8: '真实伤害', 9: '真实伤害' }
+  const OCCUPATION = { 1: ['战士', '⚔️'], 2: ['猎人', '🏹'], 3: ['法师', '🔮'], 4: ['牧师', '✨'], 5: ['召唤', '🐾'], 6: ['精灵', '🌿'], 7: ['熊猫', '🐼'], 8: ['工程', '⚙️'], 9: ['术士', '👻'], 10: ['龙族', '🐉'] }
   const QUALITY = {
-    1: { name: '绿', c1: '#3fa45a', c2: '#2c7a42', t: '#bff0c8' },
-    2: { name: '蓝', c1: '#4a90d9', c2: '#2f6bb0', t: '#bfe0ff' },
-    3: { name: '紫', c1: '#9b59b6', c2: '#76448f', t: '#e6c8ff' },
-    4: { name: '金', c1: '#f5b041', c2: '#d99310', t: '#ffe9b8' }
+    1: { name: '绿', c1: '#57b96a', c2: '#2c7a42', t: '#bff0c8' },
+    2: { name: '蓝', c1: '#54a3e8', c2: '#2f6bb0', t: '#bfe0ff' },
+    3: { name: '紫', c1: '#b06ae0', c2: '#76448f', t: '#e6c8ff' },
+    4: { name: '金', c1: '#ffc84d', c2: '#d99310', t: '#ffe9b8' }
   }
-  let heroes = null
+  const ASSET_BASE = 'data/hero-deck/assets/'
+  let snap = null
+  let heroes = []
+  let allForms = {}
   let cache = null
+  let state = { kw: '', q: 0, sort: 0 } // sort: 0品质默认 1按名称 2按品质
+
   function baseUrl() {
     const s = document.querySelector('script[src*="admin-hero-codex.js"]')
     let b = ''
@@ -24,140 +28,202 @@
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
   }
-  function qBadge(q) {
-    const Q = QUALITY[q] || QUALITY[1]
-    return `<span style="font-size:.62rem;padding:1px 6px;border-radius:8px;color:#10131a;font-weight:700;background:linear-gradient(180deg,${Q.c1},${Q.c2})">${Q.name}</span>`
-  }
-  function occBadge(o) {
-    return `<span style="font-size:.62rem;padding:1px 6px;border-radius:8px;background:rgba(255,255,255,.12);color:rgba(255,255,255,.8)">${OCCUPATION[o] || '—'}</span>`
-  }
   async function getData() {
     if (cache) return cache
-    const r = await fetch(baseUrl() + 'data/hero-deck/heroes.json')
-    heroes = await r.json()
-    // 排序：品质降序 → 职业 → id
-    heroes.sort((a, b) => (b.heroColor - a.heroColor) || (a.occupation - b.occupation) || (Number(a.id) - Number(b.id)))
-    cache = heroes
+    const r = await fetch(baseUrl() + 'data/hero-deck/hero-snapshot.json')
+    snap = await r.json()
+    allForms = snap.allForms || {}
+    heroes = Object.values(snap.heroData || {})
+    cache = true
     return heroes
   }
-  function buildUI() {
-    const ov = document.getElementById('heroDeckOverlay')
-    if (ov) return ov
-    const el = document.createElement('div')
-    el.id = 'heroDeckOverlay'
-    el.style.cssText = 'position:fixed;inset:0;z-index:99995;background:rgba(8,10,16,.92);display:none;flex-direction:column;'
-    el.innerHTML = `
-      <div style="display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap;">
-        <div style="font-size:1.15rem;font-weight:700;color:#ffd76b;">🎴 英雄卡组 <span style="font-size:.7rem;color:rgba(255,255,255,.45);font-weight:400;">官方数据 · 内测</span></div>
-        <input id="hdSearch" placeholder="搜索英雄名…" style="flex:1;min-width:160px;max-width:260px;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:.9rem;">
-        <select id="hdOcc" style="padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:#1a1f2b;color:#fff;font-size:.85rem;">
-          <option value="">全部职业</option>
-          ${Object.entries(OCCUPATION).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}
-        </select>
-        <select id="hdQ" style="padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:#1a1f2b;color:#fff;font-size:.85rem;">
-          <option value="">全部品质</option>
-          ${Object.entries(QUALITY).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('')}
-        </select>
-        <div id="hdCount" style="font-size:.8rem;color:rgba(255,255,255,.5);"></div>
-        <button onclick="window.closeHeroDeck()" style="margin-left:auto;padding:8px 14px;border:none;border-radius:8px;background:rgba(255,255,255,.12);color:#fff;cursor:pointer;font-size:.9rem;">关闭 ✕</button>
-      </div>
-      <div style="flex:1;display:flex;min-height:0;">
-        <div id="hdGridWrap" style="flex:1;overflow:auto;padding:16px;">
-          <div id="hdGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:12px;"></div>
-        </div>
-        <div id="hdDetail" style="width:380px;max-width:42vw;overflow:auto;padding:18px;border-left:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);display:none;"></div>
-      </div>`
-    document.body.appendChild(el)
-    el.querySelector('#hdSearch').addEventListener('input', render)
-    el.querySelector('#hdOcc').addEventListener('change', render)
-    el.querySelector('#hdQ').addEventListener('change', render)
-    return el
+
+  /* 图集切片：portraitFile=图集路径，portraitRect=[x,y,w,h]。w=显示宽度，按比例缩放。 */
+  function portraitHTML(h, w, extra) {
+    const r = h.portraitRect || [0, 0, 204, 198]
+    const scale = w / r[2]
+    const ht = Math.round(r[3] * scale)
+    const url = baseUrl() + ASSET_BASE + (h.portraitFile || '')
+    return `<div style="width:${w}px;height:${ht}px;overflow:hidden;border-radius:6px;${extra || ''}">` +
+      `<div style="width:${r[2]}px;height:${r[3]}px;background:url('${url}') -${r[0]}px -${r[1]}px no-repeat;transform:scale(${scale});transform-origin:0 0;"></div></div>`
   }
+
+  function fuseCount(h) {
+    const f = allForms[h.id] && allForms[h.id].fuses
+    return f ? f.length : 1
+  }
+
   function cardHTML(h) {
     const Q = QUALITY[h.heroColor] || QUALITY[1]
-    const pos = (h.heroDesc || '').replace(/^定位[:：]/, '')
-    return `<div class="hd-card" data-id="${esc(h.id)}" style="cursor:pointer;border-radius:12px;overflow:hidden;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.01));border:1px solid ${Q.c1}55;box-shadow:0 2px 10px rgba(0,0,0,.3);transition:transform .12s;display:flex;flex-direction:column;">
-      <div style="height:96px;background:linear-gradient(135deg,${Q.c1},${Q.c2});display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:800;color:${Q.t};text-shadow:0 2px 6px rgba(0,0,0,.4);">${esc(h.name.slice(0, 1))}</div>
-      <div style="padding:8px 10px;display:flex;flex-direction:column;gap:6px;">
-        <div style="font-weight:700;color:#fff;font-size:.95rem;display:flex;align-items:center;gap:6px;justify-content:space-between;">
-          <span>${esc(h.name)}</span>${qBadge(h.heroColor)}
+    const occ = OCCUPATION[h.occupation] || ['—', '❔']
+    const n = fuseCount(h)
+    return `<div class="hdc-card" data-id="${esc(h.id)}" style="position:relative;width:152px;border:3px solid #8a5a1c;border-radius:12px;
+      background:linear-gradient(180deg,#e9a63b,#c97f16);padding:3px;cursor:pointer;transition:transform .12s;">
+      <div style="position:relative;background:linear-gradient(180deg,#f8d878,#f0b43c);border-radius:8px;padding:18px 6px 0;display:flex;flex-direction:column;align-items:center;min-height:196px;">
+        <div style="position:absolute;top:-9px;left:50%;transform:translateX(-50%);z-index:2;white-space:nowrap;
+          background:linear-gradient(180deg,#8f2412,#b23a1d);border:2px solid #ffd76b;border-radius:9px;padding:2px 12px;
+          color:#ffe6a8;font-weight:700;font-size:.82rem;text-shadow:0 1px 2px rgba(0,0,0,.6);">${esc(h.name)}</div>
+        <div style="position:absolute;top:4px;left:5px;z-index:2;width:26px;height:26px;border-radius:50%;
+          background:radial-gradient(circle at 35% 30%,#3b4b66,#1c2637);border:2px solid #d9a441;
+          display:flex;align-items:center;justify-content:center;font-size:.85rem;" title="${occ[0]}">${occ[1]}</div>
+        ${portraitHTML(h, 128, 'margin-top:6px;box-shadow:0 2px 6px rgba(0,0,0,.35);')}
+        <div style="position:absolute;bottom:30px;left:7px;z-index:2;width:30px;height:32px;
+          clip-path:polygon(50% 100%,100% 72%,100% 12%,0 12%,0 72%);
+          background:linear-gradient(180deg,#ffd968,#e0a01e);border-radius:6px 6px 4px 4px;
+          display:flex;align-items:center;justify-content:center;color:#7a1f10;font-weight:800;font-size:.8rem;
+          text-shadow:0 1px 0 rgba(255,255,255,.5);" title="融合段数">${n}</div>
+        <div style="width:100%;margin-top:6px;border-radius:0 0 6px 6px;background:linear-gradient(180deg,#5a3410,#6e4415);
+          color:#fff3d6;font-size:.72rem;font-weight:700;display:flex;align-items:center;justify-content:space-between;padding:2px 8px;">
+          <span>0/${n}</span><span style="color:#ffd968;">⬆</span>
         </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;">${occBadge(h.occupation)}${ATTACK_TYPE[h.occupation] ? `<span style="font-size:.62rem;padding:1px 6px;border-radius:8px;background:rgba(255,215,107,.15);color:#ffd76b;">${ATTACK_TYPE[h.occupation]}</span>` : ''}</div>
-        <div style="font-size:.7rem;color:rgba(255,255,255,.55);line-height:1.3;min-height:2em;">${esc(pos) || '—'}</div>
       </div>
+      <div data-q="${h.heroColor}" style="position:absolute;inset:0;border-radius:12px;pointer-events:none;
+        box-shadow:inset 0 0 0 2px ${Q.c1}55;"></div>
     </div>`
   }
+
+  function filterSort() {
+    let list = heroes.slice()
+    const kw = state.kw.trim().toLowerCase()
+    if (kw) list = list.filter((h) => {
+      const occ = OCCUPATION[h.occupation] || ['']
+      return (h.name || '').toLowerCase().includes(kw)
+        || String(occ[0]).toLowerCase().includes(kw)
+        || (h.modelFolder || '').toLowerCase().includes(kw)
+        || (h.modelFiles || []).some((f) => String(f).toLowerCase().includes(kw))
+    })
+    if (state.q) list = list.filter((h) => Number(h.heroColor) === state.q)
+    if (state.sort === 1) list.sort((a, b) => String(a.name).localeCompare(String(b.name), 'zh'))
+    else if (state.sort === 2) list.sort((a, b) => (b.heroColor - a.heroColor) || String(a.name).localeCompare(String(b.name), 'zh'))
+    else list.sort((a, b) => (b.heroColor - a.heroColor) || (Number(a.id) - Number(b.id)))
+    return list
+  }
+
+  function renderGrid() {
+    const grid = document.getElementById('hdcGrid')
+    const tip = document.getElementById('hdcCount')
+    if (!grid) return
+    const list = filterSort()
+    tip.textContent = `共 ${list.length} 位英雄 · 数据表 · 图片素材`
+    grid.innerHTML = list.map(cardHTML).join('')
+  }
+
   function detailHTML(h) {
     const Q = QUALITY[h.heroColor] || QUALITY[1]
-    const pos = (h.heroDesc || '').replace(/^定位[:：]/, '')
-    const tiers = (h.tiers || []).map((t) => `<tr>
-      <td style="padding:4px 6px;color:#ffd76b;font-weight:700;">Lv.${t.level}</td>
-      <td style="padding:4px 6px;color:rgba(255,255,255,.85);">${esc(t.skillDesc || '')}</td>
-      <td style="padding:4px 6px;color:rgba(255,255,255,.7);">${esc(t.passiveInitial || '')}</td>
-      <td style="padding:4px 6px;color:rgba(255,255,255,.7);">${esc(t.passiveFull || '')}</td>
-      <td style="padding:4px 6px;color:rgba(255,215,107,.85);">${esc(t.talentName ? (t.talentName + '：' + (t.talentDesc || '')) : '')}</td>
-    </tr>`).join('')
+    const occ = OCCUPATION[h.occupation] || ['—', '❔']
+    const form = allForms[h.id] || {}
+    const sec = (t, body) => body ? `<div style="margin-top:14px;"><div style="color:#ffd76b;font-weight:700;font-size:.9rem;margin-bottom:6px;">${t}</div>${body}</div>` : ''
+    const tiers = (h.tiers || []).map((t) =>
+      `<div style="display:flex;gap:8px;padding:5px 8px;border-radius:6px;background:rgba(255,255,255,.05);margin-bottom:4px;">
+        <b style="min-width:64px;color:#ffe9b8;">${esc(t.name || t.key || '')}</b>
+        <span style="color:rgba(255,255,255,.75);font-size:.8rem;">${esc(t.desc || '')}</span></div>`).join('')
+    const fuses = (form.fuses || []).map((f) =>
+      `<div style="display:flex;gap:10px;align-items:center;padding:5px 8px;border-radius:6px;background:rgba(255,255,255,.05);margin-bottom:4px;">
+        ${f.hasPortrait ? portraitHTML(f, 44) : ''}
+        <div><b style="color:#ffe9b8;font-size:.82rem;">${esc(f.name)}</b>
+        <div style="color:rgba(255,255,255,.7);font-size:.75rem;">${esc(f.desc || '')}</div></div></div>`).join('')
+    const skins = (form.skins || []).map((s) =>
+      `<div style="display:flex;gap:10px;align-items:center;padding:6px 8px;border-radius:6px;background:rgba(255,255,255,.05);margin-bottom:4px;">
+        ${s.hasPortrait ? portraitHTML(s, 52) : ''}
+        <div><b style="color:#ffe9b8;font-size:.82rem;">${esc(s.name)}</b>${s.model ? `<span style="font-size:.68rem;color:rgba(255,255,255,.5);"> · 模型 ${esc(s.model)}</span>` : ''}
+        <div style="color:rgba(255,255,255,.7);font-size:.75rem;">${esc(s.desc || '')}</div></div></div>`).join('')
+    const passive = [h.passiveName ? `<b>${esc(h.passiveName)}</b>` : '', h.passiveDesc ? esc(h.passiveDesc) : '', h.passiveDesc2 ? `<div style="margin-top:4px;color:rgba(255,255,255,.65);">${esc(h.passiveDesc2)}</div>` : ''].filter(Boolean).join('<div style="height:2px"></div>')
     return `
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-        <div style="width:64px;height:64px;border-radius:10px;background:linear-gradient(135deg,${Q.c1},${Q.c2});display:flex;align-items:center;justify-content:center;font-size:1.6rem;font-weight:800;color:${Q.t};">${esc(h.name.slice(0, 1))}</div>
+      <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+        ${portraitHTML(h, 160, 'flex:none;box-shadow:0 4px 18px rgba(0,0,0,.5);border:2px solid #d9a441;')}
+        <div style="flex:1;min-width:220px;">
+          <div style="font-size:1.3rem;font-weight:800;color:#ffd76b;">${esc(h.name)}</div>
+          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
+            <span style="font-size:.68rem;padding:2px 8px;border-radius:8px;color:#10131a;font-weight:700;background:linear-gradient(180deg,${Q.c1},${Q.c2})">${Q.name}品质</span>
+            <span style="font-size:.68rem;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,.12);">${occ[1]} ${occ[0]}</span>
+            ${h.positioning ? `<span style="font-size:.68rem;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,.12);">定位：${esc(h.positioning)}</span>` : ''}
+            ${h.modelFolder ? `<span style="font-size:.68rem;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,.08);color:rgba(255,255,255,.55);">模型 ${esc(h.modelFolder)}</span>` : ''}
+          </div>
+          ${h.heroDesc ? `<div style="margin-top:8px;color:rgba(255,255,255,.75);font-size:.8rem;">${esc(h.heroDesc)}</div>` : ''}
+          ${sec('⚔️ 技能 · ' + esc(h.skillName || ''), h.skillDesc ? `<div style="color:rgba(255,255,255,.85);font-size:.84rem;line-height:1.5;">${esc(h.skillDesc)}</div>` : '')}
+          ${sec('🛡️ 被动', passive)}
+          ${sec('⭐ 分档 · 天赋', tiers)}
+          ${sec('🔗 融合', fuses)}
+          ${sec('🎽 皮肤', skins)}
+        </div>
+      </div>`
+  }
+
+  function openDetail(h) {
+    let ov = document.getElementById('hdcDetail')
+    if (!ov) {
+      ov = document.createElement('div')
+      ov.id = 'hdcDetail'
+      ov.style.cssText = 'position:fixed;inset:0;z-index:99997;background:rgba(4,8,14,.8);display:none;align-items:center;justify-content:center;padding:20px;'
+      ov.innerHTML = `<div style="position:relative;max-width:640px;width:100%;max-height:86vh;overflow-y:auto;border-radius:14px;padding:18px 20px;
+        background:linear-gradient(180deg,#182c44,#101c2e);border:1px solid rgba(255,215,107,.35);box-shadow:0 10px 40px rgba(0,0,0,.6);">
+        <button id="hdcDetailClose" style="position:absolute;top:10px;right:12px;background:rgba(255,255,255,.1);border:none;color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:1rem;">✕</button>
+        <div id="hdcDetailBody"></div></div>`
+      document.body.appendChild(ov)
+      ov.addEventListener('click', (e) => { if (e.target === ov) ov.style.display = 'none' })
+      ov.querySelector('#hdcDetailClose').addEventListener('click', () => { ov.style.display = 'none' })
+    }
+    ov.querySelector('#hdcDetailBody').innerHTML = detailHTML(h)
+    ov.style.display = 'flex'
+  }
+
+  function buildUI() {
+    const old = document.getElementById('heroDeckOverlay')
+    if (old) old.remove()
+    const el = document.createElement('div')
+    el.id = 'heroDeckOverlay'
+    el.style.cssText = 'position:fixed;inset:0;z-index:99995;display:none;flex-direction:column;color:#fff;' +
+      "background:radial-gradient(1200px 600px at 50% -10%,#1d4066,#12283f 55%,#0b1826);"
+    el.innerHTML = `
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid rgba(255,215,107,.18);flex-wrap:wrap;background:rgba(6,12,22,.55);">
+        <div style="width:38px;height:38px;border-radius:10px;background:linear-gradient(180deg,#8a63f0,#5f3dc4);display:flex;align-items:center;justify-content:center;font-size:1.2rem;box-shadow:0 2px 8px rgba(0,0,0,.4);">🎴</div>
         <div>
-          <div style="font-size:1.1rem;font-weight:800;color:#fff;">${esc(h.name)} ${qBadge(h.heroColor)}</div>
-          <div style="font-size:.78rem;color:rgba(255,255,255,.6);margin-top:3px;">${occBadge(h.occupation)} ${ATTACK_TYPE[h.occupation] ? `<span style="font-size:.62rem;padding:1px 6px;border-radius:8px;background:rgba(255,215,107,.15);color:#ffd76b;margin-left:4px;">${ATTACK_TYPE[h.occupation]}</span>` : ''}</div>
+          <div style="font-size:1.05rem;font-weight:800;color:#ffd76b;">英雄图鉴 <span style="font-size:.66rem;color:rgba(255,255,255,.45);font-weight:400;">e9937</span></div>
+          <div id="hdcCount" style="font-size:.7rem;color:rgba(255,255,255,.5);"></div>
+        </div>
+        <div style="flex:1"></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <div style="position:relative;">
+            <input id="hdcSearch" placeholder="🔍 搜索英雄/职业（支持拼音模型名）" style="width:250px;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:.85rem;outline:none;">
+          </div>
+          <button id="hdcSort" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:.82rem;cursor:pointer;">排序</button>
+          <button id="hdcQ" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:.82rem;cursor:pointer;">🎨 按品质</button>
+          <button id="hdcClose" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:.82rem;cursor:pointer;">✕ 关闭</button>
         </div>
       </div>
-      <div style="font-size:.82rem;color:rgba(255,255,255,.7);margin-bottom:12px;">📍 定位：${esc(pos) || '—'}</div>
-      <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px;margin-bottom:14px;">
-        <div style="font-weight:700;color:#ffd76b;margin-bottom:6px;">⚔️ ${esc(h.skillName || '技能')}</div>
-        <div style="font-size:.85rem;color:rgba(255,255,255,.85);line-height:1.5;">${esc(h.skillDesc || '—')}</div>
-      </div>
-      <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px;margin-bottom:14px;">
-        <div style="font-weight:700;color:#ffd76b;margin-bottom:6px;">🌟 ${esc(h.passiveName || '被动')}</div>
-        <div style="font-size:.85rem;color:rgba(255,255,255,.85);line-height:1.5;">${esc(h.passiveDesc || '')}</div>
-        ${h.passiveDesc2 ? `<div style="font-size:.78rem;color:rgba(255,255,255,.55);margin-top:6px;line-height:1.5;">${esc(h.passiveDesc2)}</div>` : ''}
-      </div>
-      <div style="font-weight:700;color:#ffd76b;margin-bottom:6px;">📊 分档 / 天赋预览</div>
-      <div style="overflow:auto;border:1px solid rgba(255,255,255,.08);border-radius:10px;">
-        <table style="width:100%;border-collapse:collapse;font-size:.74rem;">
-          <thead><tr style="background:rgba(255,255,255,.06);color:rgba(255,255,255,.7);">
-            <th style="padding:4px 6px;text-align:left;">等级</th><th style="padding:4px 6px;text-align:left;">技能</th><th style="padding:4px 6px;text-align:left;">初始被动</th><th style="padding:4px 6px;text-align:left;">满星被动</th><th style="padding:4px 6px;text-align:left;">天赋</th>
-          </tr></thead>
-          <tbody>${(tiers || '<tr><td colspan="5" style="padding:8px;color:rgba(255,255,255,.4);">无分档数据</td></tr>')}</tbody>
-        </table>
-      </div>
-      <div style="font-size:.7rem;color:rgba(255,255,255,.4);margin-top:14px;line-height:1.5;">※ 头像与 Spine 动画因本游戏版本图集纹理暂无法从 CDN 取回，暂以品质色呈现；数据/分档/技能/被动均为官方原始内容。</div>`
-  }
-  function render() {
-    const ov = document.getElementById('heroDeckOverlay')
-    const grid = ov.querySelector('#hdGrid')
-    const q = (ov.querySelector('#hdSearch').value || '').trim().toLowerCase()
-    const occ = ov.querySelector('#hdOcc').value
-    const qf = ov.querySelector('#hdQ').value
-    const list = (heroes || []).filter((h) => {
-      if (occ && String(h.occupation) !== occ) return false
-      if (qf && String(h.heroColor) !== qf) return false
-      if (q && !(h.name || '').toLowerCase().includes(q) && !(h.desc || '').toLowerCase().includes(q)) return false
-      return true
+      <div id="hdcGrid" style="flex:1;overflow-y:auto;padding:22px;display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:16px;justify-content:center;align-content:start;"></div>`
+    document.body.appendChild(el)
+
+    el.querySelector('#hdcClose').addEventListener('click', () => { el.style.display = 'none' })
+    el.querySelector('#hdcSearch').addEventListener('input', (e) => { state.kw = e.target.value; renderGrid() })
+    el.querySelector('#hdcSort').addEventListener('click', () => {
+      state.sort = (state.sort + 1) % 3
+      el.querySelector('#hdcSort').textContent = ['排序', '排序·名称', '排序·品质'][state.sort]
+      renderGrid()
     })
-    grid.innerHTML = list.map(cardHTML).join('')
-    ov.querySelector('#hdCount').textContent = `${list.length} / ${heroes.length}`
-    grid.querySelectorAll('.hd-card').forEach((c) => {
-      c.addEventListener('click', () => {
-        const h = heroes.find((x) => String(x.id) === c.dataset.id)
-        const det = ov.querySelector('#hdDetail')
-        det.innerHTML = detailHTML(h)
-        det.style.display = 'block'
-        grid.querySelectorAll('.hd-card').forEach((x) => (x.style.outline = 'none'))
-        c.style.outline = '2px solid #ffd76b'
-      })
+    el.querySelector('#hdcQ').addEventListener('click', () => {
+      state.q = (state.q + 1) % 5
+      const names = { 0: '🎨 按品质', 1: '🟢 绿色', 2: '🔵 蓝色', 3: '🟣 紫色', 4: '🟡 金色' }
+      el.querySelector('#hdcQ').textContent = names[state.q]
+      renderGrid()
+    })
+    el.querySelector('#hdcGrid').addEventListener('click', (e) => {
+      const card = e.target.closest('.hdc-card')
+      if (!card) return
+      const h = heroes.find((x) => String(x.id) === card.dataset.id)
+      if (h) openDetail(h)
     })
   }
+
   window.openHeroDeck = async function () {
-    const ov = buildUI()
-    ov.style.display = 'flex'
-    if (!heroes) {
-      ov.querySelector('#hdGrid').innerHTML = '<div style="color:rgba(255,255,255,.5);padding:20px;">加载中…</div>'
-      try { await getData(); render() } catch (e) { ov.querySelector('#hdGrid').innerHTML = '<div style="color:#ff8a8a;padding:20px;">数据加载失败：' + esc(e.message) + '</div>' }
+    const el = document.getElementById('heroDeckOverlay') || (buildUI(), document.getElementById('heroDeckOverlay'))
+    el.style.display = 'flex'
+    try {
+      await getData()
+      renderGrid()
+    } catch (e) {
+      document.getElementById('hdcGrid').innerHTML =
+        `<div style="grid-column:1/-1;color:#f87171;padding:30px;text-align:center;">英雄数据加载失败：${esc(e.message || e)}<br><span style="color:rgba(255,255,255,.5);font-size:.8rem;">请先运行 scripts/sync-hero-deck.mjs（或在工具箱更新资源后重新同步）</span></div>`
     }
   }
-  window.closeHeroDeck = function () { const ov = document.getElementById('heroDeckOverlay'); if (ov) ov.style.display = 'none' }
 })()
