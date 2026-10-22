@@ -58,10 +58,17 @@
   // 隐藏/恢复「特效骨」挂件：冰晶/光效(fx/*)会把包围盒撑大，使人物被算小、站偏
   function hideFxSlots(sk) {
     let n = 0
+    // 🔴 2026-10-22 稳健识别特效：官方把所有特效附件放在 images/fx/ 路径下（3619 个），
+    //   但命名有两种——'images/fx/aixin'（fx 前有斜杠）与 'fx/glow2_00004'（fx 在开头）。
+    //   只按骨骼名匹配会漏掉后者（如小野脚下爱心），导致本体盒被特效撑大→角色变小/脚不沾地。
+    //   故改为匹配「路径段 fx」（覆盖两种命名）；同时保留骨骼名匹配作为兜底。
+    const fxSeg = /(^|\/)fx(\/|$)/i
     for (let i = 0; i < sk.slots.length; i++) {
       const s = sk.slots[i]
+      if (!s.attachment) continue
       const bn = (s.bone && s.bone.data && s.bone.data.name) || ''
-      if (/fx|特效|texiao|guangxiao/i.test(bn)) { s._fxAtt = s.attachment; s.attachment = null; n++ }
+      const an = (s.attachment.name) || ''
+      if (fxSeg.test(bn) || fxSeg.test(an) || /特效|texiao|guangxiao/i.test(bn)) { s._fxAtt = s.attachment; s.attachment = null; n++ }
     }
     return n
   }
@@ -147,79 +154,6 @@
       const wy1 = toWy(maxY + 1), wy2 = toWy(minY) // canvas y 向下，世界 y 向上
       if (!(wx2 > wx1) || !(wy2 > wy1)) return null
       return { off: new spine.Vector2(wx1, wy1), size: new spine.Vector2(wx2 - wx1, wy2 - wy1) }
-    } catch (e) { return null }
-  }
-
-  // 🔴 2026-10-22 「主槽校正」：逐槽独渲染（idle 采样并集）找出角色本体槽的像素包围盒。
-  //   背景：小野类模型，脚下的爱心/漂浮特效（独立槽）会把联合包围盒撑得比本体大 40%+，
-  //   导致 fitByHeight 把角色压小、anchorFeet 锚到特效底边 →「角色极小/脚不沾地」。
-  //   本函数只做测量，不改渲染（渲染照常画全部槽）。调用方仅在联合盒线性尺寸超过
-  //   本体盒 25% 时才采用其结果，正常模型零影响。
-  function measureDominantSlot(spine, skData, anim, vb) {
-    try {
-      const sw = vb.size.x, sh = vb.size.y
-      if (!(sw > 0 && sh > 0)) return null
-      const N = 200
-      const s = Math.min((N - 6) / sw, (N - 6) / sh)
-      const oc = document.createElement('canvas')
-      oc.width = N; oc.height = N
-      const c2 = oc.getContext('2d', { willReadFrequently: true })
-      const cx = vb.off.x + sw / 2, cy = vb.off.y + sh / 2
-      const stt = new spine.AnimationState(new spine.AnimationStateData(skData))
-      const dur = anim ? (anim.duration || 0) : 0
-      const steps = Math.max(4, Math.min(8, Math.ceil(dur * 6)))
-      const r2 = new spine.canvas.SkeletonRenderer(c2)
-      r2.triangleRendering = true
-      const boxes = skData.slots.map(function () { return null })
-      for (let i = 0; i <= steps; i++) {
-        const tmp = new spine.Skeleton(skData)
-        tmp.setToSetupPose()
-        if (anim) { stt.clearTracks(); stt.setAnimation(0, anim.name, false); stt.update((dur * i) / steps); stt.apply(tmp) }
-        const atts = tmp.slots.map(function (sl) { return sl.attachment })
-        for (let k = 0; k < tmp.slots.length; k++) {
-          if (!atts[k]) continue
-          for (let j = 0; j < tmp.slots.length; j++) tmp.slots[j].attachment = (j === k) ? atts[j] : null
-          tmp.updateWorldTransform()
-          c2.setTransform(1, 0, 0, 1, 0, 0)
-          c2.clearRect(0, 0, N, N)
-          c2.save(); c2.translate(N / 2, N / 2); c2.scale(s, -s); c2.translate(-cx, -cy)
-          r2.draw(tmp); c2.restore()
-          const data = c2.getImageData(0, 0, N, N).data
-          let mnx = 1e9, mny = 1e9, mxx = -1, mxy = -1
-          for (let y = 0; y < N; y++) { const row = y * N; for (let x = 0; x < N; x++) { if (data[(row + x) * 4 + 3] > 24) { if (x < mnx) mnx = x; if (x > mxx) mxx = x; if (y < mny) mny = y; if (y > mxy) mxy = y } } }
-          if (mxx < 0) continue
-          const wx0 = (mnx - N / 2) / s + cx, wx1 = (mxx + 1 - N / 2) / s + cx
-          const wy1 = -(mny - N / 2) / s + cy, wy0 = -(mxy + 1 - N / 2) / s + cy
-          const b = boxes[k]
-          if (!b) boxes[k] = { x0: wx0, y0: wy0, x1: wx1, y1: wy1, px: (mxx - mnx + 1) * (mxy - mny + 1) }
-          else {
-            if (wx0 < b.x0) b.x0 = wx0; if (wy0 < b.y0) b.y0 = wy0
-            if (wx1 > b.x1) b.x1 = wx1; if (wy1 > b.y1) b.y1 = wy1
-            b.px += (mxx - mnx + 1) * (mxy - mny + 1)
-          }
-        }
-      }
-      // 主槽 = 累计像素量最大的槽（角色本体必然是视觉主体）
-      let dom = -1, domPx = 0
-      for (let k = 0; k < boxes.length; k++) { if (boxes[k] && boxes[k].px > domPx) { domPx = boxes[k].px; dom = k } }
-      if (dom < 0) return null
-      const d = boxes[dom]
-      // 合并「贴着本体」的槽（其盒 60% 以上落在本体盒内，如手中的武器/身前披风）；
-      // 环绕特效（光环圈）的盒只与本体盒交叠一小部分，不会并入 → 定标不被撑大
-      let x0 = d.x0, y0 = d.y0, x1 = d.x1, y1 = d.y1
-      for (let k = 0; k < boxes.length; k++) {
-        if (k === dom || !boxes[k]) continue
-        const b = boxes[k]
-        const ox = Math.max(0, Math.min(b.x1, x1) - Math.max(b.x0, x0))
-        const oy = Math.max(0, Math.min(b.y1, y1) - Math.max(b.y0, y0))
-        const area = Math.max(1e-6, (b.x1 - b.x0) * (b.y1 - b.y0))
-        if ((ox * oy) / area > 0.6) {
-          if (b.x0 < x0) x0 = b.x0; if (b.y0 < y0) y0 = b.y0
-          if (b.x1 > x1) x1 = b.x1; if (b.y1 > y1) y1 = b.y1
-        }
-      }
-      if (!(x1 > x0) || !(y1 > y0)) return null
-      return { off: new spine.Vector2(x0, y0), size: new spine.Vector2(x1 - x0, y1 - y0) }
     } catch (e) { return null }
   }
 
@@ -361,18 +295,12 @@
           // 安全兜底：排除特效后可见内容过小（说明特效本身就是主体）则退回全量
           if (mFx && mFull && (mFx.size.x * mFx.size.y) < 0.25 * (mFull.size.x * mFull.size.y)) mFx = null
           vbVis = mFx || mFull || vb
-          // 🔴 主槽校正：联合盒（或特效盒）比「角色本体槽」线性尺寸大 25%+ 时（漂浮特效撑大定标，
-          //    小野的爱心/死神的技能圈等），改用本体盒做 fit 与脚锚点。渲染不变，只影响定标。
-          try {
-            const _ref = measureDominantSlot(spine, skData, animObj, vb)
-            if (_ref && _ref.size.x > 0 && _ref.size.y > 0) {
-              const _u = Math.max(vbVis.size.x, vbVis.size.y)
-              const _d = Math.max(_ref.size.x, _ref.size.y)
-              if (_u > _d * 1.25) vbVis = _ref
-            }
-          } catch (e) {}
+          // 🔴 2026-10-22 回退「主槽校正」：实测证明特效拖底（刀焰/云/绿爆/爱心）延伸到台面正是
+          //   「落地感」的来源——联合盒锚底 0.71 ≈ 石台顶。若按本体槽定标，角色变大、脚锚点上移，
+          //   特效垂到台面以下 → 全员悬空、风灵还被槽合并规则带偏中心。角色本体被特效撑大的
+          //   个例（小野）改用 index[folder].hideSlots 在测量时剔除指定槽（渲染照常）。
           if (vbVis !== vb) vbCache[vbKey] = vbVis
-          try { window.__spineDbg = { folder: folder, model: opts.model || '', nFx: nFx, hideIdx: hideIdx, full: mFull ? { w: +mFull.size.x.toFixed(0), h: +mFull.size.y.toFixed(0) } : null, fx: mFx ? { w: +mFx.size.x.toFixed(0), h: +mFx.size.y.toFixed(0) } : null, chosen: vbVis === mFx ? 'fx' : (vbVis === mFull ? 'full' : (vbVis === vb ? 'vb' : 'dom')), dom: (vbVis !== mFx && vbVis !== mFull && vbVis !== vb) ? { w: +vbVis.size.x.toFixed(0), h: +vbVis.size.y.toFixed(0) } : null } } catch (e) {}
+          try { window.__spineDbg = { folder: folder, model: opts.model || '', nFx: nFx, hideIdx: hideIdx, full: mFull ? { w: +mFull.size.x.toFixed(0), h: +mFull.size.y.toFixed(0) } : null, fx: mFx ? { w: +mFx.size.x.toFixed(0), h: +mFx.size.y.toFixed(0) } : null, chosen: vbVis === mFx ? 'fx' : (vbVis === mFull ? 'full' : 'vb') } } catch (e) {}
         }
       }
 
