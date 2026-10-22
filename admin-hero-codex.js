@@ -114,9 +114,13 @@
     const form = allForms[h.id] || {}
     const sec = (t, body) => body ? `<div style="margin-top:14px;"><div style="color:#ffd76b;font-weight:700;font-size:.9rem;margin-bottom:6px;">${t}</div>${body}</div>` : ''
     const tiers = (h.tiers || []).map((t) =>
-      `<div style="display:flex;gap:8px;padding:5px 8px;border-radius:6px;background:rgba(255,255,255,.05);margin-bottom:4px;">
-        <b style="min-width:64px;color:#ffe9b8;">${esc(t.name || t.key || '')}</b>
-        <span style="color:rgba(255,255,255,.75);font-size:.8rem;">${esc(t.desc || '')}</span></div>`).join('')
+      `<div style="display:flex;gap:10px;padding:5px 8px;border-radius:6px;background:rgba(255,255,255,.05);margin-bottom:4px;">
+        <b style="min-width:44px;color:#ffd76b;font-size:.78rem;">Lv${esc(t.level)}</b>
+        <div style="flex:1;font-size:.76rem;color:rgba(255,255,255,.78);line-height:1.45;">
+          <div>被动：${esc(t.passiveInitial || '')}${t.passiveFull && t.passiveFull !== t.passiveInitial ? ` <span style="color:rgba(255,255,255,.45);">→</span> ${esc(t.passiveFull)}` : ''}</div>
+          ${t.talentName ? `<div style="color:#9fd0ff;">天赋·${esc(t.talentName)}：${esc(t.talentDesc || '')}</div>` : ''}
+        </div>
+      </div>`).join('')
     const fuses = (form.fuses || []).map((f) =>
       `<div style="display:flex;gap:10px;align-items:center;padding:5px 8px;border-radius:6px;background:rgba(255,255,255,.05);margin-bottom:4px;">
         ${f.hasPortrait ? portraitHTML(f, 44) : ''}
@@ -125,12 +129,21 @@
     const skins = (form.skins || []).map((s) =>
       `<div style="display:flex;gap:10px;align-items:center;padding:6px 8px;border-radius:6px;background:rgba(255,255,255,.05);margin-bottom:4px;">
         ${s.hasPortrait ? portraitHTML(s, 52) : ''}
-        <div><b style="color:#ffe9b8;font-size:.82rem;">${esc(s.name)}</b>${s.model ? `<span style="font-size:.68rem;color:rgba(255,255,255,.5);"> · 模型 ${esc(s.model)}</span>` : ''}
-        <div style="color:rgba(255,255,255,.7);font-size:.75rem;">${esc(s.desc || '')}</div></div></div>`).join('')
+        <div style="flex:1;"><b style="color:#ffe9b8;font-size:.82rem;">${esc(s.name)}</b>${s.model ? `<span style="font-size:.68rem;color:rgba(255,255,255,.5);"> · 模型 ${esc(s.model)}</span>` : ''}
+        <div style="color:rgba(255,255,255,.7);font-size:.75rem;">${esc(s.desc || '')}</div></div>
+        ${s.model ? `<button class="hdc-skinplay" data-model="${esc(s.model)}" style="flex:none;padding:4px 10px;border-radius:6px;border:1px solid rgba(255,215,107,.4);background:rgba(255,215,107,.12);color:#ffd76b;font-size:.72rem;cursor:pointer;">▶ 动画</button>` : ''}
+      </div>`).join('')
     const passive = [h.passiveName ? `<b>${esc(h.passiveName)}</b>` : '', h.passiveDesc ? esc(h.passiveDesc) : '', h.passiveDesc2 ? `<div style="margin-top:4px;color:rgba(255,255,255,.65);">${esc(h.passiveDesc2)}</div>` : ''].filter(Boolean).join('<div style="height:2px"></div>')
     return `
       <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
-        ${portraitHTML(h, 160, 'flex:none;box-shadow:0 4px 18px rgba(0,0,0,.5);border:2px solid #d9a441;')}
+        <div style="flex:none;width:224px;">
+          <div style="position:relative;width:224px;height:290px;border:2px solid #d9a441;border-radius:10px;overflow:hidden;background:radial-gradient(circle at 50% 72%,rgba(255,216,104,.16),rgba(0,0,0,.3));">
+            <canvas id="hdcSpine" style="width:100%;height:100%;display:block;"></canvas>
+            <div id="hdcSpineFallback" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">${portraitHTML(h, 180)}</div>
+            <div id="hdcSpineStatus" style="position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:.68rem;color:rgba(255,255,255,.6);padding:3px;background:rgba(0,0,0,.35);">加载动画…</div>
+          </div>
+          <div style="margin-top:6px;font-size:.66rem;color:rgba(255,255,255,.4);text-align:center;">Spine 实时渲染 · data/hero-spine</div>
+        </div>
         <div style="flex:1;min-width:220px;">
           <div style="font-size:1.3rem;font-weight:800;color:#ffd76b;">${esc(h.name)}</div>
           <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
@@ -149,22 +162,89 @@
       </div>`
   }
 
+  /* —— Spine 播放（复用 spine-hero.js 的成熟播放器与既有 data/hero-spine 资源，零新增入库）—— */
+  let _spineIdxPromise = null
+  function spineIndex() {
+    if (window.__heroSpineIndex) return Promise.resolve(window.__heroSpineIndex)
+    if (_spineIdxPromise) return _spineIdxPromise
+    _spineIdxPromise = fetch(baseUrl() + 'data/hero-spine/index.json')
+      .then((r) => r.json())
+      .then((j) => { window.__heroSpineIndex = j || {}; return window.__heroSpineIndex })
+      .catch(() => { window.__heroSpineIndex = window.__heroSpineIndex || {}; return window.__heroSpineIndex })
+    return _spineIdxPromise
+  }
+  let _lastSpineCanvas = null
+  function playHeroSpine(h, model) {
+    const canvas = document.getElementById('hdcSpine')
+    const fb = document.getElementById('hdcSpineFallback')
+    const st = document.getElementById('hdcSpineStatus')
+    if (!canvas) return
+    if (fb) fb.style.display = 'flex'
+    if (st) { st.style.display = 'block'; st.textContent = '加载动画…' }
+    spineIndex().then((idx) => {
+      const man = (window.spineHero && h.modelFolder) ? idx[h.modelFolder] : null
+      if (!man) throw new Error('no-spine')
+      // 与现有英雄面板同一套参数：默认模型取 index[folder].model，套用官方 modelOffsets 定标
+      const useModel = model || man.model || ''
+      const pngs = useModel ? ((man.modelPngs || {})[useModel] || 0) : (man.pngs || 0)
+      const moff = (man.modelOffsets && (man.modelOffsets[useModel] || man.modelOffsets[man.model])) || {}
+      window.spineHero.play(canvas, h.modelFolder, {
+        model: useModel || undefined,
+        pngs: pngs,
+        tight: true,
+        fitPadding: 0.6,
+        scale: (moff.scale > 0) ? moff.scale : undefined,
+        offsetX: moff.x || 0,
+        offsetY: moff.y || 0,
+        onStatus: (s) => {
+          const el = document.getElementById('hdcSpineStatus')
+          if (!el) return
+          if (s) { el.style.display = 'block'; el.textContent = s } else { el.style.display = 'none'; el.textContent = '' }
+        }
+      })
+      // 播放起来后撤掉立绘回退；8s 仍未播则回退并提示
+      const t0 = Date.now()
+      const poll = () => {
+        if (!document.body.contains(canvas)) return
+        if (canvas._spineSt && canvas._spineSt.playing) { if (fb) fb.style.display = 'none'; return }
+        if (Date.now() - t0 > 8000) { if (st) { st.textContent = '该模型暂无法播放'; st.style.display = 'block' } return }
+        setTimeout(poll, 300)
+      }
+      poll()
+    }).catch(() => {
+      if (fb) fb.style.display = 'flex'
+      if (st) st.style.display = 'none'
+    })
+  }
+
   function openDetail(h) {
     let ov = document.getElementById('hdcDetail')
     if (!ov) {
       ov = document.createElement('div')
       ov.id = 'hdcDetail'
       ov.style.cssText = 'position:fixed;inset:0;z-index:99997;background:rgba(4,8,14,.8);display:none;align-items:center;justify-content:center;padding:20px;'
-      ov.innerHTML = `<div style="position:relative;max-width:640px;width:100%;max-height:86vh;overflow-y:auto;border-radius:14px;padding:18px 20px;
+      ov.innerHTML = `<div style="position:relative;max-width:680px;width:100%;max-height:86vh;overflow-y:auto;border-radius:14px;padding:18px 20px;
         background:linear-gradient(180deg,#182c44,#101c2e);border:1px solid rgba(255,215,107,.35);box-shadow:0 10px 40px rgba(0,0,0,.6);">
         <button id="hdcDetailClose" style="position:absolute;top:10px;right:12px;background:rgba(255,255,255,.1);border:none;color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:1rem;">✕</button>
         <div id="hdcDetailBody"></div></div>`
       document.body.appendChild(ov)
-      ov.addEventListener('click', (e) => { if (e.target === ov) ov.style.display = 'none' })
-      ov.querySelector('#hdcDetailClose').addEventListener('click', () => { ov.style.display = 'none' })
+      const hide = () => {
+        ov.style.display = 'none'
+        if (_lastSpineCanvas) { try { window.spineHero && window.spineHero.stop(_lastSpineCanvas) } catch (e) {} }
+      }
+      ov.addEventListener('click', (e) => { if (e.target === ov) hide() })
+      ov.querySelector('#hdcDetailClose').addEventListener('click', hide)
     }
+    // 换英雄/关面板前停掉旧画布的 raf，避免泄漏
+    if (_lastSpineCanvas) { try { window.spineHero && window.spineHero.stop(_lastSpineCanvas) } catch (e) {} }
+    _lastSpineCanvas = null
     ov.querySelector('#hdcDetailBody').innerHTML = detailHTML(h)
     ov.style.display = 'flex'
+    _lastSpineCanvas = document.getElementById('hdcSpine')
+    playHeroSpine(h)
+    ov.querySelectorAll('.hdc-skinplay').forEach((btn) => {
+      btn.addEventListener('click', () => playHeroSpine(h, btn.dataset.model))
+    })
   }
 
   function buildUI() {
