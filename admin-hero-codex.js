@@ -112,52 +112,89 @@
     const Q = QUALITY[h.heroColor] || QUALITY[1]
     const occ = OCCUPATION[h.occupation] || ['—', '❔']
     const form = allForms[h.id] || {}
-    const sec = (t, body) => body ? `<div style="margin-top:14px;"><div style="color:#ffd76b;font-weight:700;font-size:.9rem;margin-bottom:6px;">${t}</div>${body}</div>` : ''
-    const tiers = (h.tiers || []).map((t) =>
-      `<div style="display:flex;gap:10px;padding:5px 8px;border-radius:6px;background:rgba(255,255,255,.05);margin-bottom:4px;">
-        <b style="min-width:44px;color:#ffd76b;font-size:.78rem;">Lv${esc(t.level)}</b>
-        <div style="flex:1;font-size:.76rem;color:rgba(255,255,255,.78);line-height:1.45;">
-          <div>被动：${esc(t.passiveInitial || '')}${t.passiveFull && t.passiveFull !== t.passiveInitial ? ` <span style="color:rgba(255,255,255,.45);">→</span> ${esc(t.passiveFull)}` : ''}</div>
-          ${t.talentName ? `<div style="color:#9fd0ff;">天赋·${esc(t.talentName)}：${esc(t.talentDesc || '')}</div>` : ''}
+    const UI = baseUrl() + 'data/hero-deck/ui/'
+    const n = fuseCount(h)
+    // 品质配色盾牌（等级/阶段数字）
+    const shield = (num, sz) => `<span style="display:inline-flex;align-items:center;justify-content:center;flex:none;
+      width:${sz}px;height:${Math.round(sz * 1.14)}px;clip-path:polygon(50% 100%,100% 74%,100% 10%,0 10%,0 74%);
+      background:linear-gradient(180deg,${Q.c1},${Q.c2});box-shadow:0 1px 3px rgba(0,0,0,.45);color:#fff;font-weight:800;
+      font-size:${Math.round(sz * 0.44)}px;text-shadow:0 1px 2px rgba(0,0,0,.6);">${num}</span>`
+    // 升级预览：阶段 > 1 的解锁项（天赋名优先，退回被动档位文案）
+    const tiers = (h.tiers || []).filter(t => Number(t.level) > 1).map(t => `
+      <div style="display:flex;gap:9px;align-items:flex-start;padding:6px 8px;margin-bottom:5px;background:rgba(255,255,255,.06);border-radius:7px;">
+        ${shield(t.level, 26)}
+        <div style="flex:1;font-size:.78rem;line-height:1.5;color:rgba(255,255,255,.85);">
+          <b style="color:#ffe9b8;">${esc(t.talentName || '阶段 ' + t.level)}</b>：${esc(t.talentDesc || t.passiveFull || t.passiveInitial || '')}
         </div>
       </div>`).join('')
-    const fuses = (form.fuses || []).map((f) =>
-      `<div style="display:flex;gap:10px;align-items:center;padding:5px 8px;border-radius:6px;background:rgba(255,255,255,.05);margin-bottom:4px;">
-        ${f.hasPortrait ? portraitHTML(f, 44) : ''}
-        <div><b style="color:#ffe9b8;font-size:.82rem;">${esc(f.name)}</b>
-        <div style="color:rgba(255,255,255,.7);font-size:.75rem;">${esc(f.desc || '')}</div></div></div>`).join('')
-    const skins = (form.skins || []).map((s) =>
-      `<div style="display:flex;gap:10px;align-items:center;padding:6px 8px;border-radius:6px;background:rgba(255,255,255,.05);margin-bottom:4px;">
-        ${s.hasPortrait ? portraitHTML(s, 52) : ''}
-        <div style="flex:1;"><b style="color:#ffe9b8;font-size:.82rem;">${esc(s.name)}</b>${s.model ? `<span style="font-size:.68rem;color:rgba(255,255,255,.5);"> · 模型 ${esc(s.model)}</span>` : ''}
-        <div style="color:rgba(255,255,255,.7);font-size:.75rem;">${esc(s.desc || '')}</div></div>
-        ${s.model ? `<button class="hdc-skinplay" data-model="${esc(s.model)}" style="flex:none;padding:4px 10px;border-radius:6px;border:1px solid rgba(255,215,107,.4);background:rgba(255,215,107,.12);color:#ffd76b;font-size:.72rem;cursor:pointer;">▶ 动画</button>` : ''}
-      </div>`).join('')
-    const passive = [h.passiveName ? `<b>${esc(h.passiveName)}</b>` : '', h.passiveDesc ? esc(h.passiveDesc) : '', h.passiveDesc2 ? `<div style="margin-top:4px;color:rgba(255,255,255,.65);">${esc(h.passiveDesc2)}</div>` : ''].filter(Boolean).join('<div style="height:2px"></div>')
+    const skins = (form.skins || []).filter(s => s.model).map(s => `
+      <button class="hdc-skinplay" data-model="${esc(s.model)}" style="display:flex;gap:8px;align-items:center;width:100%;padding:6px 8px;margin-bottom:4px;border:none;border-radius:7px;background:rgba(255,255,255,.06);color:#fff;cursor:pointer;text-align:left;">
+        ${s.hasPortrait ? portraitHTML(s, 40) : ''}
+        <span style="font-size:.78rem;color:#ffe9b8;">${esc(s.name)}</span>
+      </button>`).join('')
+    const attrRow = (ico, k, v) => `<div style="display:flex;gap:8px;align-items:center;padding:5px 8px;margin-bottom:4px;background:rgba(255,255,255,.05);border-radius:7px;">
+      <span style="flex:none;width:22px;text-align:center;">${ico}</span>
+      <span style="flex:none;width:52px;color:rgba(255,255,255,.55);font-size:.76rem;">${k}</span>
+      <span style="flex:1;font-size:.8rem;color:rgba(255,255,255,.9);">${v}</span></div>`
     return `
-      <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
-        <div style="flex:none;width:224px;">
-          <div style="position:relative;width:224px;height:290px;border:2px solid #d9a441;border-radius:10px;overflow:hidden;background:radial-gradient(circle at 50% 72%,rgba(255,216,104,.16),rgba(0,0,0,.3));">
-            <canvas id="hdcSpine" style="width:100%;height:100%;display:block;"></canvas>
-            <div id="hdcSpineFallback" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">${portraitHTML(h, 180)}</div>
-            <div id="hdcSpineStatus" style="position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:.68rem;color:rgba(255,255,255,.6);padding:3px;background:rgba(0,0,0,.35);">加载动画…</div>
-          </div>
-          <div style="margin-top:6px;font-size:.66rem;color:rgba(255,255,255,.4);text-align:center;">Spine 实时渲染 · data/hero-spine</div>
+      <div style="position:relative;width:992px;height:560px;border-radius:16px;overflow:hidden;background:#0e1c30 url('${UI}hero-detail-bg.png') center/cover no-repeat;box-shadow:0 10px 40px rgba(0,0,0,.6);">
+        <button id="hdcDetailClose" style="position:absolute;top:10px;right:12px;z-index:30;background:rgba(0,0,0,.35);border:none;color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:1rem;">✕</button>
+        <div style="position:absolute;inset:0;z-index:2;">
+          <canvas id="hdcSpine" style="width:100%;height:100%;display:block;"></canvas>
+          <img src="${UI}hero-ground-shadow.png" alt="" style="position:absolute;left:50%;top:76%;transform:translate(-50%,-50%);width:300px;opacity:.55;pointer-events:none;">
         </div>
-        <div style="flex:1;min-width:220px;">
-          <div style="font-size:1.3rem;font-weight:800;color:#ffd76b;">${esc(h.name)}</div>
-          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
-            <span style="font-size:.68rem;padding:2px 8px;border-radius:8px;color:#10131a;font-weight:700;background:linear-gradient(180deg,${Q.c1},${Q.c2})">${Q.name}品质</span>
-            <span style="font-size:.68rem;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,.12);">${occ[1]} ${occ[0]}</span>
-            ${h.positioning ? `<span style="font-size:.68rem;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,.12);">定位：${esc(h.positioning)}</span>` : ''}
-            ${h.modelFolder ? `<span style="font-size:.68rem;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,.08);color:rgba(255,255,255,.55);">模型 ${esc(h.modelFolder)}</span>` : ''}
+        <div id="hdcSpineFallback" style="position:absolute;inset:0;z-index:3;display:flex;align-items:center;justify-content:center;pointer-events:none;">${portraitHTML(h, 200)}</div>
+        <div id="hdcSpineStatus" style="position:absolute;left:14px;bottom:56px;z-index:20;display:none;font-size:.7rem;color:rgba(255,255,255,.65);background:rgba(0,0,0,.4);padding:2px 8px;border-radius:6px;"></div>
+        <div style="position:absolute;left:16px;top:12px;z-index:10;width:340px;display:flex;flex-direction:column;gap:9px;">
+          <div style="pointer-events:none;">
+            <div style="position:relative;display:inline-block;min-width:250px;padding:10px 18px 8px 52px;clip-path:polygon(0 0,100% 0,94% 100%,0 100%);background:linear-gradient(180deg,#ffc63f,#e89a12);box-shadow:0 2px 8px rgba(0,0,0,.4);">
+              <span style="position:absolute;left:-4px;top:50%;transform:translateY(-50%);">${shield(n, 40)}</span>
+              <div style="font-size:1.35rem;font-weight:800;color:#fff;text-shadow:0 2px 0 rgba(140,60,0,.55),0 0 6px rgba(0,0,0,.35);">${esc(h.name)}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;margin-top:7px;">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#3b4b66,#1c2637);border:2px solid #d9a441;font-size:.95rem;">${occ[1]}</span>
+              <b style="font-size:.9rem;text-shadow:0 1px 2px rgba(0,0,0,.6);">${occ[0]}</b>
+              ${h.heroDesc ? `<span style="font-size:.8rem;color:#dbe7ff;text-shadow:0 1px 2px rgba(0,0,0,.6);">${esc(h.heroDesc)}</span>` : ''}
+            </div>
           </div>
-          ${h.heroDesc ? `<div style="margin-top:8px;color:rgba(255,255,255,.75);font-size:.8rem;">${esc(h.heroDesc)}</div>` : ''}
-          ${sec('⚔️ 技能 · ' + esc(h.skillName || ''), h.skillDesc ? `<div style="color:rgba(255,255,255,.85);font-size:.84rem;line-height:1.5;">${esc(h.skillDesc)}</div>` : '')}
-          ${sec('🛡️ 被动', passive)}
-          ${sec('⭐ 分档 · 天赋', tiers)}
-          ${sec('🔗 融合', fuses)}
-          ${sec('🎽 皮肤', skins)}
+          ${h.skillDesc ? `<div style="pointer-events:none;background:linear-gradient(180deg,rgba(38,80,150,.88),rgba(22,48,96,.88));border:1px solid rgba(120,180,255,.35);border-radius:9px;padding:9px 12px;">
+            <span style="float:left;width:20px;height:20px;margin-right:8px;border:2px solid #9fd0ff;border-radius:4px;position:relative;"><i style="position:absolute;inset:4px;background:#9fd0ff;clip-path:polygon(0 0,100% 50%,0 100%);"></i></span>
+            <div style="overflow:hidden;font-size:.82rem;line-height:1.55;color:#eaf2ff;text-shadow:0 1px 2px rgba(0,0,0,.5);">${esc(h.skillDesc)}</div>
+          </div>` : ''}
+          ${(h.passiveDesc || h.passiveDesc2) ? `<div style="pointer-events:none;background:linear-gradient(180deg,rgba(24,52,94,.88),rgba(14,32,64,.88));border:1px solid rgba(120,180,255,.3);border-radius:9px;padding:9px 12px;">
+            ${h.passiveDesc ? `<div style="display:flex;gap:8px;margin-bottom:6px;"><img src="${UI}star-initial.png" style="flex:none;width:20px;height:20px;" alt=""><div style="font-size:.8rem;line-height:1.5;color:#eaf2ff;">初始被动 ${esc(h.passiveDesc)}</div></div>` : ''}
+            ${h.passiveDesc2 ? `<div style="display:flex;gap:8px;"><img src="${UI}star-full.png" style="flex:none;width:20px;height:20px;" alt=""><div style="font-size:.8rem;line-height:1.5;color:#eaf2ff;">满星被动 ${esc(h.passiveDesc2)}</div></div>` : ''}
+          </div>` : ''}
+        </div>
+        <div style="position:absolute;right:14px;top:14px;bottom:64px;z-index:10;width:322px;display:flex;flex-direction:column;background:rgba(10,22,44,.92);border:1px solid rgba(120,180,255,.35);border-radius:11px;overflow:hidden;">
+          <div id="hdcTabs" style="display:flex;flex:none;">
+            <button class="hdc-tab is-on" data-tab="attr" style="flex:1;padding:9px 0;border:none;cursor:pointer;font-size:.85rem;font-weight:700;color:#fff;background:linear-gradient(180deg,#2f6fd6,#2456ad);">属性详情</button>
+            <button class="hdc-tab" data-tab="up" style="flex:1;padding:9px 0;border:none;cursor:pointer;font-size:.85rem;font-weight:700;color:rgba(255,255,255,.65);background:rgba(255,255,255,.06);">升级预览</button>
+          </div>
+          <div id="hdcTabAttr" style="flex:1;overflow-y:auto;padding:10px;">
+            ${attrRow(occ[1], '职业', occ[0])}
+            ${h.heroDesc ? attrRow('🎯', '定位', esc(h.heroDesc)) : ''}
+            ${attrRow('💎', '品质', Q.name + '品质')}
+            ${attrRow('🔗', '融合', n + ' 段')}
+            ${(form.skins || []).filter(s => s.model).length ? attrRow('🎽', '皮肤', (form.skins || []).filter(s => s.model).length + ' 款可切换') : ''}
+            ${h.heroDesc ? attrRow('📖', '图鉴', esc(h.heroDesc)) : ''}
+          </div>
+          <div id="hdcTabUp" style="flex:1;display:none;overflow-y:auto;padding:10px;">
+            ${tiers || '<div style="color:rgba(255,255,255,.5);font-size:.8rem;padding:10px;">暂无升级阶段数据</div>'}
+          </div>
+        </div>
+        <div style="position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:10;display:flex;gap:16px;">
+          <button id="hdcSkinBtn" title="切换皮肤" style="width:46px;height:46px;border-radius:50%;border:2px solid #d9a441;background:radial-gradient(circle at 35% 30%,#3b4b66,#1c2637);cursor:pointer;display:flex;align-items:center;justify-content:center;">
+            <img src="${UI}skin.png" style="width:26px;height:26px;" alt="皮肤">
+          </button>
+          <button id="hdcAnimBtn" title="切换动画（idle / attack）" style="width:46px;height:46px;border-radius:50%;border:2px solid #d9a441;background:radial-gradient(circle at 35% 30%,#3b4b66,#1c2637);cursor:pointer;display:flex;align-items:center;justify-content:center;color:#ffd76b;font-size:1.05rem;font-weight:800;">▶</button>
+        </div>
+        <div id="hdcSkinPop" style="display:none;position:absolute;right:14px;bottom:66px;z-index:25;width:300px;max-height:300px;overflow-y:auto;background:rgba(10,22,44,.96);border:1px solid rgba(120,180,255,.4);border-radius:10px;padding:8px;">
+          <div style="font-size:.78rem;color:#ffd76b;font-weight:700;margin-bottom:6px;">选择皮肤</div>
+          <button class="hdc-skinplay" data-model="" style="display:flex;gap:8px;align-items:center;width:100%;padding:6px 8px;margin-bottom:4px;border:none;border-radius:7px;background:rgba(255,255,255,.06);color:#fff;cursor:pointer;text-align:left;">
+            <span style="font-size:.78rem;color:#ffe9b8;">默认 · ${esc(h.name)}</span>
+          </button>
+          ${skins}
         </div>
       </div>`
   }
@@ -201,6 +238,7 @@
         //   而图鉴已剔除 fx，再套会导致 200/161/128/113 这种参差；官方 x/y 居中偏移仍然保留。
         fitByHeight: true,
         fitPadding: 0.65,
+        anchorFeet: 0.76,
         // 不套官方 x/y 偏移：那是给「特效撑大包围盒 + 官方 scale」做补偿的；
         // tight 包围盒（已剔 fx）本身居中，再偏移反而歪（蛇女/炸弹/虎弓偏移的来源）
         hideSlots: (man.hideSlots || []).concat((man.modelHideSlots || {})[useModel] || []),
@@ -254,32 +292,61 @@
 
   function openDetail(h) {
     let ov = document.getElementById('hdcDetail')
+    const hide = () => {
+      if (ov) ov.style.display = 'none'
+      if (_lastSpineCanvas) { try { window.spineHero && window.spineHero.stop(_lastSpineCanvas) } catch (e) {} }
+    }
     if (!ov) {
       ov = document.createElement('div')
       ov.id = 'hdcDetail'
-      ov.style.cssText = 'position:fixed;inset:0;z-index:99997;background:rgba(4,8,14,.8);display:none;align-items:center;justify-content:center;padding:20px;'
-      ov.innerHTML = `<div style="position:relative;max-width:680px;width:100%;max-height:86vh;overflow-y:auto;border-radius:14px;padding:18px 20px;
-        background:linear-gradient(180deg,#182c44,#101c2e);border:1px solid rgba(255,215,107,.35);box-shadow:0 10px 40px rgba(0,0,0,.6);">
-        <button id="hdcDetailClose" style="position:absolute;top:10px;right:12px;background:rgba(255,255,255,.1);border:none;color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:1rem;">✕</button>
-        <div id="hdcDetailBody"></div></div>`
+      ov.style.cssText = 'position:fixed;inset:0;z-index:99997;background:rgba(4,8,14,.8);display:none;align-items:center;justify-content:center;padding:12px;'
+      ov.innerHTML = '<div id="hdcDetailBody"></div>'
       document.body.appendChild(ov)
-      const hide = () => {
-        ov.style.display = 'none'
-        if (_lastSpineCanvas) { try { window.spineHero && window.spineHero.stop(_lastSpineCanvas) } catch (e) {} }
-      }
       ov.addEventListener('click', (e) => { if (e.target === ov) hide() })
-      ov.querySelector('#hdcDetailClose').addEventListener('click', hide)
     }
     // 换英雄/关面板前停掉旧画布的 raf，避免泄漏
     if (_lastSpineCanvas) { try { window.spineHero && window.spineHero.stop(_lastSpineCanvas) } catch (e) {} }
     _lastSpineCanvas = null
     ov.querySelector('#hdcDetailBody').innerHTML = detailHTML(h)
     ov.style.display = 'flex'
+    ov.querySelector('#hdcDetailClose').addEventListener('click', hide)
     _lastSpineCanvas = document.getElementById('hdcSpine')
     _spineRetry = 0
     playHeroSpine(h)
+    // 页签切换：属性详情 / 升级预览
+    const tabs = ov.querySelectorAll('.hdc-tab')
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        tabs.forEach((t) => {
+          const on = t === tab
+          t.classList.toggle('is-on', on)
+          t.style.color = on ? '#fff' : 'rgba(255,255,255,.65)'
+          t.style.background = on ? 'linear-gradient(180deg,#2f6fd6,#2456ad)' : 'rgba(255,255,255,.06)'
+        })
+        const up = tab.dataset.tab === 'up'
+        ov.querySelector('#hdcTabAttr').style.display = up ? 'none' : 'block'
+        ov.querySelector('#hdcTabUp').style.display = up ? 'block' : 'none'
+      })
+    })
+    // 皮肤弹层：列出默认 + 各皮肤，点击切模型
+    const pop = ov.querySelector('#hdcSkinPop')
+    ov.querySelector('#hdcSkinBtn').addEventListener('click', () => {
+      pop.style.display = pop.style.display === 'block' ? 'none' : 'block'
+    })
     ov.querySelectorAll('.hdc-skinplay').forEach((btn) => {
-      btn.addEventListener('click', () => playHeroSpine(h, btn.dataset.model))
+      btn.addEventListener('click', () => {
+        playHeroSpine(h, btn.dataset.model || undefined)
+        pop.style.display = 'none'
+      })
+    })
+    // 动画切换：idle / attack / … 循环
+    const animBtn = ov.querySelector('#hdcAnimBtn')
+    animBtn.addEventListener('click', () => {
+      const st = _lastSpineCanvas && _lastSpineCanvas._spineSt
+      if (!st || !st.anims || !st.anims.length || !st.state) return
+      st._animIdx = ((st._animIdx == null ? -1 : st._animIdx) + 1) % st.anims.length
+      st.state.setAnimation(0, st.anims[st._animIdx], true)
+      animBtn.textContent = st.anims[st._animIdx] === 'idle' ? '▶' : '⚔'
     })
   }
 
