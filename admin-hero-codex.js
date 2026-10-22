@@ -192,6 +192,7 @@
         model: useModel || undefined,
         pngs: pngs,
         tight: true,
+        hideFx: true,
         fitPadding: 0.6,
         scale: (moff.scale > 0) ? moff.scale : undefined,
         offsetX: moff.x || 0,

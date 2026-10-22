@@ -255,8 +255,27 @@
       const idle = anims.find(function (a) { return /idle/i.test(a) }) || anims[0]
       const animObj = idle ? skData.findAnimation(idle) : null
       // 🔴 2026-10-21 包围盒按模型缓存（首次测量后复用），避免每次打开都重复采样动画
-      const vbKey = folder + '@' + (opts.model || '')
-      const vb = vbBoundsCache[vbKey] || (vbBoundsCache[vbKey] = computeBounds(spine, skData, idle))
+      // 🟢 2026-10-22 hideFx：渲染与包围盒都剔除 images/fx/* 特效槽（图鉴详情等调用方按需开启）。
+      //   普通播放器会把官方游戏里由引擎合成的特效附件原样画出来——大团爆炸/光斑，
+      //   甚至是身体图的特效拷贝（如 yilidan 的 images/fx/1/a0000 → 画面出现"两个恶魔"）。
+      //   隐藏后若骨架整体不可见（真身真在 fx 路径下的极少数模型），自动回退为不剔除。
+      let fxHide = opts.hideFx ? [] : null
+      if (fxHide) {
+        const fxSeg = /(^|\/)fx(\/|$)/i
+        skeleton.slots.forEach(function (sl, i) {
+          const bn = (sl.bone && sl.bone.data && sl.bone.data.name) || ''
+          const an = (sl.data && sl.data.attachmentName) || (sl.attachment && sl.attachment.name) || ''
+          if (fxSeg.test(bn) || fxSeg.test(an) || /特效|texiao|guangxiao/i.test(bn)) fxHide.push(i)
+        })
+        if (!fxHide.length) fxHide = null
+      }
+      const vbKey = folder + '@' + (opts.model || '') + (fxHide ? '@nofx' : '')
+      let vb = vbBoundsCache[vbKey]
+      if (!vb) {
+        vb = computeBounds(spine, skData, idle, !!fxHide)
+        if (fxHide && !(vb.size.x > 0 && vb.size.y > 0)) { fxHide = null; vb = computeBounds(spine, skData, idle, false) }
+        vbBoundsCache[vbKey] = vb
+      }
       state.setAnimation(0, idle, true)
       state.update(0); state.apply(skeleton); skeleton.updateWorldTransform()
 
@@ -287,7 +306,7 @@
               if (!hideIdx.length) hideIdx = null
             }
           } catch (e) {}
-          vbVis = measureVisualBounds(spine, skData, animObj, vb, false, hideIdx) || vb
+          vbVis = measureVisualBounds(spine, skData, animObj, vb, !!fxHide, hideIdx) || vb
           vbCache[vbKey] = vbVis
           try { window.__spineDbg = { folder: folder, model: opts.model || '', hideIdx: hideIdx, union: { w: +vbVis.size.x.toFixed(0), h: +vbVis.size.y.toFixed(0) }, chosen: 'union' } } catch (e) {}
         }
@@ -317,6 +336,7 @@
         st.raf = requestAnimationFrame(tick)
         const dt = Math.min((now - last) / 1000, 0.1); last = now
         state.update(dt); state.apply(skeleton); skeleton.updateWorldTransform()
+        if (fxHide) { for (let i = 0; i < fxHide.length; i++) { const _fs = skeleton.slots[fxHide[i]]; if (_fs) _fs.attachment = null } }
         const ctx = canvas.getContext('2d')
         const w = canvas.width, h = canvas.height
         ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, w, h)
