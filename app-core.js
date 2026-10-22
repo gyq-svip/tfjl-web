@@ -4020,13 +4020,14 @@
         }
 
         // 自动保存项目
-        // 【改动】不再自动保存项目：避免调卡调错了被直接存盘。请点工具栏 💾（确定保存）手动保存。
-        // 这里只标记"有未保存的修改"，供 💾 旁的 ●未保存 提示。
+        // 🔴 2026-10-22 重新启用「防抖自动落盘」：此前改为只标 dirty 需手动 💾，导致卡池皮肤/融合/等级等
+        //    设置改完不点保存就丢失（用户报"本地模式下保存不了"）。现在本地模式（非共享只读、且已打开项目）
+        //    下，改动后 900ms 防抖真正写库；共享只读 / 未打开具体项目 仍不写（由 💾 手动保存处理）。
+        let _autoSaveTimer = null;
         function autoSaveProject() {
             window.__tfjlProjectDirty = true;
             if (typeof updateSaveIndicator === 'function') updateSaveIndicator();
             // 项目数据变更埋点（防抖：同一项目 5 秒内只记一次，避免 input 频繁触发暴增）
-            // 注意：autoSaveProject 只标记 dirty 不落盘，但语义上"项目被修改"应计入功能使用
             if (typeof window.__recordFeatureUse === 'function') {
                 const now = Date.now();
                 if (!autoSaveProject._last || now - autoSaveProject._last > 5000) {
@@ -4034,6 +4035,19 @@
                     window.__recordFeatureUse('修改项目数据');
                 }
             }
+            if (window.__sharedProjectReadOnly) return;
+            if (!currentProjectName || currentProjectName === '默认项目') return;
+            if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
+            _autoSaveTimer = setTimeout(function () {
+                _autoSaveTimer = null;
+                try {
+                    const data = buildProjectData();
+                    saveProjectToDB(currentProjectName, currentProjectCategory || '默认分类', data).then(function () {
+                        window.__tfjlProjectDirty = false;
+                        if (typeof updateSaveIndicator === 'function') updateSaveIndicator();
+                    }).catch(function () {});
+                } catch (e) {}
+            }, 900);
         }
         function updateSaveIndicator() {
             const dot = document.getElementById('saveDirtyDot');
@@ -7761,12 +7775,12 @@
         // 保存当前项目（弹出模态框选择分类）
         let pendingSaveProjectName = '';
 
-        async function saveCurrentProject() {
-            if (window.__sharedProjectReadOnly) { alert('当前是共享资源（只读），不能保存。请先点「📥 导入到本地」再修改。'); return; }
+        // 构建当前项目存档数据（保存/自动保存共用，避免两套 payload 漂移）
+        function buildProjectData() {
             const _skinCfg = (typeof materializeProjectSkinConfig === 'function')
                 ? materializeProjectSkinConfig({ cardSkins: cardSkins, fusionSkins: window.fusionSkins, myHandCards: myHandCards, teammateHandCards: teammateHandCards, myPlacedCards: myPlacedCards, teammatePlacedCards: teammatePlacedCards })
                 : { cardSkins: cardSkins, fusionSkins: window.fusionSkins || {} };
-            const currentData = {
+            return {
                 myHandCards: myHandCards,
                 teammateHandCards: teammateHandCards,
                 myPlacedCards: myPlacedCards,
@@ -7782,6 +7796,10 @@
                 txtFiles: typeof txtFiles !== 'undefined' ? txtFiles : [],
                 referenceImages: typeof referenceImages !== 'undefined' ? referenceImages : []
             };
+        }
+        async function saveCurrentProject() {
+            if (window.__sharedProjectReadOnly) { alert('当前是共享资源（只读），不能保存。请先点「📥 导入到本地」再修改。'); return; }
+            const currentData = buildProjectData();
             const isOpen = currentProjectName && currentProjectName !== '默认项目';
             if (!isOpen) {
                 // 未打开具体项目：仍需输入名称
