@@ -173,7 +173,7 @@
           </div>
           <div id="hdcTabAttr" style="flex:1;overflow-y:auto;padding:10px;">
             ${attrRow(occ[1], '职业', occ[0])}
-            ${h.heroDesc ? attrRow('🎯', '定位', esc(h.heroDesc)) : ''}
+            ${h.heroDesc ? attrRow('🎯', '定位', esc(h.heroDesc.replace(/^定位[：:]\s*/, ''))) : ''}
             ${attrRow('💎', '品质', Q.name + '品质')}
             ${attrRow('🔗', '融合', n + ' 段')}
             ${(form.skins || []).filter(s => s.model).length ? attrRow('🎽', '皮肤', (form.skins || []).filter(s => s.model).length + ' 款可切换') : ''}
