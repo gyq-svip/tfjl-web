@@ -10793,6 +10793,34 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         //    精灵(6)/龙族(10) 未提供，走下方 HD_DTYPE[damageType] 兜底
         const HD_OCC_DTYPE = { 1: '纯粹伤害', 2: '物理伤害', 3: '魔法伤害', 4: '治疗', 5: '召唤', 6: '特殊', 7: '元素', 8: '真实伤害', 9: '真实伤害' }
 
+        // 🔴 2026-10-22 官方风格属性行（剑/闪电/扳手/爱心 雪碧图图标，见 index.html #hapStatSprite）。
+        //    一行 = 深蓝圆角条 + 左侧图标(精灵<i>或emoji) + 名称(黄)+数值(白)，与官方图鉴属性区块 1:1。
+        function hdStatRowHtml(iconInner, label, val) {
+            return '<div class="hap-row" style="position:relative;display:flex;align-items:center;height:40px;background:rgba(20,60,110,0.55);border-radius:8px;margin-bottom:6px;box-sizing:border-box;">' +
+                '<span class="hap-ico">' + iconInner + '</span>' +
+                '<div class="hap-text"><div class="hap-name">' + label + '</div><div class="hap-val">' + val + '</div></div>' +
+                '</div>'
+        }
+        function hdCoreStatRowsHtml(attack, dtype, speed, hp) {
+            return hdStatRowHtml('<i class="hap-ico-img hap-ico-img--atk"></i>', '攻击力', attack) +
+                hdStatRowHtml('<i class="hap-ico-img hap-ico-img--type"></i>', '攻击类型', dtype) +
+                hdStatRowHtml('<i class="hap-ico-img hap-ico-img--spd"></i>', '攻速', speed) +
+                hdStatRowHtml('<i class="hap-ico-img hap-ico-img--hp"></i>', '生命', hp)
+        }
+        // 🔴 2026-10-22 取英雄属性块（官方风格 4 行）。
+        //    说明：本工程 data/heroes.json 仅含占位桩 attrs（无真实分档 stats 数组），所有英雄 attackSpeed=0、
+        //    hp=1e7，并非可用战斗数值；故 stats 缺失时数值显示 —（与官方对被动卡的处理一致）。
+        //    攻击类型按职业映射 HD_OCC_DTYPE 推导（官方口径）。
+        function hdStatBlockHtml(meta, lv) {
+            const row = hdRowAt(meta && meta.stats, lv) || {}
+            const attack = (row.attack != null && row.attack !== '') ? row.attack : '—'
+            const hp = (row.hp != null && row.hp !== '') ? row.hp : '—'
+            const speed = row.cd ? (Number(row.cd) / 1000).toFixed(2) + '秒/次' : '—'
+            const dtypeRaw = (row.damageType != null && row.damageType !== '') ? row.damageType : (meta && meta.attrs ? meta.attrs.damageType : null)
+            const dtype = HD_OCC_DTYPE[Number(meta && meta.occupation)] || ((dtypeRaw != null && dtypeRaw !== '') ? (HD_DTYPE[dtypeRaw] || '—') : '—')
+            return hdCoreStatRowsHtml(attack, dtype, speed, hp)
+        }
+
         // 取当前等级生效行（与官方同口径：取 level ≤ 当前等级的最后一行）
         function hdRowAt(stats, lv) {
             if (!stats || !stats.length) return null
@@ -11035,29 +11063,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
             const drSide = handType === 'my' ? '我的' : '队友'
             function statRowsHtml() {
-                const row = hdRowAt(meta && meta.stats, curLevel) || {}
-                // stats 缺该级数据时回落到英雄级 attrs.damageType（部分英雄无分档 stats）
-                const dtypeRaw = (row.damageType != null && row.damageType !== '')
-                    ? row.damageType
-                    : (meta && meta.attrs ? meta.attrs.damageType : null)
-                // 🔴 2026-10-20 攻击类型按职业推导（用户提供的职业→类型映射：覆盖 legacy damageType，避免熊猫等被错算成物理）
-                const dtype = HD_OCC_DTYPE[Number(meta && meta.occupation)] || ((dtypeRaw != null && dtypeRaw !== '') ? (HD_DTYPE[dtypeRaw] || '—') : '—')
-                const speed = row.cd ? (Number(row.cd) / 1000).toFixed(2) + '秒/次' : '—'
-                const mk = (label, val) =>
-                    '<div style="display:flex;align-items:center;gap:8px;background:rgba(20,60,110,0.55);border-radius:8px;padding:7px 9px;margin-bottom:6px;">' +
-                    '<span style="width:20px;text-align:center;font-size:13px;">' + label.ico + '</span>' +
-                    '<span style="flex:1;font-size:clamp(10px,1.05vw,13px);color:#9fc7ff;">' + label.t + '</span>' +
-                    '<span style="font-size:clamp(11px,1.2vw,14px);font-weight:900;color:#fff;">' + val + '</span>' +
-                    '</div>'
+                // 🔴 2026-10-22 统一属性块（attrs 为源、被动卡显示 —），与官方对齐
+                const core = hdStatBlockHtml(meta, curLevel)
                 // 🔴 2026-10-20 减伤读数：与主页「减伤」弹窗同一套 drTables，实时一致
                 const drT = getDrTable(drSide)
                 const drVal = (drT.洗炼 && drT.洗炼[mainName] != null) ? drT.洗炼[mainName] : null
                 return (
-                    mk({ ico: '⚔️', t: '攻击力' }, row.attack != null ? row.attack : '—') +
-                    mk({ ico: '🔧', t: '攻击类型' }, dtype) +
-                    mk({ ico: '⚡', t: '攻速' }, speed) +
-                    mk({ ico: '❤️', t: '生命' }, row.hp != null ? row.hp : '—') +
-                    mk({ ico: '🛡', t: '减伤' }, drVal != null ? drVal + '%' : '—')
+                    core +
+                    hdStatRowHtml('<span style="font-size:20px;line-height:1;">🛡</span>', '减伤', drVal != null ? drVal + '%' : '—')
                 )
             }
 
@@ -11638,24 +11651,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         const subMhOn = (typeof getFusionComponentMoHua === 'function') ? getFusionComponentMoHua(sub) : false
                         // 副卡属性（跟随等级/皮肤实时变化）—— 左栏：技能/被动/魔化；右栏：等级+数值
                         const subStatRows = (lvNow) => {
-                            const srow = (typeof hdRowAt === 'function' ? hdRowAt(subMeta.stats, lvNow) : null) || {}
-                            const sdtRaw = (srow.damageType != null && srow.damageType !== '')
-                                ? srow.damageType
-                                : (subMeta.attrs ? subMeta.attrs.damageType : null)
-                            const sdt = (subMeta && HD_OCC_DTYPE[Number(subMeta.occupation)]) || ((sdtRaw != null && sdtRaw !== '') ? (HD_DTYPE[sdtRaw] || '—') : '—')
-                            const sp = srow.cd ? (Number(srow.cd) / 1000).toFixed(2) + '秒/次' : '—'
+                            const core = (typeof hdStatBlockHtml === 'function') ? hdStatBlockHtml(subMeta, lvNow) : ''
                             const skinRow = (subMeta.skins || []).find((s) => s.note === curSkin)
                             const skinHp = skinRow && Number(skinRow.heroSkinHp) > 0 ? Number(skinRow.heroSkinHp) : 0
-                            const row = (ico, t, v) =>
-                                '<div style="display:flex;align-items:center;gap:8px;background:rgba(20,60,110,0.55);border-radius:8px;padding:7px 9px;margin-bottom:6px;">' +
-                                '<span style="width:20px;text-align:center;font-size:13px;">' + ico + '</span>' +
-                                '<span style="flex:1;font-size:11px;color:#9fc7ff;">' + t + '</span>' +
-                                '<span style="font-size:12.5px;font-weight:900;color:#fff;">' + v + '</span></div>'
-                            return row('⚔️', '攻击力', srow.attack != null ? srow.attack : '—') +
-                                row('🔧', '攻击类型', sdt) +
-                                row('⚡', '攻速', sp) +
-                                row('❤️', '生命', srow.hp != null ? srow.hp : '—') +
-                                (skinHp ? row('✨', '皮肤生命', '+' + skinHp) : '')
+                            return core +
+                                (skinHp ? hdStatRowHtml('<span style="font-size:18px;line-height:1;">✨</span>', '皮肤生命', '+' + skinHp) : '')
                         }
                         // 🔴 2026-10-20 左栏技能/被动：与主卡 paintAll 同数据路径（official tiers 按等级取档）
                         const subSkillBlock = (lvNow) => {
@@ -12567,10 +12567,24 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     const b = document.createElement('button');
                     const sel = opt === cardName;
                     const parts = (typeof getFusionParts === 'function') ? getFusionParts(opt) : null;
+                    const baseOfOpt = (parts && parts.length) ? parts[0] : opt;
                     const label = opt === baseHero ? '不融合' : ((parts && parts.length >= 2) ? parts[1] : opt);
                     b.dataset.value = opt;
-                    b.textContent = label;
-                    b.style.cssText = 'padding:4px 8px;border-radius:7px;border:1px solid ' + (sel ? '#60a5fa' : 'rgba(255,255,255,0.2)') + ';background:' + (sel ? '#60a5fa' : 'transparent') + ';color:' + (sel ? '#1a1a2e' : '#fff') + ';cursor:pointer;font-size:0.76rem;font-weight:' + (sel ? '600' : '400') + ';';
+                    b.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:2px;padding:2px;border-radius:8px;border:2px solid ' + (sel ? '#60a5fa' : 'rgba(255,255,255,0.2)') + ';background:' + (sel ? 'rgba(96,165,250,0.18)' : 'transparent') + ';cursor:pointer;width:64px;';
+                    const img = document.createElement('img');
+                    img.style.cssText = 'width:56px;height:56px;object-fit:cover;border-radius:6px;background:#2a2a4a;display:block;';
+                    img.alt = '';
+                    img.decoding = 'async';
+                    try {
+                        const skinName = (typeof getHeroSkin === 'function') ? (getHeroSkin(baseOfOpt) || '默认') : '默认';
+                        if (typeof window.resolveHeroSkinUrl === 'function') { window.resolveHeroSkinUrl(baseOfOpt, skinName).then(function (u) { if (u) img.src = u; }).catch(function () {}); }
+                        else if (typeof getHeroSkinUrl === 'function') { img.src = getHeroSkinUrl(baseOfOpt, skinName); }
+                    } catch (e) {}
+                    b.appendChild(img);
+                    const cap = document.createElement('div');
+                    cap.style.cssText = 'font-size:0.62rem;line-height:1.1;text-align:center;color:' + (sel ? '#60a5fa' : 'rgba(255,255,255,0.85)') + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:62px;';
+                    cap.textContent = label;
+                    b.appendChild(cap);
                     b.onclick = async () => {
                         const pick = b.dataset.value;
                         // 直接改名即可：槽位用现有 upgradeCardToFusion；手牌直接改手牌数组 + 原地重绘
@@ -12670,6 +12684,21 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 }
                 sec.appendChild(subSkillInfo);
 
+                // 🔴 2026-10-22 官方风格副卡属性行（与融合弹窗/详情一致：剑/扳手/闪电/爱心精灵图标）
+                const subMeta = (typeof heroesOfficialMap !== 'undefined') ? heroesOfficialMap[_subHero] : null;
+                const subStats = subMeta && subMeta.stats;
+                const subStatTitle = document.createElement('div');
+                subStatTitle.style.cssText = 'color:#ffd75e;margin:6px 0 4px;font-size:0.78rem;';
+                subStatTitle.textContent = '📊 副卡属性';
+                sec.appendChild(subStatTitle);
+                const subStatWrap = document.createElement('div');
+                subStatWrap.id = 'csSubStat';
+                function _renderSubStat(curLv) {
+                    subStatWrap.innerHTML = (typeof hdStatBlockHtml === 'function') ? hdStatBlockHtml(subMeta, curLv) : '';
+                }
+                sec.appendChild(subStatWrap);
+                if (typeof getFusionComponentLevel === 'function') _renderSubStat(getFusionComponentLevel(_subHero));
+
                 const subSkinTitle = document.createElement('div');
                 subSkinTitle.style.cssText = 'color:#ff9800;margin:6px 0 4px;font-size:0.78rem;';
                 subSkinTitle.textContent = '🎨 副卡皮肤';
@@ -12737,12 +12766,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     const el = document.getElementById('csSubLvVal'); if (el) el.textContent = subLevels[Number(subLvInput.value)];
                     _renderSubLevelInfo(subLevels[Number(subLvInput.value)]);
                     _renderSubSkill(subLevels[Number(subLvInput.value)]);
+                    _renderSubStat(subLevels[Number(subLvInput.value)]);
                 };
                 subLvInput.onchange = async () => {
                     const newLv = subLevels[Number(subLvInput.value)];
                     if (typeof setFusionComponentLevel === 'function') setFusionComponentLevel(_subHero, newLv);
                     _renderSubLevelInfo(newLv);
                     _renderSubSkill(newLv);
+                    _renderSubStat(newLv);
                     // 🔴 2026-10-14 性能：图库槽位跳过全卡池角标重铺
                     const _libSlot = badge.closest('.ll-slot');
                     if (_libSlot && typeof window._llReapplySlot === 'function') { await window._llReapplySlot(_libSlot); }
