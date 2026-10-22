@@ -143,7 +143,6 @@
           <canvas id="hdcSpine" style="width:100%;height:100%;display:block;"></canvas>
           <img src="${UI}hero-ground-shadow.png" alt="" style="position:absolute;left:50%;top:76%;transform:translate(-50%,-50%);width:300px;opacity:.55;pointer-events:none;">
         </div>
-        <div id="hdcSpineFallback" style="position:absolute;inset:0;z-index:3;display:flex;align-items:center;justify-content:center;pointer-events:none;">${portraitHTML(h, 200)}</div>
         <div id="hdcSpineStatus" style="position:absolute;left:14px;bottom:56px;z-index:20;display:none;font-size:.7rem;color:rgba(255,255,255,.65);background:rgba(0,0,0,.4);padding:2px 8px;border-radius:6px;"></div>
         <div style="position:absolute;left:16px;top:12px;z-index:10;width:340px;display:flex;flex-direction:column;gap:9px;">
           <div style="pointer-events:none;">
@@ -214,10 +213,8 @@
   let _spineRetry = 0
   function playHeroSpine(h, model, noHideFx) {
     const canvas = document.getElementById('hdcSpine')
-    const fb = document.getElementById('hdcSpineFallback')
     const st = document.getElementById('hdcSpineStatus')
     if (!canvas) return
-    if (fb) fb.style.display = 'flex'
     if (st) { st.style.display = 'block'; st.textContent = '加载动画…' }
     spineIndex().then((idx) => {
       const man = (window.spineHero && h.modelFolder) ? idx[h.modelFolder] : null
@@ -278,14 +275,12 @@
             return
           }
           lastSum = sum
-          if (fb) fb.style.display = 'none'
         }
-        if (Date.now() - t0 > 15000 && px <= 500) { if (st) { st.style.display = 'block'; st.textContent = '动画暂未呈现，已显示立绘' } return }
+        if (Date.now() - t0 > 15000 && px <= 500) { if (st) { st.style.display = 'block'; st.textContent = '动画暂未呈现' } return }
         setTimeout(poll, 500)
       }
       poll()
     }).catch(() => {
-      if (fb) fb.style.display = 'flex'
       if (st) st.style.display = 'none'
     })
   }
