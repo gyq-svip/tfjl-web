@@ -902,7 +902,7 @@
             return 0;
         }
         // 双击右下角版本号 → 直接强制刷新（清 SW 缓存 + 重载，拿到最新前端）。
-        // 不再弹版本详情弹窗：版本信息已由悬浮提示承担，弹窗多余；双击防误触（项目已取消自动保存，误刷新会丢未存改动）。
+        // 不再弹版本详情弹窗：版本信息已由悬浮提示承担，弹窗多余；双击防误触（卡组阵容未手动保存时点刷新会丢未存改动；设置类已自动保存）。
         function onVersionTagForceRefresh() {
             if (typeof forceRefreshLatest === 'function') forceRefreshLatest();
             else location.reload(true);
