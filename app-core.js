@@ -2801,11 +2801,13 @@
                     const el = document.getElementById(id);
                     if (el) el.readOnly = isReadOnly;
                 });
-                // 只读短条：复用标题行内的 sharedReadOnlyBadge（短条，不独占一行）
+                // 只读短条：2026-10-22 起徽章独占一行（#sharedReadOnlyRow），显隐改控行容器
                 const oldBanner = document.getElementById('sharedReadOnlyBanner');
                 if (oldBanner && oldBanner.parentNode) oldBanner.parentNode.removeChild(oldBanner);
                 const badge = document.getElementById('sharedReadOnlyBadge');
                 if (badge) badge.style.display = isReadOnly ? 'inline-block' : 'none';
+                const badgeRow = document.getElementById('sharedReadOnlyRow');
+                if (badgeRow) badgeRow.style.display = isReadOnly ? 'block' : 'none';
                 const slot = document.getElementById('sharedReadOnlyBannerSlot');
                 if (slot) slot.style.display = 'none';
                 // 只读态下禁用所有「分享/上传云端」入口（云端项目不应再被分享到云端）
@@ -10167,8 +10169,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         }
 
         // 设置副卡（被融合卡）皮肤：只写当前项目 fusionSkins，绝不污染全局 heroSkinSelections
+        // 🔴 2026-10-22 共享只读态：项目数据不落盘（saveProjectToDB 静默跳过），必须明确告知用户，不能静默失败
+        function _warnSharedReadOnly() {
+            if (!window.__sharedProjectReadOnly) return false;
+            if (typeof showToast === 'function') showToast('📖 共享资源只读：融合设置不会保存，请先点「📥 导入到本地」再修改');
+            return true;
+        }
         async function setFusionSkin(fusedHero, skin) {
             if (!fusedHero) return;
+            _warnSharedReadOnly();
             if (typeof window.fusionSkins === 'undefined') window.fusionSkins = {};
             window.fusionSkins[fusedHero] = skin; // '' = 关闭副卡显示
             if (typeof persistFusionSkins === 'function') await persistFusionSkins();
@@ -10216,6 +10225,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         try { window.refreshFusionComponentViews = refreshFusionComponentViews; } catch (e) {}
         function setFusionComponentLevel(heroName, level) {
             if (!heroName) return;
+            _warnSharedReadOnly(); // 副卡等级虽走全局存储，但主卡组合/皮肤等项目数据只读态不落盘，一并提醒
             if (typeof window.fusionLevels === 'undefined') window.fusionLevels = {};
             window.fusionLevels[heroName] = Number(level) || 1;
             try { localStorage.setItem('tdjl_fusion_levels', JSON.stringify(window.fusionLevels)); } catch (e) {}
@@ -10229,6 +10239,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         }
         function setFusionComponentMoHua(heroName, enabled) {
             if (!heroName) return;
+            _warnSharedReadOnly(); // 只读态明确提示
             if (typeof window.fusionMoHua === 'undefined') window.fusionMoHua = {};
             if (enabled) window.fusionMoHua[heroName] = true;
             else delete window.fusionMoHua[heroName];
@@ -11925,9 +11936,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (!man) return
                     const model = hdSkinModel(curSkin) || (meta.spineModel || '')
                     const pngs = model ? ((man.modelPngs && man.modelPngs[model]) || 0) : (man.pngs || 0)
-                    // 🔴 2026-10-22 修正：原写法固定传 scale:1，会把索引里逐英雄的 scale 顶掉（永远不生效）。
-                    //    索引未配 scale 时传 undefined，交给 spine-hero 回退读 __heroSpineIndex[folder].scale。
-                    window.spineHero.play(cv, meta.spine, { fitPadding: 0.58, pngs, model, anchorFeet: 0.80, tight: true, fitByHeight: true, scale: (man && man.scale > 0) ? man.scale : undefined, offsetX: (man && man.offsetX) || 0 })
+                    // 🔴 2026-10-22 官方 1:1 复刻：整骨架联合盒 + fitPadding 0.6 + 官方 render-offsets
+                    //    逐模型 scale/x/y（已合并进 index[folder].modelOffsets[modelDir]），与官方
+                    //    官方渲染管线完全同一套定标居中算法，不再自创脚锚点/特效剔除。
+                    const moff = (man.modelOffsets && (man.modelOffsets[model] || man.modelOffsets[man.model])) || {}
+                    window.spineHero.play(cv, meta.spine, { fitPadding: 0.6, pngs, model, tight: true, scale: (moff.scale > 0) ? moff.scale : undefined, offsetX: moff.x || 0, offsetY: moff.y || 0 })
                 } catch (e) {}
             }
 
@@ -29917,17 +29930,19 @@ ${maSection}
                         const _spFolder = stage.getAttribute('data-spine')
                         if (!_spFolder) return; // 无动画占位舞台
                         playing.add(cv);
-                        // 🔴 2026-10-21 播放参数与主面板对齐（fitByHeight/tight/anchorFeet/逐英雄scale），修复不同英雄忽大忽小
+                        // 🔴 2026-10-22 官方 1:1：与详情弹窗同一套官方算法（联合盒+fitPadding 0.6+逐模型 offsets），
+                        //    列表与详情观感一致；逐模型 scale/x/y 取 index[folder].modelOffsets[modelDir]
                         const _spMan = (window.__heroSpineIndex && window.__heroSpineIndex[_spFolder]) || {}
                         const _spHero = (window.__heroCodexCache || []).find(function (x) { return x.spine === _spFolder && (!x.spineModel || !stage.getAttribute('data-model') || x.spineModel === stage.getAttribute('data-model')) })
+                        const _spModel = (stage.getAttribute('data-model') || (_spHero && _spHero.spineModel) || '')
+                        const _spMoff = (_spMan.modelOffsets && (_spMan.modelOffsets[_spModel] || _spMan.modelOffsets[_spMan.model])) || {}
                         window.spineHero.play(cv, _spFolder, {
-                            fitPadding: 0.58,
-                            anchorFeet: 0.71,
+                            fitPadding: 0.6,
                             tight: true,
-                            fitByHeight: true,
-                            scale: _spMan.scale || 1,
-                            offsetX: _spMan.offsetX || 0,
-                            model: (stage.getAttribute('data-model') || (_spHero && _spHero.spineModel) || ''),
+                            scale: (_spMoff.scale > 0) ? _spMoff.scale : undefined,
+                            offsetX: _spMoff.x || 0,
+                            offsetY: _spMoff.y || 0,
+                            model: _spModel,
                             pngs: _spMan.pngs || 0,
                             onStatus: function (s) {
                                 const el = stage.querySelector('.codex-spine-status');
