@@ -33,16 +33,19 @@
     if (spinePromise) return spinePromise
     const base = baseUrl()
     spinePromise = new Promise(function (resolve, reject) {
+      // 🟢 2026-10-22 网络抖动兜底：脚本加载失败时清空在途 promise，让下一次 play 自动重试
+      //   （此前一次失败会把 rejected promise 永久留在 spinePromise，刷新页面前运行时永远加载不上）
+      const fail = function (w) { spinePromise = null; reject(new Error(w + ' 加载失败')) }
       const s1 = document.createElement('script')
       s1.src = base + 'vendor/spine-core.js'
       s1.onload = function () {
         const s2 = document.createElement('script')
         s2.src = base + 'vendor/spine-canvas.js'
         s2.onload = function () { resolve() }
-        s2.onerror = reject
+        s2.onerror = function () { fail('spine-canvas') }
         document.body.appendChild(s2)
       }
-      s1.onerror = reject
+      s1.onerror = function () { fail('spine-core') }
       document.body.appendChild(s1)
     })
     return spinePromise
