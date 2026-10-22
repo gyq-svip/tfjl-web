@@ -175,7 +175,7 @@
   }
   let _lastSpineCanvas = null
   let _spineRetry = 0
-  function playHeroSpine(h, model) {
+  function playHeroSpine(h, model, noHideFx) {
     const canvas = document.getElementById('hdcSpine')
     const fb = document.getElementById('hdcSpineFallback')
     const st = document.getElementById('hdcSpineStatus')
@@ -185,22 +185,25 @@
     spineIndex().then((idx) => {
       const man = (window.spineHero && h.modelFolder) ? idx[h.modelFolder] : null
       if (!man) throw new Error('no-spine')
-      // 与现有英雄面板同一套参数：默认模型取 index[folder].model，套用官方 modelOffsets 定标
-      const useModel = model || man.model || ''
+      // 模型选择：皮肤指定 > snapshot 的 defaultModel（每英雄权威）> index 默认。
+      // 不能直接用 index.model——多英雄共用目录时（jingling 放了 6 个精灵）那是别的英雄的模型。
+      const useModel = model || h.defaultModel || man.model || ''
       const pngs = useModel ? ((man.modelPngs || {})[useModel] || 0) : (man.pngs || 0)
       const moff = (man.modelOffsets && (man.modelOffsets[useModel] || man.modelOffsets[man.model])) || {}
       window.spineHero.play(canvas, h.modelFolder, {
         model: useModel || undefined,
         pngs: pngs,
         tight: true,
-        hideFx: true,
+        hideFx: !noHideFx,
+        dedupe: true,
         // 🟢 统一观感：所有模型按「可见高度」归一化到同一档。
         //   官方 render-offsets 的 scale 是为「特效撑大包围盒」做补偿的（我们不剔特效时必须套），
         //   而图鉴已剔除 fx，再套会导致 200/161/128/113 这种参差；官方 x/y 居中偏移仍然保留。
         fitByHeight: true,
         fitPadding: 0.65,
-        offsetX: moff.x || 0,
-        offsetY: moff.y || 0,
+        // 不套官方 x/y 偏移：那是给「特效撑大包围盒 + 官方 scale」做补偿的；
+        // tight 包围盒（已剔 fx）本身居中，再偏移反而歪（蛇女/炸弹/虎弓偏移的来源）
+        hideSlots: (man.hideSlots || []).concat((man.modelHideSlots || {})[useModel] || []),
         onStatus: (s) => {
           const el = document.getElementById('hdcSpineStatus')
           if (!el) return
@@ -209,19 +212,38 @@
             _spineRetry++
             el.style.display = 'block'
             el.textContent = s + '，自动重试 ' + _spineRetry + '/2…'
-            setTimeout(() => { if (document.body.contains(canvas)) playHeroSpine(h, model) }, 1500)
+            setTimeout(() => { if (document.body.contains(canvas)) playHeroSpine(h, model, noHideFx) }, 1500)
             return
           }
           if (s) { el.style.display = 'block'; el.textContent = s } else { el.style.display = 'none'; el.textContent = '' }
         }
       })
-      // 播放起来后撤掉立绘回退；超时仍未播则提示（含重试窗口）
+      // 按实际像素判断「画出来了没有 + 动没动」：
+      // ① 有些模型（如后羿）idle 前几秒角色尚未出场 → 立绘保持到画布真的有内容为止；
+      // ② 有些模型（如萌萌 bingdundun2）idle 只动画特效槽，剔 fx 后完全静止
+      //    → 检测到「有画面但像素级静止」自动带特效重播（fx 即动画，放弃隐藏）。
       const t0 = Date.now()
+      let lastSum = null, fxTried = !noHideFx
       const poll = () => {
         if (!document.body.contains(canvas)) return
-        if (canvas._spineSt && canvas._spineSt.playing) { _spineRetry = 0; if (fb) fb.style.display = 'none'; return }
-        if (Date.now() - t0 > 15000) { if (st) { st.textContent = '该模型暂无法播放，可重进详情或刷新页面'; st.style.display = 'block' } return }
-        setTimeout(poll, 300)
+        let px = 0, sum = 0
+        try {
+          const d = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data
+          for (let i = 3; i < d.length; i += 4) { if (d[i] > 30) { px++; sum = (sum + d[i] * 31 + i) % 99999991 } }
+        } catch (e) {}
+        if (px > 500) {
+          _spineRetry = 0
+          if (fxTried && lastSum !== null && lastSum === sum) {
+            fxTried = false
+            if (st) { st.style.display = 'block'; st.textContent = '特效即动画，切换为带特效播放…' }
+            setTimeout(function () { if (document.body.contains(canvas)) playHeroSpine(h, model, true) }, 200)
+            return
+          }
+          lastSum = sum
+          if (fb) fb.style.display = 'none'
+        }
+        if (Date.now() - t0 > 15000 && px <= 500) { if (st) { st.style.display = 'block'; st.textContent = '动画暂未呈现，已显示立绘' } return }
+        setTimeout(poll, 500)
       }
       poll()
     }).catch(() => {
