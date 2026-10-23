@@ -4987,6 +4987,11 @@ if (true) {
         //    原来只在 _preheatLocalSkinUrls（本地线）里判了极速，本函数的网页/IndexedDB 线仍全量拉 421 张
         //    （实测极速档仍创建 444 个 blob / 21.8MB），属漏网。
         if (window.isPerfLite && window.isPerfLite()) { console.log('[SKIN] 极速模式：跳过皮肤预热（不显示皮肤，无需预热）'); return; }
+        // 🔴 2026-10-24 网页版预热去重：网页版已有 skins-web.js 专职负责（远程 registry + IndexedDB
+        //    + objectURL 复用）。本模块的网页线再跑一遍 = 同一批皮肤下载两次、两套独立 inflight 表
+        //    互不知晓 → 双倍带宽与连接占用，正是「加了动态皮肤后网页版静态皮肤加载不完」的帮凶。
+        //    故网页版直接交给 skins-web.js，本模块只保留 Tauri 本地磁盘线。
+        if (!isTauriApp) { console.log('[SKIN] 网页版预热交由 skins-web.js，本模块跳过（避免重复下载）'); return; }
         _preheatStarted = true;
         if (isTauriApp) {
             // Tauri: 磁盘缓存（一次性全量下载，后续秒开）

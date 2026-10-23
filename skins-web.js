@@ -225,6 +225,10 @@
   //  - 真正阻塞首屏的是「预热洪流挤占源站带宽」——故预热必须低压、可让路。
   var _preheatStarted = false;
   var _preheatAbort = false;
+  // 🔴 2026-10-24 预热去重表：priority(优先默认皮) / visible(可见卡) / 全量 三个入口会重复入队
+  //    同一张皮肤，且各自持有独立的 inflight 表互不知晓 → 同一张皮被重复下载。
+  //    这里按 hero/file 全局去重，任何入口队列过的皮肤不再二次入队。
+  var _preheated = {};
   async function _preheatSkins(heroes, opts) {
     opts = opts || {};
     var concurrency = opts.concurrency || 3;
@@ -249,7 +253,11 @@
       skinList.forEach(function (s) {
         // 🔴 跳过 IndexedDB 旧缓存恢复的 stale 皮肤：线上可能已删除/改名，发起请求必 404 刷屏
         if (s.stale) return;
-        queue.push({ hero: heroName, file: skinFileOf(heroName, s.name, s.file) });
+        var _f = skinFileOf(heroName, s.name, s.file);
+        var _k = heroName + '/' + _f;
+        if (_preheated[_k]) return; // 🔴 多入口重复：已队列过就不再下载
+        _preheated[_k] = 1;
+        queue.push({ hero: heroName, file: _f });
       });
     });
     var idx = 0;
