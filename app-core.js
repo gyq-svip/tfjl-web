@@ -13102,10 +13102,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         const PERF_MODE_KEY = 'tdjl_perf_mode';
         function getPerfMode() {
             try { const v = localStorage.getItem(PERF_MODE_KEY); if (v === 'optimized' || v === 'high' || v === 'lite') return v; } catch (e) {}
-            // 🔴 2026-08-29 内存止血：默认从 'high'(全量铺皮,卡池几百张背景图直爆 GPU 4G+) 改为 'optimized'
-            // （跳过卡池/收藏区皮肤背景图,仅保留手牌+上阵槽皮肤,体验接近全量但内存可控）。
-            // 用户若需全量皮肤,可在菜单手动切回「高性能」。
-            return 'optimized';
+            // 🔴 2026-10-24 恢复默认「高性能」= 卡池/收藏也铺皮。
+            //    08-29 曾因「卡池几百张背景图爆 GPU 4G+」把默认改成 optimized（卡池不铺皮），
+            //    但那次爆内存的两个大户本次已消除：①网页版停止 Spine 全量预热（87MB/1132 文件）
+            //    ②assetCache 加 LRU 上限 8（骨架+图集+解码位图不再无限增长）。
+            //    静态皮肤总共仅 22~27MB，全量铺满后内存可控；个别设备仍吃紧可在菜单手动切「优化」/「极速」。
+            return 'high';
         }
         function isPerfOptimized() { return getPerfMode() === 'optimized'; }
         function isPerfLite() { return getPerfMode() === 'lite'; }
