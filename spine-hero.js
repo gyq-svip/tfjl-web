@@ -301,6 +301,10 @@
       //   甚至是身体图的特效拷贝（如 yilidan 的 images/fx/1/a0000 → 画面出现"两个恶魔"）。
       //   隐藏后若骨架整体不可见（真身真在 fx 路径下的极少数模型），自动回退为不剔除。
       let fxHide = opts.hideFx ? [] : null
+      // 🔴 2026-10-24 是否存在「非 fx 的正常身体槽」（动画里挂过非 fx 附件）——
+      //   供下方 autoFxFallback 判定：有身体槽的模型，剔 fx 后画面静止是正常的（人物本来就站桩），
+      //   不能因此判定「该模型四肢全靠特效」而整体回退。
+      let hasBodySlot = false
       if (fxHide) {
         const fxSeg = /(^|\/)fx(\/|$)/i
         skeleton.slots.forEach(function (sl, i) {
@@ -320,12 +324,16 @@
         //   只有渲染路径（基于 setup pose 的 fxHide 数组）会漏，故在此按动画 timeline 补齐。
         try {
           const _animFx = {}
+          const _animNonFx = {}
           ;(skData.animations || []).forEach(function (anim) {
             ;(anim.timelines || []).forEach(function (tl) {
               if (!tl || tl.slotIndex == null || !tl.attachmentNames) return
               const _ns = tl.attachmentNames
               for (let k = 0; k < _ns.length; k++) {
-                if (_ns[k] && fxSeg.test(_ns[k])) { _animFx[tl.slotIndex] = 1; break }
+                const _nm = _ns[k]
+                if (!_nm) continue
+                if (fxSeg.test(_nm)) _animFx[tl.slotIndex] = 1
+                else _animNonFx[tl.slotIndex] = 1
               }
             })
           })
@@ -333,6 +341,8 @@
             const _i = Number(si)
             if (fxHide.indexOf(_i) < 0) fxHide.push(_i)
           })
+          // 有非 fx 附件槽 → 该模型有真正的身体/部件（如死神的 images/idle/a0000）
+          hasBodySlot = Object.keys(_animNonFx).length > 0
         } catch (e) {}
         if (!fxHide.length) fxHide = null
       }
@@ -509,7 +519,13 @@
       // 🟢 2026-10-23 autoFxFallback：像素级静止检测——「有画面但完全静止」说明该模型的
       //   idle 只动画特效槽（如萌萌），剔 fx 后只剩静态身体 → 自动带特效重播一次。
       //   图鉴详情与主页英雄面板共用。失败/无内容不重播（保持现状）。
-      if (opts.autoFxFallback && frameHide2 && frameHide2.length) {
+      // 🔴 2026-10-24 修正误判：原判据只看「画面静止」，但大多数角色的 idle 本来就是站桩不动
+      //   （死神 fashi 剔掉 shen01/shen02 后画面当然静止）→ 被误判成「四肢全靠特效」，
+      //   于是整体 hideFx:false 重播，把刚剔掉的黑红镰刀/死神残影又全放回来
+      //   （用户反馈「两个死神，一个静态不动、一个很大在那播放」即此）。
+      //   现加 !hasBodySlot：只有模型连一个非 fx 身体槽都没有（真·全身在 fx 路径下，
+      //   如萌萌 bingdundun2）才允许整体回退；有正常身体的模型保持剔除结果。
+      if (opts.autoFxFallback && frameHide2 && frameHide2.length && !hasBodySlot) {
         let lastSum = null, tried = false
         const t0 = Date.now()
         const fxPoll = function () {
