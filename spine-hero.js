@@ -251,7 +251,13 @@
       //   避免画布整块空白（用户反馈「十三姨·小野无动图」即此场景）
       if (opts.model) {
         statusCb('皮肤模型加载失败，回退基础模型')
-        play(canvas, folder, Object.assign({}, opts, { model: '', pngs: (man && man.pngs) || 0, autoFxFallback: false }))
+        // 🔴 2026-10-24 修复：此处原引用 `man`，但该变量在本作用域根本不存在（后面才定义的是 `_man`）
+        //    → 一旦皮肤模型加载失败，回退分支会抛 ReferenceError，反而什么都不画（整块空白）。
+        //    改为就地从清单取基础模型贴图页数。
+        try {
+          const _idx = (typeof window !== 'undefined' && window.__heroSpineIndex) ? window.__heroSpineIndex[folder] : null
+          play(canvas, folder, Object.assign({}, opts, { model: '', pngs: (_idx && _idx.pngs) || 0, autoFxFallback: false }))
+        } catch (e2) {}
         return
       }
       statusCb('读取骨骼资源失败: ' + folder)
@@ -324,7 +330,15 @@
         //   只有渲染路径（基于 setup pose 的 fxHide 数组）会漏，故在此按动画 timeline 补齐。
         try {
           const _animFx = {}
-          const _animNonFx = {}
+          const _animBody = {}
+          const _animAction = {}
+          const _animNotAction = {}   // 该槽还挂过「非动作」附件（身体/fx）→ 视为混合槽，不按动作槽隐藏
+          // 🔴 2026-10-24 动作类附件（攻击/技能/死亡/跑动…）：官方把这些动作帧与 idle 帧放在同一
+          //   个 skeleton 里，且 idle 动画也会给这些槽挂附件 → 播放 idle 时同时画出
+          //   「idle 身体 + attack/skill 身体」= 用户看到的「两个角色重叠」
+          //   （死神 fashi 的 bone2→images/skill/c0002、骨弓的 images/attack/a0036 即此）。
+          //   这类路径不含 fx，故 hideFx 判据抓不到，需单独按动作段识别。
+          const ACTION_SEG = /\/(attack|skill|death|die|run|walk|hit|win|lose|atk|zhunbei|wait|move)(\/|$)/i
           ;(skData.animations || []).forEach(function (anim) {
             ;(anim.timelines || []).forEach(function (tl) {
               if (!tl || tl.slotIndex == null || !tl.attachmentNames) return
@@ -332,8 +346,9 @@
               for (let k = 0; k < _ns.length; k++) {
                 const _nm = _ns[k]
                 if (!_nm) continue
-                if (fxSeg.test(_nm)) _animFx[tl.slotIndex] = 1
-                else _animNonFx[tl.slotIndex] = 1
+                if (fxSeg.test(_nm)) { _animFx[tl.slotIndex] = 1; _animNotAction[tl.slotIndex] = 1 }
+                else if (ACTION_SEG.test(_nm)) _animAction[tl.slotIndex] = 1
+                else { _animBody[tl.slotIndex] = 1; _animNotAction[tl.slotIndex] = 1 }
               }
             })
           })
@@ -341,8 +356,18 @@
             const _i = Number(si)
             if (fxHide.indexOf(_i) < 0) fxHide.push(_i)
           })
-          // 有非 fx 附件槽 → 该模型有真正的身体/部件（如死神的 images/idle/a0000）
-          hasBodySlot = Object.keys(_animNonFx).length > 0
+          // 动作槽仅在「确认存在非动作身体槽」时才隐藏——否则只带 attack 动画的模型会被整片清空
+          if (Object.keys(_animBody).length) {
+            Object.keys(_animAction).forEach(function (si) {
+              // 🔴 只隐藏「纯动作槽」：若该槽还挂过身体/其它非动作附件（如 longwangpifu 的
+              //    images/idle/a_0 既挂 idle 又挂 attack），隐藏会连带删掉身体 → 跳过。
+              if (_animNotAction[si]) return
+              const _i = Number(si)
+              if (fxHide.indexOf(_i) < 0) fxHide.push(_i)
+            })
+          }
+          // 有非 fx、非动作的正常身体槽（如死神的 images/idle/a0000）
+          hasBodySlot = Object.keys(_animBody).length > 0
         } catch (e) {}
         if (!fxHide.length) fxHide = null
       }
