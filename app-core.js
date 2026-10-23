@@ -10550,6 +10550,20 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             return { desc: descParts.join('\n\n') || '无特殊属性' };
         }
 
+        // 🟢 2026-10-23 只取皮肤专属的「额外被动」一句话（动态表 extraPassive，回退旧静态皮肤表）。
+        //   面板上方已有技能/被动/等级全文，皮肤属性卡与 Dock 悬停提示不能重复搬整段；皮肤加血也不显示（用户口径）。
+        function getSkinExtraPassive(cardName, skinName) {
+            if (!skinName || skinName === '默认') return ''
+            const mainCardName = getMainCardName(cardName)
+            try {
+                const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[mainCardName]
+                const s = d && d.skins && d.skins[skinName]
+                if (s && s.extraPassive) return String(s.extraPassive)
+            } catch (e) {}
+            const st = SKIN_ATTRIBUTES[mainCardName] && SKIN_ATTRIBUTES[mainCardName][skinName]
+            return (st && st.desc) ? String(st.desc) : ''
+        }
+
         // 🔴 2026-10-19 官方英雄数据（data/heroes.json，由官方配置表自动导出）按英雄名索引；
         //    卡牌悬停优先展示这里的信息（职业/被动/当前等级档位强化），官方没有的英雄回落旧 heroAttrsData。
         let __officialLoading = false;
@@ -11100,17 +11114,23 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             function statRowsHtml() {
                 // 🔴 2026-10-22 统一属性块（attrs 为源、被动卡显示 —），与官方对齐
                 const core = hdStatBlockHtml(meta, curLevel)
-                // 🔴 2026-10-20 减伤读数：与主页「减伤」弹窗同一套 drTables，实时一致
-                const drT = getDrTable(drSide)
-                const drVal = (drT.洗炼 && drT.洗炼[mainName] != null) ? drT.洗炼[mainName] : null
-                let html = core + hdStatRowHtml('<span style="font-size:20px;line-height:1;">🛡</span>', '减伤', drVal != null ? drVal + '%' : '—')
-                // 🟢 2026-10-23 洗炼词条（展示）：纯粹 / 魔抗 / 护甲，与洗炼面板同一存储实时同步
+                // 🟢 2026-10-23 洗炼词条横排一行（窄栏图标放不下，按用户要求去图标）：减伤·纯粹·魔抗·护甲，与洗炼面板同一存储实时同步
                 try {
+                    const drT = getDrTable(drSide)
+                    const drVal = (drT.洗炼 && drT.洗炼[mainName] != null) ? drT.洗炼[mainName] : null
                     const ex = (window.cardWashExtras || {})[mainName] || {}
-                    const row = (key, unit, icon) => { html += hdStatRowHtml('<span style="font-size:18px;line-height:1;">' + icon + '</span>', key, ex[key] != null ? ex[key] + unit : '—') }
-                    row('纯粹', '%', '✧'); row('魔抗', '', '◈'); row('护甲', '', '⛨')
-                } catch (e) {}
-                return html
+                    const seg = (label, val) => '<span style="white-space:nowrap;"><b style="color:#ffd75e;font-weight:800;">' + label + '</b> ' + val + '</span>'
+                    const washes = seg('减伤', drVal != null ? drVal + '%' : '—') +
+                        seg('纯粹', ex['纯粹'] != null ? ex['纯粹'] + '%' : '—') +
+                        seg('魔抗', ex['魔抗'] != null ? ex['魔抗'] : '—') +
+                        seg('护甲', ex['护甲'] != null ? ex['护甲'] : '—')
+                    return core +
+                        '<div class="hap-row" style="display:flex;align-items:flex-start;height:auto;min-height:40px;flex-wrap:wrap;margin-bottom:6px;padding:6px 10px;box-sizing:border-box;">' +
+                        '<div style="width:100%;">' +
+                        '<div style="color:rgba(255,255,255,0.6);font-size:0.72rem;margin-bottom:3px;">洗炼词条</div>' +
+                        '<div style="display:flex;flex-wrap:wrap;gap:4px 14px;font-size:0.92rem;font-weight:800;color:#eaf4ff;">' + washes + '</div>' +
+                        '</div></div>'
+                } catch (e) { return core }
             }
 
             function upgradeRowsHtml() {
@@ -11225,12 +11245,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         })
                         tip.style.opacity = '1'
                         tip.style.transform = 'translateX(-50%) translateY(0)'
-                        // 异步取皮肤属性填入提示
+                        // 异步取皮肤属性填入提示（🟢 2026-10-23 只显示皮肤额外被动，不重复技能/被动/等级，无加血）
                         try {
-                            const sa = typeof getSkinAttribute === 'function' ? getSkinAttribute(cardName, sk, false, curLevel) : null
-                            const sd = sa && sa.desc ? String(sa.desc) : ''
-                            const saDef = typeof getSkinAttribute === 'function' ? getSkinAttribute(cardName, '默认', false, curLevel) : null
-                            if (sd && sd !== (saDef && saDef.desc)) tip.innerHTML = '<b style="color:#ffd75e;">' + esc(sk) + '</b>\n' + esc(sd)
+                            const sd = typeof getSkinExtraPassive === 'function' ? getSkinExtraPassive(cardName, sk) : ''
+                            if (sd) tip.innerHTML = '<b style="color:#ffd75e;">' + esc(sk) + '</b>\n' + esc(sd)
                         } catch (e) {}
                     })
                     wrapEl.addEventListener('mouseleave', () => {
@@ -11711,9 +11729,13 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             const subPInit = (st.passiveInitial && String(st.passiveInitial).trim()) || String(subMeta.passiveDesc || '').replace(/^(初始被动|满星被动)\s*/, '')
                             const subPFull = (st.passiveFull && String(st.passiveFull).trim()) || String(subMeta.passiveDesc2 || '').replace(/^(初始被动|满星被动)\s*/, '')
                             const skinRow = (subMeta.skins || []).find((s) => s.note === curSkin)
+                            let skinExtra = (skinRow && skinRow.describe) ? String(skinRow.describe) : ''
+                            // 🟢 2026-10-23 官方表没收录的皮肤回退动态/静态皮肤表（与主卡皮肤属性卡同源，只取额外被动）
+                            if (!skinExtra && typeof getSkinExtraPassive === 'function') skinExtra = getSkinExtraPassive(sub, curSkin)
+                            skinExtra = skinExtra.replace(/^【?皮肤额外被动】?[:：]?\s*/, '').replace(/^额外被动[:：]\s*/, '')
                             let html = ''
                             if (subSkill) html += '<div style="margin-top:2px;font-size:10.5px;line-height:1.5;"><b style="color:#ffd75e;">技能：</b>' + esc(subSkill) + '</div>'
-                            if (skinRow && skinRow.describe) html += '<div style="margin-top:4px;font-size:10.5px;line-height:1.5;"><b style="color:#8ef58a;">额外被动：</b>' + esc(skinRow.describe) + '</div>'
+                            if (skinExtra) html += '<div style="margin-top:4px;font-size:10.5px;line-height:1.5;"><b style="color:#8ef58a;">额外被动：</b>' + esc(skinExtra) + '</div>'
                             if (subPInit) html += '<div style="margin-top:4px;font-size:10.5px;line-height:1.5;"><b style="color:#8ef58a;">初始被动：</b>' + esc(subPInit) + '</div>'
                             if (subPFull) html += '<div style="margin-top:3px;font-size:10.5px;line-height:1.5;"><b style="color:#ffd75e;">满星被动：</b>' + esc(subPFull) + '</div>'
                             return html
@@ -11939,8 +11961,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             item.onclick = async () => {
                                 if (typeof setFusionSkin === 'function') { try { await setFusionSkin(sub, sk === '默认' ? '' : sk) } catch (e) {} }
                                 if (typeof invalidateFusionHalfCache === 'function') { try { await invalidateFusionHalfCache(sub) } catch (e) {} }
-                                paintCircles()      // 左圆：换成新皮肤的副卡立绘
-                                paintFuseSkinRow()  // 刷新选中态
+                                paintCircles()        // 左圆：换成新皮肤的副卡立绘
+                                paintFuseSkinRow()    // 刷新选中态
+                                paintSubSettings()    // 🟢 2026-10-23 左栏副卡信息框跟着换肤重绘（否则「额外被动」停留旧皮肤，用户反馈）
                                 await reapplyPreviewCard()
                             }
                             hdPortraitUrl(sub, sk === '默认' ? sub : sk).then((u) => { if (u) im.src = u }).catch(() => {})
@@ -12011,14 +12034,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         mohuaCard.style.display = 'none'
                     }
                 } catch (e) { mohuaCard.style.display = 'none' }
-                // 皮肤属性：当前皮肤（非默认）的专属文案；与默认皮肤完全一致时不显示（避免与被动卡重复）
+                // 皮肤属性：只显示当前皮肤的「额外被动」一句话（🟢 2026-10-23 用户口径：技能/被动/等级上方已有，重复无意义）
                 try {
                     const skName = curSkin || '默认'
-                    if (skName !== '默认' && typeof getSkinAttribute === 'function') {
-                        const sa = getSkinAttribute(cardName, skName, false, curLevel)
-                        const saDef = getSkinAttribute(cardName, '默认', false, curLevel)
-                        const sd = sa && sa.desc ? String(sa.desc) : ''
-                        if (sd && sd !== (saDef && saDef.desc)) {
+                    if (skName !== '默认' && typeof getSkinExtraPassive === 'function') {
+                        const sd = getSkinExtraPassive(cardName, skName)
+                        if (sd) {
                             skinAttrCard.style.display = ''
                             skinAttrCard.innerHTML =
                                 '<span style="color:#7ef0b8;font-weight:900;">皮肤属性</span>' +
@@ -12554,13 +12575,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             skinAttrPanel.style.cssText = 'margin-top:8px;font-size:0.72rem;line-height:1.55;color:rgba(255,255,255,0.75);background:rgba(255,152,0,0.08);border:1px solid rgba(255,152,0,0.25);border-radius:6px;padding:6px 8px;';
             function _renderSkinAttrPanel(selSkin) {
                 try {
-                    const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[mainName];
-                    if (!d || !d.skins || !d.skins[selSkin]) {
-                        skinAttrPanel.innerHTML = selSkin === '默认' ? '<span style="opacity:0.5">默认皮肤无额外属性</span>' : '<span style="opacity:0.5">该皮肤暂无额外属性</span>';
-                        return;
-                    }
-                    const s = d.skins[selSkin];
-                    skinAttrPanel.innerHTML = s.extraPassive ? ('<span style="color:#ff9800;font-weight:600;">皮肤属性：</span>' + s.extraPassive) : '<span style="opacity:0.5">该皮肤无额外属性</span>';
+                    const sd = (typeof getSkinExtraPassive === 'function') ? getSkinExtraPassive(mainName, selSkin) : ''
+                    skinAttrPanel.innerHTML = sd ? ('<span style="color:#ff9800;font-weight:600;">皮肤属性：</span>' + _esc(sd)) : (selSkin === '默认' ? '<span style="opacity:0.5">默认皮肤无额外属性</span>' : '<span style="opacity:0.5">该皮肤暂无额外属性</span>');
                 } catch (e) { skinAttrPanel.innerHTML = ''; }
             }
             skinWrap.after(skinAttrPanel);
@@ -12793,10 +12809,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 subSkinAttrPanel.style.cssText = 'margin-top:6px;font-size:0.68rem;line-height:1.55;color:rgba(255,255,255,0.75);background:rgba(255,152,0,0.08);border:1px solid rgba(255,152,0,0.2);border-radius:6px;padding:5px 7px;';
                 function _renderSubSkinAttrPanel(selSkin) {
                     try {
-                        const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[_subHero];
-                        if (!d || !d.skins || !d.skins[selSkin]) { subSkinAttrPanel.innerHTML = '<span style="opacity:0.5">暂无皮肤属性</span>'; return; }
-                        const s = d.skins[selSkin];
-                        subSkinAttrPanel.innerHTML = s.extraPassive ? ('<span style="color:#ff9800;font-weight:600;">皮肤属性：</span>' + s.extraPassive) : '<span style="opacity:0.5">该皮肤无额外属性</span>';
+                        const sd = (typeof getSkinExtraPassive === 'function') ? getSkinExtraPassive(_subHero, selSkin) : ''
+                        subSkinAttrPanel.innerHTML = sd ? ('<span style="color:#ff9800;font-weight:600;">皮肤属性：</span>' + _esc(sd)) : '<span style="opacity:0.5">该皮肤暂无额外属性</span>';
                     } catch (e) { subSkinAttrPanel.innerHTML = ''; }
                 }
                 subSkinWrap.after(subSkinAttrPanel);
