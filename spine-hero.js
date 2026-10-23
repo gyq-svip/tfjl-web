@@ -109,54 +109,65 @@
     try {
       const sw = vb.size.x, sh = vb.size.y
       if (!(sw > 0 && sh > 0)) return null
-      const N = 320
-      const s = Math.min((N - 6) / sw, (N - 6) / sh)
-      const oc = document.createElement('canvas')
-      oc.width = N; oc.height = N
-      const c2 = oc.getContext('2d', { willReadFrequently: true })
+      const N = 512
       const cx = vb.off.x + sw / 2, cy = vb.off.y + sh / 2
       const stt = new spine.AnimationState(new spine.AnimationStateData(skData))
       const dur = anim ? (anim.duration || 0) : 0
       const steps = Math.max(6, Math.ceil(dur * 12))
-      const acc = new Uint8Array(N * N)
-      for (let i = 0; i <= steps; i++) {
-        const tmp = new spine.Skeleton(skData)
-        tmp.setToSetupPose()
-        if (anim) { stt.clearTracks(); stt.setAnimation(0, anim.name, false); stt.update((dur * i) / steps); stt.apply(tmp) }
-        if (hideFx) hideFxSlots(tmp)
-        if (hideIdx) { for (let k = 0; k < hideIdx.length; k++) { const _sl = tmp.slots[hideIdx[k]]; if (_sl) _sl.attachment = null } }
-        tmp.updateWorldTransform()
-        c2.clearRect(0, 0, N, N)
-        c2.save()
-        c2.translate(N / 2, N / 2)
-        c2.scale(s, -s)
-        c2.translate(-cx, -cy)
-        const r2 = new spine.canvas.SkeletonRenderer(c2)
-        r2.triangleRendering = true
-        r2.draw(tmp)
-        c2.restore()
-        const data = c2.getImageData(0, 0, N, N).data
-        for (let p = 3, o = 0; o < N * N; p += 4, o++) { if (data[p] > 24) acc[o] = 1 }
-      }
-      let minX = 1e9, minY = 1e9, maxX = -1, maxY = -1
-      for (let y = 0; y < N; y++) {
-        const row = y * N
-        for (let x = 0; x < N; x++) {
-          if (acc[row + x]) {
-            if (x < minX) minX = x
-            if (x > maxX) maxX = x
-            if (y < minY) minY = y
-            if (y > maxY) maxY = y
+      // 🟢 2026-10-23 两遍测量：第一遍按「骨架整盒」定标——fx 附件会把整盒撑得极大
+      //   （如后羿的火焰），可见内容被缩到几十像素，细线/半透明像素 alpha 低于阈值被漏掉，
+      //   union 偏小 → 实时渲染放得太大、人物溢出画布（后羿半截身子被切）。
+      //   第二遍按第一遍的 union 放大重测，精度足够。
+      const pass = function (fitW, fitH) {
+        const s = Math.min((N - 6) / fitW, (N - 6) / fitH)
+        if (!(s > 0)) return null
+        const oc = document.createElement('canvas')
+        oc.width = N; oc.height = N
+        const c2 = oc.getContext('2d', { willReadFrequently: true })
+        const acc = new Uint8Array(N * N)
+        for (let i = 0; i <= steps; i++) {
+          const tmp = new spine.Skeleton(skData)
+          tmp.setToSetupPose()
+          if (anim) { stt.clearTracks(); stt.setAnimation(0, anim.name, false); stt.update((dur * i) / steps); stt.apply(tmp) }
+          if (hideFx) hideFxSlots(tmp)
+          if (hideIdx) { for (let k = 0; k < hideIdx.length; k++) { const _sl = tmp.slots[hideIdx[k]]; if (_sl) _sl.attachment = null } }
+          tmp.updateWorldTransform()
+          c2.clearRect(0, 0, N, N)
+          c2.save()
+          c2.translate(N / 2, N / 2)
+          c2.scale(s, -s)
+          c2.translate(-cx, -cy)
+          const r2 = new spine.canvas.SkeletonRenderer(c2)
+          r2.triangleRendering = true
+          r2.draw(tmp)
+          c2.restore()
+          const data = c2.getImageData(0, 0, N, N).data
+          for (let p = 3, o = 0; o < N * N; p += 4, o++) { if (data[p] > 24) acc[o] = 1 }
+        }
+        let minX = 1e9, minY = 1e9, maxX = -1, maxY = -1
+        for (let y = 0; y < N; y++) {
+          const row = y * N
+          for (let x = 0; x < N; x++) {
+            if (acc[row + x]) {
+              if (x < minX) minX = x
+              if (x > maxX) maxX = x
+              if (y < minY) minY = y
+              if (y > maxY) maxY = y
+            }
           }
         }
+        if (maxX < 0) return null
+        const toWx = function (px) { return (px - N / 2) / s + cx }
+        const toWy = function (py) { return -(py - N / 2) / s + cy }
+        const wx1 = toWx(minX), wx2 = toWx(maxX + 1)
+        const wy1 = toWy(maxY + 1), wy2 = toWy(minY)
+        if (!(wx2 > wx1) || !(wy2 > wy1)) return null
+        return { off: new spine.Vector2(wx1, wy1), size: new spine.Vector2(wx2 - wx1, wy2 - wy1) }
       }
-      if (maxX < 0) return null
-      const toWx = function (px) { return (px - N / 2) / s + cx }
-      const toWy = function (py) { return -(py - N / 2) / s + cy }
-      const wx1 = toWx(minX), wx2 = toWx(maxX + 1)
-      const wy1 = toWy(maxY + 1), wy2 = toWy(minY) // canvas y 向下，世界 y 向上
-      if (!(wx2 > wx1) || !(wy2 > wy1)) return null
-      return { off: new spine.Vector2(wx1, wy1), size: new spine.Vector2(wx2 - wx1, wy2 - wy1) }
+      const r1 = pass(sw, sh)
+      if (!r1) return null
+      const r2 = pass(r1.size.x * 1.08, r1.size.y * 1.08)
+      return r2 || r1
     } catch (e) { return null }
   }
 
@@ -268,7 +279,10 @@
         skeleton.slots.forEach(function (sl, i) {
           const bn = (sl.bone && sl.bone.data && sl.bone.data.name) || ''
           const an = (sl.data && sl.data.attachmentName) || (sl.attachment && sl.attachment.name) || ''
-          if (fxSeg.test(bn) || fxSeg.test(an) || /特效|texiao|guangxiao/i.test(bn)) fxHide.push(i)
+          // 🟢 2026-10-23 槽位本身的名字也要查：皮肤模型（如骨弓 huarong）的 fx 槽 setup 为空、
+          //   附件由动画挂上，启动时 an/bn 都不含 fx，只靠槽名（fx/bingyan/…）才认得出
+          const sn = (sl.data && sl.data.name) || ''
+          if (fxSeg.test(bn) || fxSeg.test(an) || fxSeg.test(sn) || /特效|texiao|guangxiao/i.test(bn)) fxHide.push(i)
         })
         if (!fxHide.length) fxHide = null
       }
