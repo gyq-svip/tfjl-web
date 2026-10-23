@@ -227,6 +227,13 @@
     try {
       assets = await loadAssets(folder, opts.pngs, opts.model)
     } catch (e) {
+      // 🟢 2026-10-23 皮肤模型资源加载失败（404/网络/坏缓存）→ 自动回退基础模型重播，
+      //   避免画布整块空白（用户反馈「十三姨·小野无动图」即此场景）
+      if (opts.model) {
+        statusCb('皮肤模型加载失败，回退基础模型')
+        play(canvas, folder, Object.assign({}, opts, { model: '', pngs: (man && man.pngs) || 0, autoFxFallback: false }))
+        return
+      }
       statusCb('读取骨骼资源失败: ' + folder)
       return
     }
