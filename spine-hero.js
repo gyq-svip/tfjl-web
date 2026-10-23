@@ -311,6 +311,29 @@
           const sn = (sl.data && sl.data.name) || ''
           if (fxSeg.test(bn) || fxSeg.test(an) || fxSeg.test(sn) || /特效|texiao|guangxiao/i.test(bn)) fxHide.push(i)
         })
+        // 🔴 2026-10-24 规则化补强：官方部分模型 setup pose 下所有槽附件为空、槽名也不含 fx，
+        //   特效只在动画 AttachmentTimeline 里挂载。典型如死神 fashi：槽 shen01/shen02 →
+        //   images/fx/shen1/*、images/fx/shen4/*（setup 全空、槽名无 fx）→ 上面 bn/an/sn 三个判据
+        //   全部落空 → 该槽不进 fxHide → 渲染帧（frameHide2）不压制 → 默认皮肤的大镰刀/红色纹样
+        //   叠在当前皮肤上，用户看到的就是「重叠」；同时把包围盒撑大导致角色偏移变小。
+        //   注意：测量路径 measureVisualBounds 是在动画 apply 之后调 hideFxSlots，能读到附件名所以没问题；
+        //   只有渲染路径（基于 setup pose 的 fxHide 数组）会漏，故在此按动画 timeline 补齐。
+        try {
+          const _animFx = {}
+          ;(skData.animations || []).forEach(function (anim) {
+            ;(anim.timelines || []).forEach(function (tl) {
+              if (!tl || tl.slotIndex == null || !tl.attachmentNames) return
+              const _ns = tl.attachmentNames
+              for (let k = 0; k < _ns.length; k++) {
+                if (_ns[k] && fxSeg.test(_ns[k])) { _animFx[tl.slotIndex] = 1; break }
+              }
+            })
+          })
+          Object.keys(_animFx).forEach(function (si) {
+            const _i = Number(si)
+            if (fxHide.indexOf(_i) < 0) fxHide.push(_i)
+          })
+        } catch (e) {}
         if (!fxHide.length) fxHide = null
       }
       // 🟢 2026-10-23 渲染期槽位隐藏：如 yilidan/jietoubawang/duye 的 images/a0（半尺寸身体拷贝，
