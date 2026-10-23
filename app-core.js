@@ -10914,10 +10914,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const auraEl = document.createElement('div')
             // 官方版式：光环环绕角色躯干（不是平铺在脚下），直径略大于角色肩宽、中心落在腰腹；
             // top 即圆心（动画 transform 带 translate(-50%,-50%)）；z-index 低于 Spine 画布 → 环从角色身后透出，不遮挡人物
-            auraEl.style.cssText = 'position:absolute;left:50%;top:43%;width:min(27%,270px);aspect-ratio:1/1;background:url(hero-ui/aura.png) center/contain no-repeat;pointer-events:none;z-index:0;display:none;animation:hdAuraSpin 16s linear infinite;filter:drop-shadow(0 0 6px rgba(140,0,0,0.55));'
+            auraEl.style.cssText = 'position:absolute;left:50%;top:36%;width:min(27%,270px);aspect-ratio:1/1;background:url(hero-ui/aura.png) center/contain no-repeat;pointer-events:none;z-index:0;display:none;animation:hdAuraSpin 16s linear infinite;filter:drop-shadow(0 0 6px rgba(140,0,0,0.55));'
             card.appendChild(auraEl)
             const shadowEl = document.createElement('div')
-            shadowEl.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);bottom:11%;width:30%;height:8%;background:url(hero-ui/shadow.png) center/contain no-repeat;opacity:0.5;pointer-events:none;z-index:1;'
+            // 🟢 2026-10-23 阴影随脚上移到石台面（中心≈77%，原 11% 在台体前方，与站位 0.87→0.78 联动）
+            shadowEl.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);bottom:19%;width:30%;height:8%;background:url(hero-ui/shadow.png) center/contain no-repeat;opacity:0.5;pointer-events:none;z-index:1;'
             card.appendChild(shadowEl)
             // 魔化态同步光环显示
             function paintMoHuaAura() {
@@ -11390,17 +11391,13 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     else { try { updateAllCardLevelBadges() } catch (e) {} }
                 })
                 mohuaWrap.appendChild(mb)
-                const mLabel = document.createElement('div')
-                mLabel.style.cssText = 'font-size:9.5px;font-weight:900;letter-spacing:0.04em;color:#c9b8ff;text-shadow:0 1px 2px rgba(0,0,0,.7);'
-                mLabel.textContent = '魔化'
-                mohuaWrap.appendChild(mLabel)
+                // 🟢 2026-10-23 用户要求去掉「魔化」文字提醒，只留图标
                 actions.appendChild(mohuaWrap)
                 // 开/关视觉态：金边 + 紫金光晕
                 const paintMohuaBtn = () => {
                     const on = getCardMoHua(cardId, handType)
                     mb.style.borderColor = on ? '#ffd75e' : 'rgba(180,220,255,0.55)'
                     mb.style.boxShadow = on ? '0 0 10px 2px rgba(255,215,94,0.55),0 3px 8px rgba(0,0,0,0.5)' : '0 3px 8px rgba(0,0,0,0.5)'
-                    mLabel.style.color = on ? '#ffd75e' : '#c9b8ff'
                 }
                 paintMohuaBtn()
             }
@@ -11583,9 +11580,23 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         }
                     } catch (e) { variants = [] }
                     // 融合名 → 副卡英雄；普通英雄名 → 本人（修复「融合立绘全显示主卡皮肤」）
+                    // 🟢 2026-10-23 工程融合 components 用短名（火炮/射线/潜艇/宝库），官方英雄是 4 字整名
+                    //   （邪能火炮/侏儒射线/微型潜艇/地精宝库）；不解析则 heroesOfficialMap/skins/属性表按短名全查空，
+                    //   融合弹窗副卡属性/技能全「—」（用户反馈「名字对不上数据」）。
+                    const resolveFusionPartName = (n) => {
+                        if (!n) return n
+                        try { if (window.heroesOfficialMap && window.heroesOfficialMap[n]) return n } catch (e) {}
+                        try {
+                            if (window.heroesOfficialMap) {
+                                const hits = Object.keys(window.heroesOfficialMap).filter((k) => k.length > n.length && k.slice(-n.length) === n)
+                                if (hits.length === 1) return hits[0]
+                            }
+                        } catch (e) {}
+                        return n
+                    }
                     const heroOf = (name) => {
                         const p = (typeof getFusionParts === 'function') ? getFusionParts(name) : null
-                        return (p && p.length >= 2) ? p[1] : name
+                        return (p && p.length >= 2) ? resolveFusionPartName(p[1]) : name
                     }
                     const mainOf = (name) => {
                         const p = (typeof getFusionParts === 'function') ? getFusionParts(name) : null
@@ -11863,7 +11874,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             try { vs = (typeof getFusionVariantsForBase === 'function') ? getFusionVariantsForBase(baseHero) : [] } catch (e) {}
                             vs.forEach((fn) => {
                                 const parts = (typeof getFusionParts === 'function') ? getFusionParts(fn) : null
-                                const partner = (parts && parts.length >= 2) ? parts[1] : fn
+                                const partner = (parts && parts.length >= 2) ? resolveFusionPartName(parts[1]) : fn
                                 const item = document.createElement('div')
                                 item.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;'
                                 const im = document.createElement('img')
@@ -11929,7 +11940,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         fusePickRow.appendChild(tip)
                         vs.forEach((fn) => {
                             const parts = (typeof getFusionParts === 'function') ? getFusionParts(fn) : null
-                            const partner = (parts && parts.length >= 2) ? parts[1] : fn
+                            const partner = (parts && parts.length >= 2) ? resolveFusionPartName(parts[1]) : fn
                             const item = document.createElement('div')
                             item.title = '融合为「' + fn + '」（副卡：' + partner + '）'
                             item.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;'
@@ -12060,9 +12071,25 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
 
             // 当前皮肤对应的独立骨骼模型名（官方每皮肤一套；没有则用基础模型）
+            // 🟢 2026-10-23 云端皮肤注册表混有短名（打狗棒·火炮 vs 官方 打狗棒·邪能火炮），
+            //   旧存储的 curSkin 短名精确匹配失败会退回基础模型（用户反馈「打狗棒动图不对」），
+            //   补前后缀容错匹配
             function hdSkinModel(skinName) {
-                const s = ((meta && meta.skins) || []).find((x) => x.note === skinName)
-                return (s && s.model) || ''
+                const rows = ((meta && meta.skins) || [])
+                const s = rows.find((x) => x.note === skinName)
+                if (s && s.model) return s.model
+                if (skinName) {
+                    // 短名形态：前缀（皮肤系列名）相同 + 官方后缀以短后缀结尾（打狗棒·火炮 → 打狗棒·邪能火炮）
+                    const sa = String(skinName).split('·')
+                    const s2 = rows.find((x) => {
+                        if (!x.note) return false
+                        if (x.note.endsWith(skinName) || skinName.endsWith(x.note)) return true
+                        const sb = String(x.note).split('·')
+                        return sa.length === 2 && sb.length === 2 && sa[0] === sb[0] && sb[1].endsWith(sa[1])
+                    })
+                    if (s2 && s2.model) return s2.model
+                }
+                return ''
             }
             // 按当前皮肤起播/重播动画（换皮肤后调用即切换模型）
             function hdPlaySpine() {
@@ -12077,14 +12104,20 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     //             普通播放器原样画出就是"杂质"（大团爆炸、身体残影拷贝…）
                     //   dedupe   同家族身体去重——半尺寸拷贝槽（images/a0 之于 a0000）按面积比自动隐藏
                     //   hideSlots index 里逐模型登记的隐藏槽
-                    //   fitByHeight + anchorFeet 统一高度、脚落影子处（bottom:11% → 87%）
+                    //   fitByHeight + anchorFeet 统一高度、脚落石台面（🟢 2026-10-23 实测 bg.png 台面 72%~82%，
+                    //             中心 77%；原 0.87 落在台体正面 → 用户反馈「站太靠前没站在石头上」）
+                    //   scale:1  跳过 index.scale（438 行 else 分支）——11 个带 scale 的模型（沙皇0.58/后羿2.2/
+                    //             钢拳1.6…）是「特效撑大包围盒」年代的补偿，tight+hideFx 后套用即大小参差
                     //   不再套官方 scale/x/y：那是给「特效撑大包围盒」的补偿，剔特效后反而不准
                     //   autoFxFallback idle 只动画特效槽的模型（萌萌）自动带特效重播
+                    //   🟢 2026-10-23 个别模型 idle 自带大特效（沙皇·金色火焰）渲染包围盒远大于本体，
+                    //      统一 0.58 会顶出画布上缘；按模型实测微调（目标可见高度 ≤0.62）
+                    const FIT_PAD_BY_SPINE = { shawang: 0.44 }
                     window.spineHero.play(cv, meta.spine, {
-                        fitPadding: 0.65, pngs, model, tight: true,
+                        fitPadding: FIT_PAD_BY_SPINE[meta.spine] || 0.58, pngs, model, tight: true,
                         hideFx: true, dedupe: true,
                         hideSlots: (man.hideSlots || []).concat((man.modelHideSlots || {})[model] || []),
-                        fitByHeight: true, anchorFeet: 0.87,
+                        fitByHeight: true, anchorFeet: 0.78, scale: 1,
                         autoFxFallback: true
                     })
                     // 🟢 2026-10-23 空渲染兜底提示：个别模型（如龟相）主体是 PathAttachment，
