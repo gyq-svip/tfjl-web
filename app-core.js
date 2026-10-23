@@ -11728,24 +11728,32 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             const subSkill = (st.skillDesc && String(st.skillDesc).trim()) || subMeta.skillDesc || ''
                             const subPInit = (st.passiveInitial && String(st.passiveInitial).trim()) || String(subMeta.passiveDesc || '').replace(/^(初始被动|满星被动)\s*/, '')
                             const subPFull = (st.passiveFull && String(st.passiveFull).trim()) || String(subMeta.passiveDesc2 || '').replace(/^(初始被动|满星被动)\s*/, '')
-                            const skinRow = (subMeta.skins || []).find((s) => s.note === curSkin)
-                            let skinExtra = (skinRow && skinRow.describe) ? String(skinRow.describe) : ''
-                            // 🟢 2026-10-23 官方表没收录的皮肤回退动态/静态皮肤表（与主卡皮肤属性卡同源，只取额外被动）
-                            if (!skinExtra && typeof getSkinExtraPassive === 'function') skinExtra = getSkinExtraPassive(sub, curSkin)
-                            skinExtra = skinExtra.replace(/^【?皮肤额外被动】?[:：]?\s*/, '').replace(/^额外被动[:：]\s*/, '')
+                            // 🟢 2026-10-23 皮肤额外被动移到下方「皮肤属性」盒统一展示（同栏不再重复）
                             let html = ''
                             if (subSkill) html += '<div style="margin-top:2px;font-size:10.5px;line-height:1.5;"><b style="color:#ffd75e;">技能：</b>' + esc(subSkill) + '</div>'
-                            if (skinExtra) html += '<div style="margin-top:4px;font-size:10.5px;line-height:1.5;"><b style="color:#8ef58a;">额外被动：</b>' + esc(skinExtra) + '</div>'
                             if (subPInit) html += '<div style="margin-top:4px;font-size:10.5px;line-height:1.5;"><b style="color:#8ef58a;">初始被动：</b>' + esc(subPInit) + '</div>'
                             if (subPFull) html += '<div style="margin-top:3px;font-size:10.5px;line-height:1.5;"><b style="color:#ffd75e;">满星被动：</b>' + esc(subPFull) + '</div>'
                             return html
                         }
                         // 左栏：副卡名 + 技能/被动/魔化（信息类），填入上段滚动区；被融合卡列表固定在底部 subFoot
+                        // 🟢 2026-10-23 用户要求：魔化下方空位加「皮肤属性」盒（当前副卡皮肤的额外被动，换肤随 paintSubSettings 重绘）
+                        let subSkinAttrHtml = ''
+                        try {
+                            const skName = curSkin || '默认'
+                            let sd = ''
+                            if (skName !== '默认' && typeof getSkinExtraPassive === 'function') {
+                                sd = String(getSkinExtraPassive(sub, skName) || '').replace(/^【?皮肤额外被动】?[:：]?\s*/, '').replace(/^额外被动[:：]\s*/, '')
+                            }
+                            subSkinAttrHtml = sd
+                                ? ('<b style="color:#ff9800;">皮肤属性（' + esc(skName) + '）：</b>' + esc(sd))
+                                : '<span style="opacity:0.55;">默认皮肤无额外属性</span>'
+                        } catch (e) { subSkinAttrHtml = '' }
                         subMain.innerHTML =
                             '<div style="font-weight:900;color:#ffd75e;margin-bottom:6px;">副卡：' + esc(sub) + '</div>' +
                             '<div id="hdFuseSubSkill" style="margin-bottom:8px;padding:6px 7px;background:rgba(0,0,0,0.28);border-radius:8px;">' + subSkillBlock(levels[lvIdx]) + '</div>' +
                             '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><span>魔化</span><label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:#e9b8ff;"><input type="checkbox" id="hdFuseSubMhChk" ' + (subMhOn ? 'checked' : '') + ' style="accent-color:#c77dff;"><span>开启魔化</span></label></div>' +
-                            '<div id="hdFuseSubMh" style="padding:6px 7px;background:rgba(40,10,46,0.6);border-radius:8px;font-size:11px;line-height:1.5;color:#e9b8ff;' + (subMhOn ? '' : 'display:none;') + '"></div>'
+                            '<div id="hdFuseSubMh" style="padding:6px 7px;background:rgba(40,10,46,0.6);border-radius:8px;font-size:11px;line-height:1.5;color:#e9b8ff;' + (subMhOn ? '' : 'display:none;') + '"></div>' +
+                            '<div id="hdFuseSubSkinAttr" style="margin-top:8px;padding:6px 7px;background:rgba(0,0,0,0.28);border-radius:8px;font-size:10.5px;line-height:1.5;color:#ffd9a0;">' + subSkinAttrHtml + '</div>'
                         // 右栏：数值在上段滚动区（主卡同款深蓝圆角行）；等级控件复用主卡样式，钉在底部
                         subMainR.innerHTML = '<div id="hdFuseSubStats">' + subStatRows(levels[lvIdx]) + '</div>'
                         // 🔴 2026-10-21 底部等级区（主卡同款：等级框 + 进度条 + 下一档 + 滑条 + tier 快捷档钮）
