@@ -11,6 +11,25 @@
 ;(function () {
   let spinePromise = null
   const assetCache = {} // folder -> { skData, atlas }（骨架/图集跨卡片共享，避免重复 fetch+解析）
+  // 🔴 2026-10-24 内存上限（LRU）：原实现 assetCache 只增不减、永不释放。
+  //    每个模型常驻「骨架数据 + 图集 + 全部已解码贴图位图」（单模型 2~3MB PNG → 解码后可达数 MB~十几 MB），
+  //    预热/逐个打开 98 个英雄后内存能涨到数百 MB~GB 级 → 页面卡顿、浏览器丢弃其它图片解码缓存，
+  //    表现为「静态皮肤加载不出来 / 切换不丝滑」。改为保留最近使用的 N 个模型，超出释放最旧的。
+  //    释放只删缓存引用，正在播放的 entry 由闭包持有，不受影响（重开该模型时从 HTTP/SW 缓存重取）。
+  const ASSET_CACHE_MAX = 8
+  const _assetCacheOrder = []
+  function _assetCacheTrim(key) {
+    try {
+      const i = _assetCacheOrder.indexOf(key)
+      if (i >= 0) _assetCacheOrder.splice(i, 1)
+      _assetCacheOrder.push(key)
+      while (_assetCacheOrder.length > ASSET_CACHE_MAX) {
+        const old = _assetCacheOrder.shift()
+        if (old === key) continue
+        delete assetCache[old]
+      }
+    } catch (e) {}
+  }
   const vbCache = {}    // folder@model -> { off, size }（按真实不透明像素测得的紧包围盒）
   const vbBoundsCache = {}  // 🔴 2026-10-21 folder@model -> 骨架包围盒（首次测量后复用，省一次动画采样）
   const vbFxCache = {}      // 🔴 2026-10-21 folder@model -> 排除特效骨的本体包围盒
@@ -203,6 +222,7 @@
     const skData = new spine.SkeletonJson(new spine.AtlasAttachmentLoader(atlas)).readSkeletonData(skeletonJson)
     const entry = { skData: skData, atlas: atlas }
     assetCache[key] = entry
+    _assetCacheTrim(key) // 🔴 2026-10-24 LRU 上限：释放最久未用的模型，防内存无限增长
     return entry
   }
 
@@ -531,6 +551,16 @@
   }
   async function preloadAll(opts) {
     opts = opts || {}
+    // 🔴 2026-10-24 网页版默认拒绝批量预热（仅桌面端本地资源自动跑）：
+    //    网页版资源走 github.io 远程（87MB / 1132 文件），批量预热会长期占满带宽与连接池，
+    //    把「静态皮肤图片」请求挤到排队/超时 → 英雄皮肤不显示、切项目卡顿（桌面端同包本地读取，不受影响）。
+    //    opts.force = true 表示用户在设置面板里手动点了「立即下载全部」，尊重用户显式操作，照常执行。
+    if (!opts.force) {
+      try {
+        const _isTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__ || (navigator.userAgent || '').indexOf('Tauri') >= 0)
+        if (!_isTauri) { console.log('[SPINE] 网页版跳过批量预热（避免挤占静态皮肤加载）'); return }
+      } catch (e) {}
+    }
     if (_pl.running) return
     try {
       const c = navigator.connection

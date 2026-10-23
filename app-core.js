@@ -12195,8 +12195,18 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         // 供阵容图库等外部入口复用同一套英雄详情面板
         window.showHeroDetailModal = showHeroDetailModal
         // 🔴 2026-10-21 页面加载 8 秒后在空闲时段后台预热全部英雄动画资源（进度存 localStorage，可断点续传）
+        // 🔴 2026-10-24 【网页版禁用自动预热】修复「加了动态皮肤后静态皮肤不显示 / 切项目卡」：
+        //    预热会在 idle 里持续串行拉取 data/hero-spine 全量资源（实测 87MB / 1132 文件，
+        //    98 个英雄 + 275 个皮肤模型），而静态皮肤 skins/ 才 22~27MB —— 附加功能的下载量是主路径的 3~4 倍。
+        //    网页版走 github.io 远程拉取，预热长期占满带宽与连接池（每域 6 并发）→
+        //    静态皮肤 .skin 图片请求排队/超时 → 「很多英雄不显示皮肤」「切换不丝滑」；
+        //    且 assetCache 常驻内存无上限，预热越多内存越涨 → 页面整体卡顿。
+        //    桌面端资源同包发布走本地 file://，零网络开销，不受影响，故仅网页版禁用自动预热。
+        //    动态皮肤仍然可用：打开详情时走「按需预拉当前英雄」（见上方 hdPlaySpine 前的 _pre 预拉 + play 内 loadAssets）。
         setTimeout(function () {
             try {
+                const _isTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__ || location.protocol === 'tauri:' || location.protocol === 'asset:')
+                if (!_isTauri) return // 网页版：不自动全量预热，把带宽与内存留给静态皮肤
                 let inc = false
                 try { inc = localStorage.getItem('tfjl_spine_preload_skins') === '1' } catch (e) {}
                 if (window.spineHero && window.spineHero.preloadAll) window.spineHero.preloadAll({ includeSkins: inc })
@@ -12344,11 +12354,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     h += '<div style="margin-top:10px;padding:9px 12px;border:1px solid rgba(129,199,132,0.35);background:rgba(129,199,132,0.08);border-radius:8px;font-size:0.76rem;line-height:1.7;color:rgba(255,255,255,0.78);">💾 桌面版 ' + (_exeVer || '') + '：可以不逐个下载 —— 直接点「更新皮肤资源」，会一次性下载 皮肤+动画 两个整包（≈20MB + ≈84MB）解压到本地，之后动画/皮肤模型全部秒开（断网也能看）。下面的下载按钮是给不想下整包的人用的。</div>'
                 }
             } else {
-                h += '<div style="margin-top:10px;padding:9px 12px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);border-radius:8px;font-size:0.76rem;line-height:1.7;color:rgba(255,255,255,0.55);">🌐 网页版没有「整包下载」通道（那是桌面版能力），继续用下面的下载 / 按需加载即可。</div>'
+                h += '<div style="margin-top:10px;padding:9px 12px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);border-radius:8px;font-size:0.76rem;line-height:1.7;color:rgba(255,255,255,0.55);">🌐 网页版没有「整包下载」通道（那是桌面版能力）。🟢 2026-10-24 起网页版<b style="color:#ffd75e;">不再后台自动下载动画</b>——动画整包 ≈87MB，自动下载会占满带宽把静态皮肤挤掉（表现为英雄皮肤不显示、切换卡）。不影响使用：<b>打开英雄详情时会自动按需加载该英雄的动画</b>；想提前缓存就手动点下面的按钮。</div>'
             }
             h += '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">'
-            h += '<button onclick="window.spineHero&&window.spineHero.preloadAll();setTimeout(refreshSpineCacheInfo,300)" style="background:linear-gradient(135deg,#7e57c2,#5e35b1);border:none;color:#fff;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">▶ 继续下载（默认）</button>'
-            h += '<button onclick="window.spineHero&&window.spineHero.preloadAll({includeSkins:true});setTimeout(refreshSpineCacheInfo,300)" style="background:rgba(179,157,219,0.2);border:1px solid rgba(179,157,219,0.5);color:#d1c4e9;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">⚡ 立即下载全部（含皮肤）</button>'
+            h += '<button onclick="window.spineHero&&window.spineHero.preloadAll({force:true});setTimeout(refreshSpineCacheInfo,300)" style="background:linear-gradient(135deg,#7e57c2,#5e35b1);border:none;color:#fff;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">▶ 继续下载（默认）</button>'
+            h += '<button onclick="window.spineHero&&window.spineHero.preloadAll({includeSkins:true,force:true});setTimeout(refreshSpineCacheInfo,300)" style="background:rgba(179,157,219,0.2);border:1px solid rgba(179,157,219,0.5);color:#d1c4e9;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">⚡ 立即下载全部（含皮肤）</button>'
             h += '<button onclick="window.spineHero&&window.spineHero.preloadStop();setTimeout(refreshSpineCacheInfo,300)" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">⏸ 停止</button>'
             h += '<button onclick="if(confirm(\'清空动画下载记录？缓存文件仍在，只会重新开始统计并按需重拉。\')){window.spineHero&&window.spineHero.preloadReset();setTimeout(refreshSpineCacheInfo,300)}" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">🔄 重置进度</button>'
             h += '</div>'
