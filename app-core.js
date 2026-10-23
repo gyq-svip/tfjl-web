@@ -10830,6 +10830,37 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         }
 
         function showHeroDetailModal(event, cardId, cardType, handType = 'my', cardName = '') {
+            // 🟢 2026-10-23 皮肤缩略图按钮 + 选中态切换（定义在顶层，函数声明提升到本函数所有嵌套作用域，
+            //   皮肤 Dock / 融合主副卡缩略图共用；之前定义嵌套在融合回调里，导致 Dock 调不到）
+            function createSkinThumb(heroName, skin, selected, onClick) {
+                const b = document.createElement('button');
+                b.className = 'skin-thumb-btn';
+                b.dataset.skin = skin;
+                b.style.cssText = 'position:relative;width:56px;height:56px;border-radius:8px;border:2px solid ' + (selected ? '#ff9800' : 'rgba(255,255,255,0.2)') + ';background:#2a2a4a;overflow:hidden;cursor:pointer;padding:0;flex-shrink:0;transition:border-color .15s;';
+                const img = document.createElement('img');
+                img.style.cssText = 'width:100%;height:100%;object-fit:cover;opacity:0.45;';
+                img.alt = '';
+                img.decoding = 'async';
+                b.appendChild(img);
+                const label = document.createElement('div');
+                label.textContent = skin;
+                label.style.cssText = 'position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.78);color:#fff;font-size:0.55rem;line-height:1.1;padding:2px 2px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+                b.appendChild(label);
+                b.onclick = onClick;
+                if (window.resolveHeroSkinUrl) {
+                    const skinForUrl = (skin === '默认') ? heroName : skin;
+                    window.resolveHeroSkinUrl(heroName, skinForUrl).then(url => {
+                        if (url) { img.src = url; img.style.opacity = '1'; }
+                    }).catch(() => {});
+                }
+                return b;
+            }
+            function setSkinThumbSelected(btnWrap, skin) {
+                btnWrap.querySelectorAll('.skin-thumb-btn').forEach(x => {
+                    const sel = x.dataset.skin === skin;
+                    x.style.borderColor = sel ? '#ff9800' : 'rgba(255,255,255,0.2)';
+                });
+            }
             if (event) { try { event.stopPropagation(); event.preventDefault(); } catch (e) {} }
             document.querySelectorAll('.hero-detail-root').forEach((el) => { try { el.remove(); } catch (e) {} })
             if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('打开英雄详情弹窗')
@@ -10941,6 +10972,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const mohuaCard = document.createElement('div')
             mohuaCard.style.cssText = 'margin-top:2%;background:rgba(40,10,46,0.92);border:1px solid rgba(192,132,252,0.6);border-radius:10px;padding:8px 10px;color:#f3e8ff;font-size:clamp(10px,1.1vw,13px);line-height:1.55;display:none;'
             left.appendChild(mohuaCard)
+            // 皮肤属性卡（当前皮肤（非默认）的专属属性文案，位于魔化属性上方）
+            const skinAttrCard = document.createElement('div')
+            skinAttrCard.style.cssText = 'margin-top:2%;background:rgba(8,38,66,0.85);border:1px solid rgba(126,240,184,0.4);border-radius:10px;padding:8px 10px;color:#e3f6ff;font-size:clamp(10px,1.1vw,13px);line-height:1.55;display:none;'
+            left.appendChild(skinAttrCard)
 
             // —— 右列：属性详情 / 升级预览 ——
             const right = document.createElement('div')
@@ -11068,10 +11103,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 // 🔴 2026-10-20 减伤读数：与主页「减伤」弹窗同一套 drTables，实时一致
                 const drT = getDrTable(drSide)
                 const drVal = (drT.洗炼 && drT.洗炼[mainName] != null) ? drT.洗炼[mainName] : null
-                return (
-                    core +
-                    hdStatRowHtml('<span style="font-size:20px;line-height:1;">🛡</span>', '减伤', drVal != null ? drVal + '%' : '—')
-                )
+                let html = core + hdStatRowHtml('<span style="font-size:20px;line-height:1;">🛡</span>', '减伤', drVal != null ? drVal + '%' : '—')
+                // 🟢 2026-10-23 洗炼词条（展示）：纯粹 / 魔抗 / 护甲，与洗炼面板同一存储实时同步
+                try {
+                    const ex = (window.cardWashExtras || {})[mainName] || {}
+                    const row = (key, unit, icon) => { html += hdStatRowHtml('<span style="font-size:18px;line-height:1;">' + icon + '</span>', key, ex[key] != null ? ex[key] + unit : '—') }
+                    row('纯粹', '%', '✧'); row('魔抗', '', '◈'); row('护甲', '', '⛨')
+                } catch (e) {}
+                return html
             }
 
             function upgradeRowsHtml() {
@@ -11134,36 +11173,77 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 return b
             }
 
-            // 皮肤
+            // 皮肤（苹果 Dock 式：悬停放大 + 邻项连带放大，平滑过渡；悬停时头顶显示皮肤属性）
             actions.appendChild(roundBtn('hero-ui/icon-skin.png', '皮肤', () => {
                 if (pop.dataset.mode === 'skin') { pop.style.display = 'none'; pop.dataset.mode = ''; return }
                 pop.dataset.mode = 'skin'
                 pop.style.display = 'block'
                 const skins = getAvailableSkins(cardName)
-                pop.innerHTML = '<div style="font-size:12px;color:#9fc7ff;font-weight:800;margin-bottom:8px;">皮肤</div>'
-                const wrap = document.createElement('div')
-                wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;max-width:min(520px,80vw);'
+                pop.innerHTML =
+                    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">' +
+                    '<span style="font-size:12px;color:#9fc7ff;font-weight:800;">皮肤 · 悬停预览 / 点击切换</span>' +
+                    '<button data-popclose style="width:22px;height:22px;border:0;border-radius:6px;background:#e0483c;color:#fff;font-weight:900;font-size:12px;cursor:pointer;">✕</button></div>'
+                const dock = document.createElement('div')
+                dock.style.cssText = 'display:flex;align-items:flex-end;justify-content:center;gap:4px;padding:16px 6px 8px;'
+                pop.appendChild(dock)
+                pop.querySelector('[data-popclose]').onclick = () => { pop.style.display = 'none'; pop.dataset.mode = '' }
+                const pickSkin = async (sk) => {
+                    curSkin = sk
+                    setSkinThumbSelected(dock, sk)
+                    hdPlaySpine() // 换皮肤 → 切换独立骨骼模型重播
+                    if (libSlot && typeof window._llSet === 'function') {
+                        const lt = libSlot.getAttribute('data-tab'), ll = libSlot.getAttribute('data-lid'), lsd = libSlot.getAttribute('data-side') || 'my'
+                        const baseName = (window.getFusionParts && window.getFusionParts(cardName)) ? window.getFusionParts(cardName)[0] : cardName
+                        window._llSet(lt, ll, 'skin', (baseName || cardName) + '#' + lsd, sk)
+                        if (typeof window._llReapplySlot === 'function') window._llReapplySlot(libSlot)
+                    } else if (typeof setCardSkin === 'function') {
+                        await setCardSkin(cardId, sk, handType)
+                        setTimeout(() => { try { updateAllCardLevelBadges() } catch (e) {} }, 0)
+                    }
+                    paintAll()
+                }
+                const items = []
                 skins.forEach((sk) => {
-                    const sel = sk === curSkin
-                    const b = createSkinThumb(cardName, sk, sel, async () => {
-                        curSkin = sk
-                        setSkinThumbSelected(wrap, sk)
-                        if (libSlot && typeof window._llSet === 'function') {
-                            const lt = libSlot.getAttribute('data-tab'), ll = libSlot.getAttribute('data-lid'), lsd = libSlot.getAttribute('data-side') || 'my'
-                            const baseName = (window.getFusionParts && window.getFusionParts(cardName)) ? window.getFusionParts(cardName)[0] : cardName
-                            window._llSet(lt, ll, 'skin', (baseName || cardName) + '#' + lsd, sk)
-                            if (typeof window._llReapplySlot === 'function') window._llReapplySlot(libSlot)
-                        } else if (typeof setCardSkin === 'function') {
-                            await setCardSkin(cardId, sk, handType)
-                            setTimeout(() => { try { updateAllCardLevelBadges() } catch (e) {} }, 0)
-                        }
+                    const wrapEl = document.createElement('div')
+                    wrapEl.style.cssText = 'position:relative;display:flex;flex-direction:column;align-items:center;transform-origin:bottom center;transition:transform .16s cubic-bezier(.2,.9,.3,1.25);'
+                    const b = createSkinThumb(cardName, sk, sk === curSkin, () => pickSkin(sk))
+                    wrapEl.appendChild(b)
+                    // 悬停提示：皮肤名 + 皮肤属性（位于放大后的头顶）
+                    const tip = document.createElement('div')
+                    tip.style.cssText = 'position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%) translateY(4px);width:max-content;max-width:210px;' +
+                        'background:rgba(4,20,42,0.97);border:1px solid rgba(120,200,255,0.55);border-radius:8px;padding:6px 9px;color:#eaf4ff;' +
+                        'font-size:11px;line-height:1.5;text-align:left;white-space:pre-line;opacity:0;pointer-events:none;transition:opacity .15s,transform .15s;z-index:5;box-shadow:0 6px 18px rgba(0,0,0,.5);'
+                    tip.innerHTML = '<b style="color:#ffd75e;">' + esc(sk) + '</b>'
+                    wrapEl.appendChild(tip)
+                    wrapEl.addEventListener('mouseenter', () => {
+                        // Dock 放大：悬停项 1.5，邻项 1.22 / 1.08，其余 1
+                        items.forEach((it, j) => {
+                            const d = Math.abs(j - items.indexOf(wrapEl))
+                            const s = d === 0 ? 1.5 : d === 1 ? 1.22 : d === 2 ? 1.08 : 1
+                            it.style.transform = 'scale(' + s + ') translateY(' + (d === 0 ? '-6px' : '0') + ')'
+                            it.style.zIndex = d === 0 ? '4' : '1'
+                        })
+                        tip.style.opacity = '1'
+                        tip.style.transform = 'translateX(-50%) translateY(0)'
+                        // 异步取皮肤属性填入提示
+                        try {
+                            const sa = typeof getSkinAttribute === 'function' ? getSkinAttribute(cardName, sk, false, curLevel) : null
+                            const sd = sa && sa.desc ? String(sa.desc) : ''
+                            const saDef = typeof getSkinAttribute === 'function' ? getSkinAttribute(cardName, '默认', false, curLevel) : null
+                            if (sd && sd !== (saDef && saDef.desc)) tip.innerHTML = '<b style="color:#ffd75e;">' + esc(sk) + '</b>\n' + esc(sd)
+                        } catch (e) {}
                     })
-                    wrap.appendChild(b)
+                    wrapEl.addEventListener('mouseleave', () => {
+                        items.forEach((it) => { it.style.transform = ''; it.style.zIndex = '1' })
+                        tip.style.opacity = '0'
+                        tip.style.transform = 'translateX(-50%) translateY(4px)'
+                    })
+                    items.push(wrapEl)
+                    dock.appendChild(wrapEl)
                 })
-                pop.appendChild(wrap)
             }))
 
-            // 减伤 / 洗炼（第 2 个按钮，对齐官方洗炼图标位）
+            // 减伤 / 洗炼（下拉选属性 + 拖拉条 + 数值，步进 0.1；减伤与主页减伤弹窗实时同步）
             const ensureWashExtras = () => {
                 if (typeof window.cardWashExtras === 'undefined') {
                     try { window.cardWashExtras = JSON.parse(localStorage.getItem('tdjl_card_wash_extras') || '{}') || {} } catch (e) { window.cardWashExtras = {} }
@@ -11171,68 +11251,140 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 return window.cardWashExtras
             }
             const saveWashExtras = () => { try { localStorage.setItem('tdjl_card_wash_extras', JSON.stringify(window.cardWashExtras)) } catch (e) {} }
-            // 🔴 洗炼词条：减伤参与计算（与主页减伤弹窗同一套 drTables），其余仅展示、不参与计算
-            const WASH_TYPES = [
-                { key: '减伤', computed: true, unit: '%' },
-                { key: '暴击', computed: false, unit: '%' },
-                { key: '攻速', computed: false, unit: '%' },
-                { key: '生命', computed: false, unit: '%' },
-                { key: '攻击', computed: false, unit: '%' },
-                { key: '法强', computed: false, unit: '%' }
+            // 🟢 2026-10-23 洗炼词条池（对齐游戏 HeroDivinationAttrsTableData）：max=单条上限，
+            //   总上限 = 单条 × 词条数（词条数 = 品质：金4/紫3/蓝2/绿1）。排序：减伤→纯粹→魔抗→护甲→其余。
+            const WASH_ATTRS = [
+                { key: '减伤', unit: '%', max: 3, computed: true },
+                { key: '纯粹', unit: '%', max: 3 },
+                { key: '魔抗', unit: '', max: 3 },
+                { key: '护甲', unit: '', max: 3 },
+                { key: '生命', unit: '%', max: 3 },
+                { key: '暴击', unit: '%', max: 3 },
+                { key: '暴伤', unit: '%', max: 3 },
+                { key: '暴抗', unit: '%', max: 3 },
+                { key: '命中', unit: '%', max: 3 },
+                { key: '闪避', unit: '%', max: 3 },
+                { key: '攻速', unit: '%', max: 120 },
+                { key: '攻击', unit: '%', max: 120 },
+                { key: '伤害加成', unit: '%', max: 12 },
+                { key: '生命值', unit: '', max: 6000 },
+                { key: '攻击力', unit: '', max: 600 }
             ]
-            actions.appendChild(roundBtn('hero-ui/icon-wash2.png', '减伤', () => {
-                if (pop.dataset.mode === 'dr') { pop.style.display = 'none'; pop.dataset.mode = ''; return }
-                pop.dataset.mode = 'dr'
+            const washEntries = () => Math.max(1, Math.min(4, Number(meta && meta.heroColor) || 4))
+            actions.appendChild(roundBtn('hero-ui/icon-wash2.png', '洗炼', () => {
+                if (pop.dataset.mode === 'wash') { pop.style.display = 'none'; pop.dataset.mode = ''; return }
+                pop.dataset.mode = 'wash'
                 pop.style.display = 'block'
                 const extras = ensureWashExtras()
                 const ex = extras[mainName] || {}
-                let rows = ''
-                WASH_TYPES.forEach((w) => {
-                    let val = ''
-                    if (w.computed) { const tb = getDrTable(drSide); val = (tb.洗炼 && tb.洗炼[mainName] != null) ? tb.洗炼[mainName] : '' }
-                    else { val = (ex[w.key] != null) ? ex[w.key] : '' }
-                    rows += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
-                        '<span style="flex:1;font-size:12px;color:#eaf4ff;">' + w.key + (w.computed ? ' <span style="color:#ffd75e;">(计算)</span>' : ' <span style="color:#8a9bb5;">(展示)</span>') + '</span>' +
-                        '<input type="number" step="0.1" min="0" data-wash="' + w.key + '" value="' + val + '" style="width:72px;padding:4px 6px;border-radius:6px;border:1px solid rgba(120,190,255,0.4);background:rgba(0,0,0,0.3);color:#fff;font-size:12px;">' +
-                        '<span style="font-size:11px;color:#9fc7ff;width:14px;">' + w.unit + '</span></div>'
+                const entries = washEntries()
+                pop.innerHTML =
+                    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">' +
+                    '<span style="font-size:12px;color:#9fc7ff;font-weight:800;">洗炼</span>' +
+                    '<button data-popclose style="width:22px;height:22px;border:0;border-radius:6px;background:#e0483c;color:#fff;font-weight:900;font-size:12px;cursor:pointer;">✕</button></div>'
+                pop.querySelector('[data-popclose]').onclick = () => { pop.style.display = 'none'; pop.dataset.mode = '' }
+                // 属性下拉（默认减伤）
+                const sel = document.createElement('select')
+                sel.style.cssText = 'flex:1;min-width:0;padding:5px 8px;border-radius:7px;border:1px solid rgba(120,190,255,0.45);background:rgba(0,0,0,0.35);color:#fff;font-size:12px;font-weight:700;'
+                WASH_ATTRS.forEach((a) => {
+                    const o = document.createElement('option')
+                    o.value = a.key
+                    o.textContent = a.key + (a.computed ? '（参与计算）' : '')
+                    sel.appendChild(o)
                 })
-                pop.innerHTML = '<div style="font-size:12px;color:#9fc7ff;font-weight:800;margin-bottom:6px;">洗炼（减伤与词条）</div>' + rows +
-                    '<div style="margin-top:4px;font-size:10.5px;line-height:1.5;color:#8a9bb5;">减伤数值与主页「减伤」弹窗实时同步、参与计算；其余词条仅展示，不参与计算（模拟逼真）。</div>'
-                pop.querySelectorAll('input[data-wash]').forEach((inp) => {
-                    inp.oninput = () => {
-                        const key = inp.dataset.wash
-                        const v = parseFloat(inp.value) || 0
-                        const wt = WASH_TYPES.find((x) => x.key === key)
-                        if (wt.computed) {
-                            const tb = getDrTable(drSide)
-                            tb.洗炼 = tb.洗炼 || {}
-                            if (v > 0) tb.洗炼[mainName] = v; else delete tb.洗炼[mainName]
-                            if (typeof saveDamageReductionData === 'function') saveDamageReductionData()
-                            if (typeof updateDamageReductionDisplay === 'function') updateDamageReductionDisplay()
-                        } else {
-                            const e2 = (extras[mainName] = extras[mainName] || {})
-                            if (v > 0) e2[key] = v; else delete e2[key]
-                            saveWashExtras()
-                        }
-                        if (typeof renderBody === 'function') renderBody()
+                sel.value = '减伤'
+                const row1 = document.createElement('div')
+                row1.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px;'
+                row1.appendChild(sel)
+                const maxHint = document.createElement('span')
+                maxHint.style.cssText = 'flex:none;font-size:10.5px;color:#9fc7ff;'
+                row1.appendChild(maxHint)
+                pop.appendChild(row1)
+                // 拖拉条 + 数值
+                const range = document.createElement('input')
+                range.type = 'range'
+                range.step = '0.1'
+                range.style.cssText = 'flex:1;min-width:0;accent-color:#ffd75e;cursor:pointer;'
+                const num = document.createElement('input')
+                num.type = 'number'
+                num.step = '0.1'
+                num.min = '0'
+                num.style.cssText = 'width:78px;padding:5px 7px;border-radius:7px;border:1px solid rgba(120,190,255,0.45);background:rgba(0,0,0,0.35);color:#fff;font-size:12px;font-weight:800;text-align:center;'
+                const unit = document.createElement('span')
+                unit.style.cssText = 'flex:none;font-size:11px;color:#9fc7ff;width:12px;'
+                const row2 = document.createElement('div')
+                row2.style.cssText = 'display:flex;align-items:center;gap:8px;'
+                row2.appendChild(range); row2.appendChild(num); row2.appendChild(unit)
+                pop.appendChild(row2)
+                let cur = WASH_ATTRS[0]
+                const readVal = (a) => {
+                    if (a.computed) { const tb = getDrTable(drSide); return (tb.洗炼 && tb.洗炼[mainName] != null) ? Number(tb.洗炼[mainName]) : 0 }
+                    return Number(ex[a.key]) || 0
+                }
+                const writeVal = (a, v) => {
+                    if (a.computed) {
+                        const tb = getDrTable(drSide)
+                        tb.洗炼 = tb.洗炼 || {}
+                        if (v > 0) tb.洗炼[mainName] = v; else delete tb.洗炼[mainName]
+                        if (typeof saveDamageReductionData === 'function') saveDamageReductionData()
+                        if (typeof updateDamageReductionDisplay === 'function') updateDamageReductionDisplay()
+                    } else {
+                        const e2 = (extras[mainName] = extras[mainName] || {})
+                        if (v > 0) e2[a.key] = v; else delete e2[a.key]
+                        saveWashExtras()
                     }
-                })
+                    if (typeof renderBody === 'function') renderBody()
+                }
+                const syncUi = () => {
+                    const totalMax = cur.max * entries
+                    range.max = String(totalMax)
+                    num.max = String(totalMax)
+                    const v = Math.min(readVal(cur), totalMax)
+                    range.value = String(v)
+                    num.value = String(v)
+                    unit.textContent = cur.unit
+                    maxHint.textContent = '单条 ' + cur.max + (cur.unit || '') + ' × ' + entries + ' 条 = ' + totalMax + (cur.unit || '')
+                }
+                sel.onchange = () => { cur = WASH_ATTRS.find((a) => a.key === sel.value) || WASH_ATTRS[0]; syncUi() }
+                range.oninput = () => { writeVal(cur, parseFloat(range.value) || 0); num.value = range.value }
+                num.oninput = () => {
+                    let v = parseFloat(num.value)
+                    if (!Number.isFinite(v) || v < 0) v = 0
+                    const totalMax = cur.max * entries
+                    if (v > totalMax) { v = totalMax; num.value = String(v) }
+                    range.value = String(v)
+                    writeVal(cur, v)
+                }
+                syncUi()
             }))
 
-            // 魔化
+            // 魔化（图标带文字，点击即开/关；开启时金色光环高亮，不再弹提示层）
             if (hasMoHuaData(mainName)) {
-            actions.appendChild(roundBtn('hero-ui/icon-wake2.png', '魔化', async () => {
-                const on = !getCardMoHua(cardId, handType)
-                setCardMoHua(cardId, on, handType)
-                paintMoHuaAura()
-                paintAll()
-                if (libSlot && typeof window._llReapplySlot === 'function') { try { await window._llReapplySlot(libSlot) } catch (e) {} }
+                const mohuaWrap = document.createElement('div')
+                mohuaWrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:2px;'
+                const mb = roundBtn('hero-ui/icon-wake2.png', '魔化', async () => {
+                    const on = !getCardMoHua(cardId, handType)
+                    setCardMoHua(cardId, on, handType)
+                    paintMoHuaAura()
+                    paintMohuaBtn()
+                    paintAll()
+                    if (libSlot && typeof window._llReapplySlot === 'function') { try { await window._llReapplySlot(libSlot) } catch (e) {} }
                     else { try { updateAllCardLevelBadges() } catch (e) {} }
-                    pop.dataset.mode = ''
-                    pop.style.display = 'block'
-                    pop.innerHTML = '<div style="font-size:12px;color:' + (on ? '#c084fc' : '#9fc7ff') + ';font-weight:800;">魔化' + (on ? '已开启' : '已关闭') + '</div>'
-                    setTimeout(() => { if (pop.dataset.mode === '') pop.style.display = 'none' }, 1200)
-                }))
+                })
+                mohuaWrap.appendChild(mb)
+                const mLabel = document.createElement('div')
+                mLabel.style.cssText = 'font-size:9.5px;font-weight:900;letter-spacing:0.04em;color:#c9b8ff;text-shadow:0 1px 2px rgba(0,0,0,.7);'
+                mLabel.textContent = '魔化'
+                mohuaWrap.appendChild(mLabel)
+                actions.appendChild(mohuaWrap)
+                // 开/关视觉态：金边 + 紫金光晕
+                const paintMohuaBtn = () => {
+                    const on = getCardMoHua(cardId, handType)
+                    mb.style.borderColor = on ? '#ffd75e' : 'rgba(180,220,255,0.55)'
+                    mb.style.boxShadow = on ? '0 0 10px 2px rgba(255,215,94,0.55),0 3px 8px rgba(0,0,0,0.5)' : '0 3px 8px rgba(0,0,0,0.5)'
+                    mLabel.style.color = on ? '#ffd75e' : '#c9b8ff'
+                }
+                paintMohuaBtn()
             }
 
             // 融合变体
@@ -11384,113 +11536,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 return strip
             }
 
-            // ① 皮肤（官方版式：大立绘 + 名称/额外被动 + 底部缩略图）
-            actions.children[0] && (actions.children[0].onclick = null)
-            const skinBtn = actions.children[0]
-            if (skinBtn) {
-                skinBtn.onclick = () => {
-                    if (card.querySelector('.hd-sub-skin')) { card.querySelector('.hd-sub-skin').remove(); return }
-                    const sh = hdSubShell('皮肤', '#5aa2ff', 'linear-gradient(160deg,#122a4e,#0a1a33)')
-                    sh.ov.className = 'hd-sub-skin'
-                    // 皮肤列表：优先应用层现有切皮序列（保证切完有图）；为空时回退官方 heroes.json 的 skins（最全）
-                    const meta = (window.heroesOfficialMap || {})[mainName] || {}
-                    let skinList = getAvailableSkins(cardName)
-                    if (!skinList || !skinList.length) skinList = ['默认'].concat((meta.skins || []).map((s) => s.note).filter(Boolean))
-                    const info = document.createElement('div')
-                    info.style.cssText = 'position:absolute;right:12px;top:10px;width:190px;text-align:left;color:#fff;'
-                    const big = document.createElement('img')
-                    big.style.cssText = 'max-height:78%;max-width:56%;object-fit:contain;filter:drop-shadow(0 10px 18px rgba(0,0,0,0.5));'
-                    sh.body.appendChild(big)
-                    sh.body.appendChild(info)
-                    const skinRows = (meta.skins || []).filter((s) => skinList.indexOf(s.note) >= 0)
-                    function paintSkin(name) {
-                        const row = (meta.skins || []).find((s) => s.note === name)
-                        info.innerHTML =
-                            '<div style="font-size:15px;font-weight:900;color:#ffd75e;margin-bottom:6px;text-shadow:0 2px 0 #000;">' + esc(name) + '</div>' +
-                            (row && row.describe ? '<div style="font-size:11px;line-height:1.5;color:#cfe0ff;">' + esc(row.describe) + '</div>' : '') +
-                            (row && row.extraParam ? '<div style="font-size:10px;line-height:1.4;color:#8fa7c4;margin-top:6px;">获取：' + esc(row.extraParam) + '</div>' : '')
-                        hdPortraitUrl(mainName, name === '默认' ? mainName : name).then((u) => { if (u) big.src = u })
-                    }
-                    paintSkin(curSkin)
-                    hdThumbStrip(sh.body, mainName, skinList, curSkin, (name) => {
-                        curSkin = name
-                        paintSkin(name)
-                        hdPlaySpine() // 换皮肤 → 切换独立骨骼模型重播
-                        // 应用皮肤（与旧弹窗同逻辑：图库槽位写个人覆盖；其余写卡槽/全局默认）
-                        if (libSlot && typeof window._llSet === 'function') {
-                            const lt = libSlot.getAttribute('data-tab'), ll = libSlot.getAttribute('data-lid'), lsd = libSlot.getAttribute('data-side') || 'my'
-                            const baseName = (window.getFusionParts && window.getFusionParts(cardName)) ? window.getFusionParts(cardName)[0] : cardName
-                            window._llSet(lt, ll, 'skin', (baseName || cardName) + '#' + lsd, name)
-                            if (typeof window._llReapplySlot === 'function') window._llReapplySlot(libSlot)
-                        } else if (typeof setCardSkin === 'function') {
-                            Promise.resolve(setCardSkin(cardId, name, handType)).then(() => {
-                                setTimeout(() => { try { updateAllCardLevelBadges() } catch (e) {} }, 0)
-                            })
-                        }
-                    })
-                }
-            }
-
-            // ② 魔化（官方版式：左原形态 / 右魔化形态 + 被动预览 + 底部切换）
-            const mohuaBtn = actions.children[2]
-            if (mohuaBtn) {
-                mohuaBtn.onclick = () => {
-                    if (card.querySelector('.hd-sub-mohua')) { card.querySelector('.hd-sub-mohua').remove(); return }
-                    const sh = hdSubShell('魔化', '#ff6b5e', 'linear-gradient(160deg,#4a1220,#240a12)')
-                    sh.ov.className = 'hd-sub-mohua'
-                    const on = getCardMoHua(cardId, handType)
-                    const left = document.createElement('div')
-                    const right = document.createElement('div')
-                    ;[left, right].forEach((el) => {
-                        el.style.cssText = 'width:150px;height:150px;border-radius:50%;overflow:hidden;border:4px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;'
-                    })
-                    right.style.borderColor = on ? '#ff5f4d' : 'rgba(255,255,255,0.25)'
-                    const row = document.createElement('div')
-                    row.style.cssText = 'display:flex;align-items:center;gap:26px;'
-                    row.appendChild(left)
-                    row.appendChild(right)
-                    sh.body.appendChild(row)
-                    const cap = document.createElement('div')
-                    cap.style.cssText = 'position:absolute;left:0;right:0;top:12px;text-align:center;color:#ffd7d0;font-size:12px;font-weight:800;line-height:1.6;padding:0 20px;'
-                    let mhDesc = ''
-                    try {
-                        // 🔴 2026-10-20 与主卡/副卡魔化属性同数据链：本地硬编码 → 自定义 → 云端 → heroAttrsData（兼容字符串/对象两种形态）
-                        const cloud = window.skinAttributesCloud
-                        if (SKIN_ATTRIBUTES[mainName] && SKIN_ATTRIBUTES[mainName]['魔化']) mhDesc = SKIN_ATTRIBUTES[mainName]['魔化'].desc || ''
-                        else if (customSkinAttributes[mainName] && customSkinAttributes[mainName]['魔化']) mhDesc = customSkinAttributes[mainName]['魔化'].desc || ''
-                        else if (cloud && cloud[mainName] && cloud[mainName]['魔化']) mhDesc = cloud[mainName]['魔化'].desc || ''
-                        if (!mhDesc) {
-                            const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[mainName]
-                            const t = d && d.talents ? Object.values(d.talents).map((x) => x.mohuaPassive).filter(Boolean).pop() : null
-                            mhDesc = (t && typeof t === 'object' && t.desc) ? t.desc : (typeof t === 'string' ? t : '') || (d && d.mohuaPassive) || ''
-                            if (mhDesc && typeof mhDesc === 'object') mhDesc = mhDesc.desc || ''
-                        }
-                        mhDesc = String(mhDesc || '').replace(/^【魔化(被动)?】\s*/, '')
-                    } catch (e) {}
-                    cap.innerHTML = '<div style="color:#ff8f7f;font-size:14px;font-weight:900;">魔化预览</div>' +
-                        (mhDesc ? '<div style="margin-top:6px;display:inline-block;padding:4px 12px;background:rgba(120,30,50,0.55);border:1px solid rgba(255,140,120,0.4);border-radius:8px;"><b style="color:#ffb3a3;">魔化属性：</b>' + esc(mhDesc) + '</div>' : '')
-                    sh.body.appendChild(cap)
-                    Promise.all([
-                        hdPortraitUrl(mainName, curSkin === '默认' ? mainName : curSkin),
-                        hdPortraitUrl(mainName, curSkin === '默认' ? mainName : curSkin)
-                    ]).then(([u1]) => {
-                        if (u1) {
-                            const a = document.createElement('img'); a.src = u1; a.style.cssText = 'width:100%;height:100%;object-fit:cover;'; left.appendChild(a)
-                            const b2 = document.createElement('img'); b2.src = u1; b2.style.cssText = 'width:100%;height:100%;object-fit:cover;filter:saturate(1.5) hue-rotate(-14deg) brightness(0.92);'; right.appendChild(b2)
-                        }
-                    })
-                    hdThumbStrip(sh.body, mainName, ['原形态', '魔化形态'], on ? '魔化形态' : '原形态', async (name) => {
-                        const want = name === '魔化形态'
-                        if (want !== getCardMoHua(cardId, handType)) {
-                            setCardMoHua(cardId, want, handType)
-                            if (libSlot && typeof window._llReapplySlot === 'function') { try { await window._llReapplySlot(libSlot) } catch (e) {} }
-                            else { try { updateAllCardLevelBadges() } catch (e) {} }
-                        }
-                        right.style.borderColor = want ? '#ff5f4d' : 'rgba(255,255,255,0.25)'
-                        paintMoHuaAura()
-                    })
-                }
-            }
+            // ① 皮肤 / ② 魔化：2026-10-23 起不再弹子系统面板——皮肤走操作行上方的 Dock
+            //   （悬停放大 + 头顶属性预览，点击即切），魔化走图标点击开关（见上方按钮构建）。
 
             // ③ 融合（官方版式：左副卡 / 右主卡 + 底部变体切换 + 副卡等级/皮肤设置）
             const fuseBtn = actions.children[3]
@@ -11964,6 +12011,21 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         mohuaCard.style.display = 'none'
                     }
                 } catch (e) { mohuaCard.style.display = 'none' }
+                // 皮肤属性：当前皮肤（非默认）的专属文案；与默认皮肤完全一致时不显示（避免与被动卡重复）
+                try {
+                    const skName = curSkin || '默认'
+                    if (skName !== '默认' && typeof getSkinAttribute === 'function') {
+                        const sa = getSkinAttribute(cardName, skName, false, curLevel)
+                        const saDef = getSkinAttribute(cardName, '默认', false, curLevel)
+                        const sd = sa && sa.desc ? String(sa.desc) : ''
+                        if (sd && sd !== (saDef && saDef.desc)) {
+                            skinAttrCard.style.display = ''
+                            skinAttrCard.innerHTML =
+                                '<span style="color:#7ef0b8;font-weight:900;">皮肤属性</span>' +
+                                '<span style="opacity:0.72;font-size:0.88em;font-weight:700;">（' + esc(skName) + '）</span>：' + esc(sd)
+                        } else { skinAttrCard.style.display = 'none' }
+                    } else { skinAttrCard.style.display = 'none' }
+                } catch (e) { skinAttrCard.style.display = 'none' }
                 paintLevel()
                 renderBody()
             }
@@ -12297,36 +12359,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         if (typeof reapplySingleHandCard === 'function') { try { await reapplySingleHandCard(handCard, cardId, handType); } catch (e) {} }
                     }
                 }
-            }
-            // 皮肤缩略图按钮（图片 + 文字标签）
-            function createSkinThumb(heroName, skin, selected, onClick) {
-                const b = document.createElement('button');
-                b.className = 'skin-thumb-btn';
-                b.dataset.skin = skin;
-                b.style.cssText = 'position:relative;width:56px;height:56px;border-radius:8px;border:2px solid ' + (selected ? '#ff9800' : 'rgba(255,255,255,0.2)') + ';background:#2a2a4a;overflow:hidden;cursor:pointer;padding:0;flex-shrink:0;transition:border-color .15s;';
-                const img = document.createElement('img');
-                img.style.cssText = 'width:100%;height:100%;object-fit:cover;opacity:0.45;';
-                img.alt = '';
-                img.decoding = 'async';  // 🔴 2026-10-14 缩略图异步解码，避免阻塞主线程
-                b.appendChild(img);
-                const label = document.createElement('div');
-                label.textContent = skin;
-                label.style.cssText = 'position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.78);color:#fff;font-size:0.55rem;line-height:1.1;padding:2px 2px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
-                b.appendChild(label);
-                b.onclick = onClick;
-                if (window.resolveHeroSkinUrl) {
-                    const skinForUrl = (skin === '默认') ? heroName : skin;
-                    window.resolveHeroSkinUrl(heroName, skinForUrl).then(url => {
-                        if (url) { img.src = url; img.style.opacity = '1'; }
-                    }).catch(() => {});
-                }
-                return b;
-            }
-            function setSkinThumbSelected(btnWrap, skin) {
-                btnWrap.querySelectorAll('.skin-thumb-btn').forEach(x => {
-                    const sel = x.dataset.skin === skin;
-                    x.style.borderColor = sel ? '#ff9800' : 'rgba(255,255,255,0.2)';
-                });
             }
             // 关闭已有弹窗
             document.querySelectorAll('.card-settings-popup-root').forEach(el => el.remove());
