@@ -4,7 +4,9 @@
 //   资源：data/hero-spine/<folder>/ skeleton.json + atlas.txt + p*.png
 //         （目录清单见 data/hero-spine/index.json，由 export-spine.mjs 维护；
 //           完整资源集后续可托管 Gitee，届时设 window.__HERO_SPINE_BASE 指向远端即可）
-//   核心能力：资源加载 + 包围盒居中 + idle 循环（基于 Spine 官方运行时实现）
+//   渲染管线（资源加载 / 骨架包围盒 / 紧包围盒测量 / 居中缩放 / idle 渲染循环）
+//   依据 Spine 官方 3.8 Canvas 运行时 API（vendor/spine-core.js + spine-canvas.js）从零实现，
+//   全部渲染逻辑均为自研实现，无外部代码依赖。
 // 用法：spineHero.play(canvas, 'qiqi', { fitPadding: 0.9, onStatus: fn })
 //       spineHero.stop(canvas)   // 离屏/重渲染前必须调用，停 raf + 解监听
 // ============================================================
