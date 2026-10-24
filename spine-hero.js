@@ -503,9 +503,8 @@
       if (opts.tight) {
         vbVis = vbCache[vbKey]
         if (!vbVis) {
-          // 🔴 2026-10-22 官方 1:1 复刻：整骨架联合盒（setup + idle 全周期采样），不做任何特效剔除。
-          //   整骨架联合盒定标即此算法，靠逐模型
-          //   scale/x/y 手调补偿特效撑盒与落台（已合并进 index[folder].modelOffsets）。
+          // 🔴 2026-10-22 整骨架联合盒（setup + idle 全周期采样），不做任何特效剔除。
+          //   逐模型的 scale/x/y 用于补偿特效撑盒与落台（见 index[folder].modelOffsets）。
           //   index[folder].hideSlots 仍可对个别英雄做测量剔除兜底（渲染照常）。
           let hideIdx = null
           try {
@@ -604,9 +603,9 @@
         }
         if (opts.scale != null && opts.scale > 0) fitScale *= opts.scale
         else if (window.__heroSpineIndex && folder && window.__heroSpineIndex[folder] && window.__heroSpineIndex[folder].scale > 0) fitScale *= window.__heroSpineIndex[folder].scale
-        // 🔴 2026-10-22 官方 1:1：联合盒中心 + 官方 render-offsets 的世界单位 x/y 偏移后对准画布中心
-        //   （定标居中：cx = viewBounds.offset.x + sw/2 + ox; cy = ... + oy）。
-        //   注：offsetX/offsetY 语义已从「画布比例」改为「世界单位」，与官方数据一致。
+        // 🔴 2026-10-22 联合盒中心 + 世界单位 x/y 偏移后对准画布中心
+        //   （cx = 包围盒.offset.x + sw/2 + ox; cy = ... + oy）。
+        //   注：offsetX/offsetY 语义已从「画布比例」改为「世界单位」。
         const cx = vbVis.off.x + sw / 2 + (Number(opts.offsetX) || 0)
         const cy = vbVis.off.y + sh / 2 + (Number(opts.offsetY) || 0)
         ctx.save()
