@@ -12113,11 +12113,17 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     //   🟢 2026-10-23 个别模型 idle 自带大特效（沙皇·金色火焰）渲染包围盒远大于本体，
                     //      统一 0.58 会顶出画布上缘；按模型实测微调（目标可见高度 ≤0.62）
                     const FIT_PAD_BY_SPINE = { shawang: 0.44 }
+                    // 🟢 2026-10-25 死神(fashi) 专项：默认模型 fashi 的可见包围盒含大片透明留白，
+                    //   同一 pad 下实测身高只有 59.7%（皮肤版 sishenpifu 却是 69.6%）→ 按 model 覆写，
+                    //   让四个皮肤身高统一到 ~66%（bg.png 实测石台可站立台面 72%~80%、中心 76%）。
+                    const FIT_PAD_BY_MODEL = { fashi: 0.78, sishenpifu: 0.66, sishenpifu2: 0.66, pingyizhi: 0.66 }
+                    // 脚底锚点：死神袍摆落在台面中心 76%，而非统一 0.78（0.78 会压到台面前沿、甚至陷进台体正面）
+                    const ANCHOR_FEET_BY_SPINE = { fashi: 0.76 }
                     window.spineHero.play(cv, meta.spine, {
-                        fitPadding: FIT_PAD_BY_SPINE[meta.spine] || 0.58, pngs, model, tight: true,
+                        fitPadding: FIT_PAD_BY_MODEL[model] || FIT_PAD_BY_SPINE[meta.spine] || 0.58, pngs, model, tight: true,
                         hideFx: true, dedupe: true,
                         hideSlots: (man.hideSlots || []).concat((man.modelHideSlots || {})[model] || []),
-                        fitByHeight: true, anchorFeet: 0.78, scale: 1,
+                        fitByHeight: true, anchorFeet: (ANCHOR_FEET_BY_SPINE[meta.spine] || 0.78), scale: 1,
                         autoFxFallback: true
                     })
                     // 🟢 2026-10-23 空渲染兜底提示：个别模型（如龟相）主体是 PathAttachment，
