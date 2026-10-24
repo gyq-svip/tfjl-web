@@ -33,6 +33,15 @@
   const vbCache = {}    // folder@model -> { off, size }（按真实不透明像素测得的紧包围盒）
   const vbBoundsCache = {}  // 🔴 2026-10-21 folder@model -> 骨架包围盒（首次测量后复用，省一次动画采样）
   const vbFxCache = {}      // 🔴 2026-10-21 folder@model -> 排除特效骨的本体包围盒
+  // 🔴 2026-10-24 hideSlots 槽名匹配：官方骨架槽名常为「路径式」（如 dadaoguang/dadaoguang_00012、
+  //    images/a0），精确匹配 token 会漏掉。改为：精确匹配 或 以 token + 分隔符(/或_) 开头的槽名。
+  //    既兼容既有精确写法，又能命中路径式/带帧号后缀的槽名，避免「该藏的没藏掉 → 重影/撑盒」。
+  function slotMatches(token, name) {
+    if (name === token) return true
+    if (name.indexOf(token + '/') === 0) return true
+    if (name.indexOf(token + '_') === 0) return true
+    return false
+  }
   let playTokenSeq = 0  // 同一 canvas 连续 play 时，仅最后一次生效（按画布各自计时）
 
   function baseUrl() {
@@ -84,13 +93,18 @@
     //   但命名有两种——'images/fx/aixin'（fx 前有斜杠）与 'fx/glow2_00004'（fx 在开头）。
     //   只按骨骼名匹配会漏掉后者（如小野脚下爱心），导致本体盒被特效撑大→角色变小/脚不沾地。
     //   故改为匹配「路径段 fx」（覆盖两种命名）；同时保留骨骼名匹配作为兜底。
+    // 🔴 2026-10-24 补强：部分模型特效不走 fx/ 路径，而是「附件叶名以 fx 开头」——fxg01 光环、
+    //   fxfire 火焰、FX1~7、fxsm_*、fx1/fx2…（全量扫描 373 个骨架确认：以此开头的槽/附件全部是
+    //   特效，无身体件）。这类特效同样撑大包围盒（魔精灵·传国玉玺 fxg 光环把盒子撑高 ~45%，
+    //   玉玺被算小 + 偏离中心悬空）。
     const fxSeg = /(^|\/)fx(\/|$)/i
+    const fxLeaf = /(^|\/)fx/i
     for (let i = 0; i < sk.slots.length; i++) {
       const s = sk.slots[i]
       if (!s.attachment) continue
       const bn = (s.bone && s.bone.data && s.bone.data.name) || ''
       const an = (s.attachment.name) || ''
-      if (fxSeg.test(bn) || fxSeg.test(an) || /特效|texiao|guangxiao/i.test(bn)) { s._fxAtt = s.attachment; s.attachment = null; n++ }
+      if (fxSeg.test(bn) || fxSeg.test(an) || fxLeaf.test(an) || /特效|texiao|guangxiao/i.test(bn)) { s._fxAtt = s.attachment; s.attachment = null; n++ }
     }
     return n
   }
@@ -124,20 +138,35 @@
   //    而 idle 起始帧几乎无内容的模型（萌萌 bingdundun2 实测 t0 仅 38px 冰晶残影、t0.5 起角色才完整出现）
   // 会被测成极小包围盒 → 缩放爆炸 → 画成局部放大碎片（用户只见一小块绿影）。
   //    现逐帧渲染到同一块 320px 累积画布取 alpha 并集，一次扫描得到整周期可见范围。
-  function measureVisualBounds(spine, skData, anim, vb, hideFx, hideIdx) {
+  function measureVisualBounds(spine, skData, anim, vb, hideFx, hideIdx, liveBounds) {
     try {
       const sw = vb.size.x, sh = vb.size.y
       if (!(sw > 0 && sh > 0)) return null
       const N = 512
-      const cx = vb.off.x + sw / 2, cy = vb.off.y + sh / 2
+      // 🔴 2026-10-24 定标「中心」必须落在真实身体盒 liveBounds 上，而非 vb 盒中心：
+      //   vb 含大量空槽 extent（如死神 fashi：vb=227×344 而身体仅 184×299 且偏心），若以 vb 中心定标，
+      //   身体在 512 扫描画布内偏移→被裁→紧盒低估（→角色偏大/头顶贴边/站偏）。故以身体盒中心定标，
+      //   窗口尺寸取 ≥ 身体（vb 兜底），保证身体居中且完整落在画布内不被裁。
+      let cx, cy, winW, winH
+      if (liveBounds && liveBounds.w > 0 && liveBounds.h > 0) {
+        cx = liveBounds.offX + liveBounds.w / 2
+        cy = liveBounds.offY + liveBounds.h / 2
+        winW = Math.max(vb.size.x, liveBounds.w)
+        winH = Math.max(vb.size.y, liveBounds.h)
+      } else {
+        cx = vb.off.x + vb.size.x / 2
+        cy = vb.off.y + vb.size.y / 2
+        winW = vb.size.x; winH = vb.size.y
+      }
+      // 🔴 2026-10-24 定标窗口留 1.35× 安全余量：若窗口恰等于身体（如石头 xiaoxiao 身体即 412 高），
+      //   身体会被顶满 512 扫描画布边缘→边缘像素/抗锯齿被裁→紧盒低估（r2 再放大仍无法恢复）→角色溢出画布。
+      //   留余量后身体居中且四周留白，扫描得真实整盒。
       const stt = new spine.AnimationState(new spine.AnimationStateData(skData))
       const dur = anim ? (anim.duration || 0) : 0
       const steps = Math.max(6, Math.ceil(dur * 12))
-      // 🟢 2026-10-23 两遍测量：第一遍按「骨架整盒」定标——fx 附件会把整盒撑得极大
-      //   （如后羿的火焰），可见内容被缩到几十像素，细线/半透明像素 alpha 低于阈值被漏掉，
-      //   union 偏小 → 实时渲染放得太大、人物溢出画布（后羿半截身子被切）。
-      //   第二遍按第一遍的 union 放大重测，精度足够。
-      const pass = function (fitW, fitH) {
+      // 🔴 2026-10-24 扫描函数改为「按给定中心定标」：两次测量各自独立定心，第二遍按第一遍量得的内容盒重定心，
+      //   根治「getBounds 含巨大空附件留白（石头 xiaoxiao 盒 412 高而真实像素仅 ~243 且偏心）导致按盒定心把真身推出边缘→低估」。
+      const pass = function (fitW, fitH, ccx, ccy) {
         const s = Math.min((N - 6) / fitW, (N - 6) / fitH)
         if (!(s > 0)) return null
         const oc = document.createElement('canvas')
@@ -155,7 +184,7 @@
           c2.save()
           c2.translate(N / 2, N / 2)
           c2.scale(s, -s)
-          c2.translate(-cx, -cy)
+          c2.translate(-ccx, -ccy)
           const r2 = new spine.canvas.SkeletonRenderer(c2)
           r2.triangleRendering = true
           r2.draw(tmp)
@@ -176,16 +205,20 @@
           }
         }
         if (maxX < 0) return null
-        const toWx = function (px) { return (px - N / 2) / s + cx }
-        const toWy = function (py) { return -(py - N / 2) / s + cy }
+        const toWx = function (px) { return (px - N / 2) / s + ccx }
+        const toWy = function (py) { return -(py - N / 2) / s + ccy }
         const wx1 = toWx(minX), wx2 = toWx(maxX + 1)
         const wy1 = toWy(maxY + 1), wy2 = toWy(minY)
         if (!(wx2 > wx1) || !(wy2 > wy1)) return null
         return { off: new spine.Vector2(wx1, wy1), size: new spine.Vector2(wx2 - wx1, wy2 - wy1) }
       }
-      const r1 = pass(sw, sh)
+      // 🔴 2026-10-24 两遍定标 + 第二遍按内容重定心：
+      //   第一遍以「(vb∪liveBounds) 盒」定心留 1.5× 余量，保证身体（即便在盒内偏移）完整落画布内不被裁；
+      //   第二遍以第一遍量得的内容盒为中心、留 1.15× 余量重扫→真身居中→得准确紧盒（此前第二遍仍用盒定心→偏移真身被裁→低估）。
+      const r1 = pass(winW * 1.5, winH * 1.5, cx, cy)
       if (!r1) return null
-      const r2 = pass(r1.size.x * 1.08, r1.size.y * 1.08)
+      const _c2x = r1.off.x + r1.size.x / 2, _c2y = r1.off.y + r1.size.y / 2
+      const r2 = pass(r1.size.x * 1.15, r1.size.y * 1.15, _c2x, _c2y)
       return r2 || r1
     } catch (e) { return null }
   }
@@ -313,13 +346,15 @@
       let hasBodySlot = false
       if (fxHide) {
         const fxSeg = /(^|\/)fx(\/|$)/i
+        // 🔴 2026-10-24 叶名以 fx 开头的特效槽（fxg01/fxfire/FX1/fx1…，见 hideFxSlots 注释）
+        const fxLeaf = /(^|\/)fx/i
         skeleton.slots.forEach(function (sl, i) {
           const bn = (sl.bone && sl.bone.data && sl.bone.data.name) || ''
           const an = (sl.data && sl.data.attachmentName) || (sl.attachment && sl.attachment.name) || ''
           // 🟢 2026-10-23 槽位本身的名字也要查：皮肤模型（如骨弓 huarong）的 fx 槽 setup 为空、
           //   附件由动画挂上，启动时 an/bn 都不含 fx，只靠槽名（fx/bingyan/…）才认得出
           const sn = (sl.data && sl.data.name) || ''
-          if (fxSeg.test(bn) || fxSeg.test(an) || fxSeg.test(sn) || /特效|texiao|guangxiao/i.test(bn)) fxHide.push(i)
+          if (fxSeg.test(bn) || fxSeg.test(an) || fxSeg.test(sn) || fxLeaf.test(an) || fxLeaf.test(sn) || /特效|texiao|guangxiao/i.test(bn)) fxHide.push(i)
         })
         // 🔴 2026-10-24 规则化补强：官方部分模型 setup pose 下所有槽附件为空、槽名也不含 fx，
         //   特效只在动画 AttachmentTimeline 里挂载。典型如死神 fashi：槽 shen01/shen02 →
@@ -346,7 +381,7 @@
               for (let k = 0; k < _ns.length; k++) {
                 const _nm = _ns[k]
                 if (!_nm) continue
-                if (fxSeg.test(_nm)) { _animFx[tl.slotIndex] = 1; _animNotAction[tl.slotIndex] = 1 }
+                if (fxSeg.test(_nm) || fxLeaf.test(_nm)) { _animFx[tl.slotIndex] = 1; _animNotAction[tl.slotIndex] = 1 }
                 else if (ACTION_SEG.test(_nm)) _animAction[tl.slotIndex] = 1
                 else { _animBody[tl.slotIndex] = 1; _animNotAction[tl.slotIndex] = 1 }
               }
@@ -378,7 +413,9 @@
         const nameIdx = {}
         skeleton.slots.forEach(function (sl, i) { nameIdx[sl.data.name] = i })
         slotHide = []
-        opts.hideSlots.forEach(function (n) { if (nameIdx[n] !== undefined) slotHide.push(nameIdx[n]) })
+        opts.hideSlots.forEach(function (n) {
+          Object.keys(nameIdx).forEach(function (nm) { if (slotMatches(n, nm)) slotHide.push(nameIdx[nm]) })
+        })
         if (!slotHide.length) slotHide = null
       }
       const frameHide = (fxHide || slotHide) ? (fxHide || []).concat(slotHide || []) : null
@@ -390,9 +427,15 @@
       let dedupeHide = null
       if (opts.dedupe) {
         try {
-          const famBest = {}   // family -> { idx, area }
-          const famMax = {}    // family -> 最大单附件面积
-          const famSlots = {}  // family -> { slotIndex: { area, names:{} } }
+          // 去重按「全路径家族」(f) 与「叶名家族」(lf，去掉路径与尾号) 双键：
+          //   f  命中「同名同图孪生」（如 咕咕 images/a0 与 images/a0000 指向同一张图）；
+          //   lf 命中「路径不同但实为同一角色的不同拷贝」（凤凰 idle/idle_00 与 idle2/idle_00、
+          //       魔精灵 yuxi 与 yuxi2、火神 images/a0000 与 images/1/a0000、地精宝库 baokupifu×N）。
+          //   只折叠「身体尺寸」副本（maxA≥minBody），避免误删 fxg/sp/xing 等小装饰。
+          const famSlots = {}  // f  -> { slotIndex: { area, names:{} } }
+          const famMax = {}
+          const lfSlots = {}   // lf -> { slotIndex: { area, names:{} } }
+          const lfMax = {}
           const skin0 = skData.defaultSkin || (skData.skins && skData.skins[0])
           const list = skin0 && skin0.getAttachments ? skin0.getAttachments() : []
           list.forEach(function (e) {
@@ -401,31 +444,43 @@
             const nm = e.name || ''
             if (/(^|\/)fx(\/|$)/i.test(nm)) return
             const f = nm.replace(/\d+$/, '')
+            const lf = nm.replace(/^.*\//, '').replace(/\d+$/, '')
             const area = att.width * att.height
             famSlots[f] = famSlots[f] || {}
-            const rec = famSlots[f][e.slotIndex] || (famSlots[f][e.slotIndex] = { area: 0, names: {} })
-            rec.area = Math.max(rec.area, area)
+            const rec = famSlots[f][e.slotIndex] || (famSlots[f][e.slotIndex] = { area: 0, w: 0, h: 0, names: {} })
+            if (area > rec.area) { rec.area = area; rec.w = att.width; rec.h = att.height }
             rec.names[nm] = 1
             if (!famMax[f] || area > famMax[f]) famMax[f] = area
+            lfSlots[lf] = lfSlots[lf] || {}
+            const lrec = lfSlots[lf][e.slotIndex] || (lfSlots[lf][e.slotIndex] = { area: 0, w: 0, h: 0, names: {} })
+            if (area > lrec.area) { lrec.area = area; lrec.w = att.width; lrec.h = att.height }
+            lrec.names[nm] = 1
+            if (!lfMax[lf] || area > lfMax[lf]) lfMax[lf] = area
           })
           const hideSet = {}
-          Object.keys(famSlots).forEach(function (f) {
-            const entries = Object.keys(famSlots[f]).map(function (si) { return { si: Number(si), rec: famSlots[f][si] } })
-            if (entries.length < 2) return
-            // 主槽：家族内附件面积最大（并列取附件名更多的）
-            entries.sort(function (a, b) { return (b.rec.area - a.rec.area) || (Object.keys(b.rec.names).length - Object.keys(a.rec.names).length) })
-            const best = entries[0]
-            const bestNames = new Set(Object.keys(best.rec.names))
-            for (let i = 1; i < entries.length; i++) {
-              const o = entries[i]
-              // ① 半尺寸拷贝（真身 vs 残影分身）：面积 < 家族最大 60%
-              if (o.rec.area < famMax[f] * 0.6) { hideSet[o.si] = 1; continue }
-              // ② 等大同名孪生（如精灵球 images/idle/a0 与 images/idle/a0000：附件集完全相同、
-              //    同样 512x512，游戏内按状态二选一）——附件名集合与主槽完全一致就隐藏
-              const names = Object.keys(o.rec.names)
-              if (names.length === bestNames.size && names.every(function (n) { return bestNames.has(n) })) hideSet[o.si] = 1
-            }
-          })
+          // 同族副本折叠：① 半尺寸拷贝（<60%）② 等大同名孪生（附件名集完全一致）③ 等大同族身体副本（≥minBody 且 ≥85% 主槽）
+          function applyFamily(fam, famMax, minBody) {
+            Object.keys(fam).forEach(function (key) {
+              const entries = Object.keys(fam[key]).map(function (si) { return { si: Number(si), rec: fam[key][si] } })
+              if (entries.length < 2) return
+              entries.sort(function (a, b) { return (b.rec.area - a.rec.area) || (Object.keys(b.rec.names).length - Object.keys(a.rec.names).length) })
+              const best = entries[0]
+              const bestNames = new Set(Object.keys(best.rec.names))
+              const maxA = famMax[key]
+              for (let i = 1; i < entries.length; i++) {
+                const o = entries[i]
+                if (o.rec.area < maxA * 0.6) { hideSet[o.si] = 1; continue }            // ① 半尺寸残影
+                const names = Object.keys(o.rec.names)
+                if (names.length === bestNames.size && names.every(function (n) { return bestNames.has(n) })) { hideSet[o.si] = 1; continue } // ② 同名孪生
+                // ③ 完全等大的同族身体副本（yuxi/yuxi2、火神 a0000×3 等）：要求宽高完全一致——
+                //    真副本是同图同尺寸导出；而石头 xiaoxiao 的 G1~G8 是「多部件身体」（同族不同件、
+                //    尺寸各异 221×243/192×268/…），按面积比折叠会整块删身体（10-24 实测回归，已改判据）
+                if (maxA >= minBody && o.rec.w === best.rec.w && o.rec.h === best.rec.h) hideSet[o.si] = 1
+              }
+            })
+          }
+          applyFamily(famSlots, famMax, 30000)
+          applyFamily(lfSlots, lfMax, 30000)
           const arr = Object.keys(hideSet).map(Number)
           if (arr.length) dedupeHide = arr
         } catch (e) {}
@@ -472,11 +527,39 @@
             const _n2 = {}
             skData.slots.forEach(function (sd, i) { _n2[sd.name] = i })
             const _extra = []
-            opts.hideSlots.forEach(function (n) { if (_n2[n] !== undefined) _extra.push(_n2[n]) })
+            opts.hideSlots.forEach(function (n) {
+              Object.keys(_n2).forEach(function (nm) { if (slotMatches(n, nm)) _extra.push(_n2[nm]) })
+            })
             if (_extra.length) hideIdx = hideIdx ? hideIdx.concat(_extra) : _extra
           }
           if (dedupeHide && dedupeHide.length) hideIdx = hideIdx ? hideIdx.concat(dedupeHide) : dedupeHide.slice()
-          vbVis = measureVisualBounds(spine, skData, animObj, vb, !!fxHide, hideIdx) || vb
+          // 🔴 2026-10-24 实测绘「当前可见内容」包围盒（idle 全周期 union + 与渲染一致的隐藏）：
+          //   作为 measureVisualBounds 的定标窗口与定标中心。骨架盒 vb 含大量「空槽 extent」会把中心
+          //   推离身体（死神 fashi 实测 vb=227×344 而身体仅 184×299），若以 vb 中心定标，身体在 512 扫描
+          //   画布内偏移→被裁→紧盒低估（→角色偏大/头顶贴边）。用真实身体盒定标可根治。
+          let liveBounds = null
+          try {
+            const _hi = frameHide2 || []
+            const _save = _hi.map(function (i) { return skeleton.slots[i].attachment })
+            for (let _k = 0; _k < _hi.length; _k++) skeleton.slots[_hi[_k]].attachment = null
+            skeleton.updateWorldTransform()
+            const _dur = animObj ? (animObj.duration || 0) : 0
+            const _n = Math.max(8, Math.ceil(_dur * 20))
+            let _minX = 1e9, _minY = 1e9, _maxX = -1e9, _maxY = -1e9
+            for (let _i = 0; _i <= _n; _i++) {
+              skeleton.setToSetupPose()
+              if (animObj) { state.clearTracks(); state.setAnimation(0, animObj.name, false); state.update((_dur * _i) / _n); state.apply(skeleton) }
+              skeleton.updateWorldTransform()
+              const _o = new spine.Vector2(), _z = new spine.Vector2()
+              skeleton.getBounds(_o, _z)
+              _minX = Math.min(_minX, _o.x); _minY = Math.min(_minY, _o.y)
+              _maxX = Math.max(_maxX, _o.x + _z.x); _maxY = Math.max(_maxY, _o.y + _z.y)
+            }
+            for (let _k = 0; _k < _hi.length; _k++) skeleton.slots[_hi[_k]].attachment = _save[_k]
+            state.setAnimation(0, idle, true); state.update(0); state.apply(skeleton); skeleton.updateWorldTransform()
+            if (_maxX > _minX && _maxY > _minY) liveBounds = { offX: _minX, offY: _minY, w: _maxX - _minX, h: _maxY - _minY }
+          } catch (e) {}
+          vbVis = measureVisualBounds(spine, skData, animObj, vb, !!fxHide, hideIdx, liveBounds) || vb
           vbCache[vbKey] = vbVis
           try { window.__spineDbg = { folder: folder, model: opts.model || '', hideIdx: hideIdx, union: { w: +vbVis.size.x.toFixed(0), h: +vbVis.size.y.toFixed(0) }, chosen: 'union' } } catch (e) {}
         }
