@@ -210,6 +210,12 @@
       .catch(() => { window.__heroSpineIndex = window.__heroSpineIndex || {}; return window.__heroSpineIndex })
     return _spineIdxPromise
   }
+  // 🟢 2026-10-25 逐模型 fitPadding 覆写（仅登记「统一 pad 下观感明显不齐」的模型）。
+  //   图鉴画布与详情弹窗比例不同，数值以本画布实测为准，不照搬 app-core 的 0.58 基线。
+  const FIT_PAD_BY_MODEL = { fashi: 0.71, sishenpifu: 0.66, sishenpifu2: 0.66, pingyizhi: 0.66 }
+  // 死神默认模型 fashi 的紧包围盒底部还有一段留白，套统一 0.76 会让脚底浮在台面上方
+  // （实测 0.721，而皮肤是 0.759）→ 把锚点下移到 0.80 补回这段留白。
+  const ANCHOR_FEET_BY_MODEL = { fashi: 0.80 }
   let _lastSpineCanvas = null
   let _spineRetry = 0
   function playHeroSpine(h, model, noHideFx) {
@@ -235,8 +241,11 @@
         //   逐模型 scale 原本是为「特效撑大包围盒」做补偿的（我们不剔特效时必须套），
         //   而图鉴已剔除 fx，再套会导致 200/161/128/113 这种参差；官方 x/y 居中偏移仍然保留。
         fitByHeight: true,
-        fitPadding: 0.65,
-        anchorFeet: 0.76,
+        // 🟢 2026-10-25 按模型覆写（与「英雄详情弹窗」同一套死神 fashi 专项）：
+        //   默认模型 fashi 的可见包围盒含大片透明留白，统一 pad 下身高明显小于三个皮肤，
+        //   故按 model 名单独给 pad（数值经图鉴画布实测校准，目标：四皮肤身高一致）。
+        fitPadding: FIT_PAD_BY_MODEL[useModel] || 0.65,
+        anchorFeet: ANCHOR_FEET_BY_MODEL[useModel] || 0.76,
         // 不套官方 x/y 偏移：那是给「特效撑大包围盒 + 官方 scale」做补偿的；
         // tight 包围盒（已剔 fx）本身居中，再偏移反而歪（蛇女/炸弹/虎弓偏移的来源）
         hideSlots: (man.hideSlots || []).concat((man.modelHideSlots || {})[useModel] || []),
