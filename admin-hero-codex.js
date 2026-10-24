@@ -232,7 +232,7 @@
         hideFx: !noHideFx,
         dedupe: true,
         // 🟢 统一观感：所有模型按「可见高度」归一化到同一档。
-        //   官方 render-offsets 的 scale 是为「特效撑大包围盒」做补偿的（我们不剔特效时必须套），
+        //   逐模型 scale 原本是为「特效撑大包围盒」做补偿的（我们不剔特效时必须套），
         //   而图鉴已剔除 fx，再套会导致 200/161/128/113 这种参差；官方 x/y 居中偏移仍然保留。
         fitByHeight: true,
         fitPadding: 0.65,
