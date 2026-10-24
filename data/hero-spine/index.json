@@ -570,6 +570,11 @@
         "y": -11.87301419018305,
         "scale": 0.95
       }
+    },
+    "modelHideSlots": {
+      "hongmao": [
+        "dadaoguang"
+      ]
     }
   },
   "siwen": {
