@@ -110,154 +110,187 @@
     }
     return n
   }
-  // 采样 idle 动画求 tight 包围盒（世界坐标）；hideFx=true 时排除特效骨，得到「人物本体」范围
+  // 求骨架在 idle 整周期内的世界坐标包围盒（setup 姿势 + 沿动画均匀采样的逐帧并集）。
+  // 只测单帧会漏掉「起始帧几乎无内容」的模型，故必须整周期采样；hideFx 时先剔除特效槽，得到本体范围。
   function computeBounds(spine, skData, animName, hideFx) {
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-    const off = new spine.Vector2(), sz = new spine.Vector2()
-    const tmp = new spine.Skeleton(skData)
-    const stt = new spine.AnimationState(new spine.AnimationStateData(skData))
-    const merge = function (o, s) {
-      if (!isFinite(o.x) || !isFinite(o.y) || !isFinite(s.x) || !isFinite(s.y) || s.x <= 0 || s.y <= 0) return
-      minX = Math.min(minX, o.x); minY = Math.min(minY, o.y)
-      maxX = Math.max(maxX, o.x + s.x); maxY = Math.max(maxY, o.y + s.y)
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+    const off = new spine.Vector2(), size = new spine.Vector2()
+    const probe = new spine.Skeleton(skData)
+    const mixer = new spine.AnimationState(new spine.AnimationStateData(skData))
+    const absorb = function () {
+      if (!isFinite(off.x) || !isFinite(off.y) || !(size.x > 0) || !(size.y > 0)) return
+      if (off.x < x0) x0 = off.x
+      if (off.y < y0) y0 = off.y
+      if (off.x + size.x > x1) x1 = off.x + size.x
+      if (off.y + size.y > y1) y1 = off.y + size.y
     }
-    tmp.setToSetupPose(); if (hideFx) hideFxSlots(tmp); tmp.updateWorldTransform(); tmp.getBounds(off, sz); merge(off, sz)
+    const take = function () {
+      probe.updateWorldTransform()
+      probe.getBounds(off, size)
+      absorb()
+    }
+    probe.setToSetupPose()
+    if (hideFx) hideFxSlots(probe)
+    take()
     const anim = animName ? skData.findAnimation(animName) : null
     if (anim) {
-      const dur = anim.duration || 1
-      const n = Math.max(24, Math.ceil(dur * 30))
-      for (let i = 0; i <= n; i++) {
-        tmp.setToSetupPose(); stt.clearTracks(); stt.setAnimation(0, anim.name, false)
-        stt.update((dur * i) / n); stt.apply(tmp); if (hideFx) hideFxSlots(tmp); tmp.updateWorldTransform(); tmp.getBounds(off, sz); merge(off, sz)
+      const duration = anim.duration || 1
+      const frames = Math.max(24, Math.ceil(duration * 30))
+      for (let f = 0; f <= frames; f++) {
+        probe.setToSetupPose()
+        mixer.clearTracks()
+        mixer.setAnimation(0, anim.name, false)
+        mixer.update((duration * f) / frames)
+        mixer.apply(probe)
+        if (hideFx) hideFxSlots(probe)
+        take()
       }
     }
-    return { off: new spine.Vector2(minX, minY), size: new spine.Vector2(maxX - minX, maxY - minY) }
+    return { off: new spine.Vector2(x0, y0), size: new spine.Vector2(x1 - x0, y1 - y0) }
   }
 
-  // 按真实不透明像素测量紧凑包围盒（骨架 getBounds 会含大量空白附属/离屏附件，
-  // 直接用会导致角色偏小且偏离中心）。把整块网格渲染到小画布，扫 alpha 求紧边界再换算回世界坐标。
-  // 🔴 2026-10-22 升级为「idle 整周期采样取并集」：旧法只测传入骨架的当前单帧（调用方固定 t=0），
-  //    而 idle 起始帧几乎无内容的模型（萌萌 bingdundun2 实测 t0 仅 38px 冰晶残影、t0.5 起角色才完整出现）
-  // 会被测成极小包围盒 → 缩放爆炸 → 画成局部放大碎片（用户只见一小块绿影）。
-  //    现逐帧渲染到同一块 320px 累积画布取 alpha 并集，一次扫描得到整周期可见范围。
+  // 离屏扫描画布边长 / 判定「有内容」的 alpha 阈值
+  const SCAN_SIZE = 512
+  const SCAN_ALPHA = 24
+
+  // 按真实不透明像素测量紧包围盒。骨架 getBounds 会把空槽 extent、离屏附件一并算进去，
+  // 直接拿它缩放会让角色偏小且偏离中心，所以改为：把 idle 整周期逐帧画到同一张离屏画布，
+  // 取所有帧不透明像素的并集，扫描出像素边界后换算回骨架世界坐标。
   function measureVisualBounds(spine, skData, anim, vb, hideFx, hideIdx, liveBounds) {
     try {
-      const sw = vb.size.x, sh = vb.size.y
-      if (!(sw > 0 && sh > 0)) return null
-      const N = 512
-      // 🔴 2026-10-24 定标「中心」必须落在真实身体盒 liveBounds 上，而非 vb 盒中心：
-      //   vb 含大量空槽 extent（如死神 fashi：vb=227×344 而身体仅 184×299 且偏心），若以 vb 中心定标，
-      //   身体在 512 扫描画布内偏移→被裁→紧盒低估（→角色偏大/头顶贴边/站偏）。故以身体盒中心定标，
-      //   窗口尺寸取 ≥ 身体（vb 兜底），保证身体居中且完整落在画布内不被裁。
-      let cx, cy, winW, winH
+      const boxW = vb.size.x, boxH = vb.size.y
+      if (!(boxW > 0 && boxH > 0)) return null
+      const mixer = new spine.AnimationState(new spine.AnimationStateData(skData))
+      const duration = anim ? (anim.duration || 0) : 0
+      const frames = Math.max(6, Math.ceil(duration * 12))
+      // 定标中心取「真实身体盒」的中心而非骨架盒中心：骨架盒常含大片空槽留白，
+      // 按它定心会把身体推到扫描画布边缘被裁掉 → 紧盒被低估 → 角色偏大/头顶贴边。
+      let centerX = vb.off.x + boxW / 2
+      let centerY = vb.off.y + boxH / 2
+      let winW = boxW, winH = boxH
       if (liveBounds && liveBounds.w > 0 && liveBounds.h > 0) {
-        cx = liveBounds.offX + liveBounds.w / 2
-        cy = liveBounds.offY + liveBounds.h / 2
-        winW = Math.max(vb.size.x, liveBounds.w)
-        winH = Math.max(vb.size.y, liveBounds.h)
-      } else {
-        cx = vb.off.x + vb.size.x / 2
-        cy = vb.off.y + vb.size.y / 2
-        winW = vb.size.x; winH = vb.size.y
+        centerX = liveBounds.offX + liveBounds.w / 2
+        centerY = liveBounds.offY + liveBounds.h / 2
+        winW = Math.max(boxW, liveBounds.w)
+        winH = Math.max(boxH, liveBounds.h)
       }
-      // 🔴 2026-10-24 定标窗口留 1.35× 安全余量：若窗口恰等于身体（如石头 xiaoxiao 身体即 412 高），
-      //   身体会被顶满 512 扫描画布边缘→边缘像素/抗锯齿被裁→紧盒低估（r2 再放大仍无法恢复）→角色溢出画布。
-      //   留余量后身体居中且四周留白，扫描得真实整盒。
-      const stt = new spine.AnimationState(new spine.AnimationStateData(skData))
-      const dur = anim ? (anim.duration || 0) : 0
-      const steps = Math.max(6, Math.ceil(dur * 12))
-      // 🔴 2026-10-24 扫描函数改为「按给定中心定标」：两次测量各自独立定心，第二遍按第一遍量得的内容盒重定心，
-      //   根治「getBounds 含巨大空附件留白（石头 xiaoxiao 盒 412 高而真实像素仅 ~243 且偏心）导致按盒定心把真身推出边缘→低估」。
-      const pass = function (fitW, fitH, ccx, ccy) {
-        const s = Math.min((N - 6) / fitW, (N - 6) / fitH)
-        if (!(s > 0)) return null
-        const oc = document.createElement('canvas')
-        oc.width = N; oc.height = N
-        const c2 = oc.getContext('2d', { willReadFrequently: true })
-        const acc = new Uint8Array(N * N)
-        for (let i = 0; i <= steps; i++) {
-          const tmp = new spine.Skeleton(skData)
-          tmp.setToSetupPose()
-          if (anim) { stt.clearTracks(); stt.setAnimation(0, anim.name, false); stt.update((dur * i) / steps); stt.apply(tmp) }
-          if (hideFx) hideFxSlots(tmp)
-          if (hideIdx) { for (let k = 0; k < hideIdx.length; k++) { const _sl = tmp.slots[hideIdx[k]]; if (_sl) _sl.attachment = null } }
-          tmp.updateWorldTransform()
-          c2.clearRect(0, 0, N, N)
-          c2.save()
-          c2.translate(N / 2, N / 2)
-          c2.scale(s, -s)
-          c2.translate(-ccx, -ccy)
-          const r2 = new spine.canvas.SkeletonRenderer(c2)
-          r2.triangleRendering = true
-          r2.draw(tmp)
-          c2.restore()
-          const data = c2.getImageData(0, 0, N, N).data
-          for (let p = 3, o = 0; o < N * N; p += 4, o++) { if (data[p] > 24) acc[o] = 1 }
-        }
-        let minX = 1e9, minY = 1e9, maxX = -1, maxY = -1
-        for (let y = 0; y < N; y++) {
-          const row = y * N
-          for (let x = 0; x < N; x++) {
-            if (acc[row + x]) {
-              if (x < minX) minX = x
-              if (x > maxX) maxX = x
-              if (y < minY) minY = y
-              if (y > maxY) maxY = y
+      // 一次扫描：把 [viewW × viewH] 的窗口按给定中心映射到扫描画布，逐帧累积 alpha 后取并集边界
+      const scan = function (viewW, viewH, cx, cy) {
+        const scale = Math.min((SCAN_SIZE - 6) / viewW, (SCAN_SIZE - 6) / viewH)
+        if (!(scale > 0)) return null
+        const board = document.createElement('canvas')
+        board.width = SCAN_SIZE
+        board.height = SCAN_SIZE
+        const g = board.getContext('2d', { willReadFrequently: true })
+        const painted = new Uint8Array(SCAN_SIZE * SCAN_SIZE)
+        for (let f = 0; f <= frames; f++) {
+          const probe = new spine.Skeleton(skData)
+          probe.setToSetupPose()
+          if (anim) {
+            mixer.clearTracks()
+            mixer.setAnimation(0, anim.name, false)
+            mixer.update((duration * f) / frames)
+            mixer.apply(probe)
+          }
+          if (hideFx) hideFxSlots(probe)
+          if (hideIdx) {
+            for (let k = 0; k < hideIdx.length; k++) {
+              const slot = probe.slots[hideIdx[k]]
+              if (slot) slot.attachment = null
             }
+          }
+          probe.updateWorldTransform()
+          g.clearRect(0, 0, SCAN_SIZE, SCAN_SIZE)
+          g.save()
+          g.translate(SCAN_SIZE / 2, SCAN_SIZE / 2)
+          g.scale(scale, -scale)
+          g.translate(-cx, -cy)
+          const painter = new spine.canvas.SkeletonRenderer(g)
+          painter.triangleRendering = true
+          painter.draw(probe)
+          g.restore()
+          const px = g.getImageData(0, 0, SCAN_SIZE, SCAN_SIZE).data
+          for (let a = 3, i = 0; i < painted.length; a += 4, i++) {
+            if (px[a] > SCAN_ALPHA) painted[i] = 1
+          }
+        }
+        let minX = -1, minY = -1, maxX = -1, maxY = -1
+        for (let y = 0; y < SCAN_SIZE; y++) {
+          const row = y * SCAN_SIZE
+          for (let x = 0; x < SCAN_SIZE; x++) {
+            if (!painted[row + x]) continue
+            if (minX < 0 || x < minX) minX = x
+            if (x > maxX) maxX = x
+            if (minY < 0 || y < minY) minY = y
+            if (y > maxY) maxY = y
           }
         }
         if (maxX < 0) return null
-        const toWx = function (px) { return (px - N / 2) / s + ccx }
-        const toWy = function (py) { return -(py - N / 2) / s + ccy }
-        const wx1 = toWx(minX), wx2 = toWx(maxX + 1)
-        const wy1 = toWy(maxY + 1), wy2 = toWy(minY)
-        if (!(wx2 > wx1) || !(wy2 > wy1)) return null
-        return { off: new spine.Vector2(wx1, wy1), size: new spine.Vector2(wx2 - wx1, wy2 - wy1) }
+        // 像素坐标 → 世界坐标（画布 y 轴朝下而缩放取负，上下边界互换）
+        const left = (minX - SCAN_SIZE / 2) / scale + cx
+        const right = (maxX + 1 - SCAN_SIZE / 2) / scale + cx
+        const bottom = -(maxY + 1 - SCAN_SIZE / 2) / scale + cy
+        const top = -(minY - SCAN_SIZE / 2) / scale + cy
+        if (!(right > left) || !(top > bottom)) return null
+        return { off: new spine.Vector2(left, bottom), size: new spine.Vector2(right - left, top - bottom) }
       }
-      // 🔴 2026-10-24 两遍定标 + 第二遍按内容重定心：
-      //   第一遍以「(vb∪liveBounds) 盒」定心留 1.5× 余量，保证身体（即便在盒内偏移）完整落画布内不被裁；
-      //   第二遍以第一遍量得的内容盒为中心、留 1.15× 余量重扫→真身居中→得准确紧盒（此前第二遍仍用盒定心→偏移真身被裁→低估）。
-      const r1 = pass(winW * 1.5, winH * 1.5, cx, cy)
-      if (!r1) return null
-      const _c2x = r1.off.x + r1.size.x / 2, _c2y = r1.off.y + r1.size.y / 2
-      const r2 = pass(r1.size.x * 1.15, r1.size.y * 1.15, _c2x, _c2y)
-      return r2 || r1
+      // 两遍定标：第一遍放大窗口（1.5×）保证偏心身体也完整落在画布内不被裁；
+      // 第二遍改用第一遍量得的内容盒重新定心（1.15×），让真身居中后重扫 → 得到准确紧盒。
+      const coarse = scan(winW * 1.5, winH * 1.5, centerX, centerY)
+      if (!coarse) return null
+      const fine = scan(coarse.size.x * 1.15, coarse.size.y * 1.15,
+        coarse.off.x + coarse.size.x / 2, coarse.off.y + coarse.size.y / 2)
+      return fine || coarse
     } catch (e) { return null }
   }
 
-  // 加载并解析 folder 的骨架资源（带缓存；失败返回 null，由调用方展示状态）
+  // 贴图页必须「从 p0 起连续」：清单登记的页数常多于实际页数，
+  // 因此收集时一旦出现页码断档就截断，与逐页试错的语义一致。
+  function collectPages(loaded) {
+    const sorted = loaded.filter(Boolean).sort(function (a, b) { return a.index - b.index })
+    const sheets = []
+    for (let k = 0; k < sorted.length; k++) {
+      if (sorted[k].index !== k) break
+      sheets.push(sorted[k].image)
+    }
+    return sheets
+  }
+
+  // 加载并解析 folder 的骨架资源（带缓存；失败抛错，由调用方展示状态）
   // model：皮肤独立骨骼名（官方每个皮肤在英雄目录下有独立资源），有则读 models/<model>/ 子目录
-  // pngCount：清单登记的贴图页数（p0..pN-1）；不传则逐个试到失败为止
+  // pngCount：清单登记的贴图页数（p0..pN-1）；不传则按默认上限逐页尝试
   async function loadAssets(folder, pngCount, model) {
     const key = folder + '@' + (model || '')
     if (assetCache[key]) return assetCache[key]
-    const base = assetBase() + folder + (model ? '/models/' + model : '') + '/'
-    // 🔴 2026-10-20 并行加载：骨架/图集/贴图同时拉（原为串行逐个等 RTT，首次打开每英雄多等数秒）
-    //    贴图仍保持「从 p0 起连续」语义：跳过缺失页之后的不连续页，与原逐页试错的截断行为一致
-    const maxPages = pngCount > 0 ? pngCount : 9
-    const results = await Promise.all([
-      fetch(base + 'skeleton.json').then(function (r) { return r.json() }),
-      fetch(base + 'atlas.txt').then(function (r) { return r.text() }),
-      Promise.all(Array.from({ length: maxPages }, function (_, i) {
-        return loadImage(base + 'p' + i + '.png').then(function (im) { return { i: i, im: im } }, function () { return null })
-      })).then(function (rs) {
-        const ok = rs.filter(Boolean).sort(function (a, b) { return a.i - b.i })
-        const out = []
-        for (let k = 0; k < ok.length; k++) { if (ok[k].i !== k) break; out.push(ok[k].im) }
-        return out
-      })
+    const dir = assetBase() + folder + (model ? '/models/' + model : '') + '/'
+    // 骨架 / 图集 / 全部贴图页同时拉取，避免串行逐个等 RTT（首次打开会多等数秒）
+    const pageCount = pngCount > 0 ? pngCount : 9
+    const jobs = []
+    for (let i = 0; i < pageCount; i++) jobs.push(i)
+    const bundle = await Promise.all([
+      fetch(dir + 'skeleton.json').then(function (r) { return r.json() }),
+      fetch(dir + 'atlas.txt').then(function (r) { return r.text() }),
+      Promise.all(jobs.map(function (i) {
+        return loadImage(dir + 'p' + i + '.png').then(
+          function (image) { return { index: i, image: image } },
+          function () { return null }
+        )
+      })).then(collectPages)
     ])
-    const skeletonJson = results[0], atlasText = results[1], imgs = results[2]
-    if (!imgs.length) throw new Error('无贴图')
-    let pi = 0
+    const skeletonJson = bundle[0]
+    const atlasText = bundle[1]
+    const sheets = bundle[2]
+    if (!sheets.length) throw new Error('无贴图')
+    // 图集里的页面按 atlas.txt 出现顺序依次对应 p0、p1…
+    let cursor = 0
     const atlas = new spine.TextureAtlas(atlasText, function () {
-      const img = imgs[pi++] || imgs[0]
-      return new spine.canvas.CanvasTexture(img)
+      const sheet = sheets[cursor++] || sheets[0]
+      return new spine.canvas.CanvasTexture(sheet)
     })
     const skData = new spine.SkeletonJson(new spine.AtlasAttachmentLoader(atlas)).readSkeletonData(skeletonJson)
     const entry = { skData: skData, atlas: atlas }
     assetCache[key] = entry
-    _assetCacheTrim(key) // 🔴 2026-10-24 LRU 上限：释放最久未用的模型，防内存无限增长
+    _assetCacheTrim(key) // LRU 上限：释放最久未用的模型，防内存无限增长
     return entry
   }
 
@@ -505,9 +538,8 @@
       if (opts.tight) {
         vbVis = vbCache[vbKey]
         if (!vbVis) {
-          // 🔴 2026-10-22 整骨架联合盒（setup + idle 全周期采样），不做任何特效剔除。
-          //   逐模型的 scale/x/y 用于补偿特效撑盒与落台（见 index[folder].modelOffsets）。
-          //   index[folder].hideSlots 仍可对个别英雄做测量剔除兜底（渲染照常）。
+          // 整骨架联合盒（setup + idle 全周期采样）。
+          //   清单里的 index[folder].hideSlots 可对个别英雄做「测量时剔除」的兜底（渲染照常）。
           let hideIdx = null
           try {
             const _man = (typeof window !== 'undefined' && window.__heroSpineIndex) ? window.__heroSpineIndex[folder] : null
@@ -566,14 +598,14 @@
         }
       }
 
-      // 画布尺寸随容器 + dpr
+      // 画布像素尺寸跟随容器大小与设备像素比
       function fit() {
-        const parent = canvas.parentElement
-        const dpr = window.devicePixelRatio || 1
-        const w = Math.max(1, Math.round((parent ? parent.clientWidth : 400) * dpr))
-        const h = Math.max(1, Math.round((parent ? parent.clientHeight : 500) * dpr))
-        if (canvas.width !== w) canvas.width = w
-        if (canvas.height !== h) canvas.height = h
+        const box = canvas.parentElement
+        const ratio = window.devicePixelRatio || 1
+        const cw = Math.max(1, Math.round((box ? box.clientWidth : 400) * ratio))
+        const ch = Math.max(1, Math.round((box ? box.clientHeight : 500) * ratio))
+        if (canvas.width !== cw) canvas.width = cw
+        if (canvas.height !== ch) canvas.height = ch
       }
       fit()
       window.addEventListener('resize', fit)
@@ -588,38 +620,45 @@
       const tick = function (now) {
         if (!st.playing) return
         st.raf = requestAnimationFrame(tick)
-        const dt = Math.min((now - last) / 1000, 0.1); last = now
-        state.update(dt); state.apply(skeleton); skeleton.updateWorldTransform()
-        if (frameHide2) { for (let i = 0; i < frameHide2.length; i++) { const _fs = skeleton.slots[frameHide2[i]]; if (_fs) _fs.attachment = null } }
+        const dt = Math.min((now - last) / 1000, 0.1)
+        last = now
+        // 官方播放三步：推进动画时间 → 把动画结果写到骨架 → 刷新世界变换
+        state.update(dt)
+        state.apply(skeleton)
+        skeleton.updateWorldTransform()
+        // 每帧压制特效槽 / 调用方指定槽 / 同族副本槽：这些附件会被动画逐帧重新挂上，必须每帧清
+        if (frameHide2) {
+          for (let i = 0; i < frameHide2.length; i++) {
+            const slot = skeleton.slots[frameHide2[i]]
+            if (slot) slot.attachment = null
+          }
+        }
         const ctx = canvas.getContext('2d')
         const w = canvas.width, h = canvas.height
-        ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, w, h)
-        const sw = vbVis.size.x, sh = vbVis.size.y
-        if (!(sw > 0 && sh > 0)) return
-        const pad = (opts.fitPadding != null ? opts.fitPadding : 0.9)
-        let fitScale = Math.min(w / sw, h / sh) * pad
-        if (opts.fitByHeight) {
-          // 统一视觉高度：以「可见高度 = 画布高 × pad」为基准缩放，宽度只做溢出保护。
-          // 此前用 min(w/sw, h/sh) 会让偏宽的模型被整体压小，导致各卡角色大小不一。
-          fitScale = Math.min((h / sh) * pad, (w * 0.96) / sw)
-        }
-        if (opts.scale != null && opts.scale > 0) fitScale *= opts.scale
-        else if (window.__heroSpineIndex && folder && window.__heroSpineIndex[folder] && window.__heroSpineIndex[folder].scale > 0) fitScale *= window.__heroSpineIndex[folder].scale
-        // 🔴 2026-10-22 联合盒中心 + 世界单位 x/y 偏移后对准画布中心
-        //   （cx = 包围盒.offset.x + sw/2 + ox; cy = ... + oy）。
-        //   注：offsetX/offsetY 语义已从「画布比例」改为「世界单位」。
-        const cx = vbVis.off.x + sw / 2 + (Number(opts.offsetX) || 0)
-        const cy = vbVis.off.y + sh / 2 + (Number(opts.offsetY) || 0)
+        ctx.setTransform(1, 0, 0, 1, 0, 0)
+        ctx.clearRect(0, 0, w, h)
+        const boxW = vbVis.size.x, boxH = vbVis.size.y
+        if (!(boxW > 0 && boxH > 0)) return
+        // 缩放：默认把包围盒整体内接画布；fitByHeight 时以画布高度为准统一视觉大小，宽度只做溢出保护
+        const pad = opts.fitPadding != null ? opts.fitPadding : 0.9
+        let zoom = opts.fitByHeight
+          ? Math.min((h / boxH) * pad, (w * 0.96) / boxW)
+          : Math.min(w / boxW, h / boxH) * pad
+        if (opts.scale != null && opts.scale > 0) zoom *= opts.scale
+        else if (window.__heroSpineIndex && folder && window.__heroSpineIndex[folder] && window.__heroSpineIndex[folder].scale > 0) zoom *= window.__heroSpineIndex[folder].scale
         ctx.save()
         if (opts.anchorFeet != null) {
-          // 底边中点对齐锚点：横向居中、纵向落在石台面（战场小卡等旧调用方仍可用）
+          // 脚底锚点：包围盒「底边中点」落在画布纵向 anchorFeet 处（石台面），横向居中
           ctx.translate(w / 2, h * opts.anchorFeet)
-          ctx.scale(fitScale, -fitScale)
-          ctx.translate(-(vbVis.off.x + sw / 2), -vbVis.off.y)
+          ctx.scale(zoom, -zoom)
+          ctx.translate(-(vbVis.off.x + boxW / 2), -vbVis.off.y)
         } else {
+          // 包围盒中心对准画布中心，offsetX/offsetY 为世界单位偏移
+          const targetX = vbVis.off.x + boxW / 2 + (Number(opts.offsetX) || 0)
+          const targetY = vbVis.off.y + boxH / 2 + (Number(opts.offsetY) || 0)
           ctx.translate(w / 2, h / 2)
-          ctx.scale(fitScale, -fitScale)
-          ctx.translate(-cx, -cy)
+          ctx.scale(zoom, -zoom)
+          ctx.translate(-targetX, -targetY)
         }
         renderer.draw(skeleton)
         ctx.restore()
