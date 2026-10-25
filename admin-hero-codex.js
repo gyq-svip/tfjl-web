@@ -212,10 +212,12 @@
   }
   // 🟢 2026-10-25 逐模型 fitPadding 覆写（仅登记「统一 pad 下观感明显不齐」的模型）。
   //   图鉴画布与详情弹窗比例不同，数值以本画布实测为准，不照搬 app-core 的 0.58 基线。
-  const FIT_PAD_BY_MODEL = { fashi: 0.71, sishenpifu: 0.66, sishenpifu2: 0.66, pingyizhi: 0.66 }
+  const FIT_PAD_BY_MODEL = {"xiaolupifu2":0.684,"xiaolupifu":0.684,"bingnvpifu2":0.62,"jinshejing":0.618,"chunsanshiniang":0.614,"baifamonv":0.616,"wanshenglieshou":0.616,"feidie":0.598,"shenhaimogui":0.537,"nvwang_bingxue":0.686,"erlangshen":0.609,"lujunyi":0.607,"huanjinglingpifu":0.518,"kongmingdeng":0.518,"xiongmao_shengdan":0.698,"diting":0.6,"yegucheng":0.6,"yangzhi":0.6,"shenlongpifu":0.901,"yueguangbaohe01":0.601,"yueguangbaohe02":0.608,"jueying":0.61,"ayuya":0.512,"houyipifu1":0.511,"houyipifu2":0.512,"taipinglehouyi":0.511,"bodaerduo":0.512,"yanqing":0.595,"aishenpifu":0.602,"qiuwang":0.598,"nezha":0.601,"gangquan":0.598,"sanhaoji":0.598,"luzhishen":0.6,"guijiaoqi":0.6,"baoxiangui":0.6,"baokupifu01":0.6,"baokupifu02":0.598,"jianzhong":0.618,"rigui":0.616,"hunjinglingpifu":0.558,"daocaoren":0.6,"wugongjing":0.608,"tieshangongzhu":0.604,"zuoci":0.6,"shiliujie":0.6,"ligonggong":0.6,"qitiandasheng1":0.598,"qitiandasheng2":0.598,"qitiandasheng3":0.598,"zhizunbao":0.598,"dashengtaipingle":0.601,"luxiaofeng":0.573,"zhouyu":0.569,"wudujiaozhu":0.569,"hanbingzhenqi":0.592,"fashi":0.71,"sishenpifu":0.66,"sishenpifu2":0.66,"pingyizhi":0.66}
   // 死神默认模型 fashi 的紧包围盒底部还有一段留白，套统一 0.76 会让脚底浮在台面上方
   // （实测 0.721，而皮肤是 0.759）→ 把锚点下移到 0.80 补回这段留白。
-  const ANCHOR_FEET_BY_MODEL = { fashi: 0.80 }
+  const ANCHOR_FEET_BY_MODEL = {"huanyingcike":0.826,"xiaolupifu2":0.786,"xiaolupifu":0.786,"jianna":0.778,"najiapifu":0.776,"fengxingzhe":0.79,"feiji1":0.853,"feidie":0.826,"wushi":0.778,"jingling1":0.781,"jingling2":0.799,"baohulu_lei":0.774,"taipingfuzhou":0.826,"yougui":0.776,"jingling3":0.837,"huniu":0.776,"jingling4":0.78,"jingling6_1":0.78,"yueguangbaohe01":0.778,"yueguangbaohe02":0.78,"houyi":0.759,"songshupifu":0.774,"xiaolifeidao":0.792,"caijingling":0.808,"tujingling":0.781,"tujinglingpifu01":0.785,"tujinglingpifu02":0.785,"guichengxiang01":0.773,"guichengxiang02":0.773,"aishen":0.774,"baijingjing":0.774,"jingling7":0.806,"fenghuang":0.826,"bingjingling":0.794,"lanlianhua":0.796,"zhangfei":0.78,"qianshuiting":0.821,"qianshuitingpifu":0.815,"bingniao":0.794,"xuemo":0.776,"fashi":0.8}
+  // pad 无效的模型（包围盒极宽，fitByHeight 的 min() 被宽度项卡住）改用 scale 直接缩放
+  const SCALE_BY_MODEL = {"huopaopifu":0.939,"xiaolifeidao":0.95,"shangfangbaojian":1.003,"tujinglingpifu02":0.946,"leifengta":1.024,"chushouguai":1.049,"lanlianhua":0.95,"xiongmao_shengdan":0.928,"houyi":0.494,"ayuya":0.621,"houyipifu1":0.623,"houyipifu2":0.623,"taipinglehouyi":0.623,"bodaerduo":0.623,"gangquan":0.736,"sanhaoji":0.736,"luzhishen":0.763,"guijiaoqi":0.727,"leibao":0.98,"daocaoren":0.734,"wugongjing":0.727,"tieshangongzhu":0.731,"zuoci":0.731,"shiliujie":0.734,"ligonggong":0.731,"qitiandasheng1":0.734,"qitiandasheng2":0.806,"qitiandasheng3":0.749,"zhizunbao":0.738,"dashengtaipingle":0.734,"shenhulu_guang":0.985,"jingling3":1.007,"baohulu_an":0.997,"mohulu":0.982,"luxiaofeng":0.965,"tianshi":1.005}
   let _lastSpineCanvas = null
   let _spineRetry = 0
   function playHeroSpine(h, model, noHideFx) {
@@ -229,10 +231,24 @@
       // 模型选择：皮肤指定 > snapshot 的 defaultModel（每英雄权威）> index 默认。
       // 不能直接用 index.model——多英雄共用目录时（jingling 放了 6 个精灵）那是别的英雄的模型。
       const useModel = model || h.defaultModel || man.model || ''
-      const pngs = useModel ? ((man.modelPngs || {})[useModel] || 0) : (man.pngs || 0)
-      const moff = (man.modelOffsets && (man.modelOffsets[useModel] || man.modelOffsets[man.model])) || {}
+      // 资源校验：皮肤登记的骨骼模型若未随资源入库（如幻精灵紫金铃铛/孔明灯），
+      // 直接播放会走加载失败分支 → 画面残留上一个模型，表现为「偏大/位置怪异」。
+      // 这里回退到默认模型并明确提示，而不是留一个坏画面。
+      let effModel = useModel
+      let fallbackTip = ''
+      if (useModel) {
+        const hasModel = !!(man.models && Object.keys(man.models).some((k) => man.models[k] === useModel))
+        const isDefault = useModel === (h.defaultModel || man.model)
+        if (!hasModel && !isDefault) {
+          effModel = h.defaultModel || man.model || ''
+          fallbackTip = '该皮肤暂无骨骼动画，已显示默认外观'
+        }
+      }
+      const pngs = effModel ? ((man.modelPngs || {})[effModel] || 0) : (man.pngs || 0)
+      const moff = (man.modelOffsets && (man.modelOffsets[effModel] || man.modelOffsets[man.model])) || {}
+      if (fallbackTip && st) { st.style.display = 'block'; st.textContent = fallbackTip }
       window.spineHero.play(canvas, h.modelFolder, {
-        model: useModel || undefined,
+        model: effModel || undefined,
         pngs: pngs,
         tight: true,
         hideFx: !noHideFx,
@@ -244,11 +260,13 @@
         // 🟢 2026-10-25 按模型覆写（与「英雄详情弹窗」同一套死神 fashi 专项）：
         //   默认模型 fashi 的可见包围盒含大片透明留白，统一 pad 下身高明显小于三个皮肤，
         //   故按 model 名单独给 pad（数值经图鉴画布实测校准，目标：四皮肤身高一致）。
-        fitPadding: FIT_PAD_BY_MODEL[useModel] || 0.65,
-        anchorFeet: ANCHOR_FEET_BY_MODEL[useModel] || 0.76,
+        fitPadding: FIT_PAD_BY_MODEL[effModel] || 0.65,
+        anchorFeet: ANCHOR_FEET_BY_MODEL[effModel] || 0.76,
+        // scale 覆写：部分模型 index 自带 scale（补偿特效撑盒），显式替代以绕过宽度约束
+        scale: (SCALE_BY_MODEL[effModel] ? ((window.__heroSpineIndex && h.modelFolder && window.__heroSpineIndex[h.modelFolder] && window.__heroSpineIndex[h.modelFolder].scale > 0) ? window.__heroSpineIndex[h.modelFolder].scale : 1) * SCALE_BY_MODEL[effModel] : undefined),
         // 不套官方 x/y 偏移：那是给「特效撑大包围盒 + 官方 scale」做补偿的；
         // tight 包围盒（已剔 fx）本身居中，再偏移反而歪（蛇女/炸弹/虎弓偏移的来源）
-        hideSlots: (man.hideSlots || []).concat((man.modelHideSlots || {})[useModel] || []),
+        hideSlots: (man.hideSlots || []).concat((man.modelHideSlots || {})[effModel] || []),
         onStatus: (s) => {
           const el = document.getElementById('hdcSpineStatus')
           if (!el) return
