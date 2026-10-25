@@ -1,7 +1,8 @@
-// 临时脚本：把官方 render-offsets.json（逐模型手调 x/y/scale）合并进 data/hero-spine/index.json
+// 临时脚本：把逐模型缩放/偏移参数（render-offsets.json，x/y/scale）合并进 data/hero-spine/index.json
 import fs from 'fs'
 
-const OFF = 'D:/game-res/render-offsets.json'
+// 参数文件路径（按本机实际存放位置修改）
+const OFF = process.env.RENDER_OFFSETS || 'D:/game-res/render-offsets.json'
 const IDX = 'data/hero-spine/index.json'
 const off = JSON.parse(fs.readFileSync(OFF, 'utf8')).offsets || {}
 const idx = JSON.parse(fs.readFileSync(IDX, 'utf8'))

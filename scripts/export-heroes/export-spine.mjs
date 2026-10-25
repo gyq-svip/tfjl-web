@@ -3,7 +3,7 @@
 //   node scripts/export-heroes/export-spine.mjs 小野    # 单英雄
 //   node scripts/export-heroes/export-spine.mjs --all  # 批量（data/heroes.json 里所有带 spine 的英雄）
 // 输出：data/hero-spine/<folder>/  skeleton.json + atlas.txt + p*.png
-// 资源定位机制与官方 CDN 同源。
+// 资源定位机制与 export-heroes 同源（官方 CDN → Cocos 解析 → Spine 3.8）。
 import https from 'node:https'
 import fs from 'node:fs'
 import path from 'node:path'
