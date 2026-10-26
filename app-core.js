@@ -12262,6 +12262,17 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                                             if (o && typeof o === 'object') {
                                                 if (o.scale != null) j[k].scale = o.scale
                                                 if (o.offsetX != null) j[k].offsetX = o.offsetX
+                                                // 🔴 2026-10-27 逐模型 fx 保留白名单（如苏小妹风车槽 fx/suxiaomei08
+                                                //   是手持部件，被 fx 规则误删）。本地包是旧版索引，必须同步过来，
+                                                //   否则桌面端即使资源齐全也看不到该部件。
+                                                if (o.modelFxKeep != null) j[k].modelFxKeep = o.modelFxKeep
+                                                // 模型映射/贴图映射只做「补齐不覆盖」：本地包可能含线上没有的模型
+                                                if (o.models && typeof o.models === 'object') {
+                                                    j[k].models = Object.assign({}, o.models, j[k].models || {})
+                                                }
+                                                if (o.modelPngs && typeof o.modelPngs === 'object') {
+                                                    j[k].modelPngs = Object.assign({}, o.modelPngs, j[k].modelPngs || {})
+                                                }
                                             }
                                         }
                                     }

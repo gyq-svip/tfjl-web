@@ -202,12 +202,32 @@
   /* —— Spine 播放（复用 spine-hero.js 的成熟播放器与既有 data/hero-spine 资源，零新增入库）—— */
   let _spineIdxPromise = null
   function spineIndex() {
-    if (window.__heroSpineIndex) return Promise.resolve(window.__heroSpineIndex)
     if (_spineIdxPromise) return _spineIdxPromise
-    _spineIdxPromise = fetch(baseUrl() + 'data/hero-spine/index.json')
-      .then((r) => r.json())
-      .then((j) => { window.__heroSpineIndex = j || {}; return window.__heroSpineIndex })
-      .catch(() => { window.__heroSpineIndex = window.__heroSpineIndex || {}; return window.__heroSpineIndex })
+    // 🔴 2026-10-27 桌面端 __heroSpineIndex 可能来自本地旧皮肤包（缺 modelFxKeep 等新配置，
+    //   例：苏小妹风车槽 fx/suxiaomei08 会被 fx 规则误删）。这里统一用线上索引做一次
+    //   「字段补齐」后再返回（资源 URL 仍走本地 base，只同步配置数值），离线时静默降级。
+    _spineIdxPromise = (async () => {
+      let j = window.__heroSpineIndex
+      if (!j) {
+        try { j = await (await fetch(baseUrl() + 'data/hero-spine/index.json')).json() } catch (e) { j = null }
+      }
+      try {
+        const jo = await (await fetch(baseUrl() + 'data/hero-spine/index.json', { cache: 'no-store' })).json()
+        if (j && jo && typeof jo === 'object') {
+          for (const k of Object.keys(jo)) {
+            const o = jo[k]
+            if (!o || typeof o !== 'object' || !j[k]) continue
+            if (o.modelFxKeep != null && j[k].modelFxKeep == null) j[k].modelFxKeep = o.modelFxKeep
+            if (o.scale != null && j[k].scale == null) j[k].scale = o.scale
+            if (o.offsetX != null && j[k].offsetX == null) j[k].offsetX = o.offsetX
+          }
+        }
+        // 本地索引缺失的英雄目录直接采用线上条目（资源加载失败会走既有回退）
+        if (j && jo) for (const k of Object.keys(jo)) if (!j[k]) j[k] = jo[k]
+      } catch (e) {}
+      window.__heroSpineIndex = j || window.__heroSpineIndex || {}
+      return window.__heroSpineIndex
+    })()
     return _spineIdxPromise
   }
   // 🟢 2026-10-25 逐模型 fitPadding 覆写（仅登记「统一 pad 下观感明显不齐」的模型）。
