@@ -89,7 +89,10 @@
     })
   }
   // 隐藏/恢复「特效骨」挂件：冰晶/光效(fx/*)会把包围盒撑大，使人物被算小、站偏
-  function hideFxSlots(sk) {
+  // 🟢 2026-10-27 keep：fx 保留白名单（槽名/附件名数组）。官方把少数「身体部件」也放在 fx/ 目录下
+  //   （小野·苏小妹 suxiaomei 的手持风车槽 fx/suxiaomei08），三条剔除路径都必须跳过它们，
+  //   否则角色缺件。传参而非读全局，避免并发 play 互相串味。
+  function hideFxSlots(sk, keep) {
     let n = 0
     // 🔴 2026-10-22 稳健识别特效：官方把所有特效附件放在 images/fx/ 路径下（3619 个），
     //   但命名有两种——'images/fx/aixin'（fx 前有斜杠）与 'fx/glow2_00004'（fx 在开头）。
@@ -106,13 +109,16 @@
       if (!s.attachment) continue
       const bn = (s.bone && s.bone.data && s.bone.data.name) || ''
       const an = (s.attachment.name) || ''
+      const sn = (s.data && s.data.name) || ''
+      // 🟢 2026-10-27 白名单槽不剔（风车等 fx/ 路径下的身体部件）
+      if (keep && (keep.indexOf(sn) >= 0 || keep.indexOf(an) >= 0)) continue
       if (fxSeg.test(bn) || fxSeg.test(an) || fxLeaf.test(an) || /特效|texiao|guangxiao/i.test(bn)) { s._fxAtt = s.attachment; s.attachment = null; n++ }
     }
     return n
   }
   // 求骨架在 idle 整周期内的世界坐标包围盒（setup 姿势 + 沿动画均匀采样的逐帧并集）。
   // 只测单帧会漏掉「起始帧几乎无内容」的模型，故必须整周期采样；hideFx 时先剔除特效槽，得到本体范围。
-  function computeBounds(spine, skData, animName, hideFx) {
+  function computeBounds(spine, skData, animName, hideFx, keep) {
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
     const off = new spine.Vector2(), size = new spine.Vector2()
     const probe = new spine.Skeleton(skData)
@@ -130,7 +136,7 @@
       absorb()
     }
     probe.setToSetupPose()
-    if (hideFx) hideFxSlots(probe)
+    if (hideFx) hideFxSlots(probe, keep)
     take()
     const anim = animName ? skData.findAnimation(animName) : null
     if (anim) {
@@ -156,7 +162,7 @@
   // 按真实不透明像素测量紧包围盒。骨架 getBounds 会把空槽 extent、离屏附件一并算进去，
   // 直接拿它缩放会让角色偏小且偏离中心，所以改为：把 idle 整周期逐帧画到同一张离屏画布，
   // 取所有帧不透明像素的并集，扫描出像素边界后换算回骨架世界坐标。
-  function measureVisualBounds(spine, skData, anim, vb, hideFx, hideIdx, liveBounds) {
+  function measureVisualBounds(spine, skData, anim, vb, hideFx, hideIdx, liveBounds, keep) {
     try {
       const boxW = vb.size.x, boxH = vb.size.y
       if (!(boxW > 0 && boxH > 0)) return null
@@ -192,7 +198,7 @@
             mixer.update((duration * f) / frames)
             mixer.apply(probe)
           }
-          if (hideFx) hideFxSlots(probe)
+          if (hideFx) hideFxSlots(probe, keep)
           if (hideIdx) {
             for (let k = 0; k < hideIdx.length; k++) {
               const slot = probe.slots[hideIdx[k]]
@@ -379,6 +385,11 @@
       //   供下方 autoFxFallback 判定：有身体槽的模型，剔 fx 后画面静止是正常的（人物本来就站桩），
       //   不能因此判定「该模型四肢全靠特效」而整体回退。
       let hasBodySlot = false
+      // 🟢 2026-10-27 fx 保留白名单：官方导出时把少数「身体部件」也放在 fx/ 目录下
+      //   （典型：小野·苏小妹 suxiaomei 的手持风车槽 fx/suxiaomei08 —— 是风车不是特效）。
+      //   这类槽若被 fx 规则剔除，角色就会缺件（用户反馈「苏小妹的风车没有了」）。
+      //   由调用方按 model 传入要保留的槽名（数据来自 index.json 的 modelFxKeep）。
+      const fxKeep = opts.fxKeep || null
       if (fxHide) {
         const fxSeg = /(^|\/)fx(\/|$)/i
         // 🔴 2026-10-24 叶名以 fx 开头的特效槽（fxg01/fxfire/FX1/fx1…，见 hideFxSlots 注释）
@@ -389,6 +400,8 @@
           // 🟢 2026-10-23 槽位本身的名字也要查：皮肤模型（如骨弓 huarong）的 fx 槽 setup 为空、
           //   附件由动画挂上，启动时 an/bn 都不含 fx，只靠槽名（fx/bingyan/…）才认得出
           const sn = (sl.data && sl.data.name) || ''
+          // 🟢 2026-10-27 白名单槽一律不剔（风车等实为身体部件的 fx/ 路径槽）
+          if (fxKeep && (fxKeep.indexOf(sn) >= 0 || fxKeep.indexOf(an) >= 0)) return
           if (fxSeg.test(bn) || fxSeg.test(an) || fxSeg.test(sn) || fxLeaf.test(an) || fxLeaf.test(sn) || /特效|texiao|guangxiao/i.test(bn)) fxHide.push(i)
         })
         // 🔴 2026-10-24 规则化补强：官方部分模型 setup pose 下所有槽附件为空、槽名也不含 fx，
@@ -412,6 +425,11 @@
           ;(skData.animations || []).forEach(function (anim) {
             ;(anim.timelines || []).forEach(function (tl) {
               if (!tl || tl.slotIndex == null || !tl.attachmentNames) return
+              // 🟢 2026-10-27 白名单槽（风车等）不参与「动画 timeline 补强」剔除
+              if (fxKeep) {
+                const _sd = skData.slots && skData.slots[tl.slotIndex]
+                if (_sd && fxKeep.indexOf(_sd.name || '') >= 0) return
+              }
               const _ns = tl.attachmentNames
               for (let k = 0; k < _ns.length; k++) {
                 const _nm = _ns[k]
@@ -521,11 +539,12 @@
         } catch (e) {}
       }
       const frameHide2 = (dedupeHide && frameHide) ? frameHide.concat(dedupeHide) : (dedupeHide || frameHide)
-      const vbKey = folder + '@' + (opts.model || '') + (fxHide ? '@nofx' : '') + (slotHide ? '@hs' : '')
+      // 🟢 2026-10-27 缓存 key 必须带上 fxKeep，否则「带/不带白名单」会共用同一份包围盒缓存
+      const vbKey = folder + '@' + (opts.model || '') + (fxHide ? '@nofx' : '') + (slotHide ? '@hs' : '') + (fxKeep && fxKeep.length ? '@keep' + fxKeep.join('|') : '')
       let vb = vbBoundsCache[vbKey]
       if (!vb) {
-        vb = computeBounds(spine, skData, idle, !!fxHide)
-        if (fxHide && !(vb.size.x > 0 && vb.size.y > 0)) { fxHide = null; vb = computeBounds(spine, skData, idle, false) }
+        vb = computeBounds(spine, skData, idle, !!fxHide, fxKeep)
+        if (fxHide && !(vb.size.x > 0 && vb.size.y > 0)) { fxHide = null; vb = computeBounds(spine, skData, idle, false, fxKeep) }
         vbBoundsCache[vbKey] = vb
       }
       state.setAnimation(0, idle, true)
@@ -592,7 +611,7 @@
             state.setAnimation(0, idle, true); state.update(0); state.apply(skeleton); skeleton.updateWorldTransform()
             if (_maxX > _minX && _maxY > _minY) liveBounds = { offX: _minX, offY: _minY, w: _maxX - _minX, h: _maxY - _minY }
           } catch (e) {}
-          vbVis = measureVisualBounds(spine, skData, animObj, vb, !!fxHide, hideIdx, liveBounds) || vb
+          vbVis = measureVisualBounds(spine, skData, animObj, vb, !!fxHide, hideIdx, liveBounds, fxKeep) || vb
           vbCache[vbKey] = vbVis
           try { window.__spineDbg = { folder: folder, model: opts.model || '', hideIdx: hideIdx, union: { w: +vbVis.size.x.toFixed(0), h: +vbVis.size.y.toFixed(0) }, chosen: 'union' } } catch (e) {}
         }

@@ -62,6 +62,11 @@
         "y": 2.3642924356845496,
         "scale": 0.86
       }
+    },
+    "modelFxKeep": {
+      "suxiaomei": [
+        "fx/suxiaomei08"
+      ]
     }
   },
   "aersasi": {

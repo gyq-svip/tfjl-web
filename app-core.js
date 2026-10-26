@@ -12124,7 +12124,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         hideFx: true, dedupe: true,
                         hideSlots: (man.hideSlots || []).concat((man.modelHideSlots || {})[model] || []),
                         fitByHeight: true, anchorFeet: (ANCHOR_FEET_BY_SPINE[meta.spine] || 0.78), scale: 1,
-                        autoFxFallback: true
+                        autoFxFallback: true,
+                        // 🟢 2026-10-27 传入「fx 路径下的身体部件」保留名单（如苏小妹的风车），避免被特效剔除误删
+                        fxKeep: (man.modelFxKeep || {})[model] || undefined
                     })
                     // 🟢 2026-10-23 空渲染兜底提示：个别模型（如龟相）主体是 PathAttachment，
                     //   Spine canvas 运行时画不出路径附件 → 起播 6s 后画布仍全透明就提示一句，

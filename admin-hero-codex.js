@@ -224,7 +224,13 @@
   const SCALE_BY_MODEL = {"huopaopifu":0.939,"xiaolifeidao":0.95,"shangfangbaojian":1.003,"tujinglingpifu02":0.946,"leifengta":1.024,"chushouguai":1.049,"lanlianhua":0.95,"xiongmao_shengdan":0.928,"houyi":0.494,"ayuya":0.621,"houyipifu1":0.623,"houyipifu2":0.623,"taipinglehouyi":0.623,"bodaerduo":0.623,"gangquan":0.736,"sanhaoji":0.736,"luzhishen":0.763,"guijiaoqi":0.727,"leibao":0.98,"daocaoren":0.734,"wugongjing":0.727,"tieshangongzhu":0.731,"zuoci":0.731,"shiliujie":0.734,"ligonggong":0.731,"qitiandasheng1":0.734,"qitiandasheng2":0.806,"qitiandasheng3":0.749,"zhizunbao":0.738,"dashengtaipingle":0.734,"shenhulu_guang":0.985,"jingling3":1.007,"baohulu_an":0.997,"mohulu":0.982,"luxiaofeng":0.965,"tianshi":1.005}
   let _lastSpineCanvas = null
   let _spineRetry = 0
+  // 🟢 2026-10-27 播放令牌：每次 playHeroSpine 都会作废上一次的轮询定时器。
+  //    旧 poll 若不被取消，会带着**它自己闭包里的旧 model**继续跑：切到「十三姨·小野」后，
+  //    打开详情时启动的旧 poll（model=undefined）检测到画面静止，就用旧参数重播 → 把十三姨
+  //    覆盖成默认模型 qiqi（用户反馈「十三姨没有模型/不显示动图」即此）。
+  let _spineToken = 0
   function playHeroSpine(h, model, noHideFx) {
+    const myToken = ++_spineToken
     const canvas = document.getElementById('hdcSpine')
     const st = document.getElementById('hdcSpineStatus')
     if (!canvas) return
@@ -266,6 +272,8 @@
         //   故按 model 名单独给 pad（数值经图鉴画布实测校准，目标：四皮肤身高一致）。
         fitPadding: FIT_PAD_BY_MODEL[effModel] || 0.65,
         anchorFeet: ANCHOR_FEET_BY_MODEL[effModel] || 0.76,
+        // 🟢 2026-10-27 传入「fx 路径下的身体部件」保留名单（如苏小妹的风车），避免被特效剔除误删
+        fxKeep: (man.modelFxKeep || {})[effModel] || undefined,
         // scale 覆写：部分模型 index 自带 scale（补偿特效撑盒），显式替代以绕过宽度约束
         scale: (SCALE_BY_MODEL[effModel] ? ((window.__heroSpineIndex && h.modelFolder && window.__heroSpineIndex[h.modelFolder] && window.__heroSpineIndex[h.modelFolder].scale > 0) ? window.__heroSpineIndex[h.modelFolder].scale : 1) * SCALE_BY_MODEL[effModel] : undefined),
         // 不套官方 x/y 偏移：那是给「特效撑大包围盒 + 官方 scale」做补偿的；
@@ -292,6 +300,8 @@
       const t0 = Date.now()
       let lastSum = null, fxTried = !noHideFx
       const poll = () => {
+        // 🟢 2026-10-27 已被后续播放取代的 poll 必须退出，否则会用旧 model 覆盖当前画面
+        if (myToken !== _spineToken) return
         if (!document.body.contains(canvas)) return
         let px = 0, sum = 0
         try {
@@ -309,6 +319,9 @@
           lastSum = sum
         }
         if (Date.now() - t0 > 15000 && px <= 500) { if (st) { st.style.display = 'block'; st.textContent = '动画暂未呈现' } return }
+        // 🟢 2026-10-27 绝对上限：原逻辑只在「画面为空」时超时退出，画面有内容就永久轮询，
+        //    每切一次皮肤都多一个常驻定时器 → 累积后互相打架。20s 后无论如何收手。
+        if (Date.now() - t0 > 20000) return
         setTimeout(poll, 500)
       }
       poll()
