@@ -489,6 +489,10 @@
           const famMax = {}
           const lfSlots = {}   // lf -> { slotIndex: { area, names:{} } }
           const lfMax = {}
+          // 🔴 2026-10-27 槽 -> 该槽「全部（非 fx）附件名」集合。用于识别「纯副本槽」：
+          //    只有整槽附件都属于当前族时才可能是副本；若该槽还挂着别的族（多半是主体部件），
+          //    按族名判定会连主体一起删（十三姨 idle/idle_0 槽既含 attack/atk_* 又含主体 idle/idle_*）。
+          const slotAll = {}
           const skin0 = skData.defaultSkin || (skData.skins && skData.skins[0])
           const list = skin0 && skin0.getAttachments ? skin0.getAttachments() : []
           list.forEach(function (e) {
@@ -496,6 +500,8 @@
             if (!att || !att.width || !att.height) return
             const nm = e.name || ''
             if (/(^|\/)fx(\/|$)/i.test(nm)) return
+            slotAll[e.slotIndex] = slotAll[e.slotIndex] || {}
+            slotAll[e.slotIndex][nm] = 1
             const f = nm.replace(/\d+$/, '')
             const lf = nm.replace(/^.*\//, '').replace(/\d+$/, '')
             const area = att.width * att.height
@@ -522,6 +528,11 @@
               const maxA = famMax[key]
               for (let i = 1; i < entries.length; i++) {
                 const o = entries[i]
+                // 🔴 2026-10-27 纯副本判定：该槽在族内的附件数必须等于它的全部附件数，
+                //    否则说明它还挂着别的族（典型是主体部件），整槽隐藏会把主体一起删掉
+                //    （十三姨 idle/idle_0：族内 atk_*×7，全量 15 → 不隐藏）
+                const oAll = slotAll[o.si] || {}
+                if (Object.keys(o.rec.names).length < Object.keys(oAll).length) continue
                 if (o.rec.area < maxA * 0.6) { hideSet[o.si] = 1; continue }            // ① 半尺寸残影
                 const names = Object.keys(o.rec.names)
                 if (names.length === bestNames.size && names.every(function (n) { return bestNames.has(n) })) { hideSet[o.si] = 1; continue } // ② 同名孪生
