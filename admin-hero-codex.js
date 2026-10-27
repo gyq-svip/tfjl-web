@@ -220,6 +220,12 @@
             if (o.modelFxKeep != null && j[k].modelFxKeep == null) j[k].modelFxKeep = o.modelFxKeep
             if (o.scale != null && j[k].scale == null) j[k].scale = o.scale
             if (o.offsetX != null && j[k].offsetX == null) j[k].offsetX = o.offsetX
+            // 🔴 2026-10-28 补：modelHideSlots/hideSlots 也必须从线上索引补齐，
+            //   否则本地旧皮肤包（缺这两项）被 spineIndex() 写回 __heroSpineIndex 时会把
+            //   已合并的 modelHideSlots 丢掉 → 死神 fashi 的 shen01/shen02 特效槽不再隐藏 → 飞起。
+            //   与 modelFxKeep 同一来源、同一补齐逻辑（资源 URL 仍走本地 base，只同步配置数值）。
+            if (o.modelHideSlots != null && j[k].modelHideSlots == null) j[k].modelHideSlots = o.modelHideSlots
+            if (o.hideSlots != null && j[k].hideSlots == null) j[k].hideSlots = o.hideSlots
           }
         }
         // 本地索引缺失的英雄目录直接采用线上条目（资源加载失败会走既有回退）
