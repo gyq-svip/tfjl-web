@@ -1677,7 +1677,28 @@ async fn download_skins(app: tauri::AppHandle, force: Option<bool>) -> Result<St
             }
         }
         let _ = std::fs::remove_file(&spine_zip);
-        spine_note = format!("，动画资源 {} 个文件已本地化", spine_files);
+        // 🔴 2026-10-28 完整性校验：解压后统计实际文件数，与索引声明的 spine_files 比对。
+        //    不等说明解压不完整或混入了旧文件 → 直接报错中止，且不写「已安装」记录（下次会重下）。
+        let mut actual: usize = 0;
+        let hs = std::path::Path::new(&hero_spine_dir);
+        if hs.exists() {
+            let mut stack: Vec<std::path::PathBuf> = vec![hs.to_path_buf()];
+            while let Some(d) = stack.pop() {
+                if let Ok(rd) = std::fs::read_dir(&d) {
+                    for e in rd.flatten() {
+                        let p = e.path();
+                        if p.is_dir() { stack.push(p) } else { actual += 1 }
+                    }
+                }
+            }
+        }
+        if spine_files > 0 && actual as i64 != spine_files {
+            return Err(format!(
+                "动画资源解压不完整（索引声明 {} 个文件，实际 {} 个），已中止。请完全退出软件后重新点「更新皮肤资源」",
+                spine_files, actual
+            ));
+        }
+        spine_note = format!("，动画资源 {} 个文件已本地化（完整性校验通过）", actual);
         let _ = app.emit("skin-download-progress", serde_json::json!({"stage":"spine-done","files":spine_files}));
     }
 
