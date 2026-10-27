@@ -33175,7 +33175,6 @@ ${maSection}
             if (!inp) return;
             const code = inp.value.trim();
             if (!code) return;
-            console.log('[CMD] › ' + code);
             try {
                 // 支持「函数名()」快捷写法（无需 console.log）：先试内置命令
                 let result;
