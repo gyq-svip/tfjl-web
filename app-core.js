@@ -12262,6 +12262,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                                                 //   是手持部件，被 fx 规则误删）。本地包是旧版索引，必须同步过来，
                                                 //   否则桌面端即使资源齐全也看不到该部件。
                                                 if (o.modelFxKeep != null) j[k].modelFxKeep = o.modelFxKeep
+                                                // 🔴 2026-10-27 补齐其余逐模型校准字段：本地包是旧版索引，
+                                                //   缺 modelOffsets / hideSlots / modelHideSlots 会与线上代码标定错位
+                                                //   （桌面端「死神飞起」的诱因）。同样「补齐不覆盖」。
+                                                if (o.modelOffsets && typeof o.modelOffsets === 'object') {
+                                                    j[k].modelOffsets = Object.assign({}, o.modelOffsets, j[k].modelOffsets || {})
+                                                }
+                                                if (o.hideSlots != null) j[k].hideSlots = o.hideSlots
+                                                if (o.modelHideSlots && typeof o.modelHideSlots === 'object') {
+                                                    j[k].modelHideSlots = Object.assign({}, o.modelHideSlots, j[k].modelHideSlots || {})
+                                                }
                                                 // 模型映射/贴图映射只做「补齐不覆盖」：本地包可能含线上没有的模型
                                                 if (o.models && typeof o.models === 'object') {
                                                     j[k].models = Object.assign({}, o.models, j[k].models || {})

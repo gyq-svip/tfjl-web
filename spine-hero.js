@@ -926,26 +926,37 @@
   //   卡牌设置弹窗此前硬编码 fitPadding:0.9 且缺 fitByHeight/anchorFeet/hideFx/dedupe
   //   → 角色偏上/偏左（不落石台、与信息面板重叠）。
   //   现与详情弹窗同源，保证两个弹窗观感一致。逐模型覆写仅登记「统一 pad 下观感不齐」的模型。
-  function fitOptions(folder, model, man, pngs) {
+  // 🟢 2026-10-27 单一数据源：弹窗与图鉴共用同一份逐模型校准表。
+  //    旧实现在这里维护一套 4+1 条的私有小表，和图鉴 ~90 条实测表各走各的，
+  //    导致同一模型（尤其死神 fashi）在「图鉴正常、弹窗飞起」。现改为运行时读取
+  //    admin-hero-codex.js 挂出的 window.__SPINE_FIT_TABLES（同一对象，无法分叉）；
+  //    图鉴未加载时退回旧的私有表，保证不倒退。
+  function fitOptions(folder, model, man, pngs, opt) {
     man = man || {}
     model = model || ''
-    // 逐模型 fitPadding 覆写（按主 app 弹窗画布实测校准）
-    const FIT_PAD_BY_MODEL = { fashi: 0.78, sishenpifu: 0.66, sishenpifu2: 0.66, pingyizhi: 0.66 }
-    const FIT_PAD_BY_SPINE = { shawang: 0.44 }
-    const ANCHOR_FEET_BY_SPINE = { fashi: 0.76 }
-    const fitPadding = FIT_PAD_BY_MODEL[model] || FIT_PAD_BY_SPINE[folder] || 0.58
-    const anchorFeet = ANCHOR_FEET_BY_SPINE[folder] || 0.78
+    opt = opt || {}
+    const T = (typeof window !== 'undefined' && window.__SPINE_FIT_TABLES) ? window.__SPINE_FIT_TABLES : null
+    const FP = (T && T.FIT_PAD_BY_MODEL) || { fashi: 0.78, sishenpifu: 0.66, sishenpifu2: 0.66, pingyizhi: 0.66 }
+    const AF = (T && T.ANCHOR_FEET_BY_MODEL) || { fashi: 0.76 }
+    const SC = (T && T.SCALE_BY_MODEL) || {}
+    // 缺省值与图鉴对齐（图鉴 0.65/0.76）；图鉴表不可用时才退回旧弹窗基线 0.58/0.78
+    const fitPadding = FP[model] || (T ? 0.65 : 0.58)
+    const anchorFeet = AF[model] || (T ? 0.76 : 0.78)
+    // index 自带 scale（补偿特效撑盒）
+    const idxScale = (window.__heroSpineIndex && folder && window.__heroSpineIndex[folder] && window.__heroSpineIndex[folder].scale > 0)
+      ? window.__heroSpineIndex[folder].scale : 1
+    const scale = SC[model] ? (idxScale * SC[model]) : undefined
     return {
       fitPadding: fitPadding,
       pngs: pngs || 0,
       model: model,
       tight: true,
-      hideFx: true,
+      hideFx: !opt.noHideFx,
       dedupe: true,
       hideSlots: (man.hideSlots || []).concat((man.modelHideSlots || {})[model] || []),
       fitByHeight: true,
       anchorFeet: anchorFeet,
-      scale: 1,
+      scale: scale,
       autoFxFallback: true,
       fxKeep: (man.modelFxKeep || {})[model] || undefined
     }
