@@ -718,6 +718,24 @@
           ctx.translate(-targetX, -targetY)
         }
         renderer.draw(skeleton)
+        // 🟢 2026-10-28 校准探针钩子：把渲染用的包围盒/缩放挂到全局，供偏移测量读取。
+        //   桌面端画布被跨域资源污染，getImageData 读像素会被浏览器禁止（SecurityError），
+        //   故改读 Spine 运行时已算好的包围盒（世界坐标），用渲染器同一套数学反推脚底位置。
+        //   只挂数据、无 console 输出，不影响性能与既有逻辑。
+        try {
+          const _bOk = vbBody && vbBody.size && vbBody.size.x > 0
+          window.__spineBounds = {
+            folder: folder, model: opts.model || '',
+            anchorFeet: opts.anchorFeet,
+            zoom: zoom, w: w, h: h,
+            bboxOffY: vbVis.off.y, bboxSizeY: vbVis.size.y, bboxOffX: vbVis.off.x, bboxSizeX: vbVis.size.x,
+            bodyOffY: _bOk ? vbBody.off.y : vbVis.off.y,
+            bodyOffX: _bOk ? vbBody.off.x : vbVis.off.x,
+            bodySizeX: _bOk ? vbBody.size.x : vbVis.size.x,
+            bodyOk: !!_bOk,
+            cxBody: _bOk ? (vbBody.off.x + vbBody.size.x / 2) : (vbVis.off.x + boxW / 2)
+          }
+        } catch (e) {}
         ctx.restore()
       }
       st.raf = requestAnimationFrame(tick)
