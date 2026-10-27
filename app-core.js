@@ -10939,8 +10939,18 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             paintMoHuaAura()
 
             // —— Spine 动画层（铺满整卡，石台居中偏右下）——
+            // 🔴 2026-10-28 切皮肤会重建本卡片：旧的 Spine 层若不移除就层层叠加，
+            //    表现为「底下压着上一个皮肤的静态图 + 上面动着当前皮肤」（咕咕少林掌门
+            //    用户反馈「2 个皮、切多少都显示别的咕咕皮」即此）。建新层前先停掉并移除同卡片内的旧层。
+            try {
+                card.querySelectorAll('[data-spine-stage]').forEach(function (old) {
+                    try { const oc = old.querySelector('canvas'); if (oc && window.spineHero) window.spineHero.stop(oc) } catch (e) {}
+                    old.remove()
+                })
+            } catch (e) {}
             const stage = document.createElement('div')
             stage.style.cssText = 'position:absolute;inset:0;pointer-events:none;'
+            stage.setAttribute('data-spine-stage', '1')
             const cv = document.createElement('canvas')
             cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;'
             stage.appendChild(cv)

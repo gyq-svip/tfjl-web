@@ -1591,7 +1591,25 @@ async fn download_skins(app: tauri::AppHandle, force: Option<bool>) -> Result<St
 
     // ===== 4. 下载+校验全部成功后，才清空旧目录并解压（失败时本地皮肤完好无损）=====
     let _ = app.emit("skin-download-progress", serde_json::json!({"stage":"extract"}));
-    let _ = std::fs::remove_dir_all(&base);
+    // 🔴 2026-10-28 删除失败不再静默忽略：Windows 上文件被占用时 remove_dir_all 会
+    //    「部分删除成功」，旧资源残留 + 新包覆盖 = 新旧混杂（表现为「死神飞天」等资源级错位，
+    //    且各机器因为占用情况不同而表现不一致）。这里重试若干次，仍失败且目录还在则直接
+    //    报错中止——不写「已安装」记录，保证下次启动会重新下载。
+    let mut rm_err: Option<String> = None;
+    for _attempt in 0..3 {
+        match std::fs::remove_dir_all(&base) {
+            Ok(_) => { rm_err = None; break }
+            Err(e) => {
+                rm_err = Some(format!("{}", e));
+                std::thread::sleep(std::time::Duration::from_millis(500));
+            }
+        }
+    }
+    if let Some(e) = rm_err {
+        if std::path::Path::new(&base).exists() {
+            return Err(format!("清空旧皮肤目录失败（可能有文件被占用，请完全退出软件后重试）：{}", e));
+        }
+    }
     let _ = std::fs::create_dir_all(&base);
 
     #[cfg(windows)] {
@@ -1625,6 +1643,26 @@ async fn download_skins(app: tauri::AppHandle, force: Option<bool>) -> Result<St
         }
         tokio::fs::write(&spine_zip, &sdata).await.map_err(|e| e.to_string())?;
         let _ = app.emit("skin-download-progress", serde_json::json!({"stage":"spine-extract"}));
+        // 🔴 2026-10-28 动画包此前是「覆盖式解压」：Expand-Archive -Force 只覆盖同名文件，
+        //    **不会删除新包里已不存在的旧文件** → 旧模型/旧资源永久残留，与新版混杂。
+        //    该包自带完整的 data/hero-spine/，故解压前先清掉这一子树是安全的，
+        //    保证拿到的就是本包的纯净内容。（同样重试 + 失败即中止，不写已安装记录。）
+        let hero_spine_dir = format!("{}\\data\\hero-spine", base);
+        let mut srm: Option<String> = None;
+        for _attempt in 0..3 {
+            match std::fs::remove_dir_all(&hero_spine_dir) {
+                Ok(_) => { srm = None; break }
+                Err(e) => {
+                    srm = Some(format!("{}", e));
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                }
+            }
+        }
+        if let Some(e) = srm {
+            if std::path::Path::new(&hero_spine_dir).exists() {
+                return Err(format!("清空旧动画资源目录失败（请完全退出软件后重试）：{}（皮肤已更新，动画回退在线加载）", e));
+            }
+        }
         #[cfg(windows)] {
             use std::os::windows::process::CommandExt;
             let ps = format!("Expand-Archive -Path '{}' -DestinationPath '{}' -Force", spine_zip, base);
