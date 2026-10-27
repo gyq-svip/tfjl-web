@@ -573,7 +573,7 @@
                 html += `</div>`;
 
                 // 复用现成的动态规划最优购买
-                const opt = calcOptimalPurchase(need);
+                const opt = calcOptimalPurchase(need, days);
                 const overflow = opt.totalMat - need;
 
                 html += `<div style="color:#ff9800;font-weight:600;margin-bottom:8px;font-size:0.9rem;">💰 推荐购买方案</div>`;
@@ -883,13 +883,23 @@
         }
 
         // 动态规划计算最优购买方案
-        function calcOptimalPurchase(need) {
+        // 🟢 2026-10-28 限购上限改为「每日限购 × 剩余天数」。
+        //    30/128/328 礼包每天最多买 3 次（648 不限购）；原实现把上限**写死成 63**
+        //    （= 3 × 21 总天数），与用户实际剩余天数无关 → 剩 6 天仍敢推荐买 25 个 30 礼包
+        //    （上限本应 3×6=18），正是用户反馈「还剩6天最多买18次，他却算20次」的成因。
+        //    现由调用方把「剩余天数」传进来，上限 = 每日限购 × 剩余天数。
+        function calcOptimalPurchase(need, days) {
+            days = Math.max(1, Number(days) || 21);
+            const DAILY_LIMIT = 3;          // 30/128/328 每日限购次数（648 不限购）
+            const cap30 = DAILY_LIMIT * days;
+            const cap128 = DAILY_LIMIT * days;
+            const cap328 = DAILY_LIMIT * days;
             // 礼包定义（考虑购买上限）
             const gifts = [
-                { name: '30礼包', cost: 30, mat: 20, max: 63 },
-                { name: '128礼包', cost: 128, mat: 60, max: 63 },
-                { name: '328礼包', cost: 328, mat: 120, max: 63 },
-                { name: '648礼包', cost: 648, mat: 240, max: 999 },
+                { name: '30礼包', cost: 30, mat: 20, max: cap30 },
+                { name: '128礼包', cost: 128, mat: 60, max: cap128 },
+                { name: '328礼包', cost: 328, mat: 120, max: cap328 },
+                { name: '648礼包', cost: 648, mat: 240, max: Infinity },
             ];
 
             let bestCost = Infinity;
@@ -897,19 +907,19 @@
             let bestTotalMat = 0;
 
             // 枚举30/128/328的数量，648用来补余数（剪枝优化）
-            const max30 = Math.min(63, Math.ceil(need / 20));
+            const max30 = Math.min(cap30, Math.ceil(need / 20));
             for (let c30 = max30; c30 >= 0; c30--) {
                 const mat30 = c30 * 20;
                 const cost30 = c30 * 30;
                 if (cost30 >= bestCost) continue;
 
-                const max128 = Math.min(63, Math.ceil(Math.max(0, need - mat30) / 60));
+                const max128 = Math.min(cap128, Math.ceil(Math.max(0, need - mat30) / 60));
                 for (let c128 = max128; c128 >= 0; c128--) {
                     const mat128 = c128 * 60;
                     const cost128 = c128 * 128;
                     if (cost30 + cost128 >= bestCost) continue;
 
-                    const max328 = Math.min(63, Math.ceil(Math.max(0, need - mat30 - mat128) / 120));
+                    const max328 = Math.min(cap328, Math.ceil(Math.max(0, need - mat30 - mat128) / 120));
                     for (let c328 = max328; c328 >= 0; c328--) {
                         const mat328 = c328 * 120;
                         const cost328 = c328 * 328;
@@ -980,7 +990,7 @@
                 resultHtml += `</div>`;
 
                 // 计算最优方案
-                const opt = calcOptimalPurchase(need);
+                const opt = calcOptimalPurchase(need, days);
                 const totalCost = zhanLingCost + opt.cost;
                 const overflow = opt.totalMat - need;
 
