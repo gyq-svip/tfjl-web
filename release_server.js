@@ -33,6 +33,18 @@ const ROOT = __dirname;
 const PORT = Number(process.env.TFJL_RELEASE_PORT || 8799);
 const TOKEN = crypto.randomBytes(16).toString('hex');
 
+// 解析 powershell.exe 完整路径：CI/沙箱环境下 bare-name 在 PATH 中找不到时回退到完整路径
+function resolvePowershell() {
+  const roots = [process.env.SystemRoot, process.env.WINDIR, 'C:\\Windows'];
+  for (const r of roots) {
+    if (!r) continue;
+    const p = path.join(r, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+    if (fs.existsSync(p)) return p;
+  }
+  return 'powershell.exe';
+}
+const PS = resolvePowershell();
+
 const PAGES_BASE = 'https://gyq-svip.github.io/tfjl-web';
 const GITEE_OWNER = 'dragon-soars-across-the-world_0';
 const GITEE_REPO = 'tfjl-web';
@@ -122,7 +134,7 @@ function runStep(key, label, psBody, opts, onDone) {
   pushLog(key, '==================== ' + label + ' 开始 ====================');
   let child;
   try {
-    child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psScript(psBody)],
+    child = spawn(PS, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psScript(psBody)],
       { cwd: ROOT, windowsHide: true });
   } catch (e) {
     pushLog(key, '[启动失败] ' + e.message);
@@ -376,7 +388,7 @@ function runPreflight() {
     : mk('exeInGit', 'ok', 'exe/sig/zip 未进 git', '仓库干净'));
 
   // 11) GITEE_TOKEN（缺了会静默跳过上传 exe —— 最容易被忽略的坑）
-  const tok = sh('powershell.exe', ['-NoProfile', '-Command', "[Environment]::GetEnvironmentVariable('GITEE_TOKEN','User')"]);
+  const tok = sh(PS, ['-NoProfile', '-Command', "[Environment]::GetEnvironmentVariable('GITEE_TOKEN','User')"]);
   const hasTok = tok.out.trim().length > 10;
   out.push(hasTok
     ? mk('giteeToken', 'ok', 'GITEE_TOKEN 已配置（User 级）', '发布时能自动上传 exe 到 Gitee 发行版')
@@ -438,7 +450,7 @@ function runPreflight() {
   }
 
   // 15) 工具链可用性
-  const npxT = sh('powershell.exe', ['-NoProfile', '-Command', 'npx tauri --version']);
+  const npxT = sh(PS, ['-NoProfile', '-Command', 'npx tauri --version']);
   out.push(npxT.code === 0
     ? mk('toolchain', 'ok', 'tauri CLI 可用', (npxT.out.match(/tauri-cli[^\n]*/i) || [npxT.out.split('\n')[0]])[0].trim())
     : mk('toolchain', 'fail', 'npx tauri 不可用', npxT.out.split('\n').slice(0, 3).join(' | '), '在仓库根执行 npm install 恢复依赖'));
