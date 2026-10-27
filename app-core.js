@@ -12256,29 +12256,22 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                                         for (const k of Object.keys(j)) {
                                             const o = jo && jo[k]
                                             if (o && typeof o === 'object') {
-                                                if (o.scale != null) j[k].scale = o.scale
-                                                if (o.offsetX != null) j[k].offsetX = o.offsetX
-                                                // 🔴 2026-10-27 逐模型 fx 保留白名单（如苏小妹风车槽 fx/suxiaomei08
-                                                //   是手持部件，被 fx 规则误删）。本地包是旧版索引，必须同步过来，
-                                                //   否则桌面端即使资源齐全也看不到该部件。
-                                                if (o.modelFxKeep != null) j[k].modelFxKeep = o.modelFxKeep
-                                                // 🔴 2026-10-27 补齐其余逐模型校准字段：本地包是旧版索引，
-                                                //   缺 modelOffsets / hideSlots / modelHideSlots 会与线上代码标定错位
-                                                //   （桌面端「死神飞起」的诱因）。同样「补齐不覆盖」。
-                                                if (o.modelOffsets && typeof o.modelOffsets === 'object') {
-                                                    j[k].modelOffsets = Object.assign({}, o.modelOffsets, j[k].modelOffsets || {})
-                                                }
-                                                if (o.hideSlots != null) j[k].hideSlots = o.hideSlots
-                                                if (o.modelHideSlots && typeof o.modelHideSlots === 'object') {
-                                                    j[k].modelHideSlots = Object.assign({}, o.modelHideSlots, j[k].modelHideSlots || {})
-                                                }
-                                                // 模型映射/贴图映射只做「补齐不覆盖」：本地包可能含线上没有的模型
-                                                if (o.models && typeof o.models === 'object') {
-                                                    j[k].models = Object.assign({}, o.models, j[k].models || {})
-                                                }
-                                                if (o.modelPngs && typeof o.modelPngs === 'object') {
-                                                    j[k].modelPngs = Object.assign({}, o.modelPngs, j[k].modelPngs || {})
-                                                }
+                                                // 🔴 2026-10-28 全量 overlay（线上配置全面胜出）。
+                                                //   旧实现是「白名单 + 本地优先」：Object.assign({}, 线上, 本地)
+                                                //   会让**本地旧包的陈旧值反压线上**，且只覆盖 7 个字段，其余
+                                                //   （pngs / anims / model 等）一律沿用本地旧值。
+                                                //   桌面端 5s 定时器探测到本地包后切换索引 → 死神等模型立刻
+                                                //   「刚打开正常、瞬间飞天」，且各机器本地包版本不同 → 有的正常有的飞天。
+                                                //   现改为：标量字段线上优先；映射类逐键合并且线上同名键胜出，
+                                                //   本地独有条目（线上没有的模型）仍然保留。
+                                                const _MERGE_MAP = { models: 1, modelPngs: 1, modelOffsets: 1, modelHideSlots: 1, modelFxKeep: 1 };
+                                                Object.keys(o).forEach(function (key) {
+                                                    if (_MERGE_MAP[key] && o[key] && typeof o[key] === 'object') {
+                                                        j[k][key] = Object.assign({}, j[k][key] || {}, o[key]);
+                                                    } else if (o[key] != null) {
+                                                        j[k][key] = o[key];
+                                                    }
+                                                });
                                             }
                                         }
                                     }
