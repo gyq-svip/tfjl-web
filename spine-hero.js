@@ -565,6 +565,7 @@
       // 仅 opts.tight 时启用（详情大图用），避免改变战场小卡/图鉴既有观感
       // 🔴 2026-10-22 改为整周期采样（见 measureVisualBounds 注释），并缓存
       let vbVis = vb
+      let vbBody = null   // 「排除手持挂件」的本体盒（仅 fxKeep 生效时计算，用于横向居中）
       if (opts.tight) {
         vbVis = vbCache[vbKey]
         if (!vbVis) {
@@ -624,6 +625,29 @@
           } catch (e) {}
           vbVis = measureVisualBounds(spine, skData, animObj, vb, !!fxHide, hideIdx, liveBounds, fxKeep) || vb
           vbCache[vbKey] = vbVis
+          // 🟢 2026-10-27 「手持/挂件」类部件（fxKeep 白名单，如苏小妹的风车 fx/suxiaomei08）
+          //   不该影响站位：包围盒含挂件后按「包围盒居中」会把人物本体推向反侧
+          //   （苏小妹实测本体中心 0.4839、石台中心 0.498 → 偏左 1.4%）。
+          //   这里额外测一份「排除 keep 槽」的本体盒，仅用于横向居中；缩放与脚底仍用整盒。
+          if (fxKeep && fxKeep.length) {
+            const _bKey = vbKey + '@body'
+            vbBody = vbCache[_bKey]
+            if (vbBody === undefined) {
+              vbBody = null
+              try {
+                const _n3 = {}
+                skData.slots.forEach(function (sd, i) { _n3[sd.name] = i })
+                const _keepIdx = []
+                for (const _n of fxKeep) {
+                  Object.keys(_n3).forEach(function (nm) { if (nm === _n || slotMatches(_n, nm)) _keepIdx.push(_n3[nm]) })
+                }
+                if (_keepIdx.length) {
+                  vbBody = measureVisualBounds(spine, skData, animObj, vb, !!fxHide, (hideIdx || []).concat(_keepIdx), liveBounds, null)
+                }
+              } catch (e) { vbBody = null }
+              vbCache[_bKey] = vbBody || null
+            }
+          }
           try { window.__spineDbg = { folder: folder, model: opts.model || '', hideIdx: hideIdx, union: { w: +vbVis.size.x.toFixed(0), h: +vbVis.size.y.toFixed(0) }, chosen: 'union' } } catch (e) {}
         }
       }
@@ -678,10 +702,13 @@
         else if (window.__heroSpineIndex && folder && window.__heroSpineIndex[folder] && window.__heroSpineIndex[folder].scale > 0) zoom *= window.__heroSpineIndex[folder].scale
         ctx.save()
         if (opts.anchorFeet != null) {
-          // 脚底锚点：包围盒「底边中点」落在画布纵向 anchorFeet 处（石台面），横向居中
+          // 脚底锚点：包围盒「底边中点」落在画布纵向 anchorFeet 处（石台面），横向居中。
+          // 横向定心优先用 vbBody（排除手持挂件），避免挂件把人物推离石台中心。
+          const _bodyOk = vbBody && vbBody.size && vbBody.size.x > 0
+          const _cxBody = _bodyOk ? (vbBody.off.x + vbBody.size.x / 2) : (vbVis.off.x + boxW / 2)
           ctx.translate(w / 2, h * opts.anchorFeet)
           ctx.scale(zoom, -zoom)
-          ctx.translate(-(vbVis.off.x + boxW / 2), -vbVis.off.y)
+          ctx.translate(-_cxBody, -vbVis.off.y)
         } else {
           // 包围盒中心对准画布中心，offsetX/offsetY 为世界单位偏移
           const targetX = vbVis.off.x + boxW / 2 + (Number(opts.offsetX) || 0)
