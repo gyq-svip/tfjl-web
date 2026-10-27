@@ -1692,7 +1692,7 @@ async fn download_skins(app: tauri::AppHandle, force: Option<bool>) -> Result<St
                 }
             }
         }
-        if spine_files > 0 && actual as i64 != spine_files {
+        if spine_files > 0 && actual as u64 != spine_files {
             return Err(format!(
                 "动画资源解压不完整（索引声明 {} 个文件，实际 {} 个），已中止。请完全退出软件后重新点「更新皮肤资源」",
                 spine_files, actual
