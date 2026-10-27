@@ -7950,15 +7950,24 @@
         }
         
         // 检查卡牌是否有魔化数据（须与 getSkinAttribute 一致：合并 本地硬编码 / 自定义 / 云端 三处来源）
+        // 🔴 2026-10-27 修复：魔化描述为「无」(desc:"无") 视为「该英雄无魔化」，不显示魔化按钮/开关。
+        //   此前只要存在 魔化 键就返回 true，导致 小丑/石头/骨龙/祭司… 等几十个无魔化英雄也显示魔化选项。
+        function _hasRealMoHua(src, name) {
+            if (!src || !src[name]) return false;
+            const m = src[name]['魔化'];
+            if (!m) return false;
+            const d = (typeof m === 'string') ? m : (m.desc || '');
+            return !!d && String(d).trim() !== '无';
+        }
         function hasMoHuaData(cardName) {
             const mainCardName = getMainCardName(cardName);
             // 精灵卡不支持魔化，直接返回false
             const jingLingNames = ['冰精灵', '光精灵', '魔精灵', '木精灵', '土精灵', '雷精灵', '暗精灵', '幻精灵', '魂精灵', '彩精灵'];
             if (jingLingNames.some(jl => mainCardName.includes(jl))) return false;
             const cloud = (typeof window !== 'undefined' && window.skinAttributesCloud) ? window.skinAttributesCloud : null;
-            return !!(SKIN_ATTRIBUTES[mainCardName] && SKIN_ATTRIBUTES[mainCardName]['魔化'])
-                || (customSkinAttributes[mainCardName] && customSkinAttributes[mainCardName]['魔化'])
-                || (cloud && cloud[mainCardName] && cloud[mainCardName]['魔化']);
+            return _hasRealMoHua(SKIN_ATTRIBUTES, mainCardName)
+                || _hasRealMoHua(customSkinAttributes, mainCardName)
+                || _hasRealMoHua(cloud, mainCardName);
         }
         
         // 所有基础英雄名集合（优先取卡牌选择网格，兜底用皮肤/属性表；含术士1字英雄）
@@ -12112,22 +12121,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     //   autoFxFallback idle 只动画特效槽的模型（萌萌）自动带特效重播
                     //   🟢 2026-10-23 个别模型 idle 自带大特效（沙皇·金色火焰）渲染包围盒远大于本体，
                     //      统一 0.58 会顶出画布上缘；按模型实测微调（目标可见高度 ≤0.62）
-                    const FIT_PAD_BY_SPINE = { shawang: 0.44 }
-                    // 🟢 2026-10-25 死神(fashi) 专项：默认模型 fashi 的可见包围盒含大片透明留白，
-                    //   同一 pad 下实测身高只有 59.7%（皮肤版 sishenpifu 却是 69.6%）→ 按 model 覆写，
-                    //   让四个皮肤身高统一到 ~66%（bg.png 实测石台可站立台面 72%~80%、中心 76%）。
-                    const FIT_PAD_BY_MODEL = { fashi: 0.78, sishenpifu: 0.66, sishenpifu2: 0.66, pingyizhi: 0.66 }
-                    // 脚底锚点：死神袍摆落在台面中心 76%，而非统一 0.78（0.78 会压到台面前沿、甚至陷进台体正面）
-                    const ANCHOR_FEET_BY_SPINE = { fashi: 0.76 }
-                    window.spineHero.play(cv, meta.spine, {
-                        fitPadding: FIT_PAD_BY_MODEL[model] || FIT_PAD_BY_SPINE[meta.spine] || 0.58, pngs, model, tight: true,
-                        hideFx: true, dedupe: true,
-                        hideSlots: (man.hideSlots || []).concat((man.modelHideSlots || {})[model] || []),
-                        fitByHeight: true, anchorFeet: (ANCHOR_FEET_BY_SPINE[meta.spine] || 0.78), scale: 1,
-                        autoFxFallback: true,
-                        // 🟢 2026-10-27 传入「fx 路径下的身体部件」保留名单（如苏小妹的风车），避免被特效剔除误删
-                        fxKeep: (man.modelFxKeep || {})[model] || undefined
-                    })
+                    // 🟢 2026-10-27 统一走 spineHero.fitOptions：与卡牌设置弹窗同源，避免两套散落校准漂移。
+                    //   （死神 fashi 专项 fitPadding/anchorFeet 已内化进 fitOptions）
+                    window.spineHero.play(cv, meta.spine, window.spineHero.fitOptions(meta.spine, model, man, pngs))
                     // 🟢 2026-10-23 空渲染兜底提示：个别模型（如龟相）主体是 PathAttachment，
                     //   Spine canvas 运行时画不出路径附件 → 起播 6s 后画布仍全透明就提示一句，
                     //   免得用户对着一座空石台。换皮肤/重播会重置计时。
@@ -12527,7 +12523,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         const _skinRow = ((oh && oh.skins) || []).find(function (s) { return s.note === curSkin });
                         const _model = (_skinRow && _skinRow.model) || (oh && oh.spineModel) || '';
                         const _pngs = _model ? ((man.modelPngs && man.modelPngs[_model]) || 0) : (man.pngs || 0);
-                        window.spineHero.play(csCanvas, folder, { fitPadding: 0.9, pngs: _pngs, model: _model });
+                        window.spineHero.play(csCanvas, folder, window.spineHero.fitOptions(folder, _model, man, _pngs));
                     } catch (e) { csStage.style.display = 'none'; }
                 })();
             }
