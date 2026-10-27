@@ -12356,8 +12356,12 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             }
             // 🔴 2026-10-28 版本对账：把「远端最新包 / 索引数据版本 / 当前资源来源」摆出来，
             //    用于一眼判断是「皮肤资源旧了」还是「程序/校准问题」，以及本地是否拿到了最新版。
-            h += '<div id="spineVerBox" style="margin-top:8px;font-size:0.74rem;line-height:1.75;color:rgba(255,255,255,0.66);">🧾 版本对账：读取中…</div>'
+            h += '<div id="spineVerBox" style="margin-top:8px;font-size:0.74rem;line-height:1.75;color:rgba(255,255,255,0.66);">' + (window.__spineVerText || '🧾 版本对账：读取中…') + '</div>'
             ;(function () {
+                // 🟢 2026-10-28 只拉取一次并缓存：refreshSpineCacheInfo 会被轮询反复调用，
+                //    每次都重新 fetch + 重写 innerHTML 会造成「一闪一闪」，故结果缓存到
+                //    window.__spineVerText，后续直接复用（来源变化时才重取）。
+                if (window.__spineVerText) return
                 setTimeout(function () {
                     const box = document.getElementById('spineVerBox')
                     if (!box) return
@@ -12382,6 +12386,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         } else {
                             txt += '<br><span style="color:rgba(255,255,255,0.55);">在线加载：配置与资源均取自 GitHub Pages 最新版；此时若仍显示异常，则属<b>程序/校准</b>问题。</span>'
                         }
+                        window.__spineVerText = txt
                         box.innerHTML = txt
                     })
                 }, 80)
