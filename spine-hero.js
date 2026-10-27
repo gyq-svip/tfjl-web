@@ -566,6 +566,7 @@
       // 🔴 2026-10-22 改为整周期采样（见 measureVisualBounds 注释），并缓存
       let vbVis = vb
       let vbBody = null   // 「排除手持挂件」的本体盒（仅 fxKeep 生效时计算，用于横向居中）
+      let vbFoot = null   // 「排除全部隐藏槽(frameHide2)」的真实身体盒（脚底测量用，2026-10-28 校准探针）
       if (opts.tight) {
         vbVis = vbCache[vbKey]
         if (!vbVis) {
@@ -648,6 +649,45 @@
               vbCache[_bKey] = vbBody || null
             }
           }
+          // 🟢 2026-10-28 校准探针：额外算「排除全部隐藏槽(frameHide2)的真实身体盒」用于脚底测量。
+          //   frameHide2 含自动 fx + dedupe 去重 + modelHideSlots(经 opts.hideSlots 进入)，
+          //   故 vbFoot 即"实际可见身体"的包围盒，其 off.y 为真实脚底世界坐标，纯几何不受跨域污染。
+          //   用 getBounds 逐帧采样 idle 取并集（与 computeBounds 同源），确定性、无像素读。
+          {
+            const _fbKey = vbKey + '@foot'
+            let _foot = vbCache[_fbKey]
+            if (_foot === undefined) {
+              _foot = null
+              try {
+                const _p = new spine.Skeleton(skData)
+                const _m = new spine.AnimationState(new spine.AnimationStateData(skData))
+                const _hi = frameHide2 || []
+                const _save = _hi.map(function (i) { return _p.slots[i] ? _p.slots[i].attachment : null })
+                let _x0 = Infinity, _y0 = Infinity, _x1 = -Infinity, _y1 = -Infinity
+                const _dur = animObj ? (animObj.duration || 0) : 0
+                const _n = Math.max(8, Math.ceil(_dur * 20))
+                for (let _i = 0; _i <= _n; _i++) {
+                  _p.setToSetupPose()
+                  if (animObj) { _m.clearTracks(); _m.setAnimation(0, animObj.name, false); _m.update((_dur * _i) / _n); _m.apply(_p) }
+                  for (let _k = 0; _k < _hi.length; _k++) { if (_p.slots[_hi[_k]]) _p.slots[_hi[_k]].attachment = null }
+                  _p.updateWorldTransform()
+                  const _o = new spine.Vector2(), _z = new spine.Vector2()
+                  _p.getBounds(_o, _z)
+                  if (isFinite(_o.x) && isFinite(_o.y) && _z.x > 0 && _z.y > 0) {
+                    _x0 = Math.min(_x0, _o.x); _y0 = Math.min(_y0, _o.y)
+                    _x1 = Math.max(_x1, _o.x + _z.x); _y1 = Math.max(_y1, _o.y + _z.y)
+                  }
+                }
+                for (let _k = 0; _k < _hi.length; _k++) { if (_p.slots[_hi[_k]]) _p.slots[_hi[_k]].attachment = _save[_k] }
+                if (isFinite(_x0)) _foot = { off: new spine.Vector2(_x0, _y0), size: new spine.Vector2(_x1 - _x0, _y1 - _y0) }
+              } catch (e) { _foot = null }
+              vbCache[_fbKey] = _foot
+            }
+            vbFoot = _foot
+            // 横向居中用的本体盒：有 fxKeep 时已在上方排除手持挂件；否则用身体盒即可，
+            // 保证 vbBody 永远非空 → 渲染横向定心走本体而非整盒（修苏小妹风车推偏）。
+            if (!vbBody) vbBody = vbFoot
+          }
           try { window.__spineDbg = { folder: folder, model: opts.model || '', hideIdx: hideIdx, union: { w: +vbVis.size.x.toFixed(0), h: +vbVis.size.y.toFixed(0) }, chosen: 'union' } } catch (e) {}
         }
       }
@@ -724,11 +764,13 @@
         //   只挂数据、无 console 输出，不影响性能与既有逻辑。
         try {
           const _bOk = vbBody && vbBody.size && vbBody.size.x > 0
+          const _footOk = vbFoot && vbFoot.size && vbFoot.size.y > 0
           window.__spineBounds = {
             folder: folder, model: opts.model || '',
             anchorFeet: opts.anchorFeet,
             zoom: zoom, w: w, h: h,
             bboxOffY: vbVis.off.y, bboxSizeY: vbVis.size.y, bboxOffX: vbVis.off.x, bboxSizeX: vbVis.size.x,
+            footOffY: _footOk ? vbFoot.off.y : null,
             bodyOffY: _bOk ? vbBody.off.y : vbVis.off.y,
             bodyOffX: _bOk ? vbBody.off.x : vbVis.off.x,
             bodySizeX: _bOk ? vbBody.size.x : vbVis.size.x,
