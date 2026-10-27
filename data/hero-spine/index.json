@@ -2388,6 +2388,9 @@
     "modelHideSlots": {
       "gugu": [
         "images/a0"
+      ],
+      "fangzhengdashi": [
+        "idle/idle_1"
       ]
     }
   },
