@@ -295,6 +295,7 @@
             });
             if (which === 'skins') renderShopSkins();
             if (which === 'data') renderShopDataPanel();
+            if (which === 'calc') updateShopRemainDays();
         };
         async function renderShopDataPanel() {
             const box = document.getElementById('calcShopDataBody');
@@ -330,6 +331,18 @@
             }
             box.innerHTML = html;
         }
+        // 🟢 2026-10-27 修复：道具礼包限购上限必须用「剩余天数」而非活动总天数。
+        //   剩余天数 = 活动总天数 - 当前第几天 + 1（含今天），最小 1 天。
+        function getShopRemainingDays() {
+            const total = parseInt(document.getElementById('calcShopTotalDaysInput') && document.getElementById('calcShopTotalDaysInput').value) || 0;
+            const cur = parseInt(document.getElementById('calcShopCurrentDayInput') && document.getElementById('calcShopCurrentDayInput').value) || 1;
+            const rem = total - cur + 1;
+            return rem > 0 ? rem : (total > 0 ? 1 : 21);
+        }
+        window.updateShopRemainDays = function () {
+            const el = document.getElementById('calcShopRemainDaysShow');
+            if (el) el.textContent = getShopRemainingDays();
+        };
         window.doShopCalc = async function () {
             await loadActivityTabs();
             const tab = getActTab('shop');
@@ -337,7 +350,7 @@
             const g = function (id, d) { const el = document.getElementById(id); return el ? (parseInt(el.value, 10) || 0) : d; };
             const target = g('calcShopTargetInput', 0);
             const owned = g('calcShopOwnedInput', 0);
-            const days = g('calcShopDaysInput', Number(p.days) || 21) || 21;
+            const days = getShopRemainingDays() || (Number(p.days) || 21);
             const waves = g('calcShopWavesInput', Number(p.maxWaves) || 200);
             const buyZL = !!(document.getElementById('calcShopBuyZhanLing') && document.getElementById('calcShopBuyZhanLing').checked);
             const box = document.getElementById('calcShopResultContent'), area = document.getElementById('calcShopResultArea');
@@ -350,6 +363,19 @@
             const haveAll = freeShards + zlMat;
             const packs = _actParsePacks(p.packs);
             const needMat = Math.max(0, target - haveAll);
+            // 🟢 2026-10-27：限购触顶提示。若即使把所有每日限购道具买满（每天限购×剩余天数）仍不足，
+            //    说明已被上限封顶，缺口只能靠不限购礼包补齐——限购道具绝不会超过「每天限购×剩余天数」上限。
+            let cappedNote = '';
+            const limPacks = packs.filter(function (x) { return x.max > 0; });
+            if (limPacks.length) {
+                let limMaxMat = 0;
+                limPacks.forEach(function (x) { limMaxMat += x.max * days * x.mat; });
+                if (limMaxMat < needMat) {
+                    cappedNote = '<div style="margin:8px 0 0 0;padding:8px;background:rgba(255,107,107,0.12);border-radius:6px;color:#ffb3b3;font-size:0.78rem;line-height:1.6;">'
+                        + '⚠️ 限购道具已按「每天限购 × 剩余天数」封顶：即使全部买满也只够 <b>' + limMaxMat + '</b> 材料，'
+                        + '仍差 <b>' + (needMat - limMaxMat) + '</b> 材料需靠不限购礼包补齐（限购道具不会超过上限）。</div>';
+                }
+            }
             const best = _actOptimalPurchase(needMat, packs, days);
             const totalCost = zlCost + (best.cost || 0);
             let html = '';
@@ -367,7 +393,7 @@
                 html += '<div style="margin:6px 0 0 0;padding:8px;background:rgba(255,215,0,0.08);border-radius:6px;">';
                 Object.keys(best.plan || {}).forEach(function (k) { if (best.plan[k] > 0) html += '· ' + _oldNameEsc(k) + ' × <b>' + best.plan[k] + '</b><br>'; });
                 if (!Object.keys(best.plan || {}).length) html += '（按当前礼包表算不出更省方案，请检查参数）<br>';
-                html += '合计花费：<b style="color:#ffd700;">' + totalCost + ' 元</b>（含战令 ' + zlCost + ' 元），可得材料 <b>' + (haveAll + (best.totalMat || 0)) + '</b></div>';
+                html += '合计花费：<b style="color:#ffd700;">' + totalCost + ' 元</b>（含战令 ' + zlCost + ' 元），可得材料 <b>' + (haveAll + (best.totalMat || 0)) + '</b></div>' + cappedNote;
                 if (best.gold || best.purple) html += '<div style="margin-top:4px;color:#ffd700;font-size:0.78rem;">🎴 可得：金卡 <b>' + (best.gold || 0) + '</b> / 紫卡 <b>' + (best.purple || 0) + '</b></div>';
             }
             html += '</div>';

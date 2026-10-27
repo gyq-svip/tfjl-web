@@ -780,13 +780,18 @@
                             </div>
                             <div style="display:flex;gap:10px;margin-bottom:10px;">
                                 <div style="flex:1;">
-                                    <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">活动天数</label>
-                                    <input type="number" id="calcShopDaysInput" value="21" min="1" max="60" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;">
+                                    <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">活动总天数</label>
+                                    <input type="number" id="calcShopTotalDaysInput" value="21" min="1" max="60" oninput="updateShopRemainDays()" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;">
                                 </div>
                                 <div style="flex:1;">
-                                    <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">每天打多少波</label>
-                                    <input type="number" id="calcShopWavesInput" value="200" min="0" max="999" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;">
+                                    <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">当前第几天</label>
+                                    <input type="number" id="calcShopCurrentDayInput" value="1" min="1" max="60" oninput="updateShopRemainDays()" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;">
                                 </div>
+                            </div>
+                            <div style="color:#4ecdc4;font-size:0.78rem;margin-bottom:10px;line-height:1.5;">📅 剩余可购买天数：<b id="calcShopRemainDaysShow" style="color:#ffd700;">21</b> 天（限购礼包上限 = 每天限购 × 此剩余天数；含今天）</div>
+                            <div style="margin-bottom:10px;">
+                                <label style="color:rgba(255,255,255,0.7);font-size:0.8rem;display:block;margin-bottom:4px;">每天打多少波</label>
+                                <input type="number" id="calcShopWavesInput" value="200" min="0" max="999" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;box-sizing:border-box;">
                             </div>
                             <div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-bottom:10px;">💡 产出换算、礼包表、参考波数都在「📊 数据参考」里显示；换期改数字请去管理员「🎪 活动道具」</div>
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
