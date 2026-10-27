@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-09-14T11:11:53.878Z",
+  "updated": "2026-10-27T02:00:47.220Z",
   "note": "融合卡定义：components 为参与融合的2张基础卡。",
   "fusions": {
     "火炮射线": {
@@ -241,6 +241,14 @@
         "沙皇"
       ],
       "profession": "法师",
+      "quality": "金"
+    },
+    "萌萌土灵": {
+      "components": [
+        "萌萌",
+        "土灵"
+      ],
+      "profession": "熊猫",
       "quality": "金"
     }
   }
