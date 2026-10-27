@@ -3030,7 +3030,7 @@
 
   <!-- 🔴 2026-09-01 管理员入口兜底脚本（内联在 body 末尾，先于所有 defer 脚本绑定事件）
        根因：如果 app-core.js 执行到 DOMContentLoaded 注册前遇运行时错误，所有管理员入口
-       （长按/双击/快捷键/三击清缓存）都绑定不上 → 死锁，用户什么都做不了。
+       （长按/双击/快捷键/五击清缓存）都绑定不上 → 死锁，用户什么都做不了。
        方案：在 HTML 内联脚本里直接绑定事件（此时 DOM 元素已存在），不依赖 app-core.js 的
        DOMContentLoaded 回调。触发时优先调 window.openAdminPanel，不可用时直接操作 DOM。 -->
   <script>
@@ -3090,12 +3090,12 @@
       el.addEventListener('touchend', cancelLP);
       el.addEventListener('touchcancel', cancelLP);
 
-      // B. 三击清缓存 + 双击进管理员
+      // B. 五击清缓存 + 双击进管理员（🔴 2026-10-27：3 击太容易误触，与 app-core 主逻辑统一改为 5 击）
       var clickCount = 0;
       var clickTimer = null;
       el.addEventListener('click', function() {
         clickCount++;
-        if (clickCount >= 3) {
+        if (clickCount >= 5) {
           clickCount = 0;
           clearTimeout(clickTimer);
           clearCache();
@@ -3106,7 +3106,7 @@
       });
       el.addEventListener('dblclick', function() {
         setTimeout(function() {
-          if (clickCount >= 3) return;
+          if (clickCount >= 5) return;
           cancelLP();
           openAdmin();
         }, 250);
