@@ -12123,6 +12123,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     //      统一 0.58 会顶出画布上缘；按模型实测微调（目标可见高度 ≤0.62）
                     // 🟢 2026-10-27 统一走 spineHero.fitOptions：与卡牌设置弹窗同源，避免两套散落校准漂移。
                     //   （死神 fashi 专项 fitPadding/anchorFeet 已内化进 fitOptions）
+                    // 🔴 2026-10-28 播放前必须先停掉上一次：详情弹窗此前直接 play，旧渲染循环
+                    //    没被取消，会带着旧模型继续画 → 同一画布上「两个模型叠加」，静态那份
+                    //    压在下面（少林掌门·咕咕「多一串不动的佛珠」即此；历史「两个死神」同源）。
+                    //    另两个入口（10960 / 12505）本来就有 stop，这里补齐。
+                    try { window.spineHero.stop(cv) } catch (e) {}
                     window.spineHero.play(cv, meta.spine, window.spineHero.fitOptions(meta.spine, model, man, pngs))
                     // 🟢 2026-10-23 空渲染兜底提示：个别模型（如龟相）主体是 PathAttachment，
                     //   Spine canvas 运行时画不出路径附件 → 起播 6s 后画布仍全透明就提示一句，
@@ -12349,6 +12354,38 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             } else {
                 h += '<div style="margin-top:8px;font-size:0.76rem;color:#fbbf24;">🌐 资源来源：<b>在线</b>（GitHub Pages）。桌面版点「更新皮肤资源」下载整包并重启后应变为「本地整包」；若一直「在线」= 本地整包没被识别到。</div>'
             }
+            // 🔴 2026-10-28 版本对账：把「远端最新包 / 索引数据版本 / 当前资源来源」摆出来，
+            //    用于一眼判断是「皮肤资源旧了」还是「程序/校准问题」，以及本地是否拿到了最新版。
+            h += '<div id="spineVerBox" style="margin-top:8px;font-size:0.74rem;line-height:1.75;color:rgba(255,255,255,0.66);">🧾 版本对账：读取中…</div>'
+            ;(function () {
+                setTimeout(function () {
+                    const box = document.getElementById('spineVerBox')
+                    if (!box) return
+                    const _pp = location.pathname
+                    const _bb = _pp.endsWith('/') ? _pp : _pp.slice(0, _pp.lastIndexOf('/') + 1)
+                    Promise.all([
+                        fetch(_bb + 'skins-index.json', { cache: 'no-store' }).then(function (r) { return r.json() }).catch(function () { return null }),
+                        fetch(_bb + 'data/hero-spine/index.json', { cache: 'no-store' }).then(function (r) { return r.json() }).catch(function () { return null })
+                    ]).then(function (arr) {
+                        const si = arr[0] || {}, oi = arr[1] || {}
+                        let latest = ''
+                        Object.keys(oi).forEach(function (k) { const u = oi[k] && oi[k].updated; if (u && (!latest || u > latest)) latest = u })
+                        const isLocal = /asset/i.test(String(window.__HERO_SPINE_ASSET_BASE || ''))
+                        let txt = '🧾 <b style="color:#ffd75e;">版本对账</b><br>'
+                        txt += '· 远端皮肤包：<b>' + (si.package || '—') + '</b><br>'
+                        txt += '· 远端动画包：<b>' + (si.spinePackage || '—') + '</b>（' + (si.spineFiles || '?') + ' 文件 / ' + (si.spineSize ? Math.round(si.spineSize / 1048576) : '?') + 'MB）<br>'
+                        txt += '· 索引数据版本：<b>' + (latest || '—') + '</b><br>'
+                        txt += '· 前端版本：<b>' + ((window.__FRONT_VERSION || window.frontVersion || '—')) + '</b><br>'
+                        txt += '· 资源来源：<b style="color:' + (isLocal ? '#81c784' : '#fbbf24') + '">' + (isLocal ? '本地整包' : '在线 GitHub Pages') + '</b>'
+                        if (isLocal) {
+                            txt += '<br><span style="color:#fbbf24;">⚠️ 走本地整包时：若本地包早于上面「远端动画包」，就是<b>资源旧了</b> → 点「更新皮肤资源」重拉（属资源问题，非程序问题）。</span>'
+                        } else {
+                            txt += '<br><span style="color:rgba(255,255,255,0.55);">在线加载：配置与资源均取自 GitHub Pages 最新版；此时若仍显示异常，则属<b>程序/校准</b>问题。</span>'
+                        }
+                        box.innerHTML = txt
+                    })
+                }, 80)
+            })()
             // 🔴 2026-10-22 版本提示：动画/皮肤「整包下载」需桌面版 ≥2.1.9（5158089e 起的 download_skins 才会拉 spine 包）。
             // 旧版 exe 点「更新皮肤资源」只会拉皮肤包、动画仍在线加载——用户会以为坏了，这里按版本直接提示出来。
             let _exeVer = ''
