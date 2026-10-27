@@ -32971,6 +32971,23 @@ ${maSection}
         // ⚠️ 必须在使用前声明（避免 initFloatConsoleOnLoad IIFE 调用 _isConsoleEnabled 时命中 const TDZ）
         const CONSOLE_VISIBILITY_KEY = 'tdjl_consoleVisible';
 
+        // 🔴 2026-10-28 悬浮终端置顶：交互时动态抬到「当前文档最高层级 +1」，
+        //   彻底避免被英雄面板/图鉴/各种 z-index≥100000 的弹窗盖住（终端此前仅 99999）。
+        function bringFloatConsoleToFront() {
+            const con = document.getElementById('floatConsole');
+            if (!con || con.style.display === 'none') return;
+            let maxZ = 0;
+            const els = document.querySelectorAll('*');
+            for (let i = 0; i < els.length; i++) {
+                const z = parseInt(getComputedStyle(els[i]).zIndex, 10);
+                if (!isNaN(z) && z > maxZ) maxZ = z;
+            }
+            const top = Math.max(maxZ + 1, 1000000);
+            con.style.zIndex = top;
+            const tog = document.getElementById('floatConsoleToggle');
+            if (tog) tog.style.zIndex = top + 1;
+        }
+
         // 统一入口：show=true 展开浮窗，show=false 收起（显示小圆按钮）
         function _setFloatConsole(show) {
             const con = document.getElementById('floatConsole');
@@ -32981,6 +32998,7 @@ ${maSection}
             try { localStorage.setItem(CONSOLE_OPEN_KEY, floatConsoleVisible ? '1' : '0'); } catch (_) {}
             if (floatConsoleVisible) {
                 refreshFloatConsole();
+                bringFloatConsoleToFront();   // 🔴 2026-10-28 展开即置顶
                 if (floatConsoleRefreshTimer) clearInterval(floatConsoleRefreshTimer);
                 floatConsoleRefreshTimer = setInterval(refreshFloatConsole, 2500);
             } else {
@@ -33002,6 +33020,10 @@ ${maSection}
         (function initFloatConsoleOnLoad() {
             const con = document.getElementById('floatConsole');
             if (!con) return;
+            // 🔴 2026-10-28 点击/拖拽终端任意位置即置顶（pointerdown 覆盖鼠标与触摸）
+            con.addEventListener('pointerdown', bringFloatConsoleToFront);
+            const _fcTog = document.getElementById('floatConsoleToggle');
+            if (_fcTog) _fcTog.addEventListener('pointerdown', bringFloatConsoleToFront);
             const enabled = _isConsoleEnabled();
             // 🔴 2026-08-30 修复「收起后刷新又自动展开」：恢复读取 tdjl_consoleOpen 记忆
             //    （上次展开就展开、上次收起就收起）。此前强制 open=false 收起，与用户预期不符；
