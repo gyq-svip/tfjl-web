@@ -1764,7 +1764,6 @@
                     const info = document.createElement('div');
                     info.style.cssText = 'flex:1;min-width:0;font-size:0.75rem;color:rgba(255,255,255,0.85);line-height:1.5;';
                     info.innerHTML = '<div style="font-weight:bold;">' + bgEsc(t.name || '未命名') + (m.defaultBg === 'bvid:' + t.id ? ' <span style="color:#ffd700;font-size:0.64rem;">默认</span>' : '') + '</div>' +
-                        '<div style="color:rgba(255,255,255,0.45);font-size:0.68rem;word-break:break-all;">' + bgEsc(t.video || '') + '</div>' +
                         '<div style="color:rgba(255,255,255,0.4);font-size:0.66rem;">' + (t.size ? (Math.round(t.size / 1048576) + ' MB') : '') + (t.ts ? ' · ' + new Date(t.ts).toLocaleString('zh-CN', { hour12: false }) : '') + (t.codec ? ' · <b style="color:' + (t.codec === 'hevc' ? '#f87171' : '#9ae6b4') + ';">' + (t.codec === 'h264' ? 'H.264' : t.codec === 'hevc' ? 'HEVC(部分电脑不支持)' : t.codec.toUpperCase()) + '</b>' : '') + '</div>';
                     row.appendChild(info);
                     const defRef = 'bvid:' + t.id;
@@ -1990,7 +1989,6 @@
                     info.innerHTML = '<div style="font-weight:bold;">' + bgEsc(r.name || '未命名') + (r.kind === 'builtin' ? ' <span style="color:rgba(255,255,255,0.4);font-size:0.64rem;">内置</span>' : '') +
                         (r.removed ? ' <span style="color:#f87171;font-size:0.64rem;">已删</span>' : '') +
                         (m.defaultBg === 'builtin:' + r.url ? ' <span style="color:#ffd700;font-size:0.64rem;">默认</span>' : '') + '</div>' +
-                        '<div style="color:rgba(255,255,255,0.4);font-size:0.62rem;word-break:break-all;">' + bgEsc(r.url || '') + '</div>' +
                         (r.size ? '<div style="color:rgba(255,255,255,0.35);font-size:0.62rem;">' + Math.round(r.size / 1024) + ' KB' + (r.ts ? ' · ' + new Date(r.ts).toLocaleString('zh-CN', { hour12: false }) : '') + '</div>' : '');
                     row.appendChild(info);
                     if (!r.removed && r.url) {
