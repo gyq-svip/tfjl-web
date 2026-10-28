@@ -395,7 +395,9 @@
         let bgImgUrl = null, bgImgId = null, bgMigrateTried = false, bgThumbUrls = [];
         let bgVideoUrl = null, bgVideoId = null;
 
-        // 动态视频背景（MP4/WebM，存 IndexedDB 媒体库，静音循环播放）
+        // 动态视频背景（MP4/WebM，存 IndexedDB 媒体库，循环播放；声音独立开关，默认静音）
+        const BG_VIDEO_MUTE_KEY = 'TFJL_BG_VIDEO_MUTE'; // '1'=静音（默认，保自动播放） '0'=有声
+        function bgVideoMuted() { return localStorage.getItem(BG_VIDEO_MUTE_KEY) !== '0'; }
         function ensureBgVideo() {
             let v = document.getElementById('bgVideo');
             if (!v) {
@@ -403,12 +405,29 @@
                 v.id = 'bgVideo';
                 v.setAttribute('autoplay', '');
                 v.setAttribute('loop', '');
-                v.muted = true; // 静音循环，浏览器才允许自动播放
                 v.setAttribute('playsinline', '');
                 v.style.cssText = 'position:fixed;top:-40px;left:-40px;width:calc(100% + 80px);height:calc(100% + 80px);object-fit:cover;z-index:-2;pointer-events:none;';
                 document.body.appendChild(v);
             }
             return v;
+        }
+        // 应用声音开关状态；音量大小交给系统（app 内不做额外缩放，volume 恒 1）
+        function bgApplyVideoSound(v) {
+            const muted = bgVideoMuted();
+            v.muted = muted;
+            v.volume = 1;
+            return muted;
+        }
+        // 自动播放策略兜底：用户上次开着声音、本次页面加载无交互 → play() 会被浏览器拦截。
+        // 降级：先静音播上，监听一次性首次交互（点击/按键）再恢复声音。
+        function bgOnceInteract(fn) {
+            const h = function () {
+                window.removeEventListener('pointerdown', h, true);
+                window.removeEventListener('keydown', h, true);
+                try { fn(); } catch (e) {}
+            };
+            window.addEventListener('pointerdown', h, true);
+            window.addEventListener('keydown', h, true);
         }
         function stopBgVideo() {
             const v = document.getElementById('bgVideo');
@@ -423,11 +442,35 @@
                 bgVideoUrl = URL.createObjectURL(rec.blob);
                 bgVideoId = id;
                 const v = ensureBgVideo();
+                bgApplyVideoSound(v);
                 v.src = bgVideoUrl;
                 const p = v.play();
-                if (p && p.catch) p.catch(function () {});
+                if (p && p.catch) p.catch(function () {
+                    if (!bgVideoMuted()) {
+                        v.muted = true; // 先静音保证画面播上
+                        const p2 = v.play(); if (p2 && p2.catch) p2.catch(function () {});
+                        bgOnceInteract(function () { // 首次交互后恢复声音
+                            const vv = document.getElementById('bgVideo');
+                            if (vv && bgVideoId) { vv.muted = false; const p3 = vv.play(); if (p3 && p3.catch) p3.catch(function () {}); }
+                        });
+                    }
+                });
             });
         }
+        // 背景视频声音开关（用户拨动=用户手势，此时取消静音 + play 合法；音量随系统）
+        window.__bgToggleVideoSound = function (on) {
+            localStorage.setItem(BG_VIDEO_MUTE_KEY, on ? '0' : '1');
+            const v = document.getElementById('bgVideo');
+            if (v && bgVideoId) {
+                v.muted = !on;
+                v.volume = 1;
+                const p = v.play(); if (p && p.catch) p.catch(function () {});
+            }
+            // 同步已打开背景设置面板里的开关状态（不重渲染整个面板，避免打断用户操作）
+            const sw = document.getElementById('bgVideoSoundSwitch');
+            if (sw) sw.checked = !!on;
+            try { if (typeof showToast === 'function') showToast(on ? '🔊 背景视频声音已开启（音量随系统）' : '🔇 背景视频声音已关闭'); } catch (e) {}
+        };
 
         function bgOpenDb() {
             return new Promise(function (res, rej) {
@@ -586,6 +629,7 @@
                 layer.classList.add('bg-custom');
                 if (bgVideoId === vid && bgVideoUrl) {
                     const v = ensureBgVideo();
+                    bgApplyVideoSound(v);
                     if (v.paused) { const p = v.play(); if (p && p.catch) p.catch(function () {}); }
                 } else {
                     bgApplyVideo(vid).catch(function () {});
@@ -788,6 +832,7 @@
                 wrap('__bgToggleOverlay', '背景压暗开关');
                 wrap('__bgSetBlur', '面板模糊调节');
                 wrap('__bgSetFrost', '面板底色调节');
+                wrap('__bgToggleVideoSound', '背景视频声音开关');
                 wrap('__setBgPreset', '背景预设');
                 wrap('__setBgBuiltin', '内置背景图');
                 wrap('__bgRandomGrad', '随机渐变');
@@ -849,6 +894,9 @@
             const overlayOn = localStorage.getItem(BG_OVERLAY_ON) === '1';
             const blurVal = readLevel(BG_BLUR_KEY);
             const frostVal = readLevel(BG_FROST_KEY, 30);
+            // 背景视频声音开关：仅当前背景为视频时显示（音量大小随系统，app 内不做滑条）
+            const isVideoBg = (localStorage.getItem(BG_KEY) || '').trim().indexOf('video:') === 0;
+            const videoSoundOn = !bgVideoMuted();
             const modal = document.createElement('div');
             modal.id = 'bgSettingsModal';
             modal.style.cssText = 'position:fixed;top:78px;right:18px;width:332px;max-width:92vw;z-index:100000;background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:14px 16px 16px;max-height:86vh;overflow:auto;box-shadow:0 12px 44px rgba(0,0,0,0.6);';
@@ -860,6 +908,9 @@
                 '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.82rem;color:rgba(255,255,255,0.85);cursor:pointer;">' +
                 '  <input type="checkbox" id="bgOverlaySwitch"' + (overlayOn ? ' checked' : '') + ' onchange="window.__bgToggleOverlay(this.checked)">' +
                 '  背景协调压暗（开启后浅色背景自动压暗，深色不影响）</label>' +
+                (isVideoBg ? ('<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.82rem;color:rgba(255,255,255,0.85);cursor:pointer;">' +
+                '  <input type="checkbox" id="bgVideoSoundSwitch"' + (videoSoundOn ? ' checked' : '') + ' onchange="window.__bgToggleVideoSound(this.checked)">' +
+                '  背景视频声音 🔊（音量大小随系统）</label>') : '') +
                 '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.78rem;color:rgba(255,255,255,0.85);">' +
                 '  <span style="flex-shrink:0;">面板模糊</span>' +
                 '  <input type="range" id="bgBlurRange" min="0" max="100" step="1" value="' + blurVal + '" oninput="window.__bgSetBlur(this.value)" style="flex:1;min-width:0;">' +
