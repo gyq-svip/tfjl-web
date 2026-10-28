@@ -49,6 +49,8 @@ jobs:
 
           # 更新元数据（App 更新器读取）
           cp -v updater.json version.json welcome.json _site/ 2>/dev/null || true
+          # 🔴 背景主题清单 Gist ID（零配置读取来源；留空则内置视频区为空，待管理员创建并填入）
+          cp -v bg-themes-gist.json _site/ 2>/dev/null || true
           # 皮肤包索引（客户端据此得知当前有效包名，再从 Gitee 发行版拉取对应皮肤包）
           cp -v skins-index.json _site/ 2>/dev/null || true
           # 🔴 英雄图鉴数据（官方配置表导出，checkout 后 data/ 仅含已入库的 heroes.json）
