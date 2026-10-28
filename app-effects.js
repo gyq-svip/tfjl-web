@@ -239,6 +239,7 @@
         };
         window.__bgCloseSettings = function () {
             try { bgRevokeBuiltinThumbs(); } catch (e) {} // 释放缩略图 blob
+            try { bgRevokeVideoThemeThumbs(); } catch (e) {} // 释放内置视频封面 blob
             const m = document.getElementById('bgSettingsModal');
             if (m) m.remove();
         };
@@ -260,6 +261,7 @@
             if (val.indexOf('custom:') === 0) return 0.4;
             if (val.indexOf('img:') === 0) return 0.4;
             if (val.indexOf('video:') === 0) return 0.35;
+            if (val.indexOf('bvid:') === 0) return 0.35;
             if (val.indexOf('builtin:') === 0) return 0.3;
             if (val.indexOf('preset:') === 0) {
                 const key = val.slice(7);
@@ -395,9 +397,18 @@
         let bgImgUrl = null, bgImgId = null, bgMigrateTried = false, bgThumbUrls = [];
         let bgVideoUrl = null, bgVideoId = null;
 
-        // 动态视频背景（MP4/WebM，存 IndexedDB 媒体库，循环播放；声音独立开关，默认静音）
-        const BG_VIDEO_MUTE_KEY = 'TFJL_BG_VIDEO_MUTE'; // '1'=静音（默认，保自动播放） '0'=有声
-        function bgVideoMuted() { return localStorage.getItem(BG_VIDEO_MUTE_KEY) !== '0'; }
+        // 动态视频背景（MP4/WebM，存 IndexedDB 媒体库，循环播放；声音独立开关，默认开声）
+        const BG_VIDEO_MUTE_KEY = 'TFJL_BG_VIDEO_MUTE'; // '1'=静音 '0'=有声（默认开声，音量随系统可调）
+        const BG_VIDEO_VOL_KEY = 'TFJL_BG_VIDEO_VOL';   // 0~10，默认 5（即 volume=0.5）
+        function bgVideoMuted() {
+            const raw = localStorage.getItem(BG_VIDEO_MUTE_KEY);
+            return raw === null ? false : raw !== '0'; // 默认（无记录）= 开声
+        }
+        function bgVideoVol() {
+            const raw = localStorage.getItem(BG_VIDEO_VOL_KEY);
+            const v = raw === null ? 5 : (parseInt(raw, 10) || 0);
+            return Math.max(0, Math.min(10, v)) / 10;
+        }
         function ensureBgVideo() {
             let v = document.getElementById('bgVideo');
             if (!v) {
@@ -411,11 +422,11 @@
             }
             return v;
         }
-        // 应用声音开关状态；音量大小交给系统（app 内不做额外缩放，volume 恒 1）
+        // 应用声音开关状态；音量大小可调（0~10 档，默认 5）
         function bgApplyVideoSound(v) {
             const muted = bgVideoMuted();
             v.muted = muted;
-            v.volume = 1;
+            v.volume = bgVideoVol();
             return muted;
         }
         // 自动播放策略兜底：用户上次开着声音、本次页面加载无交互 → play() 会被浏览器拦截。
@@ -433,7 +444,9 @@
             const v = document.getElementById('bgVideo');
             if (v) { try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) {} }
             if (bgVideoUrl) { try { URL.revokeObjectURL(bgVideoUrl); } catch (e) {} }
+            if (bgBuiltinVideoUrl) { try { URL.revokeObjectURL(bgBuiltinVideoUrl); } catch (e) {} }
             bgVideoUrl = null; bgVideoId = null;
+            bgBuiltinVideoUrl = null; bgBuiltinVideoThemeId = null;
         }
         function bgApplyVideo(id) {
             return bgGetImage(id).then(function (rec) {
@@ -457,19 +470,167 @@
                 });
             });
         }
-        // 背景视频声音开关（用户拨动=用户手势，此时取消静音 + play 合法；音量随系统）
+        // ===== 内置视频主题库（视频/封面存 Gitee Releases，清单存公开 Gist）=====
+        // 清单 Gist：管理员在后台「主题上传」页首次上传时自动创建，ID 存本机 localStorage；
+        // 同时把 ID 回填到下方 BG_THEMES_GIST_ID 常量（新用户直接可用）。
+        const BG_THEMES_GIST_KEY = 'TFJL_BG_THEMES_GIST_ID';
+        const BG_THEMES_HIDE_KEY = 'TFJL_BG_THEMES_HIDE';
+        const BG_THEMES_GIST_ID = ''; // 例：'a45529be...'（创建后由管理员回填）
+        const BG_THEMES_FILE = 'bg-themes.json';
+        const BG_THEMES_CACHE_KEY = 'TFJL_BG_THEMES_CACHE';
+        function bgThemesGistId() {
+            try { return localStorage.getItem(BG_THEMES_GIST_KEY) || BG_THEMES_GIST_ID; } catch (e) { return BG_THEMES_GIST_ID; }
+        }
+        // 拉取内置视频清单：优先 1 小时内的本地缓存；失败回退旧缓存；彻底失败返回空数组
+        function bgThemesLoad(force) {
+            const cached = (function () {
+                try {
+                    const c = JSON.parse(localStorage.getItem(BG_THEMES_CACHE_KEY) || 'null');
+                    if (c && Array.isArray(c.themes) && Date.now() - (c.ts || 0) < 3600 * 1000) return c;
+                } catch (e) {}
+                return null;
+            })();
+            if (cached && !force) return Promise.resolve(cached.themes);
+            const gid = bgThemesGistId();
+            if (!gid) return Promise.resolve((cached && cached.themes) || []);
+            return fetch('https://api.github.com/gists/' + gid, { headers: { 'Accept': 'application/vnd.github.v3+json' } })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (g) {
+                    const f = g && g.files && g.files[BG_THEMES_FILE];
+                    if (!f || !f.content) throw new Error('no file');
+                    const parsed = JSON.parse(f.content);
+                    const themes = Array.isArray(parsed.themes) ? parsed.themes : [];
+                    try { localStorage.setItem(BG_THEMES_CACHE_KEY, JSON.stringify({ ts: Date.now(), themes: themes })); } catch (e) {}
+                    return themes;
+                })
+                .catch(function () { return (cached && cached.themes) || []; });
+        }
+        // 应用内置视频主题：优先 IndexedDB 本地缓存（首拉落盘后零网络），同时清理上一个内置视频缓存防爆盘
+        let bgBuiltinVideoUrl = null;
+        let bgBuiltinVideoThemeId = null;
+        function bgApplyBuiltinVideo(theme) {
+            const vurl = theme && theme.video;
+            if (!vurl) return Promise.reject(new Error('no url'));
+            const applyBlob = function (blob) {
+                stopBgVideo();
+                if (bgBuiltinVideoUrl) { try { URL.revokeObjectURL(bgBuiltinVideoUrl); } catch (e) {} }
+                bgBuiltinVideoUrl = URL.createObjectURL(blob);
+                const v = ensureBgVideo();
+                bgApplyVideoSound(v);
+                v.src = bgBuiltinVideoUrl;
+                const p = v.play();
+                if (p && p.catch) p.catch(function () {
+                    if (!bgVideoMuted()) { // 自动播放策略兜底：先静音播，首次交互后恢复声音
+                        v.muted = true;
+                        const p2 = v.play(); if (p2 && p2.catch) p2.catch(function () {});
+                        bgOnceInteract(function () {
+                            const vv = document.getElementById('bgVideo');
+                            if (vv) { vv.muted = false; vv.volume = bgVideoVol(); const p3 = vv.play(); if (p3 && p3.catch) p3.catch(function () {}); }
+                        });
+                    }
+                });
+            };
+            return bgAssetGet(vurl).then(function (blob) {
+                if (blob) { applyBlob(blob); return null; }
+                // 首拉：下载并落盘；只保留当前一个内置视频缓存（视频体积大，防 IndexedDB 爆盘）
+                return fetch(vurl).then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.blob(); })
+                    .then(function (b) {
+                        return bgAssetDelOldVideos().catch(function () {}).then(function () {
+                            return bgAssetPut(vurl, b).catch(function () {});
+                        }).then(function () { applyBlob(b); });
+                    });
+            }).catch(function (e) {
+                try { if (typeof showToast === 'function') showToast('⚠️ 视频下载失败：' + (e && e.message ? e.message : '网络错误')); } catch (e2) {}
+                throw e;
+            });
+        }
+        // 窗口最小化 / 收进托盘 / 切到后台时暂停背景视频与声音（含音频）；重新可见时自动续播。
+        // 用 visibilitychange 统一覆盖「最小化」「叉掉收托盘」「浏览器切走标签页」等隐藏场景。
+        function bgHasActiveVideo() { return !!(bgVideoUrl || bgBuiltinVideoUrl); }
+        function bgPauseForHidden() {
+            const v = document.getElementById('bgVideo');
+            if (v && !v.paused && bgHasActiveVideo()) { try { v.pause(); } catch (e) {} }
+        }
+        function bgResumeForVisible() {
+            const v = document.getElementById('bgVideo');
+            if (!v || !v.paused || !bgHasActiveVideo()) return;
+            const p = v.play();
+            if (p && p.catch) p.catch(function () {
+                if (!bgVideoMuted()) { // 自动播放策略兜底：先静音播，首次交互后恢复声音
+                    v.muted = true;
+                    const p2 = v.play(); if (p2 && p2.catch) p2.catch(function () {});
+                    bgOnceInteract(function () {
+                        const vv = document.getElementById('bgVideo');
+                        if (vv && bgHasActiveVideo()) { vv.muted = false; vv.volume = bgVideoVol(); const p3 = vv.play(); if (p3 && p3.catch) p3.catch(function () {}); }
+                    });
+                }
+            });
+        }
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'hidden') bgPauseForHidden();
+            else bgResumeForVisible();
+        });
+        // 桌面端（Tauri）窗口事件再兜一层：minimize/hide 暂停，unminimize/show/focus 续播
+        (function () {
+            try {
+                const W = window.__TAURI__ && window.__TAURI__.window;
+                const cur = W && W.getCurrentWindow;
+                if (typeof cur === 'function') {
+                    const w = cur.call(W);
+                    if (w && typeof w.onEvent === 'function') {
+                        w.onEvent(function (e) {
+                            const t = e && e.type;
+                            if (t === 'minimize' || t === 'hide') bgPauseForHidden();
+                            else if (t === 'unminimize' || t === 'show' || t === 'focus') bgResumeForVisible();
+                        });
+                    }
+                }
+            } catch (e) {}
+        })();
+        // 删除 assets store 里旧的内置视频缓存（key 以 http 开头且 type 为 video 的 blob）
+        function bgAssetDelOldVideos() {
+            return bgOpenDb().then(function (db) {
+                return new Promise(function (res) {
+                    const tx = db.transaction(BG_ASSET_STORE, 'readwrite');
+                    const store = tx.objectStore(BG_ASSET_STORE);
+                    const req = store.openCursor();
+                    req.onsuccess = function () {
+                        const cur = req.result;
+                        if (!cur) return;
+                        const rec = cur.value;
+                        if (rec && rec.blob && rec.blob.type && rec.blob.type.indexOf('video/') === 0) {
+                            try { store.delete(cur.key); } catch (e) {}
+                        }
+                        cur.continue();
+                    };
+                    tx.oncomplete = function () { res(); };
+                    tx.onerror = function () { res(); };
+                });
+            }).catch(function () {});
+        }
         window.__bgToggleVideoSound = function (on) {
             localStorage.setItem(BG_VIDEO_MUTE_KEY, on ? '0' : '1');
             const v = document.getElementById('bgVideo');
             if (v && bgVideoId) {
                 v.muted = !on;
-                v.volume = 1;
+                v.volume = bgVideoVol();
                 const p = v.play(); if (p && p.catch) p.catch(function () {});
             }
             // 同步已打开背景设置面板里的开关状态（不重渲染整个面板，避免打断用户操作）
             const sw = document.getElementById('bgVideoSoundSwitch');
             if (sw) sw.checked = !!on;
-            try { if (typeof showToast === 'function') showToast(on ? '🔊 背景视频声音已开启（音量随系统）' : '🔇 背景视频声音已关闭'); } catch (e) {}
+            const vol = document.getElementById('bgVideoVolRange');
+            if (vol) vol.disabled = !on;
+            try { if (typeof showToast === 'function') showToast(on ? '🔊 背景视频声音已开启（音量 ' + Math.round(bgVideoVol() * 10) + '/10）' : '🔇 背景视频声音已关闭'); } catch (e) {}
+        };
+        // 背景视频音量调节（0~10，默认 5）
+        window.__bgSetVideoVolume = function (v) {
+            const lv = Math.max(0, Math.min(10, Math.round(parseFloat(v) || 0)));
+            localStorage.setItem(BG_VIDEO_VOL_KEY, String(lv));
+            const el = document.getElementById('bgVideo');
+            if (el) el.volume = lv / 10;
+            const lab = document.getElementById('bgVideoVolVal');
+            if (lab) lab.textContent = lv + '';
         };
 
         function bgOpenDb() {
@@ -622,9 +783,26 @@
                 return;
             }
             if (val.indexOf('builtin:') !== 0) bgRevokeBuiltinUrl(); // 离开内置图 → 释放其本地 blob
-            if (val.indexOf('img:') !== 0 && val.indexOf('video:') !== 0) bgRevokeUrl();
-            if (val.indexOf('video:') !== 0) stopBgVideo();
-            if (val.indexOf('video:') === 0) {
+            const isBvid = val.indexOf('bvid:') === 0;
+            if (val.indexOf('img:') !== 0 && val.indexOf('video:') !== 0 && !isBvid) bgRevokeUrl();
+            if (val.indexOf('video:') !== 0 && !isBvid) stopBgVideo();
+            if (isBvid) {
+                // 内置视频主题（bvid:<themeId>）：本地缓存优先，首拉下载落盘
+                const tid = val.slice(5);
+                layer.classList.add('bg-custom');
+                if (bgBuiltinVideoThemeId === tid && bgBuiltinVideoUrl) {
+                    const v = ensureBgVideo();
+                    bgApplyVideoSound(v);
+                    if (v.paused) { const p = v.play(); if (p && p.catch) p.catch(function () {}); }
+                } else {
+                    bgThemesLoad().then(function (list) {
+                        const t = (list || []).find(function (x) { return x.id === tid; });
+                        if (!t) { try { if (typeof showToast === 'function') showToast('⚠️ 该主题不存在或已下架'); } catch (e) {} return; }
+                        bgBuiltinVideoThemeId = tid;
+                        bgApplyBuiltinVideo(t).catch(function () {});
+                    });
+                }
+            } else if (val.indexOf('video:') === 0) {
                 const vid = val.slice(6);
                 layer.classList.add('bg-custom');
                 if (bgVideoId === vid && bgVideoUrl) {
@@ -833,6 +1011,8 @@
                 wrap('__bgSetBlur', '面板模糊调节');
                 wrap('__bgSetFrost', '面板底色调节');
                 wrap('__bgToggleVideoSound', '背景视频声音开关');
+                wrap('__bgSetVideoVolume', '背景视频音量调节');
+                wrap('__bgApplyTheme', '内置视频主题应用');
                 wrap('__setBgPreset', '背景预设');
                 wrap('__setBgBuiltin', '内置背景图');
                 wrap('__bgRandomGrad', '随机渐变');
@@ -891,12 +1071,19 @@
                 });
                 rows.push('</div>');
             }
+            // 🎬 内置视频主题区：清单来自 Gitee/Gist，封面本地缓存优先；点击应用后视频也落盘缓存
+            rows.push('<div id="bgVideoThemeWrap" style="display:none;">' +
+                '<div style="color:rgba(255,255,255,0.55);font-size:0.78rem;margin:12px 0 6px;">🎬 内置视频（点封面切换，应用后自动缓存本机、断网也能播）</div>' +
+                '<div id="bgVideoThemeList" style="display:flex;flex-wrap:wrap;gap:8px;"></div>' +
+                '</div>');
             const overlayOn = localStorage.getItem(BG_OVERLAY_ON) === '1';
             const blurVal = readLevel(BG_BLUR_KEY);
             const frostVal = readLevel(BG_FROST_KEY, 30);
-            // 背景视频声音开关：仅当前背景为视频时显示（音量大小随系统，app 内不做滑条）
-            const isVideoBg = (localStorage.getItem(BG_KEY) || '').trim().indexOf('video:') === 0;
+            // 背景视频声音开关 + 音量：仅当前背景为视频（自传 video: / 内置 bvid:）时显示
+            const curBgVal = (localStorage.getItem(BG_KEY) || '').trim();
+            const isVideoBg = curBgVal.indexOf('video:') === 0 || curBgVal.indexOf('bvid:') === 0;
             const videoSoundOn = !bgVideoMuted();
+            const videoVol = Math.round(bgVideoVol() * 10);
             const modal = document.createElement('div');
             modal.id = 'bgSettingsModal';
             modal.style.cssText = 'position:fixed;top:78px;right:18px;width:332px;max-width:92vw;z-index:100000;background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:14px 16px 16px;max-height:86vh;overflow:auto;box-shadow:0 12px 44px rgba(0,0,0,0.6);';
@@ -910,7 +1097,12 @@
                 '  背景协调压暗（开启后浅色背景自动压暗，深色不影响）</label>' +
                 (isVideoBg ? ('<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.82rem;color:rgba(255,255,255,0.85);cursor:pointer;">' +
                 '  <input type="checkbox" id="bgVideoSoundSwitch"' + (videoSoundOn ? ' checked' : '') + ' onchange="window.__bgToggleVideoSound(this.checked)">' +
-                '  背景视频声音 🔊（音量大小随系统）</label>') : '') +
+                '  背景视频声音 🔊（默认开）</label>' +
+                '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.78rem;color:rgba(255,255,255,0.85);">' +
+                '  <span style="flex-shrink:0;">视频音量</span>' +
+                '  <input type="range" id="bgVideoVolRange" min="0" max="10" step="1" value="' + videoVol + '"' + (videoSoundOn ? '' : ' disabled') + ' oninput="window.__bgSetVideoVolume(this.value)" style="flex:1;min-width:0;">' +
+                '  <span id="bgVideoVolVal" style="min-width:40px;text-align:right;color:#ffd700;">' + videoVol + '/10</span>' +
+                '</div>') : '') +
                 '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.78rem;color:rgba(255,255,255,0.85);">' +
                 '  <span style="flex-shrink:0;">面板模糊</span>' +
                 '  <input type="range" id="bgBlurRange" min="0" max="100" step="1" value="' + blurVal + '" oninput="window.__bgSetBlur(this.value)" style="flex:1;min-width:0;">' +
@@ -974,6 +1166,7 @@
                     });
                 });
             } catch (e) {}
+            renderBgVideoThemes();
             // 悬浮窗拖拽（仅标题栏空白区拖动；按钮内点击不触发拖拽，避免关闭时窗体被拖走）
             try {
                 const hdr = document.getElementById('bgSettingsHeader');
@@ -1022,6 +1215,303 @@
         window.openBackgroundSettings = openBackgroundSettings;
         window.applyUserBackground = applyUserBackground;
         window.injectBackgroundMenu = injectBackgroundMenu;
+
+        // ===== 「🎬 内置视频」区渲染：清单拉取 → 封面本地缓存优先填充 =====
+        function renderBgVideoThemes() {
+            const wrap = document.getElementById('bgVideoThemeWrap');
+            const box = document.getElementById('bgVideoThemeList');
+            if (!wrap || !box) return;
+            bgRevokeVideoThemeThumbs();
+            const cur = (localStorage.getItem(BG_KEY) || '').trim();
+            bgThemesLoad().then(function (list) {
+                if (!wrap.isConnected) return; // 面板已关
+                if (!list || !list.length) { wrap.style.display = 'none'; return; }
+                wrap.style.display = 'block';
+                box.innerHTML = '';
+                const hidden = bgHiddenThemes();
+                list.forEach(function (t) {
+                    if (hidden.indexOf(t.id) >= 0) return;
+                    const active = cur === 'bvid:' + t.id;
+                    const div = document.createElement('div');
+                    div.style.cssText = 'position:relative;width:96px;text-align:center;';
+                    const btn = document.createElement('button');
+                    btn.setAttribute('data-bgvthumb', t.cover || '');
+                    btn.title = '点击切换到「' + String(t.name || '未命名').replace(/"/g, '') + '」';
+                    btn.style.cssText = 'width:96px;height:54px;border-radius:8px;border:2px solid ' + (active ? '#ffd700' : 'rgba(255,255,255,0.28)') + ';box-shadow:' + (active ? '0 0 10px rgba(255,215,0,0.55)' : 'none') + ';cursor:pointer;background:rgba(255,255,255,0.06) center/cover no-repeat;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.85);font-size:1.3rem;padding:0;';
+                    btn.innerHTML = '🎬';
+                    btn.onclick = function () { window.__bgApplyTheme(t.id); };
+                    div.appendChild(btn);
+                    const del = document.createElement('button');
+                    del.title = '删除';
+                    del.textContent = '✕';
+                    del.style.cssText = 'position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#e53935;border:none;color:#fff;font-size:0.66rem;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.5);';
+                    del.onclick = function () { window.__bgHideTheme(t.id); };
+                    div.appendChild(del);
+                    const cap = document.createElement('div');
+                    cap.style.cssText = 'font-size:0.6rem;color:' + (active ? '#ffd700' : 'rgba(255,255,255,0.55)') + ';margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+                    cap.textContent = (active ? '使用中 ' : '') + (t.name || '未命名');
+                    div.appendChild(cap);
+                    box.appendChild(div);
+                    if (t.cover) {
+                        bgAssetGet(t.cover).catch(function () { return null; }).then(function (blob) {
+                            if (!btn.isConnected) return;
+                            if (blob) { const bu = URL.createObjectURL(blob); bgVideoThemeThumbUrls.push(bu); btn.style.backgroundImage = 'url(' + bu + ')'; return; }
+                            fetch(t.cover).then(function (r) { return r.ok ? r.blob() : null; }).then(function (b) {
+                                if (!b || !btn.isConnected) return;
+                                const bu = URL.createObjectURL(b); bgVideoThemeThumbUrls.push(bu); btn.style.backgroundImage = 'url(' + bu + ')';
+                                bgAssetPut(t.cover, b).catch(function () {});
+                            }).catch(function () {});
+                        });
+                    }
+                });
+            });
+        }
+        function bgRevokeVideoThemeThumbs() {
+            try { bgVideoThemeThumbUrls.forEach(function (u) { URL.revokeObjectURL(u); }); } catch (e) {}
+            bgVideoThemeThumbUrls = [];
+        }
+        let bgVideoThemeThumbUrls = [];
+        // 应用内置视频主题
+        window.__bgApplyTheme = function (id) {
+            bgThemesLoad().then(function (list) {
+                const t = (list || []).find(function (x) { return x.id === id; });
+                if (!t) { try { if (typeof showToast === 'function') showToast('⚠️ 主题不存在或已下架'); } catch (e) {} return; }
+                localStorage.setItem(BG_KEY, 'bvid:' + id);
+                bgBuiltinVideoThemeId = id;
+                applyUserBackground();
+                try { if (typeof showToast === 'function') showToast('✅ 已应用「' + (t.name || '未命名') + '」，已缓存到本机'); } catch (e) {}
+                if (typeof renderBgImageList === 'function') renderBgImageList();
+            });
+        };
+        // 隐藏（本机不再显示）某个内置视频主题
+        window.__bgHideTheme = function (id) {
+            try {
+                if (!window.confirm('本机不再显示这个主题？（不影响其他用户，重新安装/清缓存可恢复）')) return;
+            } catch (e) { return; }
+            const list = bgHiddenThemes();
+            if (list.indexOf(id) < 0) list.push(id);
+            try { localStorage.setItem(BG_THEMES_HIDE_KEY, JSON.stringify(list)); } catch (e) {}
+            if ((localStorage.getItem(BG_KEY) || '').trim() === 'bvid:' + id) {
+                localStorage.setItem(BG_KEY, 'default');
+                applyUserBackground();
+            }
+            renderBgVideoThemes();
+        };
+        function bgHiddenThemes() {
+            try { return JSON.parse(localStorage.getItem(BG_THEMES_HIDE_KEY) || '[]'); } catch (e) { return []; }
+        }
+
+        // ===== 管理后台「背景主题上传」：视频/封面 → Gitee Releases；清单 → 公开 Gist =====
+        const GITEE_OWNER = 'dragon-soars-across-the-world_0';
+        const GITEE_REPO = 'tfjl-web';
+        const BG_THEMES_RELEASE_TAG = 'bg-themes';
+        const BG_THEMES_TOKEN_KEY = 'tfjl_gitee_token'; // 与皮肤打包（app-skinmaker.js）同键，复用
+        function giteeTok() { try { return localStorage.getItem(BG_THEMES_TOKEN_KEY) || ''; } catch (e) { return ''; } }
+        function giteeApiBase() { return 'https://gitee.com/api/v5/repos/' + GITEE_OWNER + '/' + GITEE_REPO; }
+        function giteeDlUrl(filename) { return 'https://gitee.com/' + GITEE_OWNER + '/' + GITEE_REPO + '/releases/download/' + BG_THEMES_RELEASE_TAG + '/' + filename; }
+        // 确保 bg-themes release 存在（没有则创建）
+        function giteeEnsureRelease(tok) {
+            return fetch(giteeApiBase() + '/releases?access_token=' + encodeURIComponent(tok) + '&per_page=100')
+                .then(function (r) { return r.json(); })
+                .then(function (list) {
+                    const rel = (list || []).find(function (x) { return x && x.tag_name === BG_THEMES_RELEASE_TAG; });
+                    if (rel) return rel;
+                    return fetch(giteeApiBase() + '/releases?access_token=' + encodeURIComponent(tok), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ tag_name: BG_THEMES_RELEASE_TAG, name: '背景主题视频库', target_commit_id: 'master' })
+                    }).then(function (r) { return r.json(); });
+                });
+        }
+        // 上传附件到指定 release（浏览器 FormData multipart）
+        function giteeUploadFile(tok, releaseId, file, filename) {
+            const fd = new FormData();
+            fd.append('file', file, filename);
+            return fetch(giteeApiBase() + '/releases/' + releaseId + '/attach_files?access_token=' + encodeURIComponent(tok), { method: 'POST', body: fd })
+                .then(function (r) { return r.json(); })
+                .then(function (j) { if (!j || j.error) throw new Error((j && j.error_description) || '上传失败'); return j; });
+        }
+        // 从视频中抓一帧当封面（用户不传封面时）
+        function bgGrabVideoFrame(file) {
+            return new Promise(function (res, rej) {
+                let v;
+                try { v = document.createElement('video'); } catch (e) { rej(e); return; }
+                v.muted = true; v.playsInline = true; v.preload = 'metadata';
+                const url = URL.createObjectURL(file);
+                const done = function (fn, arg) { try { URL.revokeObjectURL(url); } catch (e) {} fn(arg); };
+                v.onloadeddata = function () { try { v.currentTime = Math.min(1, (v.duration || 2) / 2); } catch (e) { done(rej, e); } };
+                v.onseeked = function () {
+                    try {
+                        const c = document.createElement('canvas');
+                        c.width = 480;
+                        c.height = Math.max(1, Math.round(480 * (v.videoHeight || 270) / (v.videoWidth || 480)));
+                        c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+                        c.toBlob(function (b) { if (b) done(res, b); else done(rej, new Error('封面抓帧失败')); }, 'image/jpeg', 0.72);
+                    } catch (e) { done(rej, e); }
+                };
+                v.onerror = function () { done(rej, new Error('视频解析失败')); };
+                v.src = url;
+            });
+        }
+        // 读/写主题清单 Gist（无 ID 时自动创建公开 Gist 并把 ID 存本机）
+        function bgThemesGistWrite(data) {
+            const tok = (typeof getGistToken === 'function') ? getGistToken() : '';
+            if (!tok) throw new Error('未读到 GitHub Token，无法写清单');
+            const gid = bgThemesGistId();
+            const content = JSON.stringify(data, null, 2);
+            if (gid) {
+                return fetch('https://api.github.com/gists/' + gid, {
+                    method: 'PATCH',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + tok },
+                    body: JSON.stringify({ files: { 'bg-themes.json': { content: content } } })
+                }).then(function (r) { if (!r.ok) throw new Error('清单更新失败 ' + r.status); return r.json(); });
+            }
+            return fetch('https://api.github.com/gists', {
+                method: 'POST',
+                headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + tok },
+                body: JSON.stringify({ description: 'tfjl-web 背景主题清单（自动创建）', public: true, files: { 'bg-themes.json': { content: content } } })
+            }).then(function (r) { if (!r.ok) throw new Error('清单创建失败 ' + r.status); return r.json(); })
+                .then(function (g) {
+                    try { localStorage.setItem(BG_THEMES_GIST_KEY, g.id); } catch (e) {}
+                    return g;
+                });
+        }
+        function bgToast(msg) { try { if (typeof showToast === 'function') showToast(msg); } catch (e) {} }
+        function bgEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
+        // 管理后台页面渲染
+        window.renderBgThemesAdmin = function () {
+            const body = document.getElementById('bgThemesAdminBody');
+            if (!body) return;
+            const gid = bgThemesGistId();
+            body.innerHTML =
+                '<div style="font-size:0.72rem;color:rgba(255,255,255,0.6);background:rgba(255,255,255,0.05);border-radius:6px;padding:8px;line-height:1.7;margin-bottom:12px;">' +
+                '上传后<b style="color:#ffd700;">所有人刷新页面即可看到</b>新主题；用户点应用后视频自动缓存到本机，断网也能播。<br>' +
+                '视频文件走 <b>Gitee Releases</b>（tag：' + BG_THEMES_RELEASE_TAG + '），清单走 <b>公开 Gist</b>；本页填的 Gitee Token 只存本机浏览器，不进仓库。' +
+                (gid ? ('<br>当前清单 Gist：<code style="color:#9ae6b4;">' + bgEsc(gid) + '</code>') : '<br>清单 Gist：<span style="color:#fbbf24;">未创建（首次上传自动创建）</span>') +
+                '</div>' +
+                '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:0.78rem;color:rgba(255,255,255,0.85);">' +
+                '  <span style="flex-shrink:0;">Gitee Token</span>' +
+                '  <input id="bgThemesGiteeToken" type="password" placeholder="粘贴 Gitee 私人令牌（projects 权限）" value="' + bgEsc(giteeTok()) + '" style="flex:1;min-width:0;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;font-size:0.75rem;">' +
+                '  <button class="admin-btn admin-btn-secondary" onclick="(function(){var v=document.getElementById(\'bgThemesGiteeToken\').value.trim();try{localStorage.setItem(\'' + BG_THEMES_TOKEN_KEY + '\',v);}catch(e){}bgToast(v?\'✅ Token 已保存到本机\':\'已清除\');})()" style="padding:6px 10px;font-size:0.75rem;white-space:nowrap;">保存</button>' +
+                '</div>' +
+                '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;">' +
+                '  <input id="bgThemeName" type="text" placeholder="主题名称（如：星空漫步）" style="flex:1;min-width:140px;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;font-size:0.8rem;">' +
+                '  <label style="padding:7px 12px;border-radius:8px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;cursor:pointer;font-size:0.78rem;white-space:nowrap;">🎬 选视频<input id="bgThemeVideoFile" type="file" accept="video/mp4,video/webm" style="display:none;"></label>' +
+                '  <label style="padding:7px 12px;border-radius:8px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;cursor:pointer;font-size:0.78rem;white-space:nowrap;">🖼️ 封面(可选)<input id="bgThemeCoverFile" type="file" accept="image/*" style="display:none;"></label>' +
+                '  <button class="admin-btn" onclick="window.__bgThemeUpload()" style="padding:7px 14px;font-size:0.8rem;font-weight:bold;white-space:nowrap;">☁ 上传并上架</button>' +
+                '</div>' +
+                '<div id="bgThemeUploadLog" style="font-size:0.72rem;color:rgba(255,255,255,0.55);margin-bottom:12px;min-height:1em;"></div>' +
+                '<div style="color:rgba(255,255,255,0.6);font-size:0.78rem;margin-bottom:8px;">📦 已上架主题（点「下架」仅从清单移除，Gitee 上的文件保留）</div>' +
+                '<div id="bgThemesAdminList" style="display:flex;flex-direction:column;gap:8px;"></div>';
+            renderBgThemesAdminList();
+        };
+        function renderBgThemesAdminList() {
+            const box = document.getElementById('bgThemesAdminList');
+            if (!box) return;
+            box.innerHTML = '<div style="font-size:0.75rem;color:rgba(255,255,255,0.4);">加载中…</div>';
+            bgThemesLoad(true).then(function (list) {
+                if (!box.isConnected) return;
+                if (!list.length) { box.innerHTML = '<div style="font-size:0.75rem;color:rgba(255,255,255,0.4);">还没有主题，上传第一个吧。</div>'; return; }
+                box.innerHTML = '';
+                list.slice().reverse().forEach(function (t) {
+                    const row = document.createElement('div');
+                    row.style.cssText = 'display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.05);border-radius:8px;padding:8px 10px;';
+                    const cover = document.createElement('div');
+                    cover.style.cssText = 'width:64px;height:36px;border-radius:4px;background:rgba(255,255,255,0.1) center/cover no-repeat;flex-shrink:0;';
+                    if (t.cover) { bgAssetGet(t.cover).catch(function () { return null; }).then(function (b) { if (b) cover.style.backgroundImage = 'url(' + URL.createObjectURL(b) + ')'; }); }
+                    row.appendChild(cover);
+                    const info = document.createElement('div');
+                    info.style.cssText = 'flex:1;min-width:0;font-size:0.75rem;color:rgba(255,255,255,0.85);line-height:1.5;';
+                    info.innerHTML = '<div style="font-weight:bold;">' + bgEsc(t.name || '未命名') + '</div>' +
+                        '<div style="color:rgba(255,255,255,0.45);font-size:0.68rem;word-break:break-all;">' + bgEsc(t.video || '') + '</div>' +
+                        '<div style="color:rgba(255,255,255,0.4);font-size:0.66rem;">' + (t.size ? (Math.round(t.size / 1048576) + ' MB') : '') + (t.ts ? ' · ' + new Date(t.ts).toLocaleString('zh-CN', { hour12: false }) : '') + '</div>';
+                    row.appendChild(info);
+                    const del = document.createElement('button');
+                    del.className = 'admin-btn admin-btn-secondary';
+                    del.textContent = '下架';
+                    del.style.cssText = 'padding:5px 10px;font-size:0.72rem;flex-shrink:0;';
+                    del.onclick = function () { window.__bgThemeRemove(t.id); };
+                    row.appendChild(del);
+                    box.appendChild(row);
+                });
+            });
+        }
+        // 上传并上架
+        window.__bgThemeUpload = function () {
+            const tok = (document.getElementById('bgThemesGiteeToken').value || '').trim();
+            try { localStorage.setItem(BG_THEMES_TOKEN_KEY, tok); } catch (e) {}
+            const name = (document.getElementById('bgThemeName').value || '').trim();
+            const vfile = document.getElementById('bgThemeVideoFile').files[0];
+            const cfile = document.getElementById('bgThemeCoverFile').files[0];
+            const log = function (m) { const el = document.getElementById('bgThemeUploadLog'); if (el) el.textContent = m; };
+            if (!tok) { bgToast('⚠️ 请先填写 Gitee Token'); return; }
+            if (!name) { bgToast('⚠️ 请填主题名称'); return; }
+            if (!vfile) { bgToast('⚠️ 请选择视频文件'); return; }
+            if (vfile.size > 100 * 1024 * 1024) { bgToast('⚠️ 视频超 100MB，请先压缩'); return; }
+            const gid0 = bgThemesGistId();
+            const themeId = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+            const vExt = (vfile.name.match(/\.(mp4|webm|mov)$/i) || ['.mp4'])[0].toLowerCase();
+            const vName = themeId + vExt;
+            (async function () {
+                log('① 检查 Gitee 发行版…');
+                const rel = await giteeEnsureRelease(tok);
+                const rid = rel && rel.id;
+                if (!rid) throw new Error('无法创建/获取 Gitee release（检查 Token 权限：projects）');
+                log('② 上传视频 ' + vfile.name + '（' + Math.round(vfile.size / 1048576) + 'MB）…');
+                await giteeUploadFile(tok, rid, vfile, vName);
+                let coverBlob = null, cName = '';
+                if (cfile) { coverBlob = cfile; cName = themeId + '.jpg'; }
+                else {
+                    log('③ 未传封面，从视频抓帧…');
+                    try { coverBlob = await bgGrabVideoFrame(vfile); cName = themeId + '.jpg'; } catch (e) { coverBlob = null; }
+                }
+                if (coverBlob) { log('④ 上传封面…'); await giteeUploadFile(tok, rid, coverBlob, cName); }
+                log(gid0 ? '⑤ 更新主题清单…' : '⑤ 创建主题清单 Gist…');
+                const ghTok = (typeof getGistToken === 'function') ? getGistToken() : '';
+                if (!ghTok) throw new Error('未读到 GitHub Token，无法写清单');
+                let data = { v: 1, themes: [] };
+                if (gid0) {
+                    const r = await fetch('https://api.github.com/gists/' + gid0, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': 'token ' + ghTok } });
+                    if (r.ok) { const g = await r.json(); const f = g.files && g.files['bg-themes.json']; if (f && f.content) { try { data = JSON.parse(f.content) || data; } catch (e) {} } }
+                }
+                if (!Array.isArray(data.themes)) data.themes = [];
+                const theme = { id: themeId, name: name, video: giteeDlUrl(vName), cover: coverBlob ? giteeDlUrl(cName) : '', size: vfile.size, ts: Date.now() };
+                data.themes.push(theme);
+                const g = await bgThemesGistWrite(data);
+                try { localStorage.removeItem(BG_THEMES_CACHE_KEY); } catch (e) {}
+                log('✅ 上架成功！所有人刷新页面即可在「🎬 内置视频」看到「' + name + '」' + (gid0 ? '' : '（新清单 Gist：' + g.id + '，建议把此 ID 回填到 app-effects.js 的 BG_THEMES_GIST_ID）'));
+                bgToast('✅ 主题「' + name + '」已上架');
+                document.getElementById('bgThemeName').value = '';
+                document.getElementById('bgThemeVideoFile').value = '';
+                document.getElementById('bgThemeCoverFile').value = '';
+                renderBgThemesAdminList();
+            })().catch(function (e) {
+                log('❌ 失败：' + (e && e.message ? e.message : e));
+                bgToast('❌ 上传失败：' + (e && e.message ? e.message : e));
+            });
+        };
+        // 下架（仅从清单移除）
+        window.__bgThemeRemove = function (id) {
+            if (!window.confirm('确定下架这个主题？（仅从清单移除，Gitee 上的文件保留）')) return;
+            const ghTok = (typeof getGistToken === 'function') ? getGistToken() : '';
+            const gid = bgThemesGistId();
+            if (!ghTok || !gid) { bgToast('❌ 缺少 Token 或清单 Gist'); return; }
+            fetch('https://api.github.com/gists/' + gid, { headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': 'token ' + ghTok } })
+                .then(function (r) { return r.json(); })
+                .then(function (g) {
+                    const f = g.files && g.files['bg-themes.json'];
+                    let data = { v: 1, themes: [] };
+                    if (f && f.content) { try { data = JSON.parse(f.content) || data; } catch (e) {} }
+                    data.themes = (data.themes || []).filter(function (t) { return t.id !== id; });
+                    return bgThemesGistWrite(data);
+                })
+                .then(function () {
+                    try { localStorage.removeItem(BG_THEMES_CACHE_KEY); } catch (e) {}
+                    bgToast('✅ 已下架');
+                    renderBgThemesAdminList();
+                })
+                .catch(function (e) { bgToast('❌ 下架失败：' + (e && e.message ? e.message : e)); });
+        };
 
         // ==================== 密码验证 ====================
         // 密码存储在localStorage中，支持管理员动态管理

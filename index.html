@@ -1773,6 +1773,11 @@
                         <span class="mi-emoji">🎨</span>
                         <div class="mi-text"><div class="mi-title">皮肤图鉴</div><div class="mi-sub">官方数据(内测)</div></div>
                     </div>
+                    <!-- 🔴 2026-10-29 背景主题上传：视频/封面上传 Gitee Releases，清单写公开 Gist，所有人刷新即见 -->
+                    <div class="admin-menu-item" data-key="bgThemes" onclick="adminShowPage('bgThemes')">
+                        <span class="mi-emoji">🎬</span>
+                        <div class="mi-text"><div class="mi-title">背景主题</div><div class="mi-sub">上传视频/封面到Gitee</div></div>
+                    </div>
 
                 </div>
                 <div id="adminSortEditBtn" style="display:flex;gap:8px;margin-top:8px;">
@@ -2521,6 +2526,16 @@
                     <h3 style="color:#ffd700;margin:0;font-size:1rem;">🧮 伤害测算计算器</h3>
                 </div>
                 <div class="admin-section" id="damageCalcContent" style="max-height:62vh;overflow:auto;"></div>
+            </div>
+
+            <!-- 🔴 2026-10-29 背景主题上传页（仅管理员）：视频+封面 → Gitee Releases；清单 → 公开 Gist -->
+            <div id="adminPageBgThemes" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🎬 背景主题上传</h3>
+                    <button class="admin-btn" onclick="renderBgThemesAdmin()" style="padding:6px 12px;font-size:0.8rem;margin-left:auto;">🔄 刷新列表</button>
+                </div>
+                <div id="bgThemesAdminBody"></div>
             </div>
 
             <div id="adminPageAnalytics" style="display:none;">

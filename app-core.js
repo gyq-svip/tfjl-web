@@ -30101,6 +30101,12 @@ ${maSection}
                     pageEl.style.display = 'block';
                     if (typeof renderDamageCalc === 'function') renderDamageCalc();
                 }
+            } else if (page === 'bgThemes') {
+                const pageEl = document.getElementById('adminPageBgThemes');
+                if (pageEl) {
+                    pageEl.style.display = 'block';
+                    if (typeof renderBgThemesAdmin === 'function') renderBgThemesAdmin();
+                }
             } else if (page === 'featureToggles') {
                 const pageEl = document.getElementById('adminPageFeatureToggles');
                 if (pageEl) {
