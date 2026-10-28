@@ -476,18 +476,24 @@
         const BG_THEMES_HIDE_KEY = 'TFJL_BG_THEMES_HIDE';
         const BG_THEMES_MANIFEST = 'bg-themes.json';
         const BG_THEMES_CACHE_KEY = 'TFJL_BG_THEMES_CACHE';
-        const BG_THEMES_GIST_CONF = 'bg-themes-gist.json';        // 仓库公开文件，存 {gistId}；零配置读取来源
+        const BG_THEMES_GIST_CONF = 'bg-themes-gist.json';        // 仓库公开文件，存 {gistId, owner}；零配置读取来源
         const BG_THEMES_GIST_OVERRIDE = 'tfjl_bg_gist_override'; // 本机覆盖（管理员自测用）
-        let _bgGistIdCache = null;
-        // 取清单 Gist ID：本机覆盖 > 仓库公开文件 > 空（尚未配置）
-        function bgThemesGistId() {
-            if (_bgGistIdCache !== null) return Promise.resolve(_bgGistIdCache);
-            try { const o = localStorage.getItem(BG_THEMES_GIST_OVERRIDE); if (o) { _bgGistIdCache = o; return Promise.resolve(o); } } catch (e) {}
+        const BG_THEMES_GIST_OWNER_OVERRIDE = 'tfjl_bg_gist_owner_override';
+        let _bgGistInfoCache = null;
+        // 取清单 Gist 信息 {id, owner}：本机覆盖 > 仓库公开文件 {gistId, owner} > 空（尚未配置）
+        function bgThemesGistInfo() {
+            if (_bgGistInfoCache) return Promise.resolve(_bgGistInfoCache);
+            const ov = bgLs(BG_THEMES_GIST_OVERRIDE);
+            if (ov) { _bgGistInfoCache = { id: ov, owner: bgLs(BG_THEMES_GIST_OWNER_OVERRIDE) }; return Promise.resolve(_bgGistInfoCache); }
             return fetch(new URL(BG_THEMES_GIST_CONF, location.href).href, { cache: 'no-cache' })
                 .then(function (r) { return r.ok ? r.json() : null; })
-                .then(function (j) { const id = (j && j.gistId) ? j.gistId : ''; _bgGistIdCache = id; return id; })
-                .catch(function () { _bgGistIdCache = ''; return ''; });
+                .then(function (j) {
+                    _bgGistInfoCache = { id: (j && j.gistId) ? j.gistId : '', owner: (j && j.owner) ? j.owner : '' };
+                    return _bgGistInfoCache;
+                })
+                .catch(function () { _bgGistInfoCache = { id: '', owner: '' }; return _bgGistInfoCache; });
         }
+        function bgThemesGistId() { return bgThemesGistInfo().then(function (i) { return i.id; }); }
         // 桌面端：本机未保存 Token 时，尝试从系统环境变量 GITEE_TOKEN 读取（复用用户曾设置的那个）
         let _bgEnvTokTried = false, _bgEnvTok = '';
         function bgGetEnvGiteeToken() {
@@ -509,16 +515,25 @@
                 return null;
             })();
             if (cached && !force) return Promise.resolve(cached.themes);
-            // 清单 bg-themes.json 托管在 GitHub Gist（公开可读，无需 token），用 gist ID 直接拉取：
-            //   https://api.github.com/gists/{id} -> files['bg-themes.json'].content
-            return bgThemesGistId().then(function (id) {
-                if (!id) return [];
-                return fetch('https://api.github.com/gists/' + encodeURIComponent(id), { cache: 'no-cache' })
+            // 清单 bg-themes.json 托管在公开 GitHub Gist（无需 token 即可读）。
+            // 优先走 raw CDN（gist.githubusercontent.com，不限流、CORS *）；缺 owner 时回退 API。
+            return bgThemesGistInfo().then(function (info) {
+                if (!info.id) return [];
+                const rawUrl = info.owner
+                    ? 'https://gist.githubusercontent.com/' + encodeURIComponent(info.owner) + '/' + encodeURIComponent(info.id) + '/raw/' + encodeURIComponent(BG_THEMES_MANIFEST)
+                    : '';
+                const target = rawUrl || ('https://api.github.com/gists/' + encodeURIComponent(info.id));
+                return fetch(target, { cache: 'no-cache' })
                     .then(function (r) { if (!r.ok) throw new Error('清单读取失败(HTTP ' + r.status + ')'); return r.json(); })
-                    .then(function (g) {
-                        const content = g && g.files && g.files[BG_THEMES_MANIFEST] && g.files[BG_THEMES_MANIFEST].content;
-                        let themes = [];
-                        if (content) { try { const j = JSON.parse(content); if (j && Array.isArray(j.themes)) themes = j.themes; } catch (e) {} }
+                    .then(function (j) {
+                        // raw：j 即清单对象；api：j.files['bg-themes.json'].content 是字符串
+                        let obj = null;
+                        if (rawUrl) obj = j;
+                        else {
+                            const c = j && j.files && j.files[BG_THEMES_MANIFEST] && j.files[BG_THEMES_MANIFEST].content;
+                            if (c) { try { obj = JSON.parse(c); } catch (e) {} }
+                        }
+                        const themes = (obj && Array.isArray(obj.themes)) ? obj.themes : [];
                         try { localStorage.setItem(BG_THEMES_CACHE_KEY, JSON.stringify({ ts: Date.now(), themes: themes })); } catch (e2) {}
                         return themes;
                     });
@@ -1469,8 +1484,10 @@
                 { 'bg-themes.json': { content: JSON.stringify({ v: 1, themes: [] }, null, 2) } },
                 'tfjl 背景主题清单', true
             ).then(function (g) {
+                const owner = (g && g.owner && g.owner.login) ? g.owner.login : '';
                 try { localStorage.setItem(BG_THEMES_GIST_OVERRIDE, g.id); } catch (e) {}
-                log('✅ 已创建 Gist：' + g.id + '（已存入本机覆盖）。请把它写进仓库 bg-themes-gist.json 的 gistId 字段并提交，所有人即可零配置读取。');
+                try { localStorage.setItem(BG_THEMES_GIST_OWNER_OVERRIDE, owner); } catch (e) {}
+                log('✅ 已创建 Gist：' + g.id + '（owner：' + (owner || '未知') + '，已存入本机覆盖）。请把 {"gistId":"' + g.id + '","owner":"' + owner + '"} 写进仓库 bg-themes-gist.json 并提交，所有人即可零配置读取。');
                 bgToast('✅ 清单 Gist 已创建：' + g.id);
                 window.renderBgThemesAdmin();
             }).catch(function (e) { log('❌ 创建失败：' + (e && e.message ? e.message : e)); bgToast('❌ 创建失败：' + (e && e.message ? e.message : e)); });
