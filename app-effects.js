@@ -578,17 +578,39 @@
         // 应用内置视频主题：优先 IndexedDB 本地缓存（首拉落盘后零网络），同时清理上一个内置视频缓存防爆盘
         let bgBuiltinVideoUrl = null;
         let bgBuiltinVideoThemeId = null;
+        // 检测本机能否解码 HEVC（无解码器时 canPlayType 返回空串）
+        let _bgHevcSupport = null;
+        function bgCanPlayHevc() {
+            if (_bgHevcSupport !== null) return _bgHevcSupport;
+            try {
+                const v = document.createElement('video');
+                const r = v.canPlayType('video/mp4; codecs="hvc1.1.6.L93.B0"') || v.canPlayType('video/mp4; codecs="hev1.1.6.L93.B0"');
+                _bgHevcSupport = (r === 'probably' || r === 'maybe');
+            } catch (e) { _bgHevcSupport = false; }
+            return _bgHevcSupport;
+        }
         function bgApplyBuiltinVideo(theme) {
             const vurl = theme && theme.video;
             if (!vurl) return Promise.reject(new Error('no url'));
             const themeId = theme && theme.id;
-            const applySrc = function (src) {
+            // 🟢 优先 HEVC 原片（无二次压缩、画质最好）；本机解不了则自动回退 H.264 兼容版
+            const preferHevc = !!(theme.videoHevc && bgCanPlayHevc());
+            const primary = preferHevc ? theme.videoHevc : vurl;
+            const applySrc = function (src, fallbackSrc) {
                 stopBgVideo();
                 bgBuiltinVideoUrl = src;
                 bgBuiltinVideoThemeId = themeId || null; // stopBgVideo 会清空，这里恢复标记（用于「使用中」高亮）
                 const v = ensureBgVideo();
                 bgApplyVideoSound(v);
                 v.__bgDecodeBad = false; // 新视频重置解码失败标记（ensureBgVideo 的守卫会在 metadata 到达时判定）
+                // 若这台设备其实解不了 HEVC（videoWidth=0），自动换 H.264 兼容版
+                const onMeta = function () {
+                    v.removeEventListener('loadedmetadata', onMeta);
+                    if ((!v.videoWidth || !v.videoHeight) && fallbackSrc && fallbackSrc !== src) {
+                        applySrc(fallbackSrc, '');
+                    }
+                };
+                v.addEventListener('loadedmetadata', onMeta);
                 v.src = src;
                 const p = v.play();
                 if (p && p.catch) p.catch(function () {
@@ -604,10 +626,10 @@
             };
             // 🔴 Gitee 不返回 CORS 头，fetch(vurl) 必被浏览器拦（Failed to fetch，即「下载不了」）。
             //    <video src> 直连不受 CORS 限制，故不再 fetch 下载；有本机缓存 blob 就优先用，否则直连播放。
-            return bgAssetGet(vurl).catch(function () { return null; }).then(function (blob) {
-                applySrc(blob ? URL.createObjectURL(blob) : vurl);
+            return bgAssetGet(primary).catch(function () { return null; }).then(function (blob) {
+                applySrc(blob ? URL.createObjectURL(blob) : primary, theme.video || '');
             }).catch(function (e) {
-                try { applySrc(vurl); } catch (e2) {}
+                try { applySrc(primary, theme.video || ''); } catch (e2) {}
                 try { if (typeof showToast === 'function') showToast('⚠️ 视频播放失败：' + (e && e.message ? e.message : '网络错误')); } catch (e2) {}
             });
         }
@@ -1551,8 +1573,13 @@
                 v.onerror = function () { finish(new Error('源视频无法解码（本机不支持该编码）')); };
                 v.onloadedmetadata = function () {
                     let mime = '';
-                    const cands = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1', 'video/mp4',
-                        'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+                    const cands = [
+                        'video/mp4;codecs=avc1.640028,mp4a.40.2', // H.264 High 4.0（压缩效率最好、同码率更清晰）
+                        'video/mp4;codecs=avc1.4D401F,mp4a.40.2', // Main 3.1
+                        'video/mp4;codecs=avc1.42E01E,mp4a.40.2', // Baseline 兜底
+                        'video/mp4;codecs=avc1', 'video/mp4',
+                        'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'
+                    ];
                     for (let i = 0; i < cands.length; i++) {
                         try { if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(cands[i])) { mime = cands[i]; break; } } catch (e) {}
                     }
@@ -1561,10 +1588,12 @@
                     try { stream = (typeof v.captureStream === 'function') ? v.captureStream() : (typeof v.mozCaptureStream === 'function' ? v.mozCaptureStream() : null); } catch (e) { stream = null; }
                     if (!stream) { finish(new Error('无法捕获视频流')); return; }
                     let rec;
-                    // 码率跟随源文件（约等于源 bitrate，限制 1~4Mbps）：避免 2 分钟视频被固定 4Mbps 转成 60MB
+                    // 画质优先：按分辨率给足码率（H.264 比 HEVC 需要更多码率才能同画质），避免颗粒/方块
+                    const px = (v.videoWidth || 0) * (v.videoHeight || 0);
+                    const floor = px >= 1920 * 1080 ? 8000000 : (px >= 1280 * 720 ? 6000000 : 5000000);
                     const srcBps = (v.duration && v.duration > 0) ? (file.size * 8 / v.duration) : 2000000;
-                    const bps = Math.max(1000000, Math.min(4000000, Math.round(srcBps)));
-                    try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: bps }); } catch (e) { finish(new Error('创建转码器失败')); return; }
+                    const bps = Math.max(floor, Math.min(12000000, Math.round(srcBps * 3)));
+                    try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: bps, audioBitsPerSecond: 128000 }); } catch (e) { finish(new Error('创建转码器失败')); return; }
                     const chunks = [];
                     rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
                     rec.onerror = function (e) { finish(new Error('转码失败：' + ((e && e.error && e.error.message) || '未知'))); };
@@ -1808,8 +1837,10 @@
                     if (probe.reason === 'error') throw new Error('视频解析失败，请换一个文件或重新导出');
                     throw new Error('视频检测超时，请重试');
                 }
-                let upFile = vfile, upCodec = codec.codec;
+                let upFile = vfile, upCodec = codec.codec, hevcName = '';
                 if (codec.hevc) {
+                    // 保留原始 HEVC 原片：本机能解码的设备直接播原片（画质最好、无二次压缩）
+                    hevcName = themeId + '_h' + ((vfile.name.match(/\.(mp4|mov)$/i) || ['.mp4'])[0].toLowerCase());
                     log('⓪ 检测到 H.265/HEVC，正在自动转码为 H.264…（实时转码，约需视频时长）');
                     const tr = await bgTranscodeToH264(vfile, function (p) {
                         log('⓪ 转码中… ' + Math.round(p * 100) + '%（实时转码，约需视频时长，请勿关闭页面）');
@@ -1823,6 +1854,10 @@
                 const rel = await giteeEnsureRelease(tok);
                 const rid = rel && rel.id;
                 if (!rid) throw new Error('无法创建/获取 Gitee release（检查 Token 权限：projects）');
+                if (hevcName) {
+                    log('② 上传 HEVC 原片（' + Math.round(vfile.size / 1048576) + 'MB）…');
+                    await giteeUploadFile(tok, rid, vfile, hevcName);
+                }
                 log('② 上传视频 ' + upFile.name + '（' + Math.round(upFile.size / 1048576) + 'MB）…');
                 await giteeUploadFile(tok, rid, upFile, vName);
                 let coverBlob = null, cName = '';
@@ -1834,7 +1869,7 @@
                 if (coverBlob) { log('④ 上传封面…'); await giteeUploadFile(tok, rid, coverBlob, cName); }
                 log('⑤ 读取并更新主题清单（GitHub Gist）…');
                 const m = await bgManifestLoad(true).catch(function () { return bgNormalizeManifest(null); });
-                const theme = { id: themeId, name: name, video: giteeDlUrl(vName), cover: coverBlob ? giteeDlUrl(cName) : '', size: upFile.size, ts: Date.now(), codec: upCodec };
+                const theme = { id: themeId, name: name, video: giteeDlUrl(vName), videoHevc: hevcName ? giteeDlUrl(hevcName) : '', cover: coverBlob ? giteeDlUrl(cName) : '', size: upFile.size, ts: Date.now(), codec: upCodec };
                 m.themes.push(theme);
                 await bgManifestWrite(m);
                 try { localStorage.removeItem(BG_THEMES_CACHE_KEY); } catch (e) {}
