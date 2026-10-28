@@ -496,6 +496,8 @@
         const BG_THEMES_GIST_OVERRIDE = 'tfjl_bg_gist_override'; // 本机覆盖（管理员自测用）
         const BG_THEMES_GIST_OWNER_OVERRIDE = 'tfjl_bg_gist_owner_override';
         let _bgGistInfoCache = null;
+        let _bgDefaultBg = ''; // 清单里配置的默认背景（如 bvid:<id> / builtin:<url>），应用背景时优先
+        let _bgDefPreloadTried = false; // 首启无清单缓存时，异步补拉默认背景只做一次
         // 取清单 Gist 信息 {id, owner}：本机覆盖 > 仓库公开文件 {gistId, owner} > 空（尚未配置）
         function bgThemesGistInfo() {
             if (_bgGistInfoCache) return Promise.resolve(_bgGistInfoCache);
@@ -529,8 +531,18 @@
                 v: obj.v || 1,
                 themes: Array.isArray(obj.themes) ? obj.themes : [],
                 statics: Array.isArray(obj.statics) ? obj.statics : [],
-                staticsRemoved: Array.isArray(obj.staticsRemoved) ? obj.staticsRemoved : []
+                staticsRemoved: Array.isArray(obj.staticsRemoved) ? obj.staticsRemoved : [],
+                defaultBg: (typeof obj.defaultBg === 'string') ? obj.defaultBg : ''
             };
+        }
+        // 同步取默认背景：优先内存，其次本机清单缓存（首启无缓存时返回空，由异步预加载补上）
+        function bgDefaultBgSync() {
+            if (_bgDefaultBg) return _bgDefaultBg;
+            try {
+                const c = JSON.parse(localStorage.getItem(BG_THEMES_CACHE_KEY) || 'null');
+                if (c && typeof c.defaultBg === 'string') return c.defaultBg;
+            } catch (e) {}
+            return '';
         }
         function bgManifestLoad(force) {
             const cached = (function () {
@@ -540,11 +552,11 @@
                 } catch (e) {}
                 return null;
             })();
-            if (cached && !force) return Promise.resolve(bgNormalizeManifest(cached));
+            if (cached && !force) { const m0 = bgNormalizeManifest(cached); _bgDefaultBg = m0.defaultBg; return Promise.resolve(m0); }
             // 清单 bg-themes.json 托管在 GitHub Gist。走 API + 站点注入的 GitHub Token（每个用户页面都带），
             // 认证请求额度 5000/h，不会像匿名请求那样被 60/h 限流；比 raw CDN 更快（用户实测/明确要求）。
             return bgThemesGistInfo().then(function (info) {
-                if (!info.id) return bgNormalizeManifest(null);
+                if (!info.id) { _bgDefaultBg = ''; return bgNormalizeManifest(null); }
                 const tok = (window.AllianceDB && typeof window.AllianceDB.ghToken === 'function') ? window.AllianceDB.ghToken() : '';
                 const headers = { 'Accept': 'application/vnd.github.v3+json' };
                 if (tok) headers['Authorization'] = 'token ' + tok;
@@ -555,11 +567,12 @@
                         let obj = null;
                         if (c) { try { obj = JSON.parse(c); } catch (e) {} }
                         const m = bgNormalizeManifest(obj);
+                        _bgDefaultBg = m.defaultBg;
                         try { localStorage.setItem(BG_THEMES_CACHE_KEY, JSON.stringify(Object.assign({ ts: Date.now() }, m))); } catch (e2) {}
                         return m;
                     });
             })
-            .catch(function () { return bgNormalizeManifest(cached); });
+            .catch(function () { const m2 = bgNormalizeManifest(cached); _bgDefaultBg = m2.defaultBg; return m2; });
         }
         function bgThemesLoad(force) { return bgManifestLoad(force).then(function (m) { return m.themes; }); }
         // 应用内置视频主题：优先 IndexedDB 本地缓存（首拉落盘后零网络），同时清理上一个内置视频缓存防爆盘
@@ -841,20 +854,33 @@
             layer.style.background = '';
             layer.style.backgroundImage = '';
             layer.style.backgroundAttachment = '';
-            const val = (localStorage.getItem(BG_KEY) || '').trim();
+            let val = (localStorage.getItem(BG_KEY) || '').trim();
             if (!val || val === 'default') {
-                // 🔴 2026-09-18 默认背景改为内置「美女2」；用户自己改过背景后存了各自值，不再走到这里。
-                //    「↺ 恢复默认」按钮 = 回到这张图。若用户已删除该内置图，则回退深色渐变。
-                bgRevokeUrl(); stopBgVideo();
-                const girl2Gone = (typeof bgHiddenBuiltins === 'function' && bgHiddenBuiltins().indexOf('bg/bg-girl2.jpg') >= 0);
-                if (!girl2Gone) {
-                    // 🔴 2026-09-20 走本地缓存（首拉落盘后永久本地读取，不再每次启动都远端拉取）
-                    bgApplyAsset('bg/bg-girl2.jpg');
+                // 🟢 管理员在清单里配置的默认背景优先（bvid:<视频主题> / builtin:<图片URL>）
+                const def = bgDefaultBgSync();
+                if (def) {
+                    val = def;
                 } else {
-                    bgRevokeBuiltinUrl();
+                    // 首启无清单缓存：异步补拉一次，拿到默认背景后自动重应用（用户未自定义背景时）
+                    if (!_bgDefPreloadTried) {
+                        _bgDefPreloadTried = true;
+                        bgManifestLoad().then(function (m) {
+                            const cur = (localStorage.getItem(BG_KEY) || '').trim();
+                            if ((!cur || cur === 'default') && m && m.defaultBg) applyUserBackground();
+                        }).catch(function () {});
+                    }
+                    // 回退旧默认：内置「美女2」；用户自己改过背景后存了各自值，不再走到这里。
+                    bgRevokeUrl(); stopBgVideo();
+                    const girl2Gone = (typeof bgHiddenBuiltins === 'function' && bgHiddenBuiltins().indexOf('bg/bg-girl2.jpg') >= 0);
+                    if (!girl2Gone) {
+                        // 走本地缓存（首拉落盘后永久本地读取，不再每次启动都远端拉取）
+                        bgApplyAsset('bg/bg-girl2.jpg');
+                    } else {
+                        bgRevokeBuiltinUrl();
+                    }
+                    applyBgBlur();
+                    return;
                 }
-                applyBgBlur();
-                return;
             }
             if (val.indexOf('builtin:') !== 0) bgRevokeBuiltinUrl(); // 离开内置图 → 释放其本地 blob
             const isBvid = val.indexOf('bvid:') === 0;
@@ -1326,7 +1352,9 @@
             if (!wrap || !box) return;
             bgRevokeVideoThemeThumbs();
             const cur = (localStorage.getItem(BG_KEY) || '').trim();
-            bgThemesLoad().then(function (list) {
+            bgManifestLoad().then(function (m) {
+                const list = m.themes || [];
+                const defRef = m.defaultBg || '';
                 if (!wrap.isConnected) return; // 面板已关
                 if (!list || !list.length) { wrap.style.display = 'none'; return; }
                 wrap.style.display = 'block';
@@ -1352,7 +1380,7 @@
                     div.appendChild(del);
                     const cap = document.createElement('div');
                     cap.style.cssText = 'font-size:0.6rem;color:' + (active ? '#ffd700' : 'rgba(255,255,255,0.55)') + ';margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-                    cap.textContent = (active ? '使用中 ' : '') + (t.name || '未命名');
+                    cap.textContent = (active ? '使用中 ' : '') + (t.name || '未命名') + (('bvid:' + t.id) === defRef ? ' · 默认' : '');
                     div.appendChild(cap);
                     box.appendChild(div);
                     if (t.cover) {
@@ -1524,7 +1552,10 @@
                     try { stream = (typeof v.captureStream === 'function') ? v.captureStream() : (typeof v.mozCaptureStream === 'function' ? v.mozCaptureStream() : null); } catch (e) { stream = null; }
                     if (!stream) { finish(new Error('无法捕获视频流')); return; }
                     let rec;
-                    try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4000000 }); } catch (e) { finish(new Error('创建转码器失败')); return; }
+                    // 码率跟随源文件（约等于源 bitrate，限制 1~4Mbps）：避免 2 分钟视频被固定 4Mbps 转成 60MB
+                    const srcBps = (v.duration && v.duration > 0) ? (file.size * 8 / v.duration) : 2000000;
+                    const bps = Math.max(1000000, Math.min(4000000, Math.round(srcBps)));
+                    try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: bps }); } catch (e) { finish(new Error('创建转码器失败')); return; }
                     const chunks = [];
                     rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
                     rec.onerror = function (e) { finish(new Error('转码失败：' + ((e && e.error && e.error.message) || '未知'))); };
@@ -1709,7 +1740,8 @@
             const box = document.getElementById('bgThemesAdminList');
             if (!box) return;
             box.innerHTML = '<div style="font-size:0.75rem;color:rgba(255,255,255,0.4);">加载中…</div>';
-            bgThemesLoad(true).then(function (list) {
+            bgManifestLoad(true).then(function (m) {
+                const list = m.themes || [];
                 if (!box.isConnected) return;
                 if (!list.length) { box.innerHTML = '<div style="font-size:0.75rem;color:rgba(255,255,255,0.4);">还没有主题，上传第一个吧。</div>'; return; }
                 box.innerHTML = '';
@@ -1722,10 +1754,18 @@
                     row.appendChild(cover);
                     const info = document.createElement('div');
                     info.style.cssText = 'flex:1;min-width:0;font-size:0.75rem;color:rgba(255,255,255,0.85);line-height:1.5;';
-                    info.innerHTML = '<div style="font-weight:bold;">' + bgEsc(t.name || '未命名') + '</div>' +
+                    info.innerHTML = '<div style="font-weight:bold;">' + bgEsc(t.name || '未命名') + (m.defaultBg === 'bvid:' + t.id ? ' <span style="color:#ffd700;font-size:0.64rem;">默认</span>' : '') + '</div>' +
                         '<div style="color:rgba(255,255,255,0.45);font-size:0.68rem;word-break:break-all;">' + bgEsc(t.video || '') + '</div>' +
                         '<div style="color:rgba(255,255,255,0.4);font-size:0.66rem;">' + (t.size ? (Math.round(t.size / 1048576) + ' MB') : '') + (t.ts ? ' · ' + new Date(t.ts).toLocaleString('zh-CN', { hour12: false }) : '') + (t.codec ? ' · <b style="color:' + (t.codec === 'hevc' ? '#f87171' : '#9ae6b4') + ';">' + (t.codec === 'h264' ? 'H.264' : t.codec === 'hevc' ? 'HEVC(部分电脑不支持)' : t.codec.toUpperCase()) + '</b>' : '') + '</div>';
                     row.appendChild(info);
+                    const defRef = 'bvid:' + t.id;
+                    const isDef = (m.defaultBg === defRef);
+                    const defBtn = document.createElement('button');
+                    defBtn.className = 'admin-btn admin-btn-secondary';
+                    defBtn.textContent = isDef ? '取消默认' : '设为默认';
+                    defBtn.style.cssText = 'padding:5px 10px;font-size:0.72rem;flex-shrink:0;' + (isDef ? 'color:#ffd700;' : '');
+                    defBtn.onclick = function () { window.__bgSetDefault(defRef); };
+                    row.appendChild(defBtn);
                     const del = document.createElement('button');
                     del.className = 'admin-btn admin-btn-secondary';
                     del.textContent = '下架';
@@ -1893,6 +1933,25 @@
                 renderBgStaticAdminList();
             }).catch(function (e) { bgToast('❌ 恢复失败：' + (e && e.message ? e.message : e)); });
         };
+        // 设为/取消默认背景：ref = 'bvid:<视频主题id>' 或 'builtin:<图片URL>'
+        window.__bgSetDefault = function (ref) {
+            if (!ref) return;
+            bgManifestLoad(true).then(function (m) {
+                m.defaultBg = (m.defaultBg === ref) ? '' : ref;
+                return bgManifestWrite(m);
+            }).then(function () {
+                try { localStorage.removeItem(BG_THEMES_CACHE_KEY); } catch (e) {}
+                return bgManifestLoad(true);
+            }).then(function (m) {
+                _bgDefaultBg = m.defaultBg || '';
+                bgToast(m.defaultBg ? '✅ 已设为默认背景' : '已取消默认背景');
+                renderBgThemesAdminList();
+                renderBgStaticAdminList();
+                // 当前就是默认背景的用户，立刻切换
+                const cur = (localStorage.getItem(BG_KEY) || '').trim();
+                if (!cur || cur === 'default') applyUserBackground();
+            }).catch(function (e) { bgToast('❌ 设置失败：' + (e && e.message ? e.message : e)); });
+        };
         function renderBgStaticAdminList() {
             const box = document.getElementById('bgStaticAdminList');
             if (!box) return;
@@ -1915,10 +1974,21 @@
                     const info = document.createElement('div');
                     info.style.cssText = 'flex:1;min-width:0;font-size:0.72rem;color:rgba(255,255,255,0.85);line-height:1.45;';
                     info.innerHTML = '<div style="font-weight:bold;">' + bgEsc(r.name || '未命名') + (r.kind === 'builtin' ? ' <span style="color:rgba(255,255,255,0.4);font-size:0.64rem;">内置</span>' : '') +
-                        (r.removed ? ' <span style="color:#f87171;font-size:0.64rem;">已删</span>' : '') + '</div>' +
+                        (r.removed ? ' <span style="color:#f87171;font-size:0.64rem;">已删</span>' : '') +
+                        (m.defaultBg === 'builtin:' + r.url ? ' <span style="color:#ffd700;font-size:0.64rem;">默认</span>' : '') + '</div>' +
                         '<div style="color:rgba(255,255,255,0.4);font-size:0.62rem;word-break:break-all;">' + bgEsc(r.url || '') + '</div>' +
                         (r.size ? '<div style="color:rgba(255,255,255,0.35);font-size:0.62rem;">' + Math.round(r.size / 1024) + ' KB' + (r.ts ? ' · ' + new Date(r.ts).toLocaleString('zh-CN', { hour12: false }) : '') + '</div>' : '');
                     row.appendChild(info);
+                    if (!r.removed && r.url) {
+                        const defRef = 'builtin:' + r.url;
+                        const isDef = (m.defaultBg === defRef);
+                        const dbtn = document.createElement('button');
+                        dbtn.className = 'admin-btn admin-btn-secondary';
+                        dbtn.textContent = isDef ? '取消默认' : '设为默认';
+                        dbtn.style.cssText = 'padding:4px 9px;font-size:0.7rem;flex-shrink:0;' + (isDef ? 'color:#ffd700;' : '');
+                        dbtn.onclick = function () { window.__bgSetDefault(defRef); };
+                        row.appendChild(dbtn);
+                    }
                     const btn = document.createElement('button');
                     btn.className = 'admin-btn admin-btn-secondary';
                     btn.style.cssText = 'padding:4px 9px;font-size:0.7rem;flex-shrink:0;';
