@@ -897,7 +897,16 @@
                 } else {
                     bgThemesLoad().then(function (list) {
                         const t = (list || []).find(function (x) { return x.id === tid; });
-                        if (!t) { try { if (typeof showToast === 'function') showToast('⚠️ 该主题不存在或已下架'); } catch (e) {} return; }
+                        if (!t) {
+                            // 默认主题被下架/删除：回退旧默认图（美女2），避免背景空白；同时清掉失效的默认值
+                            try { if (typeof showToast === 'function') showToast('⚠️ 默认背景主题已下架，已回退默认图'); } catch (e) {}
+                            _bgDefaultBg = '';
+                            bgRevokeUrl(); stopBgVideo();
+                            const girl2Gone = (typeof bgHiddenBuiltins === 'function' && bgHiddenBuiltins().indexOf('bg/bg-girl2.jpg') >= 0);
+                            if (!girl2Gone) bgApplyAsset('bg/bg-girl2.jpg'); else bgRevokeBuiltinUrl();
+                            applyBgBlur();
+                            return;
+                        }
                         bgBuiltinVideoThemeId = tid;
                         bgApplyBuiltinVideo(t).catch(function () {});
                     });
@@ -1846,6 +1855,8 @@
             if (!window.confirm('确定下架这个主题？（仅从清单移除，Gitee 上的文件保留）')) return;
             bgManifestLoad(true).then(function (m) {
                 m.themes = (m.themes || []).filter(function (t) { return t.id !== id; });
+                // 下架的正好是默认背景 → 清掉 defaultBg，避免指向不存在的主题
+                if (m.defaultBg === 'bvid:' + id) { m.defaultBg = ''; _bgDefaultBg = ''; }
                 return bgManifestWrite(m);
             }).then(function () {
                 try { localStorage.removeItem(BG_THEMES_CACHE_KEY); } catch (e) {}
@@ -1903,6 +1914,8 @@
         window.__bgStaticRemove = function (id) {
             if (!window.confirm('确定删除这个静态背景图？（仅从清单移除，Gitee 文件保留）')) return;
             bgManifestLoad(true).then(function (m) {
+                const rm = (m.statics || []).find(function (s) { return s.id === id; });
+                if (rm && m.defaultBg === 'builtin:' + rm.url) { m.defaultBg = ''; _bgDefaultBg = ''; }
                 m.statics = (m.statics || []).filter(function (s) { return s.id !== id; });
                 return bgManifestWrite(m);
             }).then(function () {
@@ -1916,6 +1929,7 @@
             bgManifestLoad(true).then(function (m) {
                 m.staticsRemoved = Array.isArray(m.staticsRemoved) ? m.staticsRemoved : [];
                 if (m.staticsRemoved.indexOf(url) < 0) m.staticsRemoved.push(url);
+                if (m.defaultBg === 'builtin:' + url) { m.defaultBg = ''; _bgDefaultBg = ''; }
                 return bgManifestWrite(m);
             }).then(function () {
                 try { localStorage.removeItem(BG_THEMES_CACHE_KEY); } catch (e) {}
