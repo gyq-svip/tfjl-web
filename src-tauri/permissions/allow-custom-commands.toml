@@ -222,3 +222,8 @@ commands.allow = ["gm_focus_window"]
 identifier = "allow-gm-wheel"
 description = "Allow frontend-driven mouse wheel primitive at a window-frame pixel point (used by deepsea auto-capture auto-scroll; bg=PostMessage to window, real=SetCursorPos+mouse_event)"
 commands.allow = ["gm_wheel"]
+
+[[permission]]
+identifier = "allow-get-gitee-token-env"
+description = "Allow reading the system env var GITEE_TOKEN so the bg-theme upload page can auto-fill it on desktop (no manual paste)"
+commands.allow = ["get_gitee_token_env"]

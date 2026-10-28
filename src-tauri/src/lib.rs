@@ -802,6 +802,13 @@ fn prepackage_skins() -> Result<String, String> {
     run_ps(repo, "publish_skins.ps1", &["-SkipUpload"])
 }
 
+/// 读取系统环境变量 GITEE_TOKEN（皮肤发布脚本 publish_skins.ps1 同款回退来源）。
+/// 背景主题上传页用它自动回填 Token，桌面端用户无需手动粘贴。
+#[tauri::command]
+fn get_gitee_token_env() -> String {
+    std::env::var("GITEE_TOKEN").unwrap_or_default()
+}
+
 /// 自增前端版本号（sw.js 的 CACHE_VERSION）
 /// 🔴 2026-09-21 修「小版本不自动 +1（皮肤制作一键推送 → 版本号自增跳过）」：
 ///    ① index.html 的 versionTag 本地现在是占位符 **`dev`**（真实版本号由 app-picker.js 启动后从
@@ -3414,6 +3421,7 @@ pub fn run() {
             download_installer,
             publish_skins,
             prepackage_skins,
+            get_gitee_token_env,
             find_game_windows,
             capture_window_region,
             speak_text,

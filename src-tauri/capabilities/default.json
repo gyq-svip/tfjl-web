@@ -58,6 +58,7 @@
     "allow-gm-click",
     "allow-gm-swipe",
     "allow-gm-wheel",
+    "allow-get-gitee-token-env",
     "allow-gm-type",
     "allow-gm-key",
     "allow-gm-focus-window",
