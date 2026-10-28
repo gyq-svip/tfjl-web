@@ -475,11 +475,32 @@
         // 同时把 ID 回填到下方 BG_THEMES_GIST_ID 常量（新用户直接可用）。
         const BG_THEMES_GIST_KEY = 'TFJL_BG_THEMES_GIST_ID';
         const BG_THEMES_HIDE_KEY = 'TFJL_BG_THEMES_HIDE';
-        const BG_THEMES_GIST_ID = ''; // 例：'a45529be...'（创建后由管理员回填）
+        const BG_THEMES_GIST_ID = ''; // 例：'a45529be...'（创建后由管理员回填；现已优先改用仓库内 bg-themes-gist.json 公开文件，全用户零配置可读）
         const BG_THEMES_FILE = 'bg-themes.json';
         const BG_THEMES_CACHE_KEY = 'TFJL_BG_THEMES_CACHE';
+        // 仓库内公开文件（随 Pages 发布）：写入默认清单 Gist ID，使新用户零本地配置即可见内置视频
+        const BG_THEMES_GIST_FILE = 'bg-themes-gist.json';
+        const BG_THEMES_GIST_DEFAULT_KEY = 'TFJL_BG_THEMES_GIST_DEFAULT';
+        let _bgThemesGistBootstrapped = false;
+        function bgThemesGistBootstrap() {
+            if (_bgThemesGistBootstrapped) return Promise.resolve();
+            _bgThemesGistBootstrapped = true;
+            return fetch(BG_THEMES_GIST_FILE, { cache: 'no-cache' })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (j) {
+                    const id = j && typeof j.gist === 'string' ? j.gist.trim() : '';
+                    if (id) { try { localStorage.setItem(BG_THEMES_GIST_DEFAULT_KEY, id); } catch (e) {} }
+                })
+                .catch(function () {});
+        }
         function bgThemesGistId() {
-            try { return localStorage.getItem(BG_THEMES_GIST_KEY) || BG_THEMES_GIST_ID; } catch (e) { return BG_THEMES_GIST_ID; }
+            try {
+                const ov = localStorage.getItem(BG_THEMES_GIST_KEY);
+                if (ov) return ov;                       // 管理员本机显式覆盖优先
+                const def = localStorage.getItem(BG_THEMES_GIST_DEFAULT_KEY);
+                if (def) return def;                    // 仓库公开文件下发的默认 ID（新用户零配置）
+            } catch (e) {}
+            return BG_THEMES_GIST_ID;
         }
         // 拉取内置视频清单：优先 1 小时内的本地缓存；失败回退旧缓存；彻底失败返回空数组
         function bgThemesLoad(force) {
@@ -491,19 +512,21 @@
                 return null;
             })();
             if (cached && !force) return Promise.resolve(cached.themes);
-            const gid = bgThemesGistId();
-            if (!gid) return Promise.resolve((cached && cached.themes) || []);
-            return fetch('https://api.github.com/gists/' + gid, { headers: { 'Accept': 'application/vnd.github.v3+json' } })
-                .then(function (r) { return r.ok ? r.json() : null; })
-                .then(function (g) {
-                    const f = g && g.files && g.files[BG_THEMES_FILE];
-                    if (!f || !f.content) throw new Error('no file');
-                    const parsed = JSON.parse(f.content);
-                    const themes = Array.isArray(parsed.themes) ? parsed.themes : [];
-                    try { localStorage.setItem(BG_THEMES_CACHE_KEY, JSON.stringify({ ts: Date.now(), themes: themes })); } catch (e) {}
-                    return themes;
-                })
-                .catch(function () { return (cached && cached.themes) || []; });
+            return bgThemesGistBootstrap().then(function () {
+                const gid = bgThemesGistId();
+                if (!gid) return (cached && cached.themes) || [];
+                return fetch('https://api.github.com/gists/' + gid, { headers: { 'Accept': 'application/vnd.github.v3+json' } })
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (g) {
+                        const f = g && g.files && g.files[BG_THEMES_FILE];
+                        if (!f || !f.content) throw new Error('no file');
+                        const parsed = JSON.parse(f.content);
+                        const themes = Array.isArray(parsed.themes) ? parsed.themes : [];
+                        try { localStorage.setItem(BG_THEMES_CACHE_KEY, JSON.stringify({ ts: Date.now(), themes: themes })); } catch (e) {}
+                        return themes;
+                    })
+                    .catch(function () { return (cached && cached.themes) || []; });
+            });
         }
         // 应用内置视频主题：优先 IndexedDB 本地缓存（首拉落盘后零网络），同时清理上一个内置视频缓存防爆盘
         let bgBuiltinVideoUrl = null;
@@ -1382,6 +1405,7 @@
         window.renderBgThemesAdmin = function () {
             const body = document.getElementById('bgThemesAdminBody');
             if (!body) return;
+            bgThemesGistBootstrap().then(function () {
             const gid = bgThemesGistId();
             body.innerHTML =
                 '<div style="font-size:0.72rem;color:rgba(255,255,255,0.6);background:rgba(255,255,255,0.05);border-radius:6px;padding:8px;line-height:1.7;margin-bottom:12px;">' +
@@ -1404,6 +1428,7 @@
                 '<div style="color:rgba(255,255,255,0.6);font-size:0.78rem;margin-bottom:8px;">📦 已上架主题（点「下架」仅从清单移除，Gitee 上的文件保留）</div>' +
                 '<div id="bgThemesAdminList" style="display:flex;flex-direction:column;gap:8px;"></div>';
             renderBgThemesAdminList();
+            });
         };
         function renderBgThemesAdminList() {
             const box = document.getElementById('bgThemesAdminList');
@@ -1448,11 +1473,12 @@
             if (!name) { bgToast('⚠️ 请填主题名称'); return; }
             if (!vfile) { bgToast('⚠️ 请选择视频文件'); return; }
             if (vfile.size > 100 * 1024 * 1024) { bgToast('⚠️ 视频超 100MB，请先压缩'); return; }
-            const gid0 = bgThemesGistId();
             const themeId = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
             const vExt = (vfile.name.match(/\.(mp4|webm|mov)$/i) || ['.mp4'])[0].toLowerCase();
             const vName = themeId + vExt;
             (async function () {
+                await bgThemesGistBootstrap();
+                const gid0 = bgThemesGistId();
                 log('① 检查 Gitee 发行版…');
                 const rel = await giteeEnsureRelease(tok);
                 const rid = rel && rel.id;

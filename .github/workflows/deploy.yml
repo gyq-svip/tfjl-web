@@ -51,6 +51,8 @@ jobs:
           cp -v updater.json version.json welcome.json _site/ 2>/dev/null || true
           # 皮肤包索引（客户端据此得知当前有效包名，再从 Gitee 发行版拉取对应皮肤包）
           cp -v skins-index.json _site/ 2>/dev/null || true
+          # 🔴 内置视频主题清单 Gist ID 公开文件（新用户零配置即可见「🎬 内置视频」；漏拷会 404，回退到空清单）
+          cp -v bg-themes-gist.json _site/ 2>/dev/null || true
           # 🔴 英雄图鉴数据（官方配置表导出，checkout 后 data/ 仅含已入库的 heroes.json）
           [ -d data ] && cp -rv data _site/ || true
 
