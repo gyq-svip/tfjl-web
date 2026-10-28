@@ -1436,9 +1436,11 @@
                 const t = (list || []).find(function (x) { return x.id === id; });
                 if (!t) { try { if (typeof showToast === 'function') showToast('⚠️ 主题不存在或已下架'); } catch (e) {} return; }
                 localStorage.setItem(BG_KEY, 'bvid:' + id);
-                bgBuiltinVideoThemeId = id;
+                // 🔴 不能在这里预先设置 bgBuiltinVideoThemeId：applyUserBackground 会误判「已应用该主题」
+                //    而只恢复旧视频、不切换（这就是「上传 2 个视频却不能切换主题」的根因）。
+                //    由 bgApplyBuiltinVideo 加载完成后自行标记。
                 applyUserBackground();
-                try { if (typeof showToast === 'function') showToast('✅ 已应用「' + (t.name || '未命名') + '」，已缓存到本机'); } catch (e) {}
+                try { if (typeof showToast === 'function') showToast('✅ 已应用「' + (t.name || '未命名') + '」'); } catch (e) {}
                 if (typeof renderBgImageList === 'function') renderBgImageList();
             });
         };
