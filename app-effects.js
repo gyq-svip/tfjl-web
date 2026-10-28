@@ -522,19 +522,29 @@
             return fn('get_gitee_token_env', {}).then(function (v) { _bgEnvTok = (v && typeof v === 'string') ? v : ''; return _bgEnvTok; }).catch(function () { return ''; });
         }
         // 拉取内置视频清单：优先 1 小时内的本地缓存；失败回退旧缓存；彻底失败返回空数组
-        function bgThemesLoad(force) {
+        // 清单结构：{ v, themes:[视频主题], statics:[后台新增静态背景图], staticsRemoved:[全局删除的内置图URL] }
+        function bgNormalizeManifest(obj) {
+            obj = obj || {};
+            return {
+                v: obj.v || 1,
+                themes: Array.isArray(obj.themes) ? obj.themes : [],
+                statics: Array.isArray(obj.statics) ? obj.statics : [],
+                staticsRemoved: Array.isArray(obj.staticsRemoved) ? obj.staticsRemoved : []
+            };
+        }
+        function bgManifestLoad(force) {
             const cached = (function () {
                 try {
                     const c = JSON.parse(localStorage.getItem(BG_THEMES_CACHE_KEY) || 'null');
-                    if (c && Array.isArray(c.themes) && Date.now() - (c.ts || 0) < 3600 * 1000) return c;
+                    if (c && (Array.isArray(c.themes) || Array.isArray(c.statics)) && Date.now() - (c.ts || 0) < 3600 * 1000) return c;
                 } catch (e) {}
                 return null;
             })();
-            if (cached && !force) return Promise.resolve(cached.themes);
+            if (cached && !force) return Promise.resolve(bgNormalizeManifest(cached));
             // 清单 bg-themes.json 托管在 GitHub Gist。走 API + 站点注入的 GitHub Token（每个用户页面都带），
             // 认证请求额度 5000/h，不会像匿名请求那样被 60/h 限流；比 raw CDN 更快（用户实测/明确要求）。
             return bgThemesGistInfo().then(function (info) {
-                if (!info.id) return [];
+                if (!info.id) return bgNormalizeManifest(null);
                 const tok = (window.AllianceDB && typeof window.AllianceDB.ghToken === 'function') ? window.AllianceDB.ghToken() : '';
                 const headers = { 'Accept': 'application/vnd.github.v3+json' };
                 if (tok) headers['Authorization'] = 'token ' + tok;
@@ -544,13 +554,14 @@
                         const c = g && g.files && g.files[BG_THEMES_MANIFEST] && g.files[BG_THEMES_MANIFEST].content;
                         let obj = null;
                         if (c) { try { obj = JSON.parse(c); } catch (e) {} }
-                        const themes = (obj && Array.isArray(obj.themes)) ? obj.themes : [];
-                        try { localStorage.setItem(BG_THEMES_CACHE_KEY, JSON.stringify({ ts: Date.now(), themes: themes })); } catch (e2) {}
-                        return themes;
+                        const m = bgNormalizeManifest(obj);
+                        try { localStorage.setItem(BG_THEMES_CACHE_KEY, JSON.stringify(Object.assign({ ts: Date.now() }, m))); } catch (e2) {}
+                        return m;
                     });
             })
-            .catch(function () { return (cached && cached.themes) || []; });
+            .catch(function () { return bgNormalizeManifest(cached); });
         }
+        function bgThemesLoad(force) { return bgManifestLoad(force).then(function (m) { return m.themes; }); }
         // 应用内置视频主题：优先 IndexedDB 本地缓存（首拉落盘后零网络），同时清理上一个内置视频缓存防爆盘
         let bgBuiltinVideoUrl = null;
         let bgBuiltinVideoThemeId = null;
@@ -1115,21 +1126,9 @@
                 });
             });
             rows.push('</div>');
-            if (BG_BUILTIN.length) {
-                const hidden = bgHiddenBuiltins();
-                rows.push('<div style="color:rgba(255,255,255,0.55);font-size:0.78rem;margin:12px 0 6px;">🖼️ 内置背景图（右上角 ✕ 可删除）</div>');
-                rows.push('<div style="display:flex;flex-wrap:wrap;gap:8px;">');
-                BG_BUILTIN.forEach(function (b) {
-                    if (hidden.indexOf(b.url) >= 0) return;
-                    rows.push('<div style="position:relative;">' +
-                        // 🔴 2026-09-20 缩略图不直接写远端 URL（那会每次打开设置窗都联网下 6 张图）：
-                        //    先占位，随后 data-bgthumb 走本地缓存填充（首拉落盘，之后零网络）。
-                        '<button data-bgthumb="' + b.url + '" onclick="window.__setBgBuiltin(\'' + b.url + '\')" style="padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);background-size:cover;background-position:center;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.85);cursor:pointer;font-size:0.8rem;min-width:96px;min-height:40px;">' + b.name + '</button>' +
-                        '<button onclick="window.__bgHideBuiltin(\'' + b.url + '\')" title="删除" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#e53935;border:none;color:#fff;font-size:0.66rem;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.5);">✕</button>' +
-                        '</div>');
-                });
-                rows.push('</div>');
-            }
+            // 🖼️ 静态背景图：内置默认（可被后台全局删除）+ 后台新增，统一异步渲染（需要读 Gist 清单）
+            rows.push('<div style="color:rgba(255,255,255,0.55);font-size:0.78rem;margin:12px 0 6px;">🖼️ 内置背景图（右上角 ✕ 可删除）</div>');
+            rows.push('<div id="bgStaticList" style="display:flex;flex-wrap:wrap;gap:8px;"></div>');
             // 🎬 内置视频主题区：清单来自 Gitee/Gist，封面本地缓存优先；点击应用后视频也落盘缓存
             rows.push('<div id="bgVideoThemeWrap" style="display:none;">' +
                 '<div style="color:rgba(255,255,255,0.55);font-size:0.78rem;margin:12px 0 6px;">🎬 内置视频（点封面切换，应用后自动缓存本机、断网也能播）</div>' +
@@ -1206,25 +1205,8 @@
                 '  </div>' +
                 '  <div style="margin-top:12px;color:rgba(255,255,255,0.4);font-size:0.72rem;">提示：极光/星河为动态渐变背景；浅色背景可能让部分浅色文字变淡，可勾选上方「背景协调压暗」。</div>';
             document.body.appendChild(modal);
-            // 🔴 2026-09-20 内置图缩略图填充：本地缓存优先（首拉落盘 → 以后打开设置窗零网络）
-            try {
-                bgRevokeBuiltinThumbs();
-                document.querySelectorAll('#bgSettingsModal [data-bgthumb]').forEach(function (btn) {
-                    const u = btn.getAttribute('data-bgthumb');
-                    if (!u) return;
-                    const useBlob = function (blob) {
-                        try { const bu = URL.createObjectURL(blob); bgBuiltinThumbUrls.push(bu); btn.style.backgroundImage = 'url(' + bu + ')'; } catch (e) {}
-                    };
-                    bgAssetGet(u).catch(function () { return null; }).then(function (blob) {
-                        if (blob) { useBlob(blob); return; }
-                        fetch(u).then(function (r) { return r.ok ? r.blob() : null; }).then(function (b) {
-                            if (!b) { btn.style.backgroundImage = 'url(' + u + ')'; return; }
-                            useBlob(b);
-                            bgAssetPut(u, b).catch(function () {});
-                        }).catch(function () { btn.style.backgroundImage = 'url(' + u + ')'; });
-                    });
-                });
-            } catch (e) {}
+            try { bgRevokeBuiltinThumbs(); } catch (e) {}
+            renderBgStaticList();
             renderBgVideoThemes();
             // 悬浮窗拖拽（仅标题栏空白区拖动；按钮内点击不触发拖拽，避免关闭时窗体被拖走）
             try {
@@ -1276,6 +1258,64 @@
         window.injectBackgroundMenu = injectBackgroundMenu;
 
         // ===== 「🎬 内置视频」区渲染：清单拉取 → 封面本地缓存优先填充 =====
+        // 用户设置窗「🖼️ 内置背景图」：内置默认（后台可全局删除）+ 后台新增静态图，统一渲染
+        function renderBgStaticList() {
+            const box = document.getElementById('bgStaticList');
+            if (!box) return;
+            box.innerHTML = '<div style="font-size:0.72rem;color:rgba(255,255,255,0.35);">加载中…</div>';
+            bgManifestLoad().then(function (m) {
+                if (!box.isConnected) return;
+                const removed = m.staticsRemoved || [];
+                const hidden = bgHiddenBuiltins();
+                const items = [];
+                BG_BUILTIN.forEach(function (b) {
+                    if (removed.indexOf(b.url) >= 0) return;
+                    if (hidden.indexOf(b.url) >= 0) return;
+                    items.push({ name: b.name, url: b.url });
+                });
+                (m.statics || []).forEach(function (s) {
+                    if (!s || !s.url) return;
+                    if (hidden.indexOf(s.url) >= 0) return;
+                    items.push({ name: s.name || '背景图', url: s.url });
+                });
+                if (!items.length) { box.innerHTML = '<div style="font-size:0.72rem;color:rgba(255,255,255,0.3);">暂无内置背景图</div>'; return; }
+                box.innerHTML = '';
+                items.forEach(function (it) {
+                    const wrap = document.createElement('div');
+                    wrap.style.cssText = 'position:relative;';
+                    const btn = document.createElement('button');
+                    btn.setAttribute('data-bgthumb', it.url);
+                    btn.textContent = it.name;
+                    btn.style.cssText = 'padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);background-size:cover;background-position:center;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.85);cursor:pointer;font-size:0.8rem;min-width:96px;min-height:40px;';
+                    btn.onclick = function () { window.__setBgBuiltin(it.url); };
+                    wrap.appendChild(btn);
+                    const del = document.createElement('button');
+                    del.textContent = '✕';
+                    del.title = '本机不再显示';
+                    del.style.cssText = 'position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#e53935;border:none;color:#fff;font-size:0.66rem;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.5);';
+                    del.onclick = function () { window.__bgHideBuiltin(it.url); };
+                    wrap.appendChild(del);
+                    box.appendChild(wrap);
+                });
+                // 缩略图：后台新增的 Gitee 图直接 URL（图片跨域不受 CORS 限制）；内置图走本地缓存（首拉落盘）
+                box.querySelectorAll('[data-bgthumb]').forEach(function (b2) {
+                    const u = b2.getAttribute('data-bgthumb');
+                    if (!u) return;
+                    const useBlob = function (blob) {
+                        try { const bu = URL.createObjectURL(blob); bgBuiltinThumbUrls.push(bu); b2.style.backgroundImage = 'url(' + bu + ')'; } catch (e) {}
+                    };
+                    if (/^https?:/i.test(u) && u.indexOf('gitee.com') >= 0) { b2.style.backgroundImage = 'url("' + u.replace(/"/g, '') + '")'; return; }
+                    bgAssetGet(u).catch(function () { return null; }).then(function (blob) {
+                        if (blob) { useBlob(blob); return; }
+                        fetch(u).then(function (r) { return r.ok ? r.blob() : null; }).then(function (b) {
+                            if (!b) { b2.style.backgroundImage = 'url(' + u + ')'; return; }
+                            useBlob(b);
+                            bgAssetPut(u, b).catch(function () {});
+                        }).catch(function () { b2.style.backgroundImage = 'url(' + u + ')'; });
+                    });
+                });
+            });
+        }
         function renderBgVideoThemes() {
             const wrap = document.getElementById('bgVideoThemeWrap');
             const box = document.getElementById('bgVideoThemeList');
@@ -1459,7 +1499,7 @@
         }
         // 写清单到 GitHub Gist：用站点注入/本机保存的 GitHub Token 直接 PATCH（无需手动填第二把钥匙）。
         // 清单 bg-themes.json 作为该 Gist 的一个文件存在，公开可读；管理员写时自动带上 GitHub Token。
-        function bgThemesWrite(data) {
+        function bgManifestWrite(data) {
             return bgThemesGistId().then(function (id) {
                 if (!id) throw new Error('未配置背景主题清单 Gist：请先点「① 创建清单 Gist」或把 gistId 写入 bg-themes-gist.json');
                 const files = {};
@@ -1514,9 +1554,19 @@
                 '</div>' +
                 '<div id="bgThemeFileStatus" style="font-size:0.72rem;color:rgba(255,255,255,0.6);margin-bottom:10px;min-height:1em;"></div>' +
                 '<div id="bgThemeUploadLog" style="font-size:0.72rem;color:rgba(255,255,255,0.55);margin-bottom:12px;min-height:1em;"></div>' +
-                '<div style="color:rgba(255,255,255,0.6);font-size:0.78rem;margin-bottom:8px;">📦 已上架主题（点「下架」仅从清单移除，Gitee 上的文件保留）</div>' +
-                '<div id="bgThemesAdminList" style="display:flex;flex-direction:column;gap:8px;"></div>';
+                '<div style="color:rgba(255,255,255,0.6);font-size:0.78rem;margin-bottom:8px;">📦 已上架视频主题（点「下架」仅从清单移除，Gitee 上的文件保留）</div>' +
+                '<div id="bgThemesAdminList" style="display:flex;flex-direction:column;gap:8px;"></div>' +
+                '<div style="color:rgba(255,255,255,0.6);font-size:0.78rem;margin:14px 0 8px;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;">🖼️ 静态背景图（统一管理：新增 / 删除）</div>' +
+                '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px;">' +
+                '  <input id="bgStaticName" type="text" placeholder="背景图名称（如：樱花）" style="flex:1;min-width:140px;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;font-size:0.8rem;">' +
+                '  <label id="bgStaticFileLabel" style="padding:7px 12px;border-radius:8px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;cursor:pointer;font-size:0.78rem;white-space:nowrap;">🖼️ 选图片<input id="bgStaticFile" type="file" accept="image/*" style="display:none;" onchange="window.__bgStaticFileChosen()"></label>' +
+                '  <button class="admin-btn" onclick="window.__bgStaticUpload()" style="padding:7px 14px;font-size:0.8rem;font-weight:bold;white-space:nowrap;">☁ 上传并上架</button>' +
+                '</div>' +
+                '<div id="bgStaticFileStatus" style="font-size:0.72rem;color:rgba(255,255,255,0.6);margin-bottom:6px;min-height:1em;"></div>' +
+                '<div id="bgStaticUploadLog" style="font-size:0.72rem;color:rgba(255,255,255,0.55);margin-bottom:10px;min-height:1em;"></div>' +
+                '<div id="bgStaticAdminList" style="display:flex;flex-direction:column;gap:8px;"></div>';
             renderBgThemesAdminList();
+            renderBgStaticAdminList();
             });
             });
         };
@@ -1624,12 +1674,10 @@
                 }
                 if (coverBlob) { log('④ 上传封面…'); await giteeUploadFile(tok, rid, coverBlob, cName); }
                 log('⑤ 读取并更新主题清单（GitHub Gist）…');
-                const data = { v: 1, themes: [] };
-                const existing = await bgThemesLoad(true).catch(function () { return []; });
-                if (Array.isArray(existing)) data.themes = existing.slice();
+                const m = await bgManifestLoad(true).catch(function () { return bgNormalizeManifest(null); });
                 const theme = { id: themeId, name: name, video: giteeDlUrl(vName), cover: coverBlob ? giteeDlUrl(cName) : '', size: vfile.size, ts: Date.now() };
-                data.themes.push(theme);
-                await bgThemesWrite(data);
+                m.themes.push(theme);
+                await bgManifestWrite(m);
                 try { localStorage.removeItem(BG_THEMES_CACHE_KEY); } catch (e) {}
                 log('✅ 上架成功！所有人刷新页面即可在「🎬 内置视频」看到「' + name + '」');
                 bgToast('✅ 主题「' + name + '」已上架');
@@ -1645,15 +1693,132 @@
         // 下架（仅从清单移除，Gitee 上的视频/封面文件保留；清单写回 GitHub Gist，用站点自动 Token）
         window.__bgThemeRemove = function (id) {
             if (!window.confirm('确定下架这个主题？（仅从清单移除，Gitee 上的文件保留）')) return;
-            bgThemesLoad(true).then(function (existing) {
-                const data = { v: 1, themes: (Array.isArray(existing) ? existing : []).filter(function (t) { return t.id !== id; }) };
-                return bgThemesWrite(data);
+            bgManifestLoad(true).then(function (m) {
+                m.themes = (m.themes || []).filter(function (t) { return t.id !== id; });
+                return bgManifestWrite(m);
             }).then(function () {
                 try { localStorage.removeItem(BG_THEMES_CACHE_KEY); } catch (e) {}
                 bgToast('✅ 已下架');
                 renderBgThemesAdminList();
             }).catch(function (e) { bgToast('❌ 下架失败：' + (e && e.message ? e.message : e)); });
         };
+
+        // ===== 静态背景图后台管理（新增/删除；内置默认图可全局删除/恢复）=====
+        window.__bgStaticFileChosen = function () {
+            const el = document.getElementById('bgStaticFile');
+            const f = el && el.files && el.files[0];
+            const lab = document.getElementById('bgStaticFileLabel');
+            const st = document.getElementById('bgStaticFileStatus');
+            if (f) {
+                if (lab) { lab.style.background = 'rgba(154,230,180,0.22)'; lab.style.borderColor = '#9ae6b4'; }
+                if (st) st.innerHTML = '🖼️ 已选图片：<b style="color:#9ae6b4;">' + bgEsc(f.name) + '</b>（' + Math.round(f.size / 1024) + ' KB）';
+            } else if (st) st.textContent = '';
+        };
+        window.__bgStaticUpload = function () {
+            const tok = (document.getElementById('bgThemesGiteeToken').value || '').trim();
+            const name = (document.getElementById('bgStaticName').value || '').trim();
+            const f = document.getElementById('bgStaticFile').files[0];
+            const log = function (m) { const el = document.getElementById('bgStaticUploadLog'); if (el) el.textContent = m; };
+            if (!tok) { bgToast('⚠️ 请先填写 Gitee Token'); return; }
+            if (!name) { bgToast('⚠️ 请填背景图名称'); return; }
+            if (!f) { bgToast('⚠️ 请选择图片'); return; }
+            if (f.size > 20 * 1024 * 1024) { bgToast('⚠️ 图片超 20MB，请先压缩'); return; }
+            const sid = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+            const ext = (f.name.match(/\.(jpg|jpeg|png|webp|gif)$/i) || ['.jpg'])[0].toLowerCase();
+            const sName = sid + ext;
+            (async function () {
+                log('① 检查 Gitee 发行版…');
+                const rel = await giteeEnsureRelease(tok);
+                const rid = rel && rel.id;
+                if (!rid) throw new Error('无法创建/获取 Gitee release');
+                log('② 上传图片 ' + f.name + '…');
+                await giteeUploadFile(tok, rid, f, sName);
+                log('③ 更新清单（GitHub Gist）…');
+                const m = await bgManifestLoad(true);
+                m.statics = Array.isArray(m.statics) ? m.statics : [];
+                m.statics.push({ id: sid, name: name, url: giteeDlUrl(sName), size: f.size, ts: Date.now() });
+                await bgManifestWrite(m);
+                try { localStorage.removeItem(BG_THEMES_CACHE_KEY); } catch (e) {}
+                log('✅ 已上架：所有人刷新即可在「🖼️ 内置背景图」看到「' + name + '」');
+                bgToast('✅ 静态背景「' + name + '」已上架');
+                document.getElementById('bgStaticName').value = '';
+                document.getElementById('bgStaticFile').value = '';
+                renderBgStaticAdminList();
+            })().catch(function (e) {
+                log('❌ 失败：' + (e && e.message ? e.message : e));
+                bgToast('❌ 上传失败：' + (e && e.message ? e.message : e));
+            });
+        };
+        window.__bgStaticRemove = function (id) {
+            if (!window.confirm('确定删除这个静态背景图？（仅从清单移除，Gitee 文件保留）')) return;
+            bgManifestLoad(true).then(function (m) {
+                m.statics = (m.statics || []).filter(function (s) { return s.id !== id; });
+                return bgManifestWrite(m);
+            }).then(function () {
+                try { localStorage.removeItem(BG_THEMES_CACHE_KEY); } catch (e) {}
+                bgToast('✅ 已删除');
+                renderBgStaticAdminList();
+            }).catch(function (e) { bgToast('❌ 删除失败：' + (e && e.message ? e.message : e)); });
+        };
+        window.__bgStaticRemoveBuiltin = function (url) {
+            if (!window.confirm('确定全局删除这张内置背景图？（所有用户都不再显示）')) return;
+            bgManifestLoad(true).then(function (m) {
+                m.staticsRemoved = Array.isArray(m.staticsRemoved) ? m.staticsRemoved : [];
+                if (m.staticsRemoved.indexOf(url) < 0) m.staticsRemoved.push(url);
+                return bgManifestWrite(m);
+            }).then(function () {
+                try { localStorage.removeItem(BG_THEMES_CACHE_KEY); } catch (e) {}
+                bgToast('✅ 已全局删除');
+                renderBgStaticAdminList();
+            }).catch(function (e) { bgToast('❌ 删除失败：' + (e && e.message ? e.message : e)); });
+        };
+        window.__bgStaticRestoreBuiltin = function (url) {
+            bgManifestLoad(true).then(function (m) {
+                m.staticsRemoved = (m.staticsRemoved || []).filter(function (u) { return u !== url; });
+                return bgManifestWrite(m);
+            }).then(function () {
+                try { localStorage.removeItem(BG_THEMES_CACHE_KEY); } catch (e) {}
+                bgToast('✅ 已恢复');
+                renderBgStaticAdminList();
+            }).catch(function (e) { bgToast('❌ 恢复失败：' + (e && e.message ? e.message : e)); });
+        };
+        function renderBgStaticAdminList() {
+            const box = document.getElementById('bgStaticAdminList');
+            if (!box) return;
+            box.innerHTML = '<div style="font-size:0.72rem;color:rgba(255,255,255,0.4);">加载中…</div>';
+            bgManifestLoad(true).then(function (m) {
+                if (!box.isConnected) return;
+                const removed = m.staticsRemoved || [];
+                const rows = [];
+                (m.statics || []).forEach(function (s) { rows.push({ kind: 'custom', id: s.id, name: s.name, url: s.url, size: s.size, ts: s.ts }); });
+                BG_BUILTIN.forEach(function (b) { rows.push({ kind: 'builtin', name: b.name, url: b.url, removed: removed.indexOf(b.url) >= 0 }); });
+                if (!rows.length) { box.innerHTML = '<div style="font-size:0.72rem;color:rgba(255,255,255,0.35);">暂无静态背景图</div>'; return; }
+                box.innerHTML = '';
+                rows.forEach(function (r) {
+                    const row = document.createElement('div');
+                    row.style.cssText = 'display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.05);border-radius:8px;padding:6px 8px;';
+                    const thumb = document.createElement('div');
+                    thumb.style.cssText = 'width:56px;height:32px;border-radius:4px;background:rgba(255,255,255,0.1) center/cover no-repeat;flex-shrink:0;';
+                    if (r.url) thumb.style.backgroundImage = 'url("' + String(r.url).replace(/"/g, '') + '")';
+                    row.appendChild(thumb);
+                    const info = document.createElement('div');
+                    info.style.cssText = 'flex:1;min-width:0;font-size:0.72rem;color:rgba(255,255,255,0.85);line-height:1.45;';
+                    info.innerHTML = '<div style="font-weight:bold;">' + bgEsc(r.name || '未命名') + (r.kind === 'builtin' ? ' <span style="color:rgba(255,255,255,0.4);font-size:0.64rem;">内置</span>' : '') +
+                        (r.removed ? ' <span style="color:#f87171;font-size:0.64rem;">已删</span>' : '') + '</div>' +
+                        '<div style="color:rgba(255,255,255,0.4);font-size:0.62rem;word-break:break-all;">' + bgEsc(r.url || '') + '</div>' +
+                        (r.size ? '<div style="color:rgba(255,255,255,0.35);font-size:0.62rem;">' + Math.round(r.size / 1024) + ' KB' + (r.ts ? ' · ' + new Date(r.ts).toLocaleString('zh-CN', { hour12: false }) : '') + '</div>' : '');
+                    row.appendChild(info);
+                    const btn = document.createElement('button');
+                    btn.className = 'admin-btn admin-btn-secondary';
+                    btn.style.cssText = 'padding:4px 9px;font-size:0.7rem;flex-shrink:0;';
+                    if (r.kind === 'custom') { btn.textContent = '删除'; btn.onclick = function () { window.__bgStaticRemove(r.id); }; }
+                    else if (r.removed) { btn.textContent = '恢复'; btn.onclick = function () { window.__bgStaticRestoreBuiltin(r.url); }; }
+                    else { btn.textContent = '删除'; btn.onclick = function () { window.__bgStaticRemoveBuiltin(r.url); }; }
+                    row.appendChild(btn);
+                    box.appendChild(row);
+                });
+            });
+        }
 
         // ==================== 密码验证 ====================
         // 密码存储在localStorage中，支持管理员动态管理
