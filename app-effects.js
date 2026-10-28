@@ -626,9 +626,7 @@
             if (document.visibilityState === 'hidden') bgPauseForHidden();
             else bgResumeForVisible();
         });
-        // 失焦/聚焦兜底：最小化、收托盘、切到其它窗口都会先失焦。
-        // DOM blur 在渲染进程内同步触发，比 IPC 事件更早，能赶在 WebView 冻结前暂停。
-        window.addEventListener('blur', bgPauseForHidden);
+        // 只「最小化 / 收托盘 / 页面隐藏」暂停；单纯失焦或被其它窗口遮挡**不暂停**（窗口置顶悬浮时仍可播）。
         window.addEventListener('focus', bgResumeForVisible);
         // 桌面端（Tauri v2）：修正旧代码误用的 onEvent（v2 无此方法 → 整段静默失效，最小化/托盘照播）
         (function () {
@@ -640,12 +638,18 @@
                 if (w) {
                     if (typeof w.onFocusChanged === 'function') {
                         const p = w.onFocusChanged(function (e) {
-                            if (e && e.payload) bgResumeForVisible(); else bgPauseForHidden();
+                            if (e && e.payload) { bgResumeForVisible(); return; }
+                            // 失焦后精确判断：只有真最小化或窗口不可见（收托盘）才暂停，普通遮挡/切窗口不打断
+                            const pm = (typeof w.isMinimized === 'function') ? w.isMinimized().catch(function () { return false; }) : Promise.resolve(false);
+                            const pv = (typeof w.isVisible === 'function') ? w.isVisible().catch(function () { return true; }) : Promise.resolve(true);
+                            Promise.all([pm, pv]).then(function (r) {
+                                if (r[0] || !r[1]) bgPauseForHidden();
+                            }).catch(function () {});
                         });
                         if (p && p.catch) p.catch(function () {});
                     }
                     if (typeof w.listen === 'function') {
-                        try { const p1 = w.listen('tauri://blur', function () { bgPauseForHidden(); }); if (p1 && p1.catch) p1.catch(function () {}); } catch (e) {}
+                        // 不监听 tauri://blur 暂停（会误伤「被遮挡/切窗口」）；focus 恢复保留
                         try { const p2 = w.listen('tauri://focus', function () { bgResumeForVisible(); }); if (p2 && p2.catch) p2.catch(function () {}); } catch (e) {}
                     }
                 }
@@ -1490,6 +1494,63 @@
                 return { codec: codec, hevc: hevc };
             }).catch(function () { return { codec: 'unknown', hevc: false }; });
         }
+        // 自动转码：把 HEVC 等「本机能解码」的视频重编码为 H.264/MP4（Chrome 126+/WebView2 支持 MP4 录制），
+        // 不支持 MP4 录制时回退 WebM（VP9/VP8）；两者都不支持才报错让用户手动转。
+        // 注意：MediaRecorder 是实时录制，耗时 ≈ 视频时长，期间请勿关闭页面。
+        function bgTranscodeToH264(file, onProgress) {
+            return new Promise(function (resolve, reject) {
+                const url = URL.createObjectURL(file);
+                const v = document.createElement('video');
+                v.playsInline = true; v.preload = 'auto';
+                let done = false;
+                const finish = function (err, out) {
+                    if (done) return;
+                    done = true;
+                    try { v.pause(); } catch (e) {}
+                    try { v.removeAttribute('src'); v.load(); } catch (e) {}
+                    try { URL.revokeObjectURL(url); } catch (e) {}
+                    if (err) reject(err); else resolve(out);
+                };
+                v.onerror = function () { finish(new Error('源视频无法解码（本机不支持该编码）')); };
+                v.onloadedmetadata = function () {
+                    let mime = '';
+                    const cands = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1', 'video/mp4',
+                        'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+                    for (let i = 0; i < cands.length; i++) {
+                        try { if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(cands[i])) { mime = cands[i]; break; } } catch (e) {}
+                    }
+                    if (!mime) { finish(new Error('当前环境不支持自动转码')); return; }
+                    let stream = null;
+                    try { stream = (typeof v.captureStream === 'function') ? v.captureStream() : (typeof v.mozCaptureStream === 'function' ? v.mozCaptureStream() : null); } catch (e) { stream = null; }
+                    if (!stream) { finish(new Error('无法捕获视频流')); return; }
+                    let rec;
+                    try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4000000 }); } catch (e) { finish(new Error('创建转码器失败')); return; }
+                    const chunks = [];
+                    rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+                    rec.onerror = function (e) { finish(new Error('转码失败：' + ((e && e.error && e.error.message) || '未知'))); };
+                    rec.onstop = function () {
+                        const type = mime.split(';')[0];
+                        const blob = new Blob(chunks, { type: type });
+                        if (!blob.size) { finish(new Error('转码输出为空')); return; }
+                        finish(null, { blob: blob, ext: type.indexOf('mp4') >= 0 ? '.mp4' : '.webm', mime: type });
+                    };
+                    const dur = v.duration || 0;
+                    try { rec.start(500); } catch (e) { finish(new Error('启动转码失败')); return; }
+                    const stop = function () { try { if (rec.state !== 'inactive') rec.stop(); } catch (e) {} };
+                    v.onended = stop;
+                    const timer = setInterval(function () {
+                        if (onProgress && dur > 0) { try { onProgress(Math.min(0.99, (v.currentTime || 0) / dur)); } catch (e) {} }
+                        if (v.ended) { clearInterval(timer); stop(); }
+                    }, 400);
+                    const p = v.play();
+                    if (p && p.catch) p.catch(function () {
+                        // 自动播放策略拦截了声音 → 静音重试（会丢音频，但至少能转出画面）
+                        try { v.muted = true; const p2 = v.play(); if (p2 && p2.catch) p2.catch(function () {}); } catch (e) {}
+                    });
+                };
+                v.src = url;
+            });
+        }
         // 本地探测视频能否被当前浏览器解码。
         // 🔴 H.265/HEVC（hvc1）在 Chrome/WebView2 多数解不了：loadedmetadata 照常触发、duration 正常，
         //    但 videoWidth/videoHeight = 0 → 表现「只有声音没画面」。上传前拦掉，避免传上去放不出来。
@@ -1567,7 +1628,7 @@
                 '<div style="font-size:0.72rem;color:rgba(255,255,255,0.6);background:rgba(255,255,255,0.05);border-radius:6px;padding:8px;line-height:1.7;margin-bottom:12px;">' +
                 '上传后<b style="color:#ffd700;">所有人刷新页面即可看到</b>新主题；用户点应用后视频自动缓存到本机，断网也能播。<br>' +
                 '🎬 <b>视频/封面</b>走 <b>Gitee Releases</b>（需 Gitee Token）；📋 <b>主题清单目录</b>走 <b>GitHub Gist</b>（站点自动 Token，无需手动填）。<br>' +
-                '<span style="color:#fbbf24;">⚠️ 视频统一用 <b>H.264 / MP4</b>：H.265/HEVC 依赖电脑自带解码器，<b>有的电脑能播、有的不能</b>（只有声音没画面），上传时会直接拦下。</span>' +
+                '<span style="color:#fbbf24;">⚠️ <b>H.265/HEVC 上传时会自动转成 H.264</b>（实时转码，耗时≈视频时长，请勿关闭页面）；H.264/MP4 则直接上传。</span>' +
                 '</div>' +
                 '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:0.78rem;color:rgba(255,255,255,0.85);">' +
                 '  <span style="flex-shrink:0;">Gitee Token</span>' +
@@ -1688,35 +1749,44 @@
             if (!vfile) { bgToast('⚠️ 请选择视频文件'); return; }
             if (vfile.size > 100 * 1024 * 1024) { bgToast('⚠️ 视频超 100MB，请先压缩'); return; }
             const themeId = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-            const vExt = (vfile.name.match(/\.(mp4|webm|mov)$/i) || ['.mp4'])[0].toLowerCase();
-            const vName = themeId + vExt;
+            let vName = themeId + ((vfile.name.match(/\.(mp4|webm|mov)$/i) || ['.mp4'])[0].toLowerCase());
             (async function () {
                 log('⓪ 检测视频编码…');
-                // 先按文件字节判编码（与本机能否解码无关），HEVC 一律拦下，保证换任何电脑都能播
+                // 按文件字节判编码（与本机能否解码无关）；HEVC 上传时自动转 H.264，保证换任何电脑都能播
                 const codec = await bgDetectVideoCodec(vfile);
-                if (codec.hevc) throw new Error('该视频是 H.265/HEVC 编码：Windows 默认无解码器，有的电脑能播、有的不能。请导出 H.264/MP4 后重传');
                 const probe = await bgProbeVideo(vfile);
                 if (!probe.ok) {
-                    if (probe.reason === 'decode') throw new Error('该视频当前浏览器无法解码，请导出 H.264/MP4 后重传');
+                    if (probe.reason === 'decode') throw new Error('该视频本机无法解码，无法自动转码，请用 H.264/MP4 导出后重传');
                     if (probe.reason === 'error') throw new Error('视频解析失败，请换一个文件或重新导出');
                     throw new Error('视频检测超时，请重试');
+                }
+                let upFile = vfile, upCodec = codec.codec;
+                if (codec.hevc) {
+                    log('⓪ 检测到 H.265/HEVC，正在自动转码为 H.264…（实时转码，约需视频时长）');
+                    const tr = await bgTranscodeToH264(vfile, function (p) {
+                        log('⓪ 转码中… ' + Math.round(p * 100) + '%（实时转码，约需视频时长，请勿关闭页面）');
+                    });
+                    upFile = new File([tr.blob], themeId + tr.ext, { type: tr.mime });
+                    upCodec = tr.mime.indexOf('mp4') >= 0 ? 'h264' : 'webm';
+                    vName = themeId + tr.ext;
+                    log('⓪ 转码完成：' + Math.round(upFile.size / 1048576) + ' MB（' + (upCodec === 'h264' ? 'H.264/MP4' : 'WebM') + '）');
                 }
                 log('① 检查 Gitee 发行版…');
                 const rel = await giteeEnsureRelease(tok);
                 const rid = rel && rel.id;
                 if (!rid) throw new Error('无法创建/获取 Gitee release（检查 Token 权限：projects）');
-                log('② 上传视频 ' + vfile.name + '（' + Math.round(vfile.size / 1048576) + 'MB）…');
-                await giteeUploadFile(tok, rid, vfile, vName);
+                log('② 上传视频 ' + upFile.name + '（' + Math.round(upFile.size / 1048576) + 'MB）…');
+                await giteeUploadFile(tok, rid, upFile, vName);
                 let coverBlob = null, cName = '';
                 if (cfile) { coverBlob = cfile; cName = themeId + '.jpg'; }
                 else {
                     log('③ 未传封面，从视频抓帧…');
-                    try { coverBlob = await bgGrabVideoFrame(vfile); cName = themeId + '.jpg'; } catch (e) { coverBlob = null; }
+                    try { coverBlob = await bgGrabVideoFrame(upFile); cName = themeId + '.jpg'; } catch (e) { coverBlob = null; }
                 }
                 if (coverBlob) { log('④ 上传封面…'); await giteeUploadFile(tok, rid, coverBlob, cName); }
                 log('⑤ 读取并更新主题清单（GitHub Gist）…');
                 const m = await bgManifestLoad(true).catch(function () { return bgNormalizeManifest(null); });
-                const theme = { id: themeId, name: name, video: giteeDlUrl(vName), cover: coverBlob ? giteeDlUrl(cName) : '', size: vfile.size, ts: Date.now(), codec: codec.codec };
+                const theme = { id: themeId, name: name, video: giteeDlUrl(vName), cover: coverBlob ? giteeDlUrl(cName) : '', size: upFile.size, ts: Date.now(), codec: upCodec };
                 m.themes.push(theme);
                 await bgManifestWrite(m);
                 try { localStorage.removeItem(BG_THEMES_CACHE_KEY); } catch (e) {}
