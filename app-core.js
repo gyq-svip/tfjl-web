@@ -12266,6 +12266,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                                     const _p = location.pathname
                                     const _siteBase = _p.endsWith('/') ? _p : _p.slice(0, _p.lastIndexOf('/') + 1)
                                     const ro = await fetch(_siteBase + 'data/hero-spine/index.json', { cache: 'no-store' })
+                                    let _merged = false
                                     if (ro && ro.ok) {
                                         const jo = await ro.json()
                                         for (const k of Object.keys(j)) {
@@ -12289,10 +12290,20 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                                                 });
                                             }
                                         }
+                                        _merged = true
                                     }
                                 } catch (e) {}
-                                window.__heroSpineIndex = j
-                                clearInterval(timer)
+                                // 🔴 2026-10-29 修复「本地补配置」把缺配置的旧包当权威索引缓存：
+                                //   合并成功才把 j 设为 __heroSpineIndex 并停重试；合并失败（离线/网络抖动）
+                                //   则【不】缓存——否则 __heroSpineIndex 被锁成缺 modelHideSlots 的旧值，
+                                //   shen01/shen02 等特效槽不隐藏 → 死神等模型「又起飞」。此时仅用本地包兜底
+                                //   （不覆盖 _idxPromise 已拉到的在线索引），定时器继续重试，网络恢复即补上。
+                                if (_merged) {
+                                    window.__heroSpineIndex = j
+                                    clearInterval(timer)
+                                } else if (!window.__heroSpineIndex) {
+                                    window.__heroSpineIndex = j
+                                }
                             }
                         }
                     } catch (e) {}
