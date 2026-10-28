@@ -497,15 +497,11 @@
                 return null;
             })();
             if (cached && !force) return Promise.resolve(cached.themes);
-            return fetch(giteeApiBase() + '/releases/tags/' + BG_THEMES_RELEASE_TAG, { cache: 'no-cache' })
-                .then(function (r) { return r.ok ? r.json() : null; })
-                .then(function (rel) {
-                    const assets = (rel && rel.assets) || [];
-                    const a = assets.find(function (x) { return x && x.name === BG_THEMES_MANIFEST; });
-                    if (!a || !a.browser_download_url) throw new Error('no manifest');
-                    return fetch(a.browser_download_url, { cache: 'no-cache' });
-                })
-                .then(function (r) { return r.ok ? r.json() : null; })
+            // 清单 bg-themes.json 以 attach_file 形式挂在 bg-themes 发行版下，
+            // 用与皮肤/视频一致的决定性下载地址读取（公开可读，无需 token）：
+            //   https://gitee.com/<owner>/<repo>/releases/download/<tag>/bg-themes.json
+            return fetch(giteeDlUrl(BG_THEMES_MANIFEST), { cache: 'no-cache' })
+                .then(function (r) { if (!r.ok) throw new Error('清单读取失败(HTTP ' + r.status + ')'); return r.json(); })
                 .then(function (j) {
                     const themes = (j && Array.isArray(j.themes)) ? j.themes : [];
                     try { localStorage.setItem(BG_THEMES_CACHE_KEY, JSON.stringify({ ts: Date.now(), themes: themes })); } catch (e) {}
@@ -1317,19 +1313,44 @@
         function giteeTok() { try { return localStorage.getItem(BG_THEMES_TOKEN_KEY) || ''; } catch (e) { return ''; } }
         function giteeApiBase() { return 'https://gitee.com/api/v5/repos/' + GITEE_OWNER + '/' + GITEE_REPO; }
         function giteeDlUrl(filename) { return 'https://gitee.com/' + GITEE_OWNER + '/' + GITEE_REPO + '/releases/download/' + BG_THEMES_RELEASE_TAG + '/' + filename; }
-        // 确保 bg-themes release 存在（没有则创建）
+        // 确保 bg-themes release 存在（没有则创建）。
+        // 注意：Gitee 创建 release 的字段是 target_commitish（不是 target_commit_id），
+        // 且本仓库默认分支是 main（不是 master）——写错会导致创建失败。
+        // Gitee WAF 偶发把已成功的 POST /releases 拦成假 400，故创建后复查列表确认。
         function giteeEnsureRelease(tok) {
-            return fetch(giteeApiBase() + '/releases?access_token=' + encodeURIComponent(tok) + '&per_page=100')
-                .then(function (r) { return r.json(); })
-                .then(function (list) {
-                    const rel = (list || []).find(function (x) { return x && x.tag_name === BG_THEMES_RELEASE_TAG; });
-                    if (rel) return rel;
-                    return fetch(giteeApiBase() + '/releases?access_token=' + encodeURIComponent(tok), {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ tag_name: BG_THEMES_RELEASE_TAG, name: '背景主题视频库', target_commit_id: 'master' })
-                    }).then(function (r) { return r.json(); });
+            const base = giteeApiBase();
+            const q = '?access_token=' + encodeURIComponent(tok);
+            function getList() {
+                return fetch(base + '/releases' + q + '&per_page=100', { cache: 'no-cache' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (list) { return Array.isArray(list) ? list : []; });
+            }
+            function create() {
+                const body = JSON.stringify({
+                    tag_name: BG_THEMES_RELEASE_TAG,
+                    name: '背景主题视频库',
+                    body: '背景主题视频库（自动发布）',
+                    target_commitish: 'main',
+                    prerelease: false
                 });
+                return fetch(base + '/releases' + q, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body })
+                    .then(function (r) {
+                        return r.json().then(function (j) {
+                            if (j && j.id) return j; // 真的建好了
+                            // 假 400 兜底：复查列表
+                            return getList().then(function (list) {
+                                const found = list.find(function (x) { return x && x.tag_name === BG_THEMES_RELEASE_TAG; });
+                                if (found) return found;
+                                throw new Error((j && (j.error_description || j.error)) || ('创建 release 失败(HTTP ' + r.status + ')'));
+                            });
+                        });
+                    });
+            }
+            return getList().then(function (list) {
+                const rel = list.find(function (x) { return x && x.tag_name === BG_THEMES_RELEASE_TAG; });
+                if (rel) return rel;
+                return create();
+            });
         }
         // 上传附件到指定 release（浏览器 FormData multipart）
         function giteeUploadFile(tok, releaseId, file, filename) {
@@ -1361,20 +1382,21 @@
                 v.src = url;
             });
         }
-        // 读/写主题清单 Gist（无 ID 时自动创建公开 Gist 并把 ID 存本机）
-        // 写清单到 Gitee「bg-themes」发行版：先删除旧 bg-themes.json 资产，再上传新的（与视频同款权限，无需 GitHub Token）
+        // 写清单到 Gitee「bg-themes」发行版：先删除旧 bg-themes.json 附件，再上传新的（与视频同款权限，无需 GitHub Token）
         function bgThemesWrite(data, tok) {
             return giteeEnsureRelease(tok).then(function (rel) {
                 const rid = rel && rel.id;
                 if (!rid) throw new Error('无法获取/创建 Gitee release');
-                return fetch(giteeApiBase() + '/releases/' + rid + '/attach_files?access_token=' + encodeURIComponent(tok))
-                    .then(function (r) { return r.ok ? r.json() : []; })
-                    .then(function (files) {
-                        const old = (files || []).find(function (x) { return x && x.name === BG_THEMES_MANIFEST; });
-                        const chain = old
+                // 取发行版详情里的 attach_files 列表，找到旧的 bg-themes.json 先删掉，避免重名冲突
+                return fetch(giteeApiBase() + '/releases/' + rid + '?access_token=' + encodeURIComponent(tok), { cache: 'no-cache' })
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (detail) {
+                        const files = (detail && (detail.attach_files || detail.assets)) || [];
+                        const old = files.find(function (x) { return x && x.name === BG_THEMES_MANIFEST; });
+                        const del = old && old.id
                             ? fetch(giteeApiBase() + '/releases/' + rid + '/attach_files/' + old.id + '?access_token=' + encodeURIComponent(tok), { method: 'DELETE' }).catch(function () {})
                             : Promise.resolve();
-                        return chain.then(function () {
+                        return del.then(function () {
                             const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
                             return giteeUploadFile(tok, rid, blob, BG_THEMES_MANIFEST);
                         });
