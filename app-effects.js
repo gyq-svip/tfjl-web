@@ -420,6 +420,21 @@
                 v.style.cssText = 'position:fixed;top:-40px;left:-40px;width:calc(100% + 80px);height:calc(100% + 80px);object-fit:cover;z-index:-2;pointer-events:none;';
                 document.body.appendChild(v);
             }
+            if (!v.__bgGuard) {
+                v.__bgGuard = true;
+                // 🔴 H.265/HEVC 等当前环境无解码器时 videoWidth=0（只有声音没画面）：
+                //    metadata 一到就标记并暂停；之后任何 play 尝试都立即再暂停，避免「音乐还在放」。
+                v.addEventListener('loadedmetadata', function () {
+                    if (!v.videoWidth || !v.videoHeight) {
+                        v.__bgDecodeBad = true;
+                        try { v.pause(); } catch (e) {}
+                        try { if (typeof showToast === 'function') showToast('⚠️ 该视频编码不受支持（常见 H.265/HEVC），请换 H.264 版本'); } catch (e) {}
+                    }
+                });
+                v.addEventListener('play', function () {
+                    if (v.__bgDecodeBad) { try { v.pause(); } catch (e) {} }
+                });
+            }
             return v;
         }
         // 应用声音开关状态；音量大小可调（0~10 档，默认 5）
@@ -456,6 +471,7 @@
                 bgVideoId = id;
                 const v = ensureBgVideo();
                 bgApplyVideoSound(v);
+                v.__bgDecodeBad = false;
                 v.src = bgVideoUrl;
                 const p = v.play();
                 if (p && p.catch) p.catch(function () {
@@ -541,13 +557,15 @@
         function bgApplyBuiltinVideo(theme) {
             const vurl = theme && theme.video;
             if (!vurl) return Promise.reject(new Error('no url'));
-            const applyBlob = function (blob) {
+            const themeId = theme && theme.id;
+            const applySrc = function (src) {
                 stopBgVideo();
-                if (bgBuiltinVideoUrl) { try { URL.revokeObjectURL(bgBuiltinVideoUrl); } catch (e) {} }
-                bgBuiltinVideoUrl = URL.createObjectURL(blob);
+                bgBuiltinVideoUrl = src;
+                bgBuiltinVideoThemeId = themeId || null; // stopBgVideo 会清空，这里恢复标记（用于「使用中」高亮）
                 const v = ensureBgVideo();
                 bgApplyVideoSound(v);
-                v.src = bgBuiltinVideoUrl;
+                v.__bgDecodeBad = false; // 新视频重置解码失败标记（ensureBgVideo 的守卫会在 metadata 到达时判定）
+                v.src = src;
                 const p = v.play();
                 if (p && p.catch) p.catch(function () {
                     if (!bgVideoMuted()) { // 自动播放策略兜底：先静音播，首次交互后恢复声音
@@ -555,31 +573,28 @@
                         const p2 = v.play(); if (p2 && p2.catch) p2.catch(function () {});
                         bgOnceInteract(function () {
                             const vv = document.getElementById('bgVideo');
-                            if (vv) { vv.muted = false; vv.volume = bgVideoVol(); const p3 = vv.play(); if (p3 && p3.catch) p3.catch(function () {}); }
+                            if (vv && bgHasActiveVideo()) { vv.muted = false; vv.volume = bgVideoVol(); const p3 = vv.play(); if (p3 && p3.catch) p3.catch(function () {}); }
                         });
                     }
                 });
             };
-            return bgAssetGet(vurl).then(function (blob) {
-                if (blob) { applyBlob(blob); return null; }
-                // 首拉：下载并落盘；只保留当前一个内置视频缓存（视频体积大，防 IndexedDB 爆盘）
-                return fetch(vurl).then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.blob(); })
-                    .then(function (b) {
-                        return bgAssetDelOldVideos().catch(function () {}).then(function () {
-                            return bgAssetPut(vurl, b).catch(function () {});
-                        }).then(function () { applyBlob(b); });
-                    });
+            // 🔴 Gitee 不返回 CORS 头，fetch(vurl) 必被浏览器拦（Failed to fetch，即「下载不了」）。
+            //    <video src> 直连不受 CORS 限制，故不再 fetch 下载；有本机缓存 blob 就优先用，否则直连播放。
+            return bgAssetGet(vurl).catch(function () { return null; }).then(function (blob) {
+                applySrc(blob ? URL.createObjectURL(blob) : vurl);
             }).catch(function (e) {
-                try { if (typeof showToast === 'function') showToast('⚠️ 视频下载失败：' + (e && e.message ? e.message : '网络错误')); } catch (e2) {}
-                throw e;
+                try { applySrc(vurl); } catch (e2) {}
+                try { if (typeof showToast === 'function') showToast('⚠️ 视频播放失败：' + (e && e.message ? e.message : '网络错误')); } catch (e2) {}
             });
         }
         // 窗口最小化 / 收进托盘 / 切到后台时暂停背景视频与声音（含音频）；重新可见时自动续播。
-        // 用 visibilitychange 统一覆盖「最小化」「叉掉收托盘」「浏览器切走标签页」等隐藏场景。
+        // 覆盖：DOM visibilitychange（浏览器切标签）、window blur/focus（最小化/托盘/失焦）、
+        //       Tauri v2 onFocusChanged + 原生 tauri://blur/focus + Rust 的 tfjl-minimized/restored 精确事件。
         function bgHasActiveVideo() { return !!(bgVideoUrl || bgBuiltinVideoUrl); }
         function bgPauseForHidden() {
+            // 不再用 bgHasActiveVideo 兜底：只要元素在播就暂停（避免变量未置位时漏暂停）
             const v = document.getElementById('bgVideo');
-            if (v && !v.paused && bgHasActiveVideo()) { try { v.pause(); } catch (e) {} }
+            if (v && !v.paused) { try { v.pause(); } catch (e) {} }
         }
         function bgResumeForVisible() {
             const v = document.getElementById('bgVideo');
@@ -600,20 +615,34 @@
             if (document.visibilityState === 'hidden') bgPauseForHidden();
             else bgResumeForVisible();
         });
-        // 桌面端（Tauri）窗口事件再兜一层：minimize/hide 暂停，unminimize/show/focus 续播
+        // 失焦/聚焦兜底：最小化、收托盘、切到其它窗口都会先失焦。
+        // DOM blur 在渲染进程内同步触发，比 IPC 事件更早，能赶在 WebView 冻结前暂停。
+        window.addEventListener('blur', bgPauseForHidden);
+        window.addEventListener('focus', bgResumeForVisible);
+        // 桌面端（Tauri v2）：修正旧代码误用的 onEvent（v2 无此方法 → 整段静默失效，最小化/托盘照播）
         (function () {
             try {
-                const W = window.__TAURI__ && window.__TAURI__.window;
-                const cur = W && W.getCurrentWindow;
-                if (typeof cur === 'function') {
-                    const w = cur.call(W);
-                    if (w && typeof w.onEvent === 'function') {
-                        w.onEvent(function (e) {
-                            const t = e && e.type;
-                            if (t === 'minimize' || t === 'hide') bgPauseForHidden();
-                            else if (t === 'unminimize' || t === 'show' || t === 'focus') bgResumeForVisible();
+                const T = window.__TAURI__;
+                if (!T) return;
+                const W = T.window;
+                const w = (W && typeof W.getCurrentWindow === 'function') ? W.getCurrentWindow() : null;
+                if (w) {
+                    if (typeof w.onFocusChanged === 'function') {
+                        const p = w.onFocusChanged(function (e) {
+                            if (e && e.payload) bgResumeForVisible(); else bgPauseForHidden();
                         });
+                        if (p && p.catch) p.catch(function () {});
                     }
+                    if (typeof w.listen === 'function') {
+                        try { const p1 = w.listen('tauri://blur', function () { bgPauseForHidden(); }); if (p1 && p1.catch) p1.catch(function () {}); } catch (e) {}
+                        try { const p2 = w.listen('tauri://focus', function () { bgResumeForVisible(); }); if (p2 && p2.catch) p2.catch(function () {}); } catch (e) {}
+                    }
+                }
+                const E = T.event;
+                if (E && typeof E.listen === 'function') {
+                    // Rust 端精确事件（lib.rs：Focused(false)+is_minimized → tfjl-minimized；Focused(true) → tfjl-restored）
+                    try { const p3 = E.listen('tfjl-minimized', function () { bgPauseForHidden(); }); if (p3 && p3.catch) p3.catch(function () {}); } catch (e) {}
+                    try { const p4 = E.listen('tfjl-restored', function () { bgResumeForVisible(); }); if (p4 && p4.catch) p4.catch(function () {}); } catch (e) {}
                 }
             } catch (e) {}
         })();
@@ -1286,11 +1315,8 @@
                         bgAssetGet(t.cover).catch(function () { return null; }).then(function (blob) {
                             if (!btn.isConnected) return;
                             if (blob) { const bu = URL.createObjectURL(blob); bgVideoThemeThumbUrls.push(bu); btn.style.backgroundImage = 'url(' + bu + ')'; return; }
-                            fetch(t.cover).then(function (r) { return r.ok ? r.blob() : null; }).then(function (b) {
-                                if (!b || !btn.isConnected) return;
-                                const bu = URL.createObjectURL(b); bgVideoThemeThumbUrls.push(bu); btn.style.backgroundImage = 'url(' + bu + ')';
-                                bgAssetPut(t.cover, b).catch(function () {});
-                            }).catch(function () {});
+                            // 无缓存：封面直接用网络 URL（CSS 背景跨域不受 CORS 限制，Gitee 可正常显示）
+                            btn.style.backgroundImage = 'url("' + String(t.cover).replace(/"/g, '') + '")';
                         });
                     }
                 });
@@ -1386,6 +1412,29 @@
                 .then(function (r) { return r.json(); })
                 .then(function (j) { if (!j || j.error) throw new Error((j && j.error_description) || '上传失败'); return j; });
         }
+        // 本地探测视频能否被当前浏览器解码。
+        // 🔴 H.265/HEVC（hvc1）在 Chrome/WebView2 多数解不了：loadedmetadata 照常触发、duration 正常，
+        //    但 videoWidth/videoHeight = 0 → 表现「只有声音没画面」。上传前拦掉，避免传上去放不出来。
+        function bgProbeVideo(file) {
+            return new Promise(function (resolve) {
+                const url = URL.createObjectURL(file);
+                const v = document.createElement('video');
+                v.muted = true; v.playsInline = true; v.preload = 'metadata';
+                const done = function (res) {
+                    try { URL.revokeObjectURL(url); } catch (e) {}
+                    try { v.removeAttribute('src'); v.load(); } catch (e) {}
+                    resolve(res);
+                };
+                const t = setTimeout(function () { done({ ok: false, reason: 'timeout' }); }, 15000);
+                v.onloadedmetadata = function () {
+                    clearTimeout(t);
+                    if (!v.videoWidth || !v.videoHeight) { done({ ok: false, reason: 'decode', w: v.videoWidth || 0, h: v.videoHeight || 0 }); return; }
+                    done({ ok: true, w: v.videoWidth, h: v.videoHeight, dur: v.duration || 0 });
+                };
+                v.onerror = function () { clearTimeout(t); done({ ok: false, reason: 'error', code: v.error && v.error.code }); };
+                v.src = url;
+            });
+        }
         // 从视频中抓一帧当封面（用户不传封面时）
         function bgGrabVideoFrame(file) {
             return new Promise(function (res, rej) {
@@ -1439,7 +1488,8 @@
             body.innerHTML =
                 '<div style="font-size:0.72rem;color:rgba(255,255,255,0.6);background:rgba(255,255,255,0.05);border-radius:6px;padding:8px;line-height:1.7;margin-bottom:12px;">' +
                 '上传后<b style="color:#ffd700;">所有人刷新页面即可看到</b>新主题；用户点应用后视频自动缓存到本机，断网也能播。<br>' +
-                '🎬 <b>视频/封面</b>走 <b>Gitee Releases</b>（需 Gitee Token）；📋 <b>主题清单目录</b>走 <b>GitHub Gist</b>（站点自动 Token，无需手动填）。' +
+                '🎬 <b>视频/封面</b>走 <b>Gitee Releases</b>（需 Gitee Token）；📋 <b>主题清单目录</b>走 <b>GitHub Gist</b>（站点自动 Token，无需手动填）。<br>' +
+                '<span style="color:#fbbf24;">⚠️ 视频请用 <b>H.264 / MP4</b>：手机 H.265/HEVC 录屏浏览器解不了（会只有声音没画面），上传前会自动检测拦截。</span>' +
                 '</div>' +
                 '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:0.78rem;color:rgba(255,255,255,0.85);">' +
                 '  <span style="flex-shrink:0;">Gitee Token</span>' +
@@ -1519,7 +1569,7 @@
                     row.style.cssText = 'display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.05);border-radius:8px;padding:8px 10px;';
                     const cover = document.createElement('div');
                     cover.style.cssText = 'width:64px;height:36px;border-radius:4px;background:rgba(255,255,255,0.1) center/cover no-repeat;flex-shrink:0;';
-                    if (t.cover) { bgAssetGet(t.cover).catch(function () { return null; }).then(function (b) { if (b) cover.style.backgroundImage = 'url(' + URL.createObjectURL(b) + ')'; }); }
+                    if (t.cover) { bgAssetGet(t.cover).catch(function () { return null; }).then(function (b) { cover.style.backgroundImage = b ? ('url(' + URL.createObjectURL(b) + ')') : ('url("' + String(t.cover).replace(/"/g, '') + '")'); }); }
                     row.appendChild(cover);
                     const info = document.createElement('div');
                     info.style.cssText = 'flex:1;min-width:0;font-size:0.75rem;color:rgba(255,255,255,0.85);line-height:1.5;';
@@ -1553,6 +1603,13 @@
             const vExt = (vfile.name.match(/\.(mp4|webm|mov)$/i) || ['.mp4'])[0].toLowerCase();
             const vName = themeId + vExt;
             (async function () {
+                log('⓪ 检测视频编码（浏览器能否解码）…');
+                const probe = await bgProbeVideo(vfile);
+                if (!probe.ok) {
+                    if (probe.reason === 'decode') throw new Error('该视频浏览器无法解码（多为 H.265/HEVC），请导出 H.264/MP4 后重传');
+                    if (probe.reason === 'error') throw new Error('视频解析失败，请换一个文件或重新导出');
+                    throw new Error('视频检测超时，请重试');
+                }
                 log('① 检查 Gitee 发行版…');
                 const rel = await giteeEnsureRelease(tok);
                 const rid = rel && rel.id;
