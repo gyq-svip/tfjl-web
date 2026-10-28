@@ -1442,6 +1442,8 @@
                 applyUserBackground();
                 try { if (typeof showToast === 'function') showToast('✅ 已应用「' + (t.name || '未命名') + '」'); } catch (e) {}
                 if (typeof renderBgImageList === 'function') renderBgImageList();
+                // 🔴 切换后重渲染主题卡片，否则「使用中」高亮还停在旧主题上
+                if (typeof renderBgVideoThemes === 'function') renderBgVideoThemes();
             });
         };
         // 隐藏（本机不再显示）某个内置视频主题
