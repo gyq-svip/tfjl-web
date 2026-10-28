@@ -1452,6 +1452,44 @@
                 .then(function (r) { return r.json(); })
                 .then(function (j) { if (!j || j.error) throw new Error((j && j.error_description) || '上传失败'); return j; });
         }
+        // 直接读文件字节判断视频编码（与「本机能不能解」无关，保证跨电脑一致）。
+        // MP4/MOV 的 sample entry：hvc1/hev1/dvhe/dvh1 = H.265/HEVC；avc1/avc3 = H.264；
+        // vp09 = VP9；av01 = AV1。HEVC 是「有的电脑能播、有的不能」的根源（Windows 默认无解码器），统一拦掉。
+        function bgDetectVideoCodec(file) {
+            const CHUNK = 4 * 1024 * 1024; // 读头尾各 4MB（moov 可能在文件头或尾）
+            const read = function (blob) {
+                return blob.arrayBuffer ? blob.arrayBuffer() : new Promise(function (res, rej) {
+                    const fr = new FileReader();
+                    fr.onload = function () { res(fr.result); };
+                    fr.onerror = rej;
+                    fr.readAsArrayBuffer(blob);
+                });
+            };
+            const parts = [file.slice(0, Math.min(CHUNK, file.size))];
+            if (file.size > CHUNK) parts.push(file.slice(Math.max(0, file.size - CHUNK)));
+            return Promise.all(parts.map(read)).then(function (bufs) {
+                const views = bufs.map(function (b) { return new Uint8Array(b); });
+                const find = function (sig) {
+                    const s = sig.split('').map(function (c) { return c.charCodeAt(0); });
+                    for (let k = 0; k < views.length; k++) {
+                        const a = views[k];
+                        for (let i = 0; i + s.length <= a.length; i++) {
+                            let ok = true;
+                            for (let j = 0; j < s.length; j++) { if (a[i + j] !== s[j]) { ok = false; break; } }
+                            if (ok) return true;
+                        }
+                    }
+                    return false;
+                };
+                const hevc = find('hvc1') || find('hev1') || find('dvhe') || find('dvh1');
+                let codec = 'unknown';
+                if (hevc) codec = 'hevc';
+                else if (find('avc1') || find('avc3')) codec = 'h264';
+                else if (find('vp09')) codec = 'vp9';
+                else if (find('av01')) codec = 'av1';
+                return { codec: codec, hevc: hevc };
+            }).catch(function () { return { codec: 'unknown', hevc: false }; });
+        }
         // 本地探测视频能否被当前浏览器解码。
         // 🔴 H.265/HEVC（hvc1）在 Chrome/WebView2 多数解不了：loadedmetadata 照常触发、duration 正常，
         //    但 videoWidth/videoHeight = 0 → 表现「只有声音没画面」。上传前拦掉，避免传上去放不出来。
@@ -1529,7 +1567,7 @@
                 '<div style="font-size:0.72rem;color:rgba(255,255,255,0.6);background:rgba(255,255,255,0.05);border-radius:6px;padding:8px;line-height:1.7;margin-bottom:12px;">' +
                 '上传后<b style="color:#ffd700;">所有人刷新页面即可看到</b>新主题；用户点应用后视频自动缓存到本机，断网也能播。<br>' +
                 '🎬 <b>视频/封面</b>走 <b>Gitee Releases</b>（需 Gitee Token）；📋 <b>主题清单目录</b>走 <b>GitHub Gist</b>（站点自动 Token，无需手动填）。<br>' +
-                '<span style="color:#fbbf24;">⚠️ 视频请用 <b>H.264 / MP4</b>：手机 H.265/HEVC 录屏浏览器解不了（会只有声音没画面），上传前会自动检测拦截。</span>' +
+                '<span style="color:#fbbf24;">⚠️ 视频统一用 <b>H.264 / MP4</b>：H.265/HEVC 依赖电脑自带解码器，<b>有的电脑能播、有的不能</b>（只有声音没画面），上传时会直接拦下。</span>' +
                 '</div>' +
                 '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:0.78rem;color:rgba(255,255,255,0.85);">' +
                 '  <span style="flex-shrink:0;">Gitee Token</span>' +
@@ -1625,7 +1663,7 @@
                     info.style.cssText = 'flex:1;min-width:0;font-size:0.75rem;color:rgba(255,255,255,0.85);line-height:1.5;';
                     info.innerHTML = '<div style="font-weight:bold;">' + bgEsc(t.name || '未命名') + '</div>' +
                         '<div style="color:rgba(255,255,255,0.45);font-size:0.68rem;word-break:break-all;">' + bgEsc(t.video || '') + '</div>' +
-                        '<div style="color:rgba(255,255,255,0.4);font-size:0.66rem;">' + (t.size ? (Math.round(t.size / 1048576) + ' MB') : '') + (t.ts ? ' · ' + new Date(t.ts).toLocaleString('zh-CN', { hour12: false }) : '') + '</div>';
+                        '<div style="color:rgba(255,255,255,0.4);font-size:0.66rem;">' + (t.size ? (Math.round(t.size / 1048576) + ' MB') : '') + (t.ts ? ' · ' + new Date(t.ts).toLocaleString('zh-CN', { hour12: false }) : '') + (t.codec ? ' · <b style="color:' + (t.codec === 'hevc' ? '#f87171' : '#9ae6b4') + ';">' + (t.codec === 'h264' ? 'H.264' : t.codec === 'hevc' ? 'HEVC(部分电脑不支持)' : t.codec.toUpperCase()) + '</b>' : '') + '</div>';
                     row.appendChild(info);
                     const del = document.createElement('button');
                     del.className = 'admin-btn admin-btn-secondary';
@@ -1653,10 +1691,13 @@
             const vExt = (vfile.name.match(/\.(mp4|webm|mov)$/i) || ['.mp4'])[0].toLowerCase();
             const vName = themeId + vExt;
             (async function () {
-                log('⓪ 检测视频编码（浏览器能否解码）…');
+                log('⓪ 检测视频编码…');
+                // 先按文件字节判编码（与本机能否解码无关），HEVC 一律拦下，保证换任何电脑都能播
+                const codec = await bgDetectVideoCodec(vfile);
+                if (codec.hevc) throw new Error('该视频是 H.265/HEVC 编码：Windows 默认无解码器，有的电脑能播、有的不能。请导出 H.264/MP4 后重传');
                 const probe = await bgProbeVideo(vfile);
                 if (!probe.ok) {
-                    if (probe.reason === 'decode') throw new Error('该视频浏览器无法解码（多为 H.265/HEVC），请导出 H.264/MP4 后重传');
+                    if (probe.reason === 'decode') throw new Error('该视频当前浏览器无法解码，请导出 H.264/MP4 后重传');
                     if (probe.reason === 'error') throw new Error('视频解析失败，请换一个文件或重新导出');
                     throw new Error('视频检测超时，请重试');
                 }
@@ -1675,7 +1716,7 @@
                 if (coverBlob) { log('④ 上传封面…'); await giteeUploadFile(tok, rid, coverBlob, cName); }
                 log('⑤ 读取并更新主题清单（GitHub Gist）…');
                 const m = await bgManifestLoad(true).catch(function () { return bgNormalizeManifest(null); });
-                const theme = { id: themeId, name: name, video: giteeDlUrl(vName), cover: coverBlob ? giteeDlUrl(cName) : '', size: vfile.size, ts: Date.now() };
+                const theme = { id: themeId, name: name, video: giteeDlUrl(vName), cover: coverBlob ? giteeDlUrl(cName) : '', size: vfile.size, ts: Date.now(), codec: codec.codec };
                 m.themes.push(theme);
                 await bgManifestWrite(m);
                 try { localStorage.removeItem(BG_THEMES_CACHE_KEY); } catch (e) {}
