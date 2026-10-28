@@ -515,24 +515,19 @@
                 return null;
             })();
             if (cached && !force) return Promise.resolve(cached.themes);
-            // 清单 bg-themes.json 托管在公开 GitHub Gist（无需 token 即可读）。
-            // 优先走 raw CDN（gist.githubusercontent.com，不限流、CORS *）；缺 owner 时回退 API。
+            // 清单 bg-themes.json 托管在 GitHub Gist。走 API + 站点注入的 GitHub Token（每个用户页面都带），
+            // 认证请求额度 5000/h，不会像匿名请求那样被 60/h 限流；比 raw CDN 更快（用户实测/明确要求）。
             return bgThemesGistInfo().then(function (info) {
                 if (!info.id) return [];
-                const rawUrl = info.owner
-                    ? 'https://gist.githubusercontent.com/' + encodeURIComponent(info.owner) + '/' + encodeURIComponent(info.id) + '/raw/' + encodeURIComponent(BG_THEMES_MANIFEST)
-                    : '';
-                const target = rawUrl || ('https://api.github.com/gists/' + encodeURIComponent(info.id));
-                return fetch(target, { cache: 'no-cache' })
+                const tok = (window.AllianceDB && typeof window.AllianceDB.ghToken === 'function') ? window.AllianceDB.ghToken() : '';
+                const headers = { 'Accept': 'application/vnd.github.v3+json' };
+                if (tok) headers['Authorization'] = 'token ' + tok;
+                return fetch('https://api.github.com/gists/' + encodeURIComponent(info.id), { cache: 'no-cache', headers: headers })
                     .then(function (r) { if (!r.ok) throw new Error('清单读取失败(HTTP ' + r.status + ')'); return r.json(); })
-                    .then(function (j) {
-                        // raw：j 即清单对象；api：j.files['bg-themes.json'].content 是字符串
+                    .then(function (g) {
+                        const c = g && g.files && g.files[BG_THEMES_MANIFEST] && g.files[BG_THEMES_MANIFEST].content;
                         let obj = null;
-                        if (rawUrl) obj = j;
-                        else {
-                            const c = j && j.files && j.files[BG_THEMES_MANIFEST] && j.files[BG_THEMES_MANIFEST].content;
-                            if (c) { try { obj = JSON.parse(c); } catch (e) {} }
-                        }
+                        if (c) { try { obj = JSON.parse(c); } catch (e) {} }
                         const themes = (obj && Array.isArray(obj.themes)) ? obj.themes : [];
                         try { localStorage.setItem(BG_THEMES_CACHE_KEY, JSON.stringify({ ts: Date.now(), themes: themes })); } catch (e2) {}
                         return themes;
