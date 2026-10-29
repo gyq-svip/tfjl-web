@@ -1516,8 +1516,42 @@
             const fd = new FormData();
             fd.append('file', file, filename);
             return fetch(giteeApiBase() + '/releases/' + releaseId + '/attach_files?access_token=' + encodeURIComponent(tok), { method: 'POST', body: fd })
-                .then(function (r) { return r.json(); })
-                .then(function (j) { if (!j || j.error) throw new Error((j && j.error_description) || '上传失败'); return j; });
+                .then(function (r) {
+                    // 🔴 Gitee 报错用 message 字段（不是 error），且 HTTP 可能 400：只看 j.error 会把失败当成功
+                    return r.json().catch(function () { return null; }).then(function (j) {
+                        if (!r.ok) throw new Error('上传失败(HTTP ' + r.status + ')' + ((j && (j.message || j.error_description)) ? '：' + (j.message || j.error_description) : ''));
+                        if (!j || j.error || !(j.browser_download_url || j.name)) throw new Error((j && (j.message || j.error_description)) || '上传失败');
+                        // 上传后必须验证附件真的存进去了（配额满/静默丢弃时清单不能照写）：查附件列表，最多重试 3 次
+                        const verify = function (attempt) {
+                            return fetch(giteeApiBase() + '/releases/' + releaseId + '/attach_files?access_token=' + encodeURIComponent(tok), { cache: 'no-cache' })
+                                .then(function (lr) { return lr.ok ? lr.json() : []; })
+                                .then(function (files) {
+                                    const found = (files || []).some(function (f) { return f.name === filename; });
+                                    if (found) return j;
+                                    if (attempt >= 3) throw new Error('上传后验证失败：Gitee 附件列表里找不到 ' + filename + '。最常见原因是仓库附件配额（1GB）已满，请到后台删除已下架主题后重试');
+                                    return new Promise(function (res) { setTimeout(res, 2000); }).then(function () { return verify(attempt + 1); });
+                                });
+                        };
+                        return verify(0);
+                    });
+                });
+        }
+        // 下架/删除时同步删除 Gitee 发行版附件（否则孤儿文件会把仓库附件配额 1GB 堆满，新上传全部静默失败）
+        function giteeDeleteAttachments(tok, names) {
+            return giteeEnsureRelease(tok).then(function (rel) {
+                const rid = rel && rel.id;
+                if (!rid || !names || !names.length) return null;
+                return fetch(giteeApiBase() + '/releases/' + rid + '/attach_files?access_token=' + encodeURIComponent(tok), { cache: 'no-cache' })
+                    .then(function (r) { return r.ok ? r.json() : []; })
+                    .then(function (files) {
+                        const targets = (files || []).filter(function (f) { return names.indexOf(f.name) >= 0; });
+                        return Promise.all(targets.map(function (f) {
+                            return fetch(giteeApiBase() + '/releases/' + rid + '/attach_files/' + f.id + '?access_token=' + encodeURIComponent(tok), { method: 'DELETE' })
+                                .then(function (dr) { return dr.ok; })
+                                .catch(function () { return false; });
+                        }));
+                    });
+            }).catch(function () { return null; });
         }
         // 直接读文件字节判断视频编码（与「本机能不能解」无关，保证跨电脑一致）。
         // MP4/MOV 的 sample entry：hvc1/hev1/dvhe/dvh1 = H.265/HEVC；avc1/avc3 = H.264；
@@ -1888,9 +1922,11 @@
                 bgToast('❌ 上传失败：' + (e && e.message ? e.message : e));
             });
         };
-        // 下架（仅从清单移除，Gitee 上的视频/封面文件保留；清单写回 GitHub Gist，用站点自动 Token）
+        // 下架 = 从清单移除 + 同步删除 Gitee 上的视频/封面/原片附件（否则孤儿文件堆满仓库配额，新上传会静默失败）
         window.__bgThemeRemove = function (id) {
-            if (!window.confirm('确定下架这个主题？（仅从清单移除，Gitee 上的文件保留）')) return;
+            if (!window.confirm('确定下架这个主题？（清单移除 + Gitee 上的视频/封面文件一并删除，不可恢复）')) return;
+            let tok = '';
+            try { tok = giteeTok(); } catch (e) {}
             bgManifestLoad(true).then(function (m) {
                 m.themes = (m.themes || []).filter(function (t) { return t.id !== id; });
                 // 下架的正好是默认背景 → 清掉 defaultBg，避免指向不存在的主题
@@ -1900,6 +1936,7 @@
                 try { localStorage.removeItem(BG_THEMES_CACHE_KEY); } catch (e) {}
                 bgToast('✅ 已下架');
                 renderBgThemesAdminList();
+                if (tok) giteeDeleteAttachments(tok, [id + '.mp4', id + '.jpg', id + '_h.mp4', id + '_h.jpg']);
             }).catch(function (e) { bgToast('❌ 下架失败：' + (e && e.message ? e.message : e)); });
         };
 
@@ -1950,7 +1987,9 @@
             });
         };
         window.__bgStaticRemove = function (id) {
-            if (!window.confirm('确定删除这个静态背景图？（仅从清单移除，Gitee 文件保留）')) return;
+            if (!window.confirm('确定删除这个静态背景图？（清单移除 + Gitee 上的图片文件一并删除，不可恢复）')) return;
+            let tok = '';
+            try { tok = giteeTok(); } catch (e) {}
             bgManifestLoad(true).then(function (m) {
                 const rm = (m.statics || []).find(function (s) { return s.id === id; });
                 if (rm && m.defaultBg === 'builtin:' + rm.url) { m.defaultBg = ''; _bgDefaultBg = ''; }
@@ -1960,6 +1999,7 @@
                 try { localStorage.removeItem(BG_THEMES_CACHE_KEY); } catch (e) {}
                 bgToast('✅ 已删除');
                 renderBgStaticAdminList();
+                if (tok) giteeDeleteAttachments(tok, [id + '.jpg']);
             }).catch(function (e) { bgToast('❌ 删除失败：' + (e && e.message ? e.message : e)); });
         };
         window.__bgStaticRemoveBuiltin = function (url) {
