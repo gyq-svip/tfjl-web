@@ -480,7 +480,7 @@
                         const p2 = v.play(); if (p2 && p2.catch) p2.catch(function () {});
                         bgOnceInteract(function () { // 首次交互后恢复声音（回调时重查静音开关：期间用户可能已关声音）
                             const vv = document.getElementById('bgVideo');
-                            if (vv && bgVideoId) {
+                            if (vv && (bgVideoId || bgBuiltinVideoThemeId)) { // 🔴 内置主题视频设置的是 bgBuiltinVideoThemeId，别只查 bgVideoId
                                 const m = bgVideoMuted();
                                 vv.muted = m;
                                 vv.volume = m ? 0 : bgVideoVol();
@@ -735,7 +735,7 @@
         window.__bgToggleVideoSound = function (on) {
             localStorage.setItem(BG_VIDEO_MUTE_KEY, on ? '0' : '1');
             const v = document.getElementById('bgVideo');
-            if (v && bgVideoId) {
+            if (v && (bgVideoId || bgBuiltinVideoThemeId)) { // 🔴 内置主题视频是 bgBuiltinVideoThemeId，本地上传才是 bgVideoId
                 v.muted = !on;
                 v.volume = on ? bgVideoVol() : 0; // 关声音时音量同步归 0
                 const p = v.play(); if (p && p.catch) p.catch(function () {});
