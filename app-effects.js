@@ -441,7 +441,7 @@
         function bgApplyVideoSound(v) {
             const muted = bgVideoMuted();
             v.muted = muted;
-            v.volume = bgVideoVol();
+            v.volume = muted ? 0 : bgVideoVol(); // 静音时音量归 0（双保险：muted 被别处重置也不会出声）
             return muted;
         }
         // 自动播放策略兜底：用户上次开着声音、本次页面加载无交互 → play() 会被浏览器拦截。
@@ -478,9 +478,14 @@
                     if (!bgVideoMuted()) {
                         v.muted = true; // 先静音保证画面播上
                         const p2 = v.play(); if (p2 && p2.catch) p2.catch(function () {});
-                        bgOnceInteract(function () { // 首次交互后恢复声音
+                        bgOnceInteract(function () { // 首次交互后恢复声音（回调时重查静音开关：期间用户可能已关声音）
                             const vv = document.getElementById('bgVideo');
-                            if (vv && bgVideoId) { vv.muted = false; const p3 = vv.play(); if (p3 && p3.catch) p3.catch(function () {}); }
+                            if (vv && bgVideoId) {
+                                const m = bgVideoMuted();
+                                vv.muted = m;
+                                vv.volume = m ? 0 : bgVideoVol();
+                                const p3 = vv.play(); if (p3 && p3.catch) p3.catch(function () {});
+                            }
                         });
                     }
                 });
@@ -619,7 +624,12 @@
                         const p2 = v.play(); if (p2 && p2.catch) p2.catch(function () {});
                         bgOnceInteract(function () {
                             const vv = document.getElementById('bgVideo');
-                            if (vv && bgHasActiveVideo()) { vv.muted = false; vv.volume = bgVideoVol(); const p3 = vv.play(); if (p3 && p3.catch) p3.catch(function () {}); }
+                            if (vv && bgHasActiveVideo()) {
+                                const m = bgVideoMuted(); // 回调时重查：期间用户可能已关声音
+                                vv.muted = m;
+                                vv.volume = m ? 0 : bgVideoVol();
+                                const p3 = vv.play(); if (p3 && p3.catch) p3.catch(function () {});
+                            }
                         });
                     }
                 });
@@ -652,7 +662,12 @@
                     const p2 = v.play(); if (p2 && p2.catch) p2.catch(function () {});
                     bgOnceInteract(function () {
                         const vv = document.getElementById('bgVideo');
-                        if (vv && bgHasActiveVideo()) { vv.muted = false; vv.volume = bgVideoVol(); const p3 = vv.play(); if (p3 && p3.catch) p3.catch(function () {}); }
+                        if (vv && bgHasActiveVideo()) {
+                            const m = bgVideoMuted(); // 回调时重查：期间用户可能已关声音
+                            vv.muted = m;
+                            vv.volume = m ? 0 : bgVideoVol();
+                            const p3 = vv.play(); if (p3 && p3.catch) p3.catch(function () {});
+                        }
                     });
                 }
             });
@@ -722,7 +737,7 @@
             const v = document.getElementById('bgVideo');
             if (v && bgVideoId) {
                 v.muted = !on;
-                v.volume = bgVideoVol();
+                v.volume = on ? bgVideoVol() : 0; // 关声音时音量同步归 0
                 const p = v.play(); if (p && p.catch) p.catch(function () {});
             }
             // 同步已打开背景设置面板里的开关状态（不重渲染整个面板，避免打断用户操作）

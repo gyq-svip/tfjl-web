@@ -401,6 +401,30 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // 🔴 2026-10-29 背景主题视频/封面（Gitee bg-themes 发行版）：跨版本专用缓存 tfjl-bgmedia。
+    //    Gitee 下载链路全程 Cache-Control:no-cache（302→302→200 每一跳都带）→ 浏览器 HTTP 缓存完全失效，
+    //    导致网页版每次播放都重拉几十 MB。视频/封面是内容不变文件（下架重传必换 id），整包缓存安全；
+    //    缓存名不带 -runtime 后缀 → activate 清理时不误删。
+    //    注意：Gitee 无 CORS 头 → 只能 no-cors opaque 响应（Cache API 可存可用，JS 读不了 body）；
+    //    视频元素的 Range 请求一律忽略 Range 取全量 200 应答（浏览器接受 200 应答 Range 请求），保证播放/循环/seek 可用。
+    if (url.hostname === 'gitee.com' && url.pathname.indexOf('/releases/download/bg-themes/') >= 0) {
+        event.respondWith((async () => {
+            try {
+                const cache = await caches.open('tfjl-bgmedia');
+                const cached = await cache.match(request.url, { ignoreVary: true });
+                if (cached) return cached;
+                const resp = await fetch(request.url, { method: 'GET', mode: 'no-cors', cache: 'no-store' });
+                if (resp && (resp.type === 'opaque' || resp.ok)) {
+                    try { await cache.put(request.url, resp.clone()); } catch (e) {}
+                }
+                return resp;
+            } catch (e) {
+                return fetch(request);
+            }
+        })());
+        return;
+    }
+
     // 皮肤元数据 JSON（cards/fusions/skin-attributes/registry 等）随时随版本变动，
     // 且 github.io 偶发不可达时 networkFirst 会回退到旧缓存 → 导致「英雄卡消失」（如 水人）。
     // 故这些 JSON 永远直连拿最新，不走 SW 缓存；图片 .skin/.png 仍走 SWR 离线可用。
