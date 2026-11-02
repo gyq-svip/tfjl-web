@@ -499,6 +499,50 @@ window.EQUIP_IMG = {
         return row.querySelector('select, button');
     }
 
+    // 模拟器自带的「融合变体（选副卡）」区：追加进 showLevelDropdown 弹窗（主页因 isProjectScope 不渲染，模拟器手牌容器不在其判定内）
+    function appendSimFusionVariants(box, side, ovKey, cardName) {
+        const baseHero = (typeof window.getMainCardName === 'function') ? window.getMainCardName(cardName) : cardName;
+        const fusionParts = (typeof window.getFusionParts === 'function') ? window.getFusionParts(cardName) : null;
+        const isFusion = !!(fusionParts && fusionParts.length >= 2);
+        const variants = (typeof window.getFusionVariantsForBase === 'function') ? window.getFusionVariantsForBase(baseHero) : [];
+        if (!variants.length && !isFusion) return; // 无可选变体且非融合卡 → 不显示
+        const section = document.createElement('div');
+        section.id = 'simFusionVariants';
+        section.style.cssText = 'margin:14px 0 6px;border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;';
+        const title = document.createElement('div');
+        title.style.cssText = 'color:#60a5fa;font-weight:700;margin-bottom:6px;';
+        title.textContent = '🔗 融合变体（选副卡）';
+        section.appendChild(title);
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;';
+        const opts = [baseHero].concat(variants);
+        opts.forEach(function (opt) {
+            const sel = opt === cardName;
+            const parts = (typeof window.getFusionParts === 'function') ? window.getFusionParts(opt) : null;
+            const label = opt === baseHero ? '不融合' : ((parts && parts.length >= 2) ? parts[1] : opt);
+            const b = document.createElement('button');
+            b.textContent = label;
+            b.dataset.value = opt;
+            b.style.cssText = 'padding:4px 8px;border-radius:6px;border:2px solid ' + (sel ? '#60a5fa' : 'rgba(255,255,255,0.2)') + ';background:' + (sel ? 'rgba(96,165,250,0.18)' : 'transparent') + ';color:#fff;cursor:pointer;font-size:0.75rem;';
+            b.onclick = function () {
+                const ov = state.overrides[side][ovKey] || {};
+                if (opt === baseHero) { delete ov.fusion; } else { ov.fusion = opt; }
+                state.overrides[side][ovKey] = ov;
+                render(); // 重新渲染（含手牌/上阵卡按融合名显示），不关闭弹窗（弹窗挂在 body 上）
+                // 刷新按钮选中态
+                wrap.querySelectorAll('button').forEach(function (x) {
+                    const xSel = x.dataset.value === (opt === baseHero ? baseHero : opt);
+                    x.style.borderColor = xSel ? '#60a5fa' : 'rgba(255,255,255,0.2)';
+                    x.style.background = xSel ? 'rgba(96,165,250,0.18)' : 'transparent';
+                });
+                if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('模拟器-选择融合副卡');
+            };
+            wrap.appendChild(b);
+        });
+        section.appendChild(wrap);
+        box.appendChild(section);
+    }
+
     // 点卡设置 = 主页同款 showLevelDropdown（等级/魔化/皮肤/融合切换一套通用）
     function openCardSettings(el, ev) {
         const cardId = el.dataset.cardId;
@@ -509,6 +553,18 @@ window.EQUIP_IMG = {
         const info = getCardInfo(cardName);
         try { window.showLevelDropdown(ev, cardId, info.type || 'gold', side, cardName); } catch (e) {}
         watchPopupClose(side, el.dataset.ovKey || cardName, cardId, cardName, info.type || 'gold');
+        // 🔴 模拟器手牌容器不是主页 #myHandContainer/.battle-slot，showLevelDropdown 的 isProjectScope 判定为 false，
+        //    导致内置「融合变体（选副卡）」区整块不渲染 → 管理员添加的融合（如小丑猫咪）在面板里弹不出选项。
+        //    仿图库做法：模拟器在弹窗里自行追加融合变体区，选项写入模拟器 override.fusion（与 placeCard 读取一致）。
+        setTimeout(function () {
+            try {
+                const root = document.querySelector('.card-settings-popup-root');
+                if (!root) return;
+                const box = root.querySelector('div');
+                if (!box || box.querySelector('#simFusionVariants')) return;
+                appendSimFusionVariants(box, side, el.dataset.ovKey || cardName, cardName);
+            } catch (e) {}
+        }, 0);
     }
 
     // 主页弹窗关闭后，把改动的 等级/魔化/皮肤 捕获进 override（跨波保留）；融合形态渲染时实时读主页全局 fusionSkins
@@ -882,7 +938,16 @@ window.EQUIP_IMG = {
             const subIdx = subName ? window.CHARIOT_LIST.indexOf(subName) : -1;
             if (mainIdx >= 0 || subIdx >= 0) {
                 saved = window.__tfjlChariot[side];
-                window.__tfjlChariot[side] = { main: mainIdx >= 0 ? mainIdx : '', mainLv: mainLv, sub: subIdx >= 0 ? subIdx : '', subLv: subLv };
+                // 🔴 战车状态是 1-based（主页 chariotName(idx)=CHARIOT_LIST[idx-1]，CHARIOT_DEFAULT.main=1）。
+                //    模拟器原写 indexOf 的 0-based：第1个战车写成 main:0 → chariotName(0)=CHARIOT_LIST[-1]=undefined →
+                //    整段战车减伤丢失；其余战车也错位到前一个车。改为 +1 对齐主页，并补 subFusion。
+                window.__tfjlChariot[side] = {
+                    main: mainIdx >= 0 ? mainIdx + 1 : '',
+                    mainLv: mainLv,
+                    sub: subIdx >= 0 ? subIdx + 1 : '',
+                    subLv: subLv,
+                    subFusion: conf.subFusion || 0
+                };
             }
         }
         let result = '0';
