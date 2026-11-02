@@ -1781,6 +1781,11 @@
                         <span class="mi-emoji">🎪</span>
                         <div class="mi-text"><div class="mi-title">活动道具</div><div class="mi-sub">3 个活动的名字/道具维护</div></div>
                     </div>
+                    <!-- 🟢 2026-11-03 副本攻略（内测）：副本 → boss → 多套打法方案；先只在管理员里维护，稳定后再放给用户端 -->
+                    <div class="admin-menu-item" data-key="dungeon" onclick="adminShowPage('dungeon')">
+                        <span class="mi-emoji">🧭</span>
+                        <div class="mi-text"><div class="mi-title">副本攻略</div><div class="mi-sub">boss 多套打法(内测)</div></div>
+                    </div>
                     <!-- 🔴 2026-10-13 活动阵容云端维护：改完保存 → 所有人刷新页面即可看到最新 7 日 A/B 轮转（不用改代码/重新部署） -->
                     <div class="admin-menu-item" data-key="actLineup" onclick="adminShowPage('actLineup')">
                         <span class="mi-emoji">🏆</span>
@@ -2205,6 +2210,33 @@
                     保存后对所有人生效（存云端 Gist）；旧活动存 old_activity_items.json，活动 tab 存 activity_tabs.json。
                 </div>
                 <div id="adminOldItemsBody" style="max-height:66vh;overflow-y:auto;font-size:0.8rem;">加载中…</div>
+            </div>
+
+            <!-- 🟢 2026-11-03 副本攻略（内测）：副本 → boss(属性/注意事项) → 任意多套打法方案 -->
+            <div id="adminPageDungeon" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#ffd700;margin:0;font-size:1rem;">🧭 副本攻略维护</h3>
+                    <button class="admin-btn" onclick="dungeonAdminReload()" style="padding:6px 12px;font-size:0.8rem;margin-left:auto;">🔄 重新载入</button>
+                    <button class="admin-btn" onclick="dungeonAdminToggleIO()" style="padding:6px 12px;font-size:0.8rem;">📄 导入 / 导出</button>
+                    <button class="admin-btn" onclick="dungeonAdminSave()" style="padding:6px 12px;font-size:0.8rem;background:linear-gradient(135deg,#4caf50,#2e7d32);border:none;color:#fff;">💾 保存并下发</button>
+                </div>
+                <div style="font-size:0.72rem;color:rgba(255,255,255,0.55);margin-bottom:10px;background:rgba(255,255,255,0.05);border-radius:6px;padding:8px;line-height:1.7;">
+                    <b style="color:#ffd700;">结构：副本 → boss → 多套打法</b>（一个 boss 想挂几套就挂几套，不限制「主卡/副卡」那种固定栏位）<br>
+                    · 每个 boss 填 <b style="color:#4ecdc4;">属性/机制</b>（如 反伤 240减免 双猪）和 <b style="color:#4ecdc4;">注意事项</b>；<br>
+                    · 每套方案填 <b>打法名</b>（如 火炮流 / 天使流 / 战将流）、<b>阵容</b>（可直接从已保存阵容里选，也能手写）、<b>标签</b>、<b>说明</b>；<br>
+                    · 保存后存云端 <code>dungeon_maps.json</code>（全网可用），同时写一份本地缓存；<b>目前只在管理员可见</b>，完善后再放给用户端。
+                </div>
+                <div id="dungeonAdminBody" style="max-height:64vh;overflow-y:auto;font-size:0.8rem;">加载中…</div>
+                <div id="dungeonAdminIO" style="display:none;margin-top:10px;">
+                    <div style="font-size:0.72rem;color:rgba(255,255,255,0.55);margin-bottom:6px;">下面是当前数据的 JSON：可以整段复制备份，也可以改完（或从别处粘贴）后点「导入到编辑器」。</div>
+                    <textarea id="dungeonAdminJson" spellcheck="false" style="width:100%;box-sizing:border-box;height:180px;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.18);border-radius:8px;color:#e0e0e0;font-family:Consolas,Monaco,monospace;font-size:0.72rem;padding:8px;line-height:1.5;resize:vertical;outline:none;"></textarea>
+                    <div style="display:flex;gap:8px;margin-top:6px;">
+                        <button class="admin-btn" onclick="dungeonAdminExportJson()" style="padding:5px 12px;font-size:0.78rem;">📤 导出到文本框</button>
+                        <button class="admin-btn" onclick="dungeonAdminImportJson()" style="padding:5px 12px;font-size:0.78rem;background:rgba(255,152,0,0.25);border:1px solid rgba(255,152,0,0.35);color:#ffb74d;">📥 导入到编辑器</button>
+                    </div>
+                </div>
+                <datalist id="dungeonProjectList"></datalist>
             </div>
 
             <!-- 🔴 2026-10-13 🏆 活动阵容云端维护：粘贴文本 → 保存下发（activity_lineup.json） -->

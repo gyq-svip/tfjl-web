@@ -29772,6 +29772,337 @@ ${maSection}
             if (!r.ok) throw new Error('HTTP ' + r.status);
         }
 
+        // ==================== 🧭 副本攻略（管理员内测，2026-11-03）====================
+        // 结构：副本(dungeon) → boss 节点(node) → 任意多套打法方案(plan)
+        //   node: { id, name(boss名), attrs(属性/机制), notes(注意事项) }
+        //   plan: { id, title(打法名 如 火炮流), lineup(阵容名，可引用已保存项目), tags(标签), note(说明) }
+        // 存云端 GIST_ID 的 dungeon_maps.json（全网可读），同时写一份 localStorage 本地缓存。
+        // 目前只在管理员面板可见；用户端页面待稳定后再开。
+        const DUNGEON_GIST_FILE = 'dungeon_maps.json';
+        const DUNGEON_LS_KEY = 'TFJL_DungeonMaps';
+        let _dungeonDraft = null;
+        let _dungeonCur = '';
+        let _dungeonBound = false;
+        let _dungeonProjFilled = false;
+
+        function _dUid(p) { return p + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+        function _dungeonNormalize(src) {
+            const out = { version: 1, updated: (src && src.updated) || '', dungeons: [] };
+            const list = (src && Array.isArray(src.dungeons)) ? src.dungeons : [];
+            list.forEach(function (dn) {
+                if (!dn) return;
+                const nodes = Array.isArray(dn.nodes) ? dn.nodes : [];
+                out.dungeons.push({
+                    id: String(dn.id || _dUid('d')),
+                    name: String(dn.name || '未命名副本'),
+                    note: String(dn.note || ''),
+                    nodes: nodes.filter(Boolean).map(function (n) {
+                        const plans = Array.isArray(n.plans) ? n.plans : [];
+                        return {
+                            id: String(n.id || _dUid('n')),
+                            name: String(n.name || ''),
+                            attrs: String(n.attrs || ''),
+                            notes: String(n.notes || ''),
+                            plans: plans.filter(Boolean).map(function (p) {
+                                return {
+                                    id: String(p.id || _dUid('p')),
+                                    title: String(p.title || ''),
+                                    lineup: String(p.lineup || ''),
+                                    tags: String(p.tags || ''),
+                                    note: String(p.note || '')
+                                };
+                            })
+                        };
+                    })
+                });
+            });
+            return out;
+        }
+
+        async function loadDungeonData(force) {
+            if (_dungeonDraft && !force) return _dungeonDraft;
+            let data = null;
+            try {
+                const token = getGistToken();
+                if (token && typeof wallReadGistFile === 'function') {
+                    const c = await wallReadGistFile(GIST_ID, DUNGEON_GIST_FILE, token);
+                    if (c) data = JSON.parse(c);
+                }
+            } catch (e) { console.warn('[副本] 读云端失败，用本地缓存:', e); }
+            if (!data) {
+                try { const ls = localStorage.getItem(DUNGEON_LS_KEY); if (ls) data = JSON.parse(ls); } catch (e) {}
+            }
+            _dungeonDraft = _dungeonNormalize(data || { version: 1, dungeons: [] });
+            if (!_dungeonCur || !_dungeonDraft.dungeons.some(function (d) { return d.id === _dungeonCur; })) {
+                _dungeonCur = _dungeonDraft.dungeons.length ? _dungeonDraft.dungeons[0].id : '';
+            }
+            return _dungeonDraft;
+        }
+
+        function _dungeonCurObj() {
+            if (!_dungeonDraft) return null;
+            return _dungeonDraft.dungeons.find(function (d) { return d.id === _dungeonCur; }) || null;
+        }
+
+        // 已保存阵容 → datalist（手写也行，只是给个候选）
+        async function _dungeonFillProjectList() {
+            if (_dungeonProjFilled) return;
+            _dungeonProjFilled = true;
+            try {
+                const list = await loadProjectListFromDB();
+                const dl = document.getElementById('dungeonProjectList');
+                if (!dl) { _dungeonProjFilled = false; return; }
+                dl.innerHTML = (list || []).filter(function (p) { return p && p.name; })
+                    .map(function (p) { return '<option value="' + _esc(p.name) + '">' + _esc(p.category || '') + '</option>'; }).join('');
+            } catch (e) { _dungeonProjFilled = false; }
+        }
+
+        function _dungeonInput(scope, dId, nId, pId, field, val, ph, extra) {
+            const attrs = 'data-scope="' + scope + '" data-f="' + field + '"' +
+                (dId ? ' data-d="' + _esc(dId) + '"' : '') +
+                (nId ? ' data-n="' + _esc(nId) + '"' : '') +
+                (pId ? ' data-p="' + _esc(pId) + '"' : '');
+            return '<input ' + attrs + (extra || '') + ' value="' + _esc(val || '') + '" placeholder="' + _esc(ph || '') +
+                '" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#fff;font-size:0.78rem;padding:5px 8px;outline:none;">';
+        }
+
+        function renderDungeonAdmin(force) {
+            const box = document.getElementById('dungeonAdminBody');
+            if (!box) return;
+            if (force || !_dungeonDraft) {
+                box.innerHTML = '<div style="color:rgba(255,255,255,0.5);padding:14px;">载入中…</div>';
+                loadDungeonData(!!force).then(function () { renderDungeonAdmin(); _dungeonFillProjectList(); });
+                return;
+            }
+            if (!_dungeonBound) {
+                _dungeonBound = true;
+                box.addEventListener('input', _dungeonOnInput);
+                box.addEventListener('change', _dungeonOnInput);
+            }
+            const d = _dungeonDraft;
+            const cur = _dungeonCurObj();
+            let h = '';
+
+            // ① 副本选择条
+            h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">';
+            d.dungeons.forEach(function (dn) {
+                const on = dn.id === _dungeonCur;
+                h += '<button data-actbtn="' + _esc(dn.id) + '" onclick="dungeonAdminSwitch(\'' + _esc(dn.id) + '\')" style="padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;' +
+                    (on ? 'background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;' : 'background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);') + '">🗺 ' + _esc(dn.name) + '</button>';
+            });
+            h += '<button onclick="dungeonAdminAddDungeon()" style="padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;background:rgba(78,205,196,0.18);border:1px solid rgba(78,205,196,0.4);color:#4ecdc4;">＋ 新建副本</button>';
+            h += '<button onclick="dungeonAdminAddSample()" style="padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);color:rgba(255,255,255,0.6);">填入示例结构</button>';
+            h += '</div>';
+
+            if (!cur) {
+                h += '<div style="color:rgba(255,255,255,0.5);padding:20px;text-align:center;border:1px dashed rgba(255,255,255,0.15);border-radius:8px;">还没有副本 —— 点上面「＋ 新建副本」开始（或点「填入示例结构」看看长什么样）</div>';
+                box.innerHTML = h;
+                return;
+            }
+
+            // ② 副本信息
+            h += '<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px;margin-bottom:10px;">';
+            h += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">';
+            h += '<div style="flex:1 1 200px;"><div style="font-size:0.68rem;color:rgba(255,255,255,0.45);margin-bottom:3px;">副本名字</div>' + _dungeonInput('dungeon', cur.id, '', '', 'name', cur.name, '如 深海 / 天灾 / 地精') + '</div>';
+            h += '<div style="flex:2 1 320px;"><div style="font-size:0.68rem;color:rgba(255,255,255,0.45);margin-bottom:3px;">副本说明（可留空）</div>' + _dungeonInput('dungeon', cur.id, '', '', 'note', cur.note, '如 每周三重置 / 推荐战力 3 万') + '</div>';
+            h += '<button onclick="dungeonAdminDelDungeon()" style="padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;background:rgba(244,67,54,0.18);border:1px solid rgba(244,67,54,0.35);color:#ef9a9a;height:30px;">🗑 删除副本</button>';
+            h += '</div></div>';
+
+            // ③ boss 节点
+            h += '<div style="font-size:0.72rem;color:rgba(255,255,255,0.5);margin:2px 0 8px;">共 <b style="color:#ffd700;">' + cur.nodes.length + '</b> 个 boss，合计 <b style="color:#4ecdc4;">' + cur.nodes.reduce(function (a, n) { return a + (n.plans || []).length; }, 0) + '</b> 套打法</div>';
+
+            cur.nodes.forEach(function (n, ni) {
+                h += '<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px;margin-bottom:10px;">';
+                h += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px;">';
+                h += '<div style="flex:0 0 150px;"><div style="font-size:0.68rem;color:rgba(255,255,255,0.45);margin-bottom:3px;">BOSS 名字</div>' + _dungeonInput('node', cur.id, n.id, '', 'name', n.name, '如 巫医') + '</div>';
+                h += '<div style="flex:1 1 260px;"><div style="font-size:0.68rem;color:rgba(255,255,255,0.45);margin-bottom:3px;">BOSS 属性 / 机制</div>' + _dungeonInput('node', cur.id, n.id, '', 'attrs', n.attrs, '如 反伤 · 240减免 · 双猪 · 18亡将') + '</div>';
+                h += '<button onclick="dungeonAdminDelNode(\'' + _esc(n.id) + '\')" style="padding:5px 10px;border-radius:6px;cursor:pointer;font-size:0.72rem;background:rgba(244,67,54,0.15);border:1px solid rgba(244,67,54,0.3);color:#ef9a9a;height:28px;">🗑 删 boss</button>';
+                h += '</div>';
+                h += '<div style="margin-bottom:8px;"><div style="font-size:0.68rem;color:rgba(255,255,255,0.45);margin-bottom:3px;">注意事项</div>' +
+                    '<textarea data-scope="node" data-f="notes" data-d="' + _esc(cur.id) + '" data-n="' + _esc(n.id) + '" placeholder="如 必须先破盾；第 3 波前留技能；别把主卡累死"' +
+                    ' style="width:100%;box-sizing:border-box;height:46px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#fff;font-size:0.78rem;padding:6px 8px;outline:none;resize:vertical;line-height:1.5;">' + _esc(n.notes) + '</textarea></div>';
+
+                // 方案
+                (n.plans || []).forEach(function (p, pi) {
+                    h += '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;background:rgba(78,205,196,0.05);border:1px solid rgba(78,205,196,0.16);border-radius:6px;padding:8px;margin-bottom:6px;">';
+                    h += '<div style="flex:0 0 130px;"><div style="font-size:0.64rem;color:rgba(255,255,255,0.4);margin-bottom:2px;">打法名 ' + (pi + 1) + '</div>' + _dungeonInput('plan', cur.id, n.id, p.id, 'title', p.title, '火炮流 / 天使流') + '</div>';
+                    h += '<div style="flex:1 1 200px;"><div style="font-size:0.64rem;color:rgba(255,255,255,0.4);margin-bottom:2px;">阵容（可从已保存阵容选）</div>' +
+                        _dungeonInput('plan', cur.id, n.id, p.id, 'lineup', p.lineup, '阵容名或直接写配置', ' list="dungeonProjectList"') + '</div>';
+                    h += '<div style="flex:0 0 130px;"><div style="font-size:0.64rem;color:rgba(255,255,255,0.4);margin-bottom:2px;">标签</div>' + _dungeonInput('plan', cur.id, n.id, p.id, 'tags', p.tags, '火炮,副卡') + '</div>';
+                    h += '<div style="flex:1 1 220px;"><div style="font-size:0.64rem;color:rgba(255,255,255,0.4);margin-bottom:2px;">说明</div>' + _dungeonInput('plan', cur.id, n.id, p.id, 'note', p.note, '开局…集火…') + '</div>';
+                    h += '<button onclick="dungeonAdminDelPlan(\'' + _esc(n.id) + '\',\'' + _esc(p.id) + '\')" style="padding:5px 9px;border-radius:6px;cursor:pointer;font-size:0.7rem;background:rgba(244,67,54,0.12);border:1px solid rgba(244,67,54,0.25);color:#ef9a9a;height:28px;">删</button>';
+                    h += '</div>';
+                });
+                h += '<button onclick="dungeonAdminAddPlan(\'' + _esc(n.id) + '\')" style="padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.74rem;background:rgba(78,205,196,0.15);border:1px solid rgba(78,205,196,0.3);color:#4ecdc4;">＋ 添加一套打法</button>';
+                h += '</div>';
+            });
+
+            h += '<button onclick="dungeonAdminAddNode()" style="width:100%;padding:9px;border-radius:8px;cursor:pointer;font-size:0.8rem;background:rgba(255,215,0,0.12);border:1px dashed rgba(255,215,0,0.4);color:#ffd700;">＋ 添加一个 BOSS</button>';
+
+            box.innerHTML = h;
+        }
+
+        function _dungeonOnInput(e) {
+            const t = e.target;
+            if (!t || !t.dataset || !t.dataset.f || !_dungeonDraft) return;
+            const scope = t.dataset.scope, f = t.dataset.f;
+            const dn = _dungeonDraft.dungeons.find(function (x) { return x.id === t.dataset.d; });
+            if (!dn) return;
+            if (scope === 'dungeon') { dn[f] = t.value; return; }
+            const nd = dn.nodes.find(function (x) { return x.id === t.dataset.n; });
+            if (!nd) return;
+            if (scope === 'node') { nd[f] = t.value; return; }
+            const pl = nd.plans.find(function (x) { return x.id === t.dataset.p; });
+            if (pl) pl[f] = t.value;
+        }
+
+        function dungeonAdminSwitch(id) { _dungeonCur = id; renderDungeonAdmin(); }
+
+        function dungeonAdminAddDungeon() {
+            if (!_dungeonDraft) return;
+            const name = prompt('新副本名字（如 深海 / 天灾 / 地精 / 人类 / 兽人）：', '');
+            if (name === null) return;
+            const dn = { id: _dUid('d'), name: String(name || '').trim() || '未命名副本', note: '', nodes: [] };
+            _dungeonDraft.dungeons.push(dn);
+            _dungeonCur = dn.id;
+            renderDungeonAdmin();
+        }
+
+        function dungeonAdminDelDungeon() {
+            const cur = _dungeonCurObj();
+            if (!cur) return;
+            if (!confirm('删除副本「' + cur.name + '」（含 ' + cur.nodes.length + ' 个 boss）？保存后生效。')) return;
+            _dungeonDraft.dungeons = _dungeonDraft.dungeons.filter(function (x) { return x.id !== cur.id; });
+            _dungeonCur = _dungeonDraft.dungeons.length ? _dungeonDraft.dungeons[0].id : '';
+            renderDungeonAdmin();
+        }
+
+        function dungeonAdminAddNode() {
+            const cur = _dungeonCurObj();
+            if (!cur) return;
+            cur.nodes.push({ id: _dUid('n'), name: '', attrs: '', notes: '', plans: [] });
+            renderDungeonAdmin();
+        }
+
+        function dungeonAdminDelNode(nid) {
+            const cur = _dungeonCurObj();
+            if (!cur) return;
+            const nd = cur.nodes.find(function (x) { return x.id === nid; });
+            if (!nd) return;
+            if (!confirm('删除 boss「' + (nd.name || '未命名') + '」及其 ' + nd.plans.length + ' 套打法？保存后生效。')) return;
+            cur.nodes = cur.nodes.filter(function (x) { return x.id !== nid; });
+            renderDungeonAdmin();
+        }
+
+        function dungeonAdminAddPlan(nid) {
+            const cur = _dungeonCurObj();
+            if (!cur) return;
+            const nd = cur.nodes.find(function (x) { return x.id === nid; });
+            if (!nd) return;
+            nd.plans.push({ id: _dUid('p'), title: '', lineup: '', tags: '', note: '' });
+            renderDungeonAdmin();
+        }
+
+        function dungeonAdminDelPlan(nid, pid) {
+            const cur = _dungeonCurObj();
+            if (!cur) return;
+            const nd = cur.nodes.find(function (x) { return x.id === nid; });
+            if (!nd) return;
+            nd.plans = nd.plans.filter(function (x) { return x.id !== pid; });
+            renderDungeonAdmin();
+        }
+
+        function dungeonAdminAddSample() {
+            if (!_dungeonDraft) return;
+            if (_dungeonDraft.dungeons.length && !confirm('会追加一个示例副本「深海（示例）」，继续？')) return;
+            const dn = {
+                id: _dUid('d'), name: '深海（示例）', note: '每天 3 次 · 推荐战力 3 万',
+                nodes: [{
+                    id: _dUid('n'), name: '巫医', attrs: '反伤 · 240减免 · 双猪 · 18亡将', notes: '必须先破盾；第 3 波前留技能；别把主卡累死',
+                    plans: [
+                        { id: _dUid('p'), title: '火炮流', lineup: '深海-巫医-火炮', tags: '火炮,副卡', note: '开局双爆发压血线，第 4 波集火召唤物' },
+                        { id: _dUid('p'), title: '天使流', lineup: '深海-巫医-天使', tags: '天使,续航', note: '靠天使奶量拖到 boss 放技能后再开爆发' },
+                        { id: _dUid('p'), title: '战将流', lineup: '', tags: '战将,高配', note: '没有战将可以留空，玩家自己填' }
+                    ]
+                }, {
+                    id: _dUid('n'), name: '异兽', attrs: '闪避 · 240减免 · 24射线', notes: '闪避高，带命中/破甲',
+                    plans: [{ id: _dUid('p'), title: '命中流', lineup: '', tags: '命中', note: '' }]
+                }]
+            };
+            _dungeonDraft.dungeons.push(dn);
+            _dungeonCur = dn.id;
+            renderDungeonAdmin();
+        }
+
+        async function dungeonAdminSave() {
+            if (!_dungeonDraft) return;
+            const d = _dungeonDraft;
+            d.updated = new Date().toLocaleString('zh-CN');
+            let nodeCount = 0, planCount = 0;
+            d.dungeons.forEach(function (dn) { nodeCount += dn.nodes.length; dn.nodes.forEach(function (n) { planCount += n.plans.length; }); });
+            try {
+                await _actGistPatch(DUNGEON_GIST_FILE, d);
+                try { localStorage.setItem(DUNGEON_LS_KEY, JSON.stringify(d)); } catch (e) {}
+                alert('✅ 已保存并下发\n\n副本 ' + d.dungeons.length + ' 个 · boss ' + nodeCount + ' 个 · 打法 ' + planCount + ' 套\n（存云端 ' + DUNGEON_GIST_FILE + '，用户端页面待开放）');
+            } catch (e) {
+                // 云端失败也先留本地，避免辛苦填的内容丢
+                try { localStorage.setItem(DUNGEON_LS_KEY, JSON.stringify(d)); } catch (e2) {}
+                alert('⚠️ 云端保存失败：' + ((e && e.message) || e) + '\n\n已先存到本机缓存（换设备看不到）。请检查网络/Token 后重试。');
+            }
+        }
+
+        async function dungeonAdminReload() {
+            if (!confirm('重新从云端载入？当前未保存的修改会丢失。')) return;
+            _dungeonDraft = null;
+            _dungeonCur = '';
+            renderDungeonAdmin(true);
+        }
+
+        function dungeonAdminToggleIO() {
+            const el = document.getElementById('dungeonAdminIO');
+            if (!el) return;
+            const show = el.style.display === 'none' || !el.style.display;
+            el.style.display = show ? 'block' : 'none';
+            if (show) dungeonAdminExportJson();
+        }
+
+        function dungeonAdminExportJson() {
+            const ta = document.getElementById('dungeonAdminJson');
+            if (!ta || !_dungeonDraft) return;
+            ta.value = JSON.stringify(_dungeonDraft, null, 2);
+        }
+
+        function dungeonAdminImportJson() {
+            const ta = document.getElementById('dungeonAdminJson');
+            if (!ta) return;
+            let obj;
+            try { obj = JSON.parse(ta.value); } catch (e) { alert('❌ JSON 格式不对：' + e.message); return; }
+            if (!obj || !Array.isArray(obj.dungeons)) { alert('❌ 结构不对：最外层需要有 dungeons 数组'); return; }
+            _dungeonDraft = _dungeonNormalize(obj);
+            _dungeonCur = _dungeonDraft.dungeons.length ? _dungeonDraft.dungeons[0].id : '';
+            renderDungeonAdmin();
+            alert('✅ 已导入到编辑器（还没保存，确认无误后点「💾 保存并下发」）');
+        }
+
+        try {
+            window.renderDungeonAdmin = renderDungeonAdmin;
+            window.dungeonAdminSwitch = dungeonAdminSwitch;
+            window.dungeonAdminAddDungeon = dungeonAdminAddDungeon;
+            window.dungeonAdminDelDungeon = dungeonAdminDelDungeon;
+            window.dungeonAdminAddNode = dungeonAdminAddNode;
+            window.dungeonAdminDelNode = dungeonAdminDelNode;
+            window.dungeonAdminAddPlan = dungeonAdminAddPlan;
+            window.dungeonAdminDelPlan = dungeonAdminDelPlan;
+            window.dungeonAdminAddSample = dungeonAdminAddSample;
+            window.dungeonAdminSave = dungeonAdminSave;
+            window.dungeonAdminReload = dungeonAdminReload;
+            window.dungeonAdminToggleIO = dungeonAdminToggleIO;
+            window.dungeonAdminExportJson = dungeonAdminExportJson;
+            window.dungeonAdminImportJson = dungeonAdminImportJson;
+            window.loadDungeonData = loadDungeonData;
+        } catch (e) {}
+
         // ==================== 🏆 活动阵容云端维护（管理员，2026-10-13）====================
         // 存索引 Gist 的 activity_lineup.json → { title, list: [{ day, A:[10], B:[10] }], ts }
         // 所有人打开「阵容图库 → 🏆 活动阵容」时自动拉取覆盖本地 lineup-data.js（换期不用改代码/不用部署）
@@ -30493,6 +30824,13 @@ ${maSection}
                 if (pageEl) {
                     pageEl.style.display = 'block';
                     if (typeof window.renderOldItemsAdmin === 'function') window.renderOldItemsAdmin();
+                }
+            } else if (page === 'dungeon') {
+                // 🟢 2026-11-03 副本攻略（内测）：副本 → boss → 多套打法
+                const pageEl = document.getElementById('adminPageDungeon');
+                if (pageEl) {
+                    pageEl.style.display = 'block';
+                    if (typeof window.renderDungeonAdmin === 'function') window.renderDungeonAdmin(true);
                 }
             } else if (page === 'hubManage') {
                 const pageEl = document.getElementById('adminPageHubManage');
