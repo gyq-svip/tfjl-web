@@ -3177,6 +3177,9 @@
             <label style="font-size:0.7rem;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;" title="鼠标悬停在按钮/标签上弹的说明框：觉得挡视线就取消勾选（立即生效、会记住，游戏监控面板一起生效）">
             <input type="checkbox" id="hoverTipToggle" checked onchange="toggleHoverTips(this.checked)"> 悬浮提示
             </label>
+            <label style="font-size:0.7rem;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;" title="卡牌设置用哪套面板：不勾=新版（官方版式大图：立绘/技能/属性详情/升级预览）；勾=旧版（紧凑面板：等级滑条+皮肤小图+融合副卡）。选定后 卡池/收藏/手牌/卡槽/阵容图库 全部按这套打开，会记住。">
+            <input type="checkbox" id="cardSettingsModeToggle" onchange="setCardSettingsMode(this.checked?'old':'new')"> 旧版设置面板
+            </label>
         </div>
     </div>
 </body>

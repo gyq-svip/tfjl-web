@@ -10852,6 +10852,46 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             return hit
         }
 
+        // 🟢 2026-11-03 卡牌设置面板「新版 / 旧版」全局切换（用户偏好，存 localStorage，跨项目/重启保留）
+        //   新版 = 官方版式英雄详情弹窗（大立绘/技能/属性详情/升级预览）
+        //   旧版 = 紧凑设置面板（等级滑条 + 皮肤小图 + 融合副卡 + 魔化）
+        //   选定后「卡池 / 收藏 / 手牌 / 卡槽 / 阵容图库」全部按同一套面板打开。
+        let cardSettingsMode = 'new';
+        try { const _cm = localStorage.getItem('tfjl_card_settings_mode'); if (_cm === 'old' || _cm === 'new') cardSettingsMode = _cm; } catch (e) {}
+        function setCardSettingsMode(mode) {
+            cardSettingsMode = (mode === 'old') ? 'old' : 'new';
+            try { localStorage.setItem('tfjl_card_settings_mode', cardSettingsMode); } catch (e) {}
+            const cb = document.getElementById('cardSettingsModeToggle');
+            if (cb) cb.checked = (cardSettingsMode === 'old');
+            if (typeof showToast === 'function') {
+                showToast(cardSettingsMode === 'old'
+                    ? '✅ 卡牌设置已切换为「旧版」面板（全局生效）'
+                    : '✅ 卡牌设置已切换为「新版」面板（全局生效）', 'success');
+            }
+        }
+        window.setCardSettingsMode = setCardSettingsMode;
+        window.__getCardSettingsMode = function () { return cardSettingsMode; };
+        // 统一入口：所有地方点等级角标都走这里（opts.poolScope = 卡池/收藏，皮肤写全局默认而不是项目）
+        function openCardSettingsPanel(event, cardId, cardType, handType, cardName, opts) {
+            const poolScope = !!(opts && opts.poolScope);
+            if (cardSettingsMode === 'old' && typeof showLevelDropdown === 'function') {
+                return showLevelDropdown(event, cardId, cardType, handType || 'my', cardName || '');
+            }
+            if (typeof showHeroDetailModal === 'function') {
+                return showHeroDetailModal(event, cardId, cardType, handType || 'my', cardName || '', { poolScope: poolScope });
+            }
+        }
+        window.openCardSettingsPanel = openCardSettingsPanel;
+        // 首屏同步勾选框状态（面板可能后于脚本渲染）
+        try {
+            const _syncMode = function () {
+                const cb = document.getElementById('cardSettingsModeToggle');
+                if (cb) cb.checked = (cardSettingsMode === 'old');
+            };
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(_syncMode, 500); });
+            else setTimeout(_syncMode, 500);
+        } catch (e) {}
+
         // 🟢 2026-11-03 皮肤缩略图按钮 + 选中态切换提到「模块顶层」：
         //   原来这两个函数嵌在 showHeroDetailModal 内部，只有详情弹窗能用；
         //   而卡牌设置弹窗 showLevelDropdown（卡池/收藏角标走它）也调 createSkinThumb →
@@ -10887,7 +10927,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             });
         }
 
-        function showHeroDetailModal(event, cardId, cardType, handType = 'my', cardName = '') {
+        function showHeroDetailModal(event, cardId, cardType, handType = 'my', cardName = '', opts = {}) {
+            const poolScope = !!(opts && opts.poolScope);   // 卡池/收藏：皮肤写全局默认皮，而非当前项目
             if (event) { try { event.stopPropagation(); event.preventDefault(); } catch (e) {} }
             document.querySelectorAll('.hero-detail-root').forEach((el) => { try { el.remove(); } catch (e) {} })
             if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('打开英雄详情弹窗')
@@ -11240,6 +11281,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         const baseName = (window.getFusionParts && window.getFusionParts(cardName)) ? window.getFusionParts(cardName)[0] : cardName
                         window._llSet(lt, ll, 'skin', (baseName || cardName) + '#' + lsd, sk)
                         if (typeof window._llReapplySlot === 'function') window._llReapplySlot(libSlot)
+                    } else if (poolScope && typeof setDefaultCardSkin === 'function') {
+                        // 🟢 2026-11-03 卡池/收藏范围：写「全局默认皮 defaultCardSkins」→ 卡池那张卡立即刷新，
+                        //   以后上阵 / 新加入手牌也默认继承（与旧版面板的卡池语义一致）
+                        await setDefaultCardSkin(cardId, sk)
+                        setTimeout(() => { try { updateAllCardLevelBadges() } catch (e) {} }, 0)
                     } else if (typeof setCardSkin === 'function') {
                         await setCardSkin(cardId, sk, handType)
                         setTimeout(() => { try { updateAllCardLevelBadges() } catch (e) {} }, 0)
@@ -11425,10 +11471,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 paintMohuaBtn()
             }
 
-            // 融合变体
+            // 融合变体（卡池/收藏没有“卡槽/手牌”归属，融合是上阵后的事 → 不显示这个按钮，避免点了没反应）
             const baseHero = (typeof getBaseHeroName === 'function') ? getBaseHeroName(mainName).heroName : mainName
             const variants = (typeof getFusionVariantsForBase === 'function') ? getFusionVariantsForBase(baseHero) : []
-            if (variants && variants.length) {
+            if (variants && variants.length && !poolScope) {
                 actions.appendChild(roundBtn('hero-ui/icon-fuse2.png', '融合', () => {
                     if (pop.dataset.mode === 'fuse') { pop.style.display = 'none'; pop.dataset.mode = ''; return }
                     pop.dataset.mode = 'fuse'
@@ -18030,26 +18076,19 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     //    因为它会补加「🔗 融合变体」区（支持切换/取消融合）；直接调 showLevelDropdown 时
                     //    图库 isProjectScope=false 不会渲染融合区，导致"点等级角标=设置"看不到融合选项。
                     const slot = badge.closest('.ll-slot');
-                    if (slot && typeof window._llOpenSettings === 'function') {
+                    const cardId = badge.dataset.cardId;
+                    const cardType = badge.dataset.cardType;
+                    const handType = badge.dataset.handType || 'my';
+                    const cardName = badge.dataset.cardName || '';
+                    // 🔴 2026-11-03 统一入口：所有地方按「卡牌设置面板模式（新版/旧版）」打开
+                    //   新版：手牌/卡槽/卡池 → 官方版式详情弹窗；图库槽位 → 图库专属入口（含融合变体区）
+                    //   旧版：全部 → 紧凑设置面板 showLevelDropdown（图库槽位它内部也能识别 .ll-slot）
+                    if (slot && cardSettingsMode !== 'old' && typeof window._llOpenSettings === 'function') {
                         window._llOpenSettings(slot, e);
                     } else {
-                        const cardId = badge.dataset.cardId;
-                        const cardType = badge.dataset.cardType;
-                        const handType = badge.dataset.handType || 'my';
-                        const cardName = badge.dataset.cardName || '';
-                        // 🔴 2026-11-03 修复「卡池的卡不能设置皮肤/融合/等级」：
-                        //   2026-10-20 引入官方版式详情弹窗时，把角标点击**统一**换成了 showHeroDetailModal，
-                        //   但卡池/收藏的卡没有"项目"归属——旧面板 showLevelDropdown 会按 isProjectScope=false
-                        //   把皮肤写进「全局默认皮 defaultCardSkins」（卡池立刻刷新，上阵后也默认继承）；
-                        //   而 showHeroDetailModal 一律走 setCardSkin → 写入项目 cardSkins，卡池卡不刷新、下次也不生效，
-                        //   融合切换同样找不到手牌节点而无效。这里按来源分流：卡池/收藏 → 旧设置面板；手牌/卡槽 → 新详情弹窗。
+                        // 卡池/收藏没有「项目」归属 → poolScope：新版弹窗里皮肤也要写全局默认皮（否则卡池不刷新）
                         const isPoolCtx = !!badge.closest('.collapsible-section, #favoriteCardsGrid');
-                        if (isPoolCtx && typeof showLevelDropdown === 'function') {
-                            showLevelDropdown(e, cardId, cardType, handType, cardName);
-                        } else {
-                            // 🔴 2026-10-20 改为官方版式英雄详情弹窗（等级/皮肤/魔化/融合 入口在石台下方）
-                            showHeroDetailModal(e, cardId, cardType, handType, cardName);
-                        }
+                        openCardSettingsPanel(e, cardId, cardType, handType, cardName, { poolScope: isPoolCtx });
                     }
                     return;
                 }
