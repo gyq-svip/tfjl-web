@@ -19108,11 +19108,18 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             } else {
                 // 🔴 s1.0.158 修复:新闻列表按"每天一次"节流,但标题由管理员低频修改,
                 // 不应被新闻节流挡住——否则 24h 内冷启动永远显示旧标题,只能手动点标题才刷新。
-                // 故缓存有效时也轻量拉一次(仅副作用更新 currentConfig.title,不覆盖新闻列表缓存)。
+                // 🟢 2026-11-03 修复「管理员发布后只有发布那台电脑能看到」的真因：
+                //   这里虽然每次都拉了一次云端，但**返回值被直接丢弃**，公告列表仍然用当天缓存 →
+                //   某台设备当天打开过，之后管理员再发的公告/功能简介它就一直看不到（要等第二天换日期）。
+                //   改为拉回来就比对：内容有变化 → 替换内存 + 覆盖缓存（缓存先渲染，不拖慢首屏）。
                 try {
-                    await fetchNewsFromGitHub();
+                    const fresh = await fetchNewsFromGitHub();
+                    if (Array.isArray(fresh) && JSON.stringify(fresh) !== JSON.stringify(cachedNews)) {
+                        newsItems = fresh;
+                        saveNewsToCache(fresh);
+                    }
                 } catch (e) {
-                    console.warn('📢 冷启动刷新标题失败(沿用缓存/默认):', e);
+                    console.warn('📢 冷启动刷新公告失败(沿用缓存/默认):', e);
                 }
             }
             
@@ -19665,9 +19672,59 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             const panel = document.getElementById('introPanel');
             if (panel) panel.classList.toggle('min');
         }
-        try { window.renderIntroPanel = renderIntroPanel; window.toggleIntroPanelMin = toggleIntroPanelMin; } catch (e) {}
+        // ==================== 功能简介·清晰阅读窗 ====================
+        // 🟢 2026-11-03：简介板默认是淡色（rgba 0.32）不干扰界面，直接读很费劲。
+        //   这里提供按需“看清”：点面板上的 🔍 弹大字号阅读窗（0.95/1.12rem、深色底、可选中复制），
+        //   支持 A+/A- 切字号（记住选择）、点背景/×/Esc 关闭。简介板本身的淡色默认值保持不变。
+        const INTRO_READER_BIG_KEY = 'TFJL_IntroReaderBig';
+        function applyIntroReaderFont() {
+            const body = document.getElementById('introReaderBody');
+            const btn = document.getElementById('introReaderFontBtn');
+            let big = false;
+            try { big = localStorage.getItem(INTRO_READER_BIG_KEY) === '1'; } catch (e) {}
+            if (body) body.style.fontSize = big ? '1.12rem' : '0.95rem';
+            if (btn) { btn.textContent = big ? 'A-' : 'A+'; btn.title = big ? '切回标准字号' : '切换大字号'; }
+        }
+        function toggleIntroReaderFont() {
+            try {
+                const big = localStorage.getItem(INTRO_READER_BIG_KEY) === '1';
+                localStorage.setItem(INTRO_READER_BIG_KEY, big ? '0' : '1');
+            } catch (e) {}
+            applyIntroReaderFont();
+        }
+        function showIntroReader() {
+            const modal = document.getElementById('introReaderModal');
+            const body = document.getElementById('introReaderBody');
+            const src = document.getElementById('introPanelBody');
+            if (!modal || !body) return;
+            const text = src ? String(src.textContent || '').trim() : '';
+            if (!text) return;                       // 没有简介内容时不弹空窗
+            body.textContent = text;
+            applyIntroReaderFont();
+            modal.style.display = 'flex';
+            body.scrollTop = 0;
+        }
+        function closeIntroReader() {
+            const modal = document.getElementById('introReaderModal');
+            if (modal) modal.style.display = 'none';
+        }
+        // Esc 关闭（只作用于本窗，不影响其它弹窗）
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('introReaderModal');
+                if (modal && modal.style.display === 'flex') closeIntroReader();
+            }
+        });
+        try {
+            window.showIntroReader = showIntroReader;
+            window.closeIntroReader = closeIntroReader;
+            window.toggleIntroReaderFont = toggleIntroReaderFont;
+            window.renderIntroPanel = renderIntroPanel;
+            window.toggleIntroPanelMin = toggleIntroPanelMin;
+        } catch (e) {}
 
         let activeTimeCheckInterval = null;
+        let _newsPollTick = 0;   // 🟢 2026-11-03 每 5 分钟后台拉一次公告的计数器（配合 startActiveTimeCheck 的 60s 循环）
         function startActiveTimeCheck() {
             if (activeTimeCheckInterval) clearInterval(activeTimeCheckInterval);
             activeTimeCheckInterval = setInterval(() => {
@@ -19687,6 +19744,23 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                 }
                 renderIntroPanel(); // 每分钟兜底：生效/到期时间切换后简介板跟随更新
                 try { renderWindowTitle(); } catch (e) {}   // 🟢 2026-11-03 窗口标题也每分钟兜底（管理员改完，在线用户不刷新也能跟上）
+
+                // 🟢 2026-11-03 每 5 分钟从云端再拉一次公告：管理员刚发的公告 / 功能简介，
+                //   其它设备即使一直开着窗口（当天缓存未过期）也能自动跟上，不用重启或等第二天。
+                if (++_newsPollTick % 5 === 0) {
+                    (async () => {
+                        try {
+                            const fresh = await fetchNewsFromGitHub();
+                            if (Array.isArray(fresh) && JSON.stringify(fresh) !== JSON.stringify(newsItems)) {
+                                newsItems = fresh;
+                                saveNewsToCache(fresh);
+                                initMarquee();          // 内部会顺带重绘简介板 + 窗口标题
+                                renderIntroPanel();
+                                try { renderWindowTitle(); } catch (e) {}
+                            }
+                        } catch (e) { /* 网络波动忽略，下个周期再试 */ }
+                    })();
+                }
             }, 60000);
         }
         
@@ -35384,6 +35458,8 @@ ${maSection}
                 localStorage.setItem(NEWS_CACHE_TIME_KEY, new Date().toISOString());
                 initMarquee();
                 if (category === '窗口标题') { try { renderWindowTitle(); } catch (e) {} }
+                // 🟢 2026-11-03 发布后立即重绘简介板（原来只刷跑马灯/标题，功能简介要等 1 分钟兜底才出现）
+                try { renderIntroPanel(); } catch (e) {}
 
                 document.getElementById('adminNewsName').value = '';
                 document.getElementById('adminNewsContent').value = '';

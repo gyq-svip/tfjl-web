@@ -3463,6 +3463,18 @@
    推导：右侧可用空隙 = 50vw - 460px（出战区最宽 920px 居中）→ 探出量 = min(56, 可用 - 24)。 */
 #introPanel { scrollbar-width: thin; right: min(0px, max(-56px, 484px - 50vw)); }
 #introPanelBody b, #introPanelBody strong { color: rgba(255,255,255,0.45); font-weight: 700; }
+/* 🟢 2026-11-03 按需「看清」：默认仍是淡色（不干扰界面），鼠标悬停时自动加深背景 + 提亮文字；
+   移动端/长时间阅读 → 点右上角 🔍 打开大字号阅读窗（#introReaderModal，可 A+/A- 调字号）。 */
+#introPanel { transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease; }
+#introPanel:hover { background: rgba(0,0,0,0.76) !important; border-color: rgba(255,255,255,0.24) !important; box-shadow: 0 8px 26px rgba(0,0,0,0.5); }
+#introPanel:hover #introPanelBody { color: rgba(255,255,255,0.95) !important; }
+#introPanel:hover #introPanelBody b, #introPanel:hover #introPanelBody strong { color: #fff !important; }
+#introPanel:hover > div span { color: rgba(255,255,255,0.85) !important; }
+#introPanel.min:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.45); }
+/* 阅读窗滚动条（深色底，细一些） */
+#introReaderBody::-webkit-scrollbar { width: 8px; }
+#introReaderBody::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 4px; }
+#introReaderBody::-webkit-scrollbar-track { background: transparent; }
 /* 最小化折叠态：收成小药丸，只留「📖 功能简介 −」标题行，点击展开 */
 #introPanel.min { width: auto !important; max-height: none !important; padding: 4px 10px 5px !important; }
 #introPanel.min #introPanelBody { display: none !important; }
