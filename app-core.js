@@ -29925,13 +29925,18 @@ ${maSection}
 
                 // 方案
                 (n.plans || []).forEach(function (p, pi) {
-                    h += '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;background:rgba(78,205,196,0.05);border:1px solid rgba(78,205,196,0.16);border-radius:6px;padding:8px;margin-bottom:6px;">';
+                    h += '<div style="background:rgba(78,205,196,0.05);border:1px solid rgba(78,205,196,0.16);border-radius:6px;padding:8px;margin-bottom:6px;">';
+                    h += '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;">';
                     h += '<div style="flex:0 0 130px;"><div style="font-size:0.64rem;color:rgba(255,255,255,0.4);margin-bottom:2px;">打法名 ' + (pi + 1) + '</div>' + _dungeonInput('plan', cur.id, n.id, p.id, 'title', p.title, '火炮流 / 天使流') + '</div>';
-                    h += '<div style="flex:1 1 200px;"><div style="font-size:0.64rem;color:rgba(255,255,255,0.4);margin-bottom:2px;">阵容（可从已保存阵容选）</div>' +
+                    h += '<div style="flex:1 1 220px;"><div style="font-size:0.64rem;color:rgba(255,255,255,0.4);margin-bottom:2px;">阵容（可从已保存阵容选）</div>' +
                         _dungeonInput('plan', cur.id, n.id, p.id, 'lineup', p.lineup, '阵容名或直接写配置', ' list="dungeonProjectList"') + '</div>';
                     h += '<div style="flex:0 0 130px;"><div style="font-size:0.64rem;color:rgba(255,255,255,0.4);margin-bottom:2px;">标签</div>' + _dungeonInput('plan', cur.id, n.id, p.id, 'tags', p.tags, '火炮,副卡') + '</div>';
-                    h += '<div style="flex:1 1 220px;"><div style="font-size:0.64rem;color:rgba(255,255,255,0.4);margin-bottom:2px;">说明</div>' + _dungeonInput('plan', cur.id, n.id, p.id, 'note', p.note, '开局…集火…') + '</div>';
                     h += '<button onclick="dungeonAdminDelPlan(\'' + _esc(n.id) + '\',\'' + _esc(p.id) + '\')" style="padding:5px 9px;border-radius:6px;cursor:pointer;font-size:0.7rem;background:rgba(244,67,54,0.12);border:1px solid rgba(244,67,54,0.25);color:#ef9a9a;height:28px;">删</button>';
+                    h += '</div>';
+                    // 说明改成整行多行框：导入的攻略说明较长（主/副马车 + 战车 + 属性），单行看不全
+                    h += '<div style="margin-top:6px;"><div style="font-size:0.64rem;color:rgba(255,255,255,0.4);margin-bottom:2px;">说明</div>' +
+                        '<textarea data-scope="plan" data-f="note" data-d="' + _esc(cur.id) + '" data-n="' + _esc(n.id) + '" data-p="' + _esc(p.id) + '"' +
+                        ' placeholder="打法要点 / 主副马车配置 / 属性" style="width:100%;box-sizing:border-box;height:44px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#fff;font-size:0.76rem;padding:6px 8px;outline:none;resize:vertical;line-height:1.5;">' + _esc(p.note) + '</textarea></div>';
                     h += '</div>';
                 });
                 h += '<button onclick="dungeonAdminAddPlan(\'' + _esc(n.id) + '\')" style="padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.74rem;background:rgba(78,205,196,0.15);border:1px solid rgba(78,205,196,0.3);color:#4ecdc4;">＋ 添加一套打法</button>';
