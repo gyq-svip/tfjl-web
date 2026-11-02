@@ -105,7 +105,7 @@
             {
                 id: 'beixiang',
                 name: '活动对战杯',
-                title: '第四话·封神台 · 活动对战杯',
+                title: '第四话·丐帮 · 活动对战杯',
                 icon: '🆕',
                 noParams: true,
                 items: BEIXIANG_ITEMS_DEFAULT.map(function (x) { return { name: x.name, cost: x.cost }; }),

@@ -29538,7 +29538,7 @@ ${maSection}
         let _oldItemsAdminDraft = null;     // 旧活动道具草稿
         let _oldItemsNameDraft = '';        // 🟢 2026-11-03 旧活动名字草稿（可改，存 old_activity_items.json 的 name）
         let _actTabsAdminDraft = null;      // 可扩展活动草稿（tabs 数组）
-        let _actAdminCur = 'old';           // 当前正在维护哪个活动：'old' 或 tab.id
+        let _actAdminCur = 'beixiang';      // 当前正在维护哪个活动：'old' 或 tab.id（默认=计算器第 1 个 tab：活动对战杯）
         let _actAdminLoaded = false;
 
         // 统一把数据写回索引 Gist 的某个文件
@@ -29794,14 +29794,25 @@ ${maSection}
             const curTab = _actAdminCurTab();
             const curName = isTab ? ((curTab && curTab.name) || '') : (_oldItemsNameDraft || '旧活动·轮回');
             let html = '';
-            // 活动选择器：旧活动 + 每个可扩展活动
+            // 🔴 2026-11-03 顺序必须与计算器顶部 tab 完全一致：① 🆕 活动对战杯(每天5局) ② 📦 旧活动 ③ 🏪 状元商店
+            //   之前「旧活动」固定排第一，管理员打开看到的第 1 项不是用户端第 1 个 tab（用户反馈「对应错」）。
+            const ACT_UI_ORDER = ['beixiang', 'old', 'shop'];
+            const actEntries = [{ id: 'old', kind: 'old' }].concat((_actTabsAdminDraft || []).map(function (t) { return { id: t.id, kind: 'tab', t: t }; }));
+            actEntries.sort(function (a, b) {
+                const ia = ACT_UI_ORDER.indexOf(a.id), ib = ACT_UI_ORDER.indexOf(b.id);
+                return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+            });
+            const actBtnStyle = function (on) {
+                return on ? 'background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;' : 'background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);';
+            };
             html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">';
-            html += '<button data-actbtn="old" onclick="actTabAdminSwitch(\'old\')" style="padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;' +
-                (_actAdminCur === 'old' ? 'background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;' : 'background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);') + '">📦 ' + _esc(_oldItemsNameDraft || '旧活动·轮回') + '</button>';
-            (_actTabsAdminDraft || []).forEach(function (t) {
-                const on = _actAdminCur === t.id;
-                html += '<button data-actbtn="' + _esc(t.id) + '" onclick="actTabAdminSwitch(\'' + _esc(t.id) + '\')" style="padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;' +
-                    (on ? 'background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;' : 'background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);') + '">' + (t.icon || '🏪') + ' ' + _esc(t.name) + '</button>';
+            actEntries.forEach(function (e) {
+                const on = (_actAdminCur === e.id);
+                if (e.kind === 'old') {
+                    html += '<button data-actbtn="old" onclick="actTabAdminSwitch(\'old\')" style="padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;' + actBtnStyle(on) + '">📦 ' + _esc(_oldItemsNameDraft || '旧活动·轮回') + '</button>';
+                } else {
+                    html += '<button data-actbtn="' + _esc(e.t.id) + '" onclick="actTabAdminSwitch(\'' + _esc(e.t.id) + '\')" style="padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;' + actBtnStyle(on) + '">' + (e.t.icon || '🏪') + ' ' + _esc(e.t.name) + '</button>';
+                }
             });
             html += '</div>';
             // 🟢 2026-11-03 活动名字 / 页面内标题（每期活动玩法一样、名字不一样，改这里即可，不用改代码）
@@ -29810,7 +29821,7 @@ ${maSection}
             html += '<input id="actAdminNameInput" value="' + _esc(curName) + '" placeholder="如 活动对战杯 / 旧活动·轮回" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.35);border-radius:6px;color:#fff;font-size:0.82rem;padding:6px 8px;outline:none;">';
             if (isTab && curTab) {
                 html += '<div style="color:#4ecdc4;font-size:0.75rem;font-weight:600;margin:8px 0 4px;">📰 页面内大标题（可留空，留空就用上面的名字）</div>';
-                html += '<input id="actAdminTitleInput" value="' + _esc(curTab.title || '') + '" placeholder="如 第四话·封神台 · 活动对战杯" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.3);border:1px solid rgba(78,205,196,0.35);border-radius:6px;color:#fff;font-size:0.82rem;padding:6px 8px;outline:none;">';
+                html += '<input id="actAdminTitleInput" value="' + _esc(curTab.title || '') + '" placeholder="如 第四话·丐帮 · 活动对战杯" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.3);border:1px solid rgba(78,205,196,0.35);border-radius:6px;color:#fff;font-size:0.82rem;padding:6px 8px;outline:none;">';
             }
             html += '<div style="color:rgba(255,255,255,0.4);font-size:0.68rem;margin-top:6px;line-height:1.5;">换赛季只改名字即可（玩法/道具结构不变）；改完点下面「💾 保存并立即生效」。</div>';
             html += '</div>';
