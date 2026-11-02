@@ -729,6 +729,45 @@ window.EQUIP_IMG = {
     let _sideStateRefs = { my: null, teammate: null };
     function currentSideStateRef(side) { return _sideStateRefs[side]; }
 
+    // 手牌皮肤渲染（复用主页手牌管线）：与 renderHand 配套，替代误用的 applySkinBgToSlot。
+    // 关键点：手牌容器是 .selected-card，必须用 .hand-skin-layer 体系；.skin-layer 是战斗槽专用、在手牌下无样式。
+    async function applySimHandSkin(div, heroName, card, side) {
+        if (!heroName || typeof window.resolveHeroSkinUrl !== 'function') return;
+        const parts = (typeof window.getFusionParts === 'function') ? window.getFusionParts(heroName) : null;
+        const splitOn = (typeof window.isFusionSkinSplitEnabled === 'function') ? window.isFusionSkinSplitEnabled() : true;
+        if (splitOn && parts && parts.length >= 2) {
+            // 融合卡：主卡整皮（底层）+ 被融合卡半张（上层），与主页手牌 applyFusionSkinToHandCard 一致
+            const mainHero = parts[0], fusedHero = parts[1];
+            let mainSkin = '默认';
+            if (typeof window.getCardSkin === 'function' && card.id) { const g = window.getCardSkin(card.id, mainHero, side); if (g) mainSkin = g; }
+            let mainUrl = null;
+            try { mainUrl = await window.resolveHeroSkinUrl(mainHero, mainSkin); } catch (e) {}
+            let fusedUrl = null, fusedIsBadge = false;
+            if (typeof window.resolveFusionHalf === 'function') {
+                try { const fi = await window.resolveFusionHalf(fusedHero, div); if (fi) { fusedUrl = fi.url; fusedIsBadge = !!fi.isBadge; } } catch (e) {}
+            }
+            if (typeof window.applyFusionSkinToHandCard === 'function') {
+                if (mainUrl || fusedUrl) { window.applyFusionSkinToHandCard(div, mainUrl, fusedUrl, fusedIsBadge); return; }
+            }
+            if (typeof window.removeSkinBgFromHandCard === 'function') window.removeSkinBgFromHandCard(div);
+            return;
+        }
+        // 非融合 / 融合未开启：整张皮肤（与主页手牌 applySkinBgToHandCard 一致）
+        const name = (typeof getMainCardName === 'function' && getMainCardName(heroName) !== heroName) ? getMainCardName(heroName) : heroName;
+        let useSkin = card.skin;
+        if (!useSkin || useSkin === '默认') {
+            if (typeof window.getCardSkin === 'function' && card.id) { const g = window.getCardSkin(card.id, name, side); if (g) useSkin = g; }
+        }
+        let url = null;
+        try { url = await window.resolveHeroSkinUrl(name, useSkin || '默认'); } catch (e) {}
+        if (url) {
+            if (typeof window.applySkinBgToHandCard === 'function') window.applySkinBgToHandCard(div, url);
+            else if (typeof window.removeSkinBgFromHandCard === 'function') window.removeSkinBgFromHandCard(div);
+        } else if (typeof window.removeSkinBgFromHandCard === 'function') {
+            window.removeSkinBgFromHandCard(div);
+        }
+    }
+
     function renderHand(container, handList, side, placedBases) {
         container.innerHTML = '';
         const sc = side === SIDE_MY ? state.mainScript : state.subScript;
@@ -751,16 +790,19 @@ window.EQUIP_IMG = {
             div.className = 'selected-card card-item' + (isPlaced ? ' placed' : '');
             div.dataset.id = card.id; div.dataset.name = heroName; div.dataset.ovKey = name; div.dataset.type = card.type; div.dataset.profession = card.profession; div.dataset.handType = side;
             if (card.isFusion) div.dataset.fusion = 'true'; else div.removeAttribute('data-fusion');
-            div.style.cssText = 'width:100%;height:100%;min-width:0;max-width:100%;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;background-color:rgba(28,28,48,0.92);background-size:cover;background-position:center;overflow:hidden;font-size:0.72rem;padding:4px 2px;border-radius:8px;'
+            div.style.cssText = 'width:100%;height:100%;min-width:0;max-width:100%;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;overflow:hidden;font-size:0.72rem;padding:4px 2px;border-radius:8px;'
                 + (isPlaced ? 'border:1px dashed rgba(78,205,196,0.6);opacity:0.42;filter:grayscale(1);' : 'border:1px solid rgba(255,255,255,0.15);');
             if (isPlaced) div.title = '已上场';
             div.innerHTML = simBadgeHTML(card, side) + '<span class="card-name" data-full-name="' + esc(heroName) + '" style="text-align:center;text-shadow:0 1px 3px rgba(0,0,0,0.9);">' + esc(display) + '</span>';
             div.addEventListener('click', function (ev) { ev.stopPropagation(); openCardSettings(div, ev); });
             container.appendChild(div);
-            // 皮肤背景：与上阵槽同一条管线（applySkinBgToSlot）；融合卡不强制皮肤，让主页融合状态(fusionSkins)生效
-            if (typeof window.applySkinBgToSlot === 'function') {
-                try { window.applySkinBgToSlot(div, heroName, card.id, side, card.isFusion ? undefined : skin, card.isFusion ? undefined : skin); } catch (e) {}
-            }
+            // 🔴 2026-11-02 手牌皮肤必须走「手牌」管线（applySkinBgToHandCard / applyFusionSkinToHandCard，
+            //    插入 .hand-skin-layer / .hand-skin-fused），与主页手牌一致。
+            //    旧实现误用 applySkinBgToSlot（战斗槽管线，插入 .skin-layer）——.selected-card 下无 .skin-layer 样式，
+            //    导致皮肤图无定位、只露局部碎片、卡底透出深色遮罩。
+            //    融合卡不强制皮肤（forceMainSkin 不传），让主页融合状态(fusionSkins)生效；主卡皮肤优先用脚本/覆盖显式值，
+            //    否则回退 getCardSkin（与 applySkinBgToSlot 解析优先级一致）。
+            applySimHandSkin(div, heroName, card, side).catch(function () {});
         });
     }
 

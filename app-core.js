@@ -14069,6 +14069,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
         // 🔴 2026-09-22 暴露给「阵容图库」(lineup-library.js)：复用主页同款卡槽皮肤渲染管线（含融合/双缓冲）
         try { window.applySkinBgToSlot = applySkinBgToSlot; } catch (e) {}
+        // 🔴 2026-11-02 暴露「手牌」皮肤管线给「脚本推演模拟器」(app-scriptsim.js) 复用：
+        //    模拟器手牌是 .selected-card 容器，必须用 .hand-skin-layer 体系（applySkinBgToHandCard /
+        //    applyFusionSkinToHandCard），不能用 .skin-layer（那是战斗槽专用，.selected-card 下无样式 → 皮肤只露碎片）。
+        try { window.applySkinBgToHandCard = applySkinBgToHandCard; } catch (e) {}
+        try { window.applyFusionSkinToHandCard = applyFusionSkinToHandCard; } catch (e) {}
+        try { window.removeSkinBgFromHandCard = removeSkinBgFromHandCard; } catch (e) {}
+        try { window.resolveFusionHalf = resolveFusionHalf; } catch (e) {}
+        try { window.isFusionSkinSplitEnabled = function () { return fusionSkinSplitEnabled; }; } catch (e) {}
 
         async function restoreBattleSlots() {
             // 恢复我方战斗槽
