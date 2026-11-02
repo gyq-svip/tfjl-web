@@ -19300,6 +19300,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             const activeItems = newsItems.filter(item => {
                 if (item.category === 'welcome') return false; // 🔴 欢迎词不属于公告：公告列表不显示
                 if (item.category === '窗口标题') return false; // 🔴 窗口标题不属于公告：只作用于窗口标题栏，公告列表不显示
+                if (item.category === '功能简介') return false; // 🔴 2026-11-03 功能简介不属于公告：只在出战区简介板展示，不进普通公告列表（管理端历史公告照常显示全部）
                 if (item.active_time && new Date(item.active_time) > now) return false;
                 if (item.expire_time && new Date(item.expire_time) <= now) return false;
                 return true;

@@ -3457,7 +3457,11 @@
 /* ===================== 功能简介板（出战区右侧，内容=管理员公告·分类「功能简介」） ===================== */
 /* 淡色随主题：默认 rgba(255,255,255,0.32)，需要换主题色时改 CSS 变量 --introPanelColor 即可 */
 /* 阵容图库角标可点击：弹主页同款设置窗（皮肤走全局默认 setDefaultCardSkin，等级/魔化本就是全局，改完全局生效） */
-#introPanel { scrollbar-width: thin; }
+/* 🟢 2026-11-03 简介板右移：原来贴出战区右边缘(right:0)会压住队友卡组 32px。
+   现向右探出，探出量随屏幕宽度自适应：宽屏探 56px（与队友卡组留约 24px 间距），
+   窄屏自动收回，且始终留 24px 安全边距不超出窗口。
+   推导：右侧可用空隙 = 50vw - 460px（出战区最宽 920px 居中）→ 探出量 = min(56, 可用 - 24)。 */
+#introPanel { scrollbar-width: thin; right: min(0px, max(-56px, 484px - 50vw)); }
 #introPanelBody b, #introPanelBody strong { color: rgba(255,255,255,0.45); font-weight: 700; }
 /* 最小化折叠态：收成小药丸，只留「📖 功能简介 −」标题行，点击展开 */
 #introPanel.min { width: auto !important; max-height: none !important; padding: 4px 10px 5px !important; }
