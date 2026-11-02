@@ -19623,6 +19623,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             if (!panel) return;
             const now = new Date();
             const items = (newsItems || []).filter(it => it && it.category === '功能简介'
+                && it.content && String(it.content).trim()   // 🟢 空正文不参与选取（否则最新一条为空会把整块简介板藏掉）
                 && !(it.active_time && new Date(it.active_time) > now)
                 && !(it.expire_time && new Date(it.expire_time) <= now));
             const latest = _pickLatestNews(items);
@@ -34519,6 +34520,9 @@ ${maSection}
 
         function closeAdminPanel() {
             document.getElementById('adminPanelOverlay').style.display = 'none';
+            // 🔴 2026-11-03 修复「卡组工具消失」：关闭管理面板时没把子页收起来，子页仍是 display:block，
+            //   而 _syncSelSideCtrls 只要看到任何 [id^="adminPage"] 可见就判定"被遮挡"→ 右侧工具条永久隐藏。
+            try { if (typeof adminHideAllPages === 'function') adminHideAllPages(); } catch (e) {}
             // 🔴 2026-10-21 关闭管理面板后恢复右侧悬浮工具条（仅主页显示）
             try { const ssc = document.getElementById('selSideCtrls'); if (ssc) ssc.style.display = 'flex'; } catch (e) {}
             try { if (typeof window._syncSelSideCtrls === 'function') window._syncSelSideCtrls(); } catch (e) {}
@@ -34546,9 +34550,15 @@ ${maSection}
                     if (el && el.style.display && el.style.display !== 'none') { covered = true; break; }
                 }
                 if (!covered) {
-                    const pages = document.querySelectorAll('[id^="adminPage"]');
-                    for (let i = 0; i < pages.length; i++) {
-                        if (pages[i].style.display && pages[i].style.display !== 'none') { covered = true; break; }
+                    // 🔴 2026-11-03 只在管理面板本身可见时才看子页：子页都在 overlay 内部，overlay 隐藏时
+                    //   它们即使残留 display:block 也不会遮挡界面，不能因此把右侧工具条永久藏起来（用户反馈"卡组工具消失"）。
+                    const ov = document.getElementById('adminPanelOverlay');
+                    const ovVisible = !!(ov && ov.style.display && ov.style.display !== 'none');
+                    if (ovVisible) {
+                        const pages = document.querySelectorAll('[id^="adminPage"]');
+                        for (let i = 0; i < pages.length; i++) {
+                            if (pages[i].style.display && pages[i].style.display !== 'none') { covered = true; break; }
+                        }
                     }
                 }
                 const want = covered ? 'none' : 'flex';
