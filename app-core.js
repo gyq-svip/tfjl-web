@@ -10852,38 +10852,42 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             return hit
         }
 
+        // 🟢 2026-11-03 皮肤缩略图按钮 + 选中态切换提到「模块顶层」：
+        //   原来这两个函数嵌在 showHeroDetailModal 内部，只有详情弹窗能用；
+        //   而卡牌设置弹窗 showLevelDropdown（卡池/收藏角标走它）也调 createSkinThumb →
+        //   直接 ReferenceError「createSkinThumb is not defined」，面板渲染中断、看起来就是「卡池不能设置皮肤」。
+        //   提到顶层后两个弹窗共用同一实现。
+        function createSkinThumb(heroName, skin, selected, onClick) {
+            const b = document.createElement('button');
+            b.className = 'skin-thumb-btn';
+            b.dataset.skin = skin;
+            b.style.cssText = 'position:relative;width:56px;height:56px;border-radius:8px;border:2px solid ' + (selected ? '#ff9800' : 'rgba(255,255,255,0.2)') + ';background:#2a2a4a;overflow:hidden;cursor:pointer;padding:0;flex-shrink:0;transition:border-color .15s;';
+            const img = document.createElement('img');
+            img.style.cssText = 'width:100%;height:100%;object-fit:cover;opacity:0.45;';
+            img.alt = '';
+            img.decoding = 'async';
+            b.appendChild(img);
+            const label = document.createElement('div');
+            label.textContent = skin;
+            label.style.cssText = 'position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.78);color:#fff;font-size:0.55rem;line-height:1.1;padding:2px 2px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+            b.appendChild(label);
+            b.onclick = onClick;
+            if (window.resolveHeroSkinUrl) {
+                const skinForUrl = (skin === '默认') ? heroName : skin;
+                window.resolveHeroSkinUrl(heroName, skinForUrl).then(url => {
+                    if (url) { img.src = url; img.style.opacity = '1'; }
+                }).catch(() => {});
+            }
+            return b;
+        }
+        function setSkinThumbSelected(btnWrap, skin) {
+            btnWrap.querySelectorAll('.skin-thumb-btn').forEach(x => {
+                const sel = x.dataset.skin === skin;
+                x.style.borderColor = sel ? '#ff9800' : 'rgba(255,255,255,0.2)';
+            });
+        }
+
         function showHeroDetailModal(event, cardId, cardType, handType = 'my', cardName = '') {
-            // 🟢 2026-10-23 皮肤缩略图按钮 + 选中态切换（定义在顶层，函数声明提升到本函数所有嵌套作用域，
-            //   皮肤 Dock / 融合主副卡缩略图共用；之前定义嵌套在融合回调里，导致 Dock 调不到）
-            function createSkinThumb(heroName, skin, selected, onClick) {
-                const b = document.createElement('button');
-                b.className = 'skin-thumb-btn';
-                b.dataset.skin = skin;
-                b.style.cssText = 'position:relative;width:56px;height:56px;border-radius:8px;border:2px solid ' + (selected ? '#ff9800' : 'rgba(255,255,255,0.2)') + ';background:#2a2a4a;overflow:hidden;cursor:pointer;padding:0;flex-shrink:0;transition:border-color .15s;';
-                const img = document.createElement('img');
-                img.style.cssText = 'width:100%;height:100%;object-fit:cover;opacity:0.45;';
-                img.alt = '';
-                img.decoding = 'async';
-                b.appendChild(img);
-                const label = document.createElement('div');
-                label.textContent = skin;
-                label.style.cssText = 'position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.78);color:#fff;font-size:0.55rem;line-height:1.1;padding:2px 2px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
-                b.appendChild(label);
-                b.onclick = onClick;
-                if (window.resolveHeroSkinUrl) {
-                    const skinForUrl = (skin === '默认') ? heroName : skin;
-                    window.resolveHeroSkinUrl(heroName, skinForUrl).then(url => {
-                        if (url) { img.src = url; img.style.opacity = '1'; }
-                    }).catch(() => {});
-                }
-                return b;
-            }
-            function setSkinThumbSelected(btnWrap, skin) {
-                btnWrap.querySelectorAll('.skin-thumb-btn').forEach(x => {
-                    const sel = x.dataset.skin === skin;
-                    x.style.borderColor = sel ? '#ff9800' : 'rgba(255,255,255,0.2)';
-                });
-            }
             if (event) { try { event.stopPropagation(); event.preventDefault(); } catch (e) {} }
             document.querySelectorAll('.hero-detail-root').forEach((el) => { try { el.remove(); } catch (e) {} })
             if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('打开英雄详情弹窗')
@@ -17854,6 +17858,18 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             saveCardOrder();
         }
 
+        // 🟢 2026-11-03 首次进入顺序修正：密码门 → 昵称 → 欢迎弹窗。
+        //   之前欢迎弹窗在 DOMContentLoaded 就自己弹（z-index 99999），会压在密码框 / 昵称框上，
+        //   新用户看到「还没输完密码又跳出欢迎」。现在改为：昵称设置完成（老用户已有昵称则立即）后广播 app-ready，
+        //   欢迎弹窗只认这个信号。两个入口（自动登录 enter() / 手动输密码 enterArchiveFromLogin）都要调用。
+        function markAppReady() {
+            if (window.__appUnlocked) return;
+            window.__appUnlocked = true;
+            try { document.dispatchEvent(new CustomEvent('tfjl:app-ready')); } catch (e) {}
+            try { window.dispatchEvent(new CustomEvent('tfjl:app-ready')); } catch (e) {}
+        }
+        window.__markAppReady = markAppReady;
+
         document.addEventListener('DOMContentLoaded', () => {
             // 登录检查（异步：需读磁盘 auth_state.json 判断是否已登录过）。
             // 优先级：localStorage 已登录 → 磁盘已登录 → 记住密码且校验通过 → 否则显示密码门。
@@ -17865,7 +17881,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     overlay.style.display = 'none';
                     main.classList.add('visible');
                     // 进入主界面后强制要求设置昵称（启动即弹；未设过才弹，老用户已设过不弹）
-                    if (typeof ensureNickname === 'function') ensureNickname(true);
+                    // 🟢 2026-11-03 昵称设完（老用户已有则立即）才广播 app-ready → 欢迎弹窗在此之后才弹
+                    const nickP = (typeof ensureNickname === 'function') ? Promise.resolve(ensureNickname(true)) : Promise.resolve(null);
+                    nickP.then(markAppReady).catch(markAppReady);
                     // 已设过昵称的用户在此补记登录打卡（首设用户由 ensureNickname 保存后记录）
                     if (localStorage.getItem('TFJL_UserName')) {
                         if (typeof recordLoginEvent === 'function') recordLoginEvent();
@@ -18019,8 +18037,19 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         const cardType = badge.dataset.cardType;
                         const handType = badge.dataset.handType || 'my';
                         const cardName = badge.dataset.cardName || '';
-                        // 🔴 2026-10-20 改为官方版式英雄详情弹窗（等级/皮肤/魔化/融合 入口在石台下方）
-                        showHeroDetailModal(e, cardId, cardType, handType, cardName);
+                        // 🔴 2026-11-03 修复「卡池的卡不能设置皮肤/融合/等级」：
+                        //   2026-10-20 引入官方版式详情弹窗时，把角标点击**统一**换成了 showHeroDetailModal，
+                        //   但卡池/收藏的卡没有"项目"归属——旧面板 showLevelDropdown 会按 isProjectScope=false
+                        //   把皮肤写进「全局默认皮 defaultCardSkins」（卡池立刻刷新，上阵后也默认继承）；
+                        //   而 showHeroDetailModal 一律走 setCardSkin → 写入项目 cardSkins，卡池卡不刷新、下次也不生效，
+                        //   融合切换同样找不到手牌节点而无效。这里按来源分流：卡池/收藏 → 旧设置面板；手牌/卡槽 → 新详情弹窗。
+                        const isPoolCtx = !!badge.closest('.collapsible-section, #favoriteCardsGrid');
+                        if (isPoolCtx && typeof showLevelDropdown === 'function') {
+                            showLevelDropdown(e, cardId, cardType, handType, cardName);
+                        } else {
+                            // 🔴 2026-10-20 改为官方版式英雄详情弹窗（等级/皮肤/魔化/融合 入口在石台下方）
+                            showHeroDetailModal(e, cardId, cardType, handType, cardName);
+                        }
                     }
                     return;
                 }

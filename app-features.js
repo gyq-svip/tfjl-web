@@ -2175,10 +2175,23 @@
             // 🔴 2026-09-18 修复「欢迎弹窗无法触发」：getWelcomeGuideData 定义在 app-core.js，
             //    脚本/懒加载顺序不定——app-features 先执行时它还不存在，原一次性 fire 直接 return 且永不重试。
             //    现改为等待就绪（最多 30 次 × 1s）；并暴露到 window 供菜单手动触发。
+            // 🟢 2026-11-03 顺序修正：密码门 → 昵称 → 欢迎。原版在 DOMContentLoaded 抢跑，会压在密码框/昵称框上
+            //    （新用户刚输 tfjl 没输完就跳出欢迎）。现在必须等 app-core/app-effects 在昵称设完后广播的 app-ready。
             let tries = 0;
+            const gateOpen = function () {
+                const ov = document.getElementById('passwordOverlay');
+                if (!ov) return false;
+                const d = ov.style.display;
+                return d !== 'none' && d !== '';
+            };
             const fire = function () {
                 if (window.__TAURI__ || window.__TAURI_INTERNALS__) return;
-                if (typeof window.getWelcomeGuideData !== 'function' && tries < 30) {
+                if (document.getElementById('welcomeGuideModal')) return; // 已开着
+                if (gateOpen() || !window.__appUnlocked) {
+                    if (tries++ < 240) setTimeout(fire, 500);   // 最多等 2 分钟，等用户输密码 + 设昵称
+                    return;
+                }
+                if (typeof window.getWelcomeGuideData !== 'function' && tries < 60) {
                     tries++;
                     setTimeout(fire, 1000);
                     return;
@@ -2187,8 +2200,9 @@
             };
             window.showWelcomeGuide = showWelcomeGuide;   // force 参数：true=无视已读强制弹
             window.closeWelcomeGuide = closeWelcomeGuide; // 弹窗按钮 inline onclick 需要
-            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fire);
-            else fire();
+            try { document.addEventListener('tfjl:app-ready', function () { setTimeout(fire, 350); }); } catch (e) {}
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(fire, 900); });
+            else setTimeout(fire, 900);
         })();
 
         function closeChatRoom() {

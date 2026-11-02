@@ -2217,7 +2217,10 @@
             document.getElementById('passwordOverlay').style.display = 'none';
             document.getElementById('mainContent').classList.add('visible');
             // 进入主界面后强制要求设置昵称（与 enter() 一致：未设过才弹，老用户已设过不弹）
-            if (typeof ensureNickname === 'function') ensureNickname(true);
+            // 🟢 2026-11-03 顺序修正：昵称设完（老用户已有则立即）才广播 app-ready → 欢迎弹窗排在这之后
+            const nickP = (typeof ensureNickname === 'function') ? Promise.resolve(ensureNickname(true)) : Promise.resolve(null);
+            const ready = function () { if (typeof window.__markAppReady === 'function') window.__markAppReady(); };
+            nickP.then(ready).catch(ready);
             // 已设过昵称的用户在此补记登录打卡（首设用户由 ensureNickname 保存后记录）
             if (localStorage.getItem('TFJL_UserName')) {
                 if (typeof recordLoginEvent === 'function') recordLoginEvent();
