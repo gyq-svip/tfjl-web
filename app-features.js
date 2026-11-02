@@ -32,8 +32,10 @@
         // 内置默认（供管理员页「恢复内置」与云端无配置时兜底，暴露给 app-core.js 侧的管理界面）
         window.ACTIVITY_SKINS_DEFAULT = ACTIVITY_SKINS.map(function (s) { return { name: s.name, cost: s.cost, category: String(s.cost) }; });
         const OLD_ITEMS_FILE = 'old_activity_items.json';
+        const OLD_ACTIVITY_NAME_DEFAULT = '旧活动·轮回';
         let _oldItemsCache = null;
         let _oldItemsFlat = [];
+        let _oldActivityName = OLD_ACTIVITY_NAME_DEFAULT;   // 🟢 2026-11-03 旧活动名字也由管理端维护（old_activity_items.json 的 name）
         // 读云端配置（管理员维护的清单），失败/无配置 → 内置默认
         async function loadOldActivityItems(force) {
             if (_oldItemsCache && !force) return _oldItemsCache;
@@ -45,6 +47,7 @@
                     if (c) {
                         const d = JSON.parse(c);
                         if (d && Array.isArray(d.items) && d.items.length) {
+                            _oldActivityName = String(d.name || '').trim() || OLD_ACTIVITY_NAME_DEFAULT;
                             _oldItemsCache = d.items.filter(function (x) { return x && x.name; })
                                 .map(function (x) { const cost = Number(x.cost) || 0; return { name: String(x.name), cost: cost, category: String(cost) }; });
                             return _oldItemsCache;
@@ -52,15 +55,18 @@
                     }
                 }
             } catch (e) {}
+            _oldActivityName = OLD_ACTIVITY_NAME_DEFAULT;
             _oldItemsCache = window.ACTIVITY_SKINS_DEFAULT.slice();
             return _oldItemsCache;
         }
         function getOldActivityItems() { return _oldItemsCache || window.ACTIVITY_SKINS_DEFAULT; }
+        function getOldActivityName() { return _oldActivityName || OLD_ACTIVITY_NAME_DEFAULT; }
         // 管理员保存后调用：清缓存 → 重拉 → 重渲染
         window.__reloadOldActivityItems = async function () {
             _oldItemsCache = null;
             await loadOldActivityItems(true);
             if (typeof renderCalcSkins === 'function') await renderCalcSkins();
+            if (typeof applyActivityNames === 'function') await applyActivityNames();
         };
 
         // ==================== 🏪 可扩展「活动 Tabs」（状元商店等） ====================
@@ -73,10 +79,43 @@
         //   packs   = 名称:金额:材料:金卡:限购:紫卡  用 | 分隔（限购 0 = 不限；紫卡可省略，默认 0）
         //   waveRef = 档位:每日波数           用 | 分隔（纯参考展示）
         const ACTIVITY_TABS_FILE = 'activity_tabs.json';
+        // 🆕 2026-11-03 「活动对战杯」（原「新活动·封神杯」）道具默认清单 = 战旗商店（皮肤/战车）。
+        //   以前写死在 renderBeixiangSkins / doBeixiangCalc 里，管理员改不了、也看不到；
+        //   现在并入 activity_tabs.json 的 beixiang tab → 管理端「🎪 活动道具」可增删改，用户端实时读。
+        const BEIXIANG_ITEMS_DEFAULT = [
+            { name: '卷帘大将·斧客', cost: 480 },
+            { name: '小白龙·剑客', cost: 480 },
+            { name: '电容器', cost: 480 },
+            { name: '富甲天下号', cost: 480 },
+            { name: '银河之光', cost: 480 },
+            { name: '走马江湖号', cost: 480 },
+            { name: '泰山掌门·闪', cost: 640 },
+            { name: '衡山掌门点骨弓', cost: 640 },
+            { name: '一指名医·死神', cost: 640 },
+            { name: '狮王争霸号', cost: 720 },
+            { name: '花果神山号', cost: 720 },
+            { name: '魔化·火灵', cost: 960 },
+            { name: '风暴·小炮', cost: 1280 },
+            { name: '风清扬·天使', cost: 1280 },
+            { name: '随机龙珠', cost: 1600 }
+        ];
         const ACTIVITY_TABS_DEFAULT = [
+            // 🆕 活动对战杯：玩法固定（每日 5 局、赢6输2、礼包固定），所以 noParams=true 不显示波数参数编辑器；
+            //   只需要能改「活动名字/标题」和「战旗商店道具清单」。
+            {
+                id: 'beixiang',
+                name: '活动对战杯',
+                title: '第四话·封神台 · 活动对战杯',
+                icon: '🆕',
+                noParams: true,
+                items: BEIXIANG_ITEMS_DEFAULT.map(function (x) { return { name: x.name, cost: x.cost }; }),
+                params: {}
+            },
             {
                 id: 'shop',
                 name: '状元商店',
+                title: '',
+                icon: '🏪',
                 items: [
                     { name: '巨灵神·海妖', cost: 480 }, { name: '金银法王·恶匪', cost: 480 },
                     { name: '电容器', cost: 480 }, { name: '山河社稷号', cost: 480 },
@@ -125,7 +164,11 @@
                 const def = ACTIVITY_TABS_DEFAULT.find(function (d) { return d.id === t.id; }) || {};
                 return {
                     id: t.id || def.id,
-                    name: t.name || def.name || '未命名活动',
+                    // 🟢 2026-11-03 名字/标题改为「云端优先、默认兜底」：管理员在「活动道具」里改完即生效
+                    name: String(t.name || def.name || '未命名活动'),
+                    title: String(t.title != null ? t.title : (def.title || '')),
+                    icon: String(t.icon || def.icon || '🏪'),
+                    noParams: t.noParams === true || def.noParams === true,
                     items: (Array.isArray(t.items) && t.items.length) ? t.items : (def.items || []),
                     params: Object.assign({}, def.params || {}, t.params || {})
                 };
@@ -140,10 +183,38 @@
             const list = _actTabsCache || ACTIVITY_TABS_DEFAULT;
             return list.find(function (t) { return t.id === id; }) || list[0] || null;
         }
+        // 🟢 2026-11-03 活动名字不再写死：统一从管理端配置读
+        //   旧活动名 = old_activity_items.json 的 name；其他活动名 = activity_tabs.json 的 name（页面内大标题用 title，可空）
+        async function applyActivityNames() {
+            let oldName = getOldActivityName();
+            try { await loadOldActivityItems(); oldName = getOldActivityName(); } catch (e) {}
+            try { await loadActivityTabs(); } catch (e) {}
+            const bx = (function () { try { return getActTab('beixiang') || {}; } catch (e) { return {}; } })();
+            const shop = (function () { try { return getActTab('shop') || {}; } catch (e) { return {}; } })();
+            const setBtn = function (id, icon, name) {
+                const b = document.getElementById(id);
+                if (!b) return;
+                b.textContent = (icon ? icon + ' ' : '') + String(name || '');
+            };
+            setBtn('calcTopNew', bx.icon || '🆕', bx.name || '活动对战杯');
+            setBtn('calcTopOld', '📦', oldName || '旧活动·轮回');
+            setBtn('calcTopShop', shop.icon || '🏪', shop.name || '状元商店');
+            const tNew = document.getElementById('calcNewTitle');
+            if (tNew) tNew.textContent = '🏆 ' + String(bx.title || bx.name || '活动对战杯');
+        }
+        window.applyActivityNames = applyActivityNames;
+        // 首屏也套一次（DOM 就绪后再跑，避免拿不到按钮节点）
+        try {
+            const _bootNames = function () { setTimeout(function () { try { applyActivityNames(); } catch (e) {} }, 1200); };
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _bootNames);
+            else _bootNames();
+        } catch (e) {}
         window.__reloadActivityTabs = async function () {
             _actTabsCache = null;
             await loadActivityTabs(true);
             if (typeof renderShopSkins === 'function') await renderShopSkins();
+            if (typeof renderBeixiangSkins === 'function') await renderBeixiangSkins();
+            if (typeof applyActivityNames === 'function') await applyActivityNames();
         };
         // 波数 → 碎片（含"打满额外奖励"）；碎片 → 需要的波数（反算，向上取整）
         function _actShardsFromWaves(waves, p) {
@@ -400,30 +471,15 @@
             box.innerHTML = html;
             area.style.display = 'block';
         };
-        // 活动对战杯皮肤/战车清单（第四话·封神台）
-        const BEIXIANG_SKINS = [
-            // 480战旗档
-            { name: '卷帘大将·斧客', cost: 480, category: '480' },
-            { name: '小白龙·剑客', cost: 480, category: '480' },
-            { name: '电容器', cost: 480, category: '480' },
-            { name: '富甲天下号', cost: 480, category: '480' },
-            { name: '银河之光', cost: 480, category: '480' },
-            { name: '走马江湖号', cost: 480, category: '480' },
-            // 640战旗档
-            { name: '泰山掌门·闪', cost: 640, category: '640' },
-            { name: '衡山掌门点骨弓', cost: 640, category: '640' },
-            { name: '一指名医·死神', cost: 640, category: '640' },
-            // 720战旗档
-            { name: '狮王争霸号', cost: 720, category: '720' },
-            { name: '花果神山号', cost: 720, category: '720' },
-            // 960战旗档
-            { name: '魔化·火灵', cost: 960, category: '960' },
-            // 1280战旗档
-            { name: '风暴·小炮', cost: 1280, category: '1280' },
-            { name: '风清扬·天使', cost: 1280, category: '1280' },
-            // 1600战旗档
-            { name: '随机龙珠', cost: 1600, category: '1600' },
-        ];
+        // 🆕 2026-11-03 活动对战杯道具清单改为「管理端维护」（activity_tabs.json → tabs[beixiang].items），不再写死。
+        //   管理端改完保存 → __reloadActivityTabs → 这里重读；云端读不到时回退内置默认 BEIXIANG_ITEMS_DEFAULT。
+        function getBeixiangItems() {
+            let all = [];
+            try { const tab = getActTab('beixiang'); all = (tab && tab.items) || []; } catch (e) {}
+            if (!all.length) all = BEIXIANG_ITEMS_DEFAULT;
+            return all.filter(function (x) { return x && x.name; })
+                .map(function (x) { return { name: String(x.name), cost: Number(x.cost) || 0 }; });
+        }
         let calcBeixiangSelected = new Set();
 
         function toggleBeixiangSkin(name) {
@@ -441,34 +497,41 @@
 
         function updateBeixiangSummary() {
             let total = 0;
+            const items = getBeixiangItems();
             calcBeixiangSelected.forEach(name => {
-                const s = BEIXIANG_SKINS.find(x => x.name === name);
-                if (s) total += s.cost;
+                const s = items.find(x => x.name === name);
+                if (s) total += Number(s.cost) || 0;
             });
-            document.getElementById('calcBeixiangTargetTotal').textContent = total;
+            const el = document.getElementById('calcBeixiangTargetTotal');
+            if (el) el.textContent = total;
         }
 
-        function renderBeixiangSkins() {
+        async function renderBeixiangSkins() {
             const container = document.getElementById('calcBeixiangSkinsList');
             if (!container) return;
-            const categories = ['480', '640', '720', '960', '1280', '1600'];
-            const catColors = { '480': '#4caf50', '640': '#2196f3', '720': '#9c27b0', '960': '#ff9800', '1280': '#ef4444', '1600': '#ffd700' };
+            try { await loadActivityTabs(); } catch (e) {}
+            const items = getBeixiangItems();
+            // 档位不再写死 480/640/720/960/1280/1600：按管理端实际清单的 cost 去重升序分组
+            const cats = Array.from(new Set(items.map(s => Number(s.cost) || 0))).sort(function (a, b) { return a - b; });
+            const palette = ['#4caf50', '#2196f3', '#9c27b0', '#ff9800', '#ef4444', '#ffd700', '#00bcd4', '#8bc34a'];
+            const escApos = function (s) { return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); };
             let html = '';
-            categories.forEach(cat => {
-                const skins = BEIXIANG_SKINS.filter(s => s.category === cat);
-                if (skins.length === 0) return;
+            cats.forEach(function (cat, ci) {
+                const color = palette[ci % palette.length];
+                const skins = items.filter(s => (Number(s.cost) || 0) === cat);
+                if (!skins.length) return;
                 html += `<div style="margin-bottom:8px;">`;
-                html += `<div style="color:${catColors[cat]};font-size:0.75rem;font-weight:600;margin-bottom:4px;">${cat}战旗档</div>`;
+                html += `<div style="color:${color};font-size:0.75rem;font-weight:600;margin-bottom:4px;">${cat}战旗档</div>`;
                 html += `<div style="display:flex;flex-wrap:wrap;gap:4px;">`;
                 skins.forEach(skin => {
                     const isSelected = calcBeixiangSelected.has(skin.name);
-                    const bg = isSelected ? `background:linear-gradient(135deg,${catColors[cat]},#2e7d32);border-color:${catColors[cat]};` : 'background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1);';
+                    const bg = isSelected ? `background:linear-gradient(135deg,${color},#2e7d32);border-color:${color};` : 'background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1);';
                     const check = isSelected ? '<span style="margin-right:3px;">✓</span>' : '';
-                    html += `<div onclick="toggleBeixiangSkin('${skin.name}')" style="${bg}border:1px solid;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.75rem;color:${isSelected ? '#fff' : 'rgba(255,255,255,0.8)'};transition:all 0.2s;user-select:none;">${check}${skin.name}<span style="opacity:0.6;margin-left:3px;font-size:0.65rem;">${skin.cost}</span></div>`;
+                    html += `<div onclick="toggleBeixiangSkin('${escApos(skin.name)}')" style="${bg}border:1px solid;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.75rem;color:${isSelected ? '#fff' : 'rgba(255,255,255,0.8)'};transition:all 0.2s;user-select:none;">${check}${skin.name}<span style="opacity:0.6;margin-left:3px;font-size:0.65rem;">${skin.cost}</span></div>`;
                 });
                 html += `</div></div>`;
             });
-            container.innerHTML = html;
+            container.innerHTML = html || '<div style="color:rgba(255,255,255,0.4);padding:10px;text-align:center;">该活动还没有道具，请在管理端「🎪 活动道具」里添加</div>';
         }
 
         // 剩余天数精确化：含今天算 (总天数−当前天+1) 整天，再减"今天已过比例"
@@ -527,9 +590,10 @@
 
         function doBeixiangCalc() {
             let target = 0;
+            const bxItems = getBeixiangItems();
             calcBeixiangSelected.forEach(name => {
-                const s = BEIXIANG_SKINS.find(x => x.name === name);
-                if (s) target += s.cost;
+                const s = bxItems.find(x => x.name === name);
+                if (s) target += Number(s.cost) || 0;
             });
             const owned = parseInt(document.getElementById('calcBeixiangOwnedInput').value) || 0;
             const days = getBeixiangRemainingDays();
@@ -618,6 +682,8 @@
             if (panel.style.display === 'block') {
                 if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('计算器');
                 switchCalcTopTab('new');
+                // 🟢 2026-11-03 每次打开计算器都刷一次活动名字（管理端改完名字后，用户重开面板即生效）
+                try { applyActivityNames(); } catch (e) {}
             }
         }
 

@@ -29536,6 +29536,7 @@ ${maSection}
         const OLD_ITEMS_GIST_FILE = 'old_activity_items.json';
         const ACT_TABS_GIST_FILE = 'activity_tabs.json';
         let _oldItemsAdminDraft = null;     // 旧活动道具草稿
+        let _oldItemsNameDraft = '';        // 🟢 2026-11-03 旧活动名字草稿（可改，存 old_activity_items.json 的 name）
         let _actTabsAdminDraft = null;      // 可扩展活动草稿（tabs 数组）
         let _actAdminCur = 'old';           // 当前正在维护哪个活动：'old' 或 tab.id
         let _actAdminLoaded = false;
@@ -29682,17 +29683,19 @@ ${maSection}
         async function _actAdminLoad(force) {
             if (_actAdminLoaded && !force) return;
             _actAdminLoaded = true;
-            // ① 旧活动道具
+            // ① 旧活动道具 + 名字
             let items = [];
+            let oldName = '';
             try {
                 const token = getGistToken();
                 if (token && typeof wallReadGistFile === 'function') {
                     const c = await wallReadGistFile(GIST_ID, OLD_ITEMS_GIST_FILE, token);
-                    if (c) { const d = JSON.parse(c); if (d && Array.isArray(d.items)) items = d.items; }
+                    if (c) { const d = JSON.parse(c); if (d && Array.isArray(d.items)) items = d.items; if (d && d.name) oldName = String(d.name); }
                 }
             } catch (e) {}
             if (!items || !items.length) items = (window.ACTIVITY_SKINS_DEFAULT || []).map(s => ({ name: s.name, cost: s.cost }));
             _oldItemsAdminDraft = items.map(x => ({ name: String(x.name || ''), cost: Number(x.cost) || 0 }));
+            _oldItemsNameDraft = String(oldName || '').trim() || '旧活动·轮回';
             // ② 可扩展活动
             let tabs = null;
             try {
@@ -29702,13 +29705,30 @@ ${maSection}
                     if (c) { const d = JSON.parse(c); if (d && Array.isArray(d.tabs) && d.tabs.length) tabs = d.tabs; }
                 }
             } catch (e) {}
-            if (!tabs) tabs = JSON.parse(JSON.stringify(window.ACTIVITY_TABS_DEFAULT || []));
+            const defs = (window.ACTIVITY_TABS_DEFAULT || []);
+            if (!tabs) tabs = JSON.parse(JSON.stringify(defs));
+            else {
+                // 🟢 2026-11-03 云端可能只存了「状元商店」，缺「活动对战杯」→ 用内置默认补齐，
+                //   否则管理员面板里永远只有 2 个活动（用户反馈「只能改 2 个，少一个」）。
+                defs.forEach(function (d) {
+                    if (!tabs.some(function (t) { return t.id === d.id; })) tabs.push(JSON.parse(JSON.stringify(d)));
+                });
+                const order = defs.map(function (d) { return d.id; });
+                tabs.sort(function (a, b) {
+                    const ia = order.indexOf(a.id), ib = order.indexOf(b.id);
+                    return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
+                });
+            }
             _actTabsAdminDraft = tabs.map(function (t) {
+                const def = defs.find(function (d) { return d.id === t.id; }) || {};
                 return {
                     id: String(t.id || ''),
-                    name: String(t.name || '未命名活动'),
+                    name: String(t.name || def.name || '未命名活动'),
+                    title: String(t.title != null ? t.title : (def.title || '')),
+                    icon: String(t.icon || def.icon || '🏪'),
+                    noParams: t.noParams === true || def.noParams === true,
                     items: (t.items || []).map(x => ({ name: String(x.name || ''), cost: Number(x.cost) || 0 })),
-                    params: Object.assign({}, t.params || {})
+                    params: Object.assign({}, def.params || {}, t.params || {})
                 };
             });
             if (_actAdminCur !== 'old' && !_actTabsAdminDraft.some(t => t.id === _actAdminCur)) _actAdminCur = 'old';
@@ -29772,16 +29792,27 @@ ${maSection}
             const draft = _actAdminCurItems();
             const isTab = _actAdminCur !== 'old';
             const curTab = _actAdminCurTab();
+            const curName = isTab ? ((curTab && curTab.name) || '') : (_oldItemsNameDraft || '旧活动·轮回');
             let html = '';
             // 活动选择器：旧活动 + 每个可扩展活动
             html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">';
-            html += '<button onclick="actTabAdminSwitch(\'old\')" style="padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;' +
-                (_actAdminCur === 'old' ? 'background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;' : 'background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);') + '">📦 旧活动·轮回</button>';
+            html += '<button data-actbtn="old" onclick="actTabAdminSwitch(\'old\')" style="padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;' +
+                (_actAdminCur === 'old' ? 'background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;' : 'background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);') + '">📦 ' + _esc(_oldItemsNameDraft || '旧活动·轮回') + '</button>';
             (_actTabsAdminDraft || []).forEach(function (t) {
                 const on = _actAdminCur === t.id;
-                html += '<button onclick="actTabAdminSwitch(\'' + _esc(t.id) + '\')" style="padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;' +
-                    (on ? 'background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;' : 'background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);') + '">🏪 ' + _esc(t.name) + '</button>';
+                html += '<button data-actbtn="' + _esc(t.id) + '" onclick="actTabAdminSwitch(\'' + _esc(t.id) + '\')" style="padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;' +
+                    (on ? 'background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;' : 'background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);') + '">' + (t.icon || '🏪') + ' ' + _esc(t.name) + '</button>';
             });
+            html += '</div>';
+            // 🟢 2026-11-03 活动名字 / 页面内标题（每期活动玩法一样、名字不一样，改这里即可，不用改代码）
+            html += '<div style="background:rgba(255,215,0,0.06);border:1px solid rgba(255,215,0,0.25);border-radius:8px;padding:10px;margin-bottom:12px;">';
+            html += '<div style="color:#ffd700;font-size:0.8rem;font-weight:600;margin-bottom:6px;">🏷️ 活动名字（计算器顶部按钮显示这个）</div>';
+            html += '<input id="actAdminNameInput" value="' + _esc(curName) + '" placeholder="如 活动对战杯 / 旧活动·轮回" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.35);border-radius:6px;color:#fff;font-size:0.82rem;padding:6px 8px;outline:none;">';
+            if (isTab && curTab) {
+                html += '<div style="color:#4ecdc4;font-size:0.75rem;font-weight:600;margin:8px 0 4px;">📰 页面内大标题（可留空，留空就用上面的名字）</div>';
+                html += '<input id="actAdminTitleInput" value="' + _esc(curTab.title || '') + '" placeholder="如 第四话·封神台 · 活动对战杯" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.3);border:1px solid rgba(78,205,196,0.35);border-radius:6px;color:#fff;font-size:0.82rem;padding:6px 8px;outline:none;">';
+            }
+            html += '<div style="color:rgba(255,255,255,0.4);font-size:0.68rem;margin-top:6px;line-height:1.5;">换赛季只改名字即可（玩法/道具结构不变）；改完点下面「💾 保存并立即生效」。</div>';
             html += '</div>';
             // 道具清单（按档位分组）
             html += '<div style="color:#ffd700;font-size:0.82rem;font-weight:600;margin-bottom:6px;">🎁 道具清单（档位 = 材料数）</div>';
@@ -29806,8 +29837,8 @@ ${maSection}
                 '<input id="oldItemsNewCost" type="number" placeholder="档位/材料数" style="width:112px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.3);border-radius:5px;color:#ffd700;font-size:0.75rem;padding:5px 8px;outline:none;">' +
                 '<button onclick="oldItemsAdminAdd()" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;border:none;font-size:0.75rem;padding:5px 12px;border-radius:5px;cursor:pointer;">➕ 添加</button>' +
                 '</div>';
-            // 参数区（可扩展活动）
-            if (isTab && curTab) html += _renderActParamsEditor(curTab);
+            // 参数区（可扩展活动；noParams 的活动如「活动对战杯」玩法固定，不显示波数参数编辑器）
+            if (isTab && curTab && !curTab.noParams) html += _renderActParamsEditor(curTab);
             html += '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">' +
                 '<button onclick="oldItemsAdminSave()" style="flex:1;min-width:140px;background:linear-gradient(135deg,#2196f3,#1976d2);color:#fff;border:none;font-size:0.85rem;padding:9px;border-radius:7px;cursor:pointer;font-weight:600;">💾 保存并立即生效' + (isTab ? '（道具+参数）' : '') + '</button>' +
                 '<button onclick="oldItemsAdminReset()" style="background:rgba(255,152,0,0.2);border:1px solid rgba(255,152,0,0.4);color:#ffb74d;font-size:0.8rem;padding:9px 14px;border-radius:7px;cursor:pointer;">↩ 恢复内置默认</button>' +
@@ -29833,6 +29864,31 @@ ${maSection}
                     t.params[k] = numeric.indexOf(k) >= 0 ? Math.max(0, Number(this.value) || 0) : this.value.trim();
                 });
             });
+            // 🟢 2026-11-03 活动名字 / 页面内标题改动 → 写进草稿；按钮文字就地更新（不整块重绘，避免吞掉紧接着的「保存」点击）
+            const nameInp = box.querySelector('#actAdminNameInput');
+            if (nameInp) {
+                nameInp.addEventListener('change', function () {
+                    const v = String(this.value || '').trim();
+                    let icon = '📦', label = '';
+                    if (_actAdminCur === 'old') {
+                        _oldItemsNameDraft = v || '旧活动·轮回';
+                        label = _oldItemsNameDraft;
+                    } else {
+                        const t = _actAdminCurTab();
+                        if (t) { t.name = v || t.name || '未命名活动'; icon = t.icon || '🏪'; label = t.name; }
+                    }
+                    const key = (_actAdminCur === 'old') ? 'old' : _actAdminCur;
+                    const btn = box.querySelector('button[data-actbtn="' + key + '"]');
+                    if (btn) btn.textContent = icon + ' ' + label;
+                });
+            }
+            const titleInp = box.querySelector('#actAdminTitleInput');
+            if (titleInp) {
+                titleInp.addEventListener('change', function () {
+                    const t = _actAdminCurTab();
+                    if (t) t.title = String(this.value || '').trim();
+                });
+            }
         }
         window.oldItemsAdminAdd = function () {
             const n = document.getElementById('oldItemsNewName');
@@ -29857,12 +29913,17 @@ ${maSection}
             if (_actAdminCur === 'old') {
                 if (!confirm('恢复为内置默认清单（当前云端配置将被覆盖）？')) return;
                 _oldItemsAdminDraft = (window.ACTIVITY_SKINS_DEFAULT || []).map(s => ({ name: s.name, cost: s.cost }));
+                _oldItemsNameDraft = '旧活动·轮回';
             } else {
                 const t = _actAdminCurTab();
                 if (!t) return;
-                if (!confirm('把「' + t.name + '」恢复为内置默认（道具 + 参数都覆盖，保存后生效）？')) return;
+                if (!confirm('把「' + t.name + '」恢复为内置默认（名字 + 道具 + 参数都覆盖，保存后生效）？')) return;
                 const def = (window.ACTIVITY_TABS_DEFAULT || []).find(function (x) { return x.id === t.id; });
                 if (!def) { alert('内置默认里没有这个活动'); return; }
+                t.name = def.name || t.name;
+                t.title = def.title || '';
+                t.icon = def.icon || t.icon;
+                t.noParams = def.noParams === true;
                 t.items = (def.items || []).map(function (x) { return { name: x.name, cost: x.cost }; });
                 t.params = Object.assign({}, def.params || {});
             }
@@ -29877,9 +29938,10 @@ ${maSection}
                         .filter(x => x && String(x.name).trim())
                         .map(x => ({ name: String(x.name).trim(), cost: Math.max(0, Number(x.cost) || 0) }));
                     if (!items.length) { alert('清单为空，至少要有一个道具'); return; }
-                    await _actGistPatch(OLD_ITEMS_GIST_FILE, { items: items });
+                    const nm = String(_oldItemsNameDraft || '').trim() || '旧活动·轮回';
+                    await _actGistPatch(OLD_ITEMS_GIST_FILE, { name: nm, items: items });
                     if (typeof window.__reloadOldActivityItems === 'function') await window.__reloadOldActivityItems();
-                    alert('✅ 旧活动已保存并生效（' + items.length + ' 个道具）');
+                    alert('✅「' + nm + '」已保存并生效（' + items.length + ' 个道具）');
                 } else {
                     const t = _actAdminCurTab();
                     if (!t) return;

@@ -558,7 +558,7 @@
 
                     <!-- 新：选择目标 -->
                     <div id="calcNewTargetPanel">
-                        <div style="color:#ff9800;font-weight:600;margin-bottom:10px;font-size:0.9rem;">🏆 第四话·封神台 · 活动对战杯</div>
+                        <div id="calcNewTitle" style="color:#ff9800;font-weight:600;margin-bottom:10px;font-size:0.9rem;">🏆 第四话·封神台 · 活动对战杯</div>
                         <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:10px;">⚔️ 每日 5 局对战（赢=6战旗，输=2战旗）→ 攒战旗买皮肤/战车</div>
                         <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:12px;">
                             <div style="color:#4ecdc4;font-weight:600;margin-bottom:8px;font-size:0.85rem;">🎯 选择目标（多选）</div>
@@ -1762,7 +1762,7 @@
                     </div>
                     <div class="admin-menu-item" data-key="oldItems" onclick="adminShowPage('oldItems')">
                         <span class="mi-emoji">🎪</span>
-                        <div class="mi-text"><div class="mi-title">活动道具</div><div class="mi-sub">旧活动档位/道具维护</div></div>
+                        <div class="mi-text"><div class="mi-title">活动道具</div><div class="mi-sub">3 个活动的名字/道具维护</div></div>
                     </div>
                     <!-- 🔴 2026-10-13 活动阵容云端维护：改完保存 → 所有人刷新页面即可看到最新 7 日 A/B 轮转（不用改代码/重新部署） -->
                     <div class="admin-menu-item" data-key="actLineup" onclick="adminShowPage('actLineup')">
@@ -2174,9 +2174,13 @@
                     <button class="admin-btn" onclick="renderOldItemsAdmin(true)" style="padding:6px 12px;font-size:0.8rem;margin-left:auto;">🔄 重新载入</button>
                 </div>
                 <div style="font-size:0.72rem;color:rgba(255,255,255,0.55);margin-bottom:10px;background:rgba(255,255,255,0.05);border-radius:6px;padding:8px;line-height:1.6;">
-                    <b style="color:#ffd700;">按活动分开维护</b>：上面按钮可切换「旧活动·轮回」和各个活动 tab（如 🏪 状元商店）。<br>
+                    <b style="color:#ffd700;">按活动分开维护（与计算器 3 个活动一一对应）</b>：<br>
+                    · 🆕 <b>活动对战杯</b>（计算器第 1 个 tab）<br>
+                    · 📦 <b>旧活动·轮回</b>（计算器第 2 个 tab）<br>
+                    · 🏪 <b>状元商店</b>（计算器第 3 个 tab）<br>
+                    <b style="color:#ffd700;">每期活动名字不一样、玩法一样</b>：先在上方「🏷️ 活动名字」里改成这期的名字（页面内大标题可选），再维护道具，<b style="color:#4ecdc4;">名字和道具都会同步到用户端计算器</b>。<br>
                     档位 = 材料数：改「档位数字」即改档位，填一个不存在的数字（如 1600 / 604）就是新增档位。<br>
-                    <b style="color:#4ecdc4;">活动 tab 还能改该活动的参数</b>（活动天数、每 N 波 = M 碎片、战令、礼包表、参考波数表）——活动换期波数规则不一样时改这里，不用改代码。<br>
+                    <b style="color:#4ecdc4;">状元商店还能改该活动的参数</b>（活动天数、每 N 波 = M 碎片、战令、礼包表、参考波数表）——活动换期波数规则不一样时改这里，不用改代码。<br>
                     保存后对所有人生效（存云端 Gist）；旧活动存 old_activity_items.json，活动 tab 存 activity_tabs.json。
                 </div>
                 <div id="adminOldItemsBody" style="max-height:66vh;overflow-y:auto;font-size:0.8rem;">加载中…</div>
