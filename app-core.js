@@ -8193,6 +8193,21 @@
             });
             return [...out];
         }
+        // 🟢 2026-11-03 卡池「默认融合形态」：在卡池里给某张基础卡选好融合形态（如 小丑 → 小丑猫咪），
+        //   以后把它加入手牌时自动就是该形态。全局存储（localStorage），与副卡等级/魔化同级。
+        let fusionDefaults = {};
+        try { fusionDefaults = JSON.parse(localStorage.getItem('tdjl_fusion_defaults') || '{}') || {}; } catch (e) { fusionDefaults = {}; }
+        function getDefaultFusion(baseHero) {
+            return (baseHero && fusionDefaults && fusionDefaults[baseHero]) ? fusionDefaults[baseHero] : '';
+        }
+        function setDefaultFusion(baseHero, fusionName) {
+            if (!baseHero) return;
+            if (fusionName) fusionDefaults[baseHero] = fusionName;
+            else delete fusionDefaults[baseHero];
+            try { localStorage.setItem('tdjl_fusion_defaults', JSON.stringify(fusionDefaults)); } catch (e) {}
+        }
+        window.getDefaultFusion = getDefaultFusion;
+        window.setDefaultFusion = setDefaultFusion;
             // 在槽位上刷新"融合卡切换"控件（基础英雄有融合变体→显示「融合」；当前卡本身是融合卡→额外显示「编辑融合」）
         function refreshSlotFusionControl(slot) {
             if (!slot || !slot.classList.contains('filled')) return;
@@ -11471,10 +11486,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 paintMohuaBtn()
             }
 
-            // 融合变体（卡池/收藏没有“卡槽/手牌”归属，融合是上阵后的事 → 不显示这个按钮，避免点了没反应）
+            // 融合变体（卡池/收藏也能用：选中的形态会存为该基础卡的「默认融合形态」，加入手牌时自动套用）
             const baseHero = (typeof getBaseHeroName === 'function') ? getBaseHeroName(mainName).heroName : mainName
             const variants = (typeof getFusionVariantsForBase === 'function') ? getFusionVariantsForBase(baseHero) : []
-            if (variants && variants.length && !poolScope) {
+            if (variants && variants.length) {
                 actions.appendChild(roundBtn('hero-ui/icon-fuse2.png', '融合', () => {
                     if (pop.dataset.mode === 'fuse') { pop.style.display = 'none'; pop.dataset.mode = ''; return }
                     pop.dataset.mode = 'fuse'
@@ -11976,6 +11991,20 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         paintSubSettings()
                         paintFuseSkinRow()
                         paintFusePickRow()
+                        // 🟢 2026-11-03 卡池/收藏：选中的形态存为该基础卡的「默认融合形态」→ 加入手牌时自动套用
+                        if (poolScope) {
+                            try {
+                                // 🔴 用入参 cardName 推导（不要用 mainName：加载官方数据后它会被改写成「邪能火炮」等官方名，
+                                //   与卡池卡面名「火炮」对不上 → 存进去的默认项永远匹配不到）
+                                const _baseRaw = (typeof getMainCardName === 'function') ? getMainCardName(cardName) : cardName
+                                const _base = (typeof getBaseHeroName === 'function') ? getBaseHeroName(_baseRaw).heroName : _baseRaw
+                                const _isBase = (!opt || opt === _base)
+                                setDefaultFusion(_base, _isBase ? '' : opt)
+                                if (typeof showToast === 'function') {
+                                    showToast(_isBase ? ('已取消「' + _base + '」的默认融合形态') : ('✅ 已设为默认融合：' + _base + ' → ' + opt + '（以后加入手牌自动使用）'), 'success')
+                                }
+                            } catch (e) {}
+                        }
                         const slotEl = badge && badge.closest ? badge.closest('.battle-slot') : null
                         if (libSlot) {
                             const lt = libSlot.getAttribute('data-tab'), ll = libSlot.getAttribute('data-lid'), lsd = libSlot.getAttribute('data-side') || 'my'
@@ -12056,6 +12085,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             lb.style.cssText = 'font-size:9.5px;color:' + (sk === cur ? '#ffd75e' : '#c9b28a') + ';max-width:70px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
                             item.appendChild(lb)
                             item.onclick = async () => {
+                                // 🟢 2026-11-03 卡池/收藏：副卡皮肤额外写「全局英雄皮肤表」，换项目也继承
+                                //   （卡池里副卡常是短名「射线」，而副卡英雄是「侏儒射线」→ 按名字写，别按卡 id 找）
+                                if (poolScope) {
+                                    try {
+                                        window.heroSkinSelections = window.heroSkinSelections || {}
+                                        if (sk === '默认') delete window.heroSkinSelections[sub]
+                                        else window.heroSkinSelections[sub] = sk
+                                        localStorage.setItem('tdjl_heroSkinSelections', JSON.stringify(window.heroSkinSelections))
+                                    } catch (e) {}
+                                }
                                 if (typeof setFusionSkin === 'function') { try { await setFusionSkin(sub, sk === '默认' ? '' : sk) } catch (e) {} }
                                 if (typeof invalidateFusionHalfCache === 'function') { try { await invalidateFusionHalfCache(sub) } catch (e) {} }
                                 paintCircles()        // 左圆：换成新皮肤的副卡立绘
@@ -12825,7 +12864,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
             // 融合变体选择（只对基础英雄且存在融合变体时显示；卡池/收藏中不处理上阵关系）
             // 🔴 2026-10-14 UX 调整：从弹窗底部上移到「魔化（主卡）」之下，方便先选副卡再看副卡皮肤/等级/魔化
-            if (isProjectScope && hasVariants) {
+            // 🟢 2026-11-03 卡池/收藏也显示融合变体（原来只有项目内显示）：选中的形态会存为该基础卡的默认融合形态，
+            //   加入手牌时自动套用。图库槽位（libSlot）仍由图库自己的入口追加，避免重复。
+            if ((isProjectScope || !libSlot) && hasVariants) {
                 const fvTitle = document.createElement('div');
                 fvTitle.style.cssText = 'color:#60a5fa;margin:14px 0 6px;border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;';
                 fvTitle.textContent = '🔗 融合变体（选副卡）';
@@ -12857,11 +12898,22 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     b.appendChild(cap);
                     b.onclick = async () => {
                         const pick = b.dataset.value;
+                        // 🟢 2026-11-03 卡池/收藏：没有卡槽/手牌归属 → 存为该基础卡的「默认融合形态」（加入手牌时自动套用），
+                        //   不在这里改任何手牌（否则会误改同名手牌卡）
+                        const fromPool = !isProjectScope && !libSlot;
+                        if (fromPool) {
+                            try {
+                                const _baseRaw = (typeof getMainCardName === 'function') ? getMainCardName(cardName) : cardName;
+                                const _base = (typeof getBaseHeroName === 'function') ? getBaseHeroName(_baseRaw).heroName : _baseRaw;
+                                if (typeof setDefaultFusion === 'function') setDefaultFusion(_base, (pick === _base) ? '' : pick);
+                                if (typeof showToast === 'function') showToast(pick === _base ? ('已取消「' + _base + '」的默认融合形态') : ('✅ 已设为默认融合：' + _base + ' → ' + pick + '（以后加入手牌自动使用）'), 'success');
+                            } catch (e) {}
+                        }
                         // 直接改名即可：槽位用现有 upgradeCardToFusion；手牌直接改手牌数组 + 原地重绘
-                        const slotEl = badge.closest('.battle-slot');
+                        const slotEl = fromPool ? null : badge.closest('.battle-slot');
                         if (slotEl && typeof upgradeCardToFusion === 'function') {
                             await upgradeCardToFusion(slotEl, pick);
-                        } else {
+                        } else if (!fromPool) {
                             const handArr = (handType === 'my') ? myHandCards : teammateHandCards;
                             const hc = handArr && handArr.find(c => c.id === cardId);
                             if (hc) hc.name = pick;
@@ -14476,7 +14528,18 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         // side 可选：'my' | 'teammate' 指定上阵到哪侧；不传则沿用原自动逻辑（优先我的，满了才队友）
         function handlePoolCardClick(card, side) {
             const cardId = card.dataset.id;
-            const cardName = card.dataset.name;
+            let cardName = card.dataset.name;
+            // 🟢 2026-11-03 卡池里设过「默认融合形态」的基础卡 → 加入手牌时自动用该形态（如 小丑 → 小丑猫咪）
+            try {
+                const _isFusionCard = (typeof getFusionParts === 'function') && getFusionParts(cardName);
+                if (!_isFusionCard && typeof getDefaultFusion === 'function') {
+                    // 卡面名可能是短名（火炮），也可能是官方名（邪能火炮）→ 两种键都查一遍
+                    const _main = (typeof getMainCardName === 'function') ? getMainCardName(cardName) : cardName;
+                    const _base = (typeof getBaseHeroName === 'function') ? getBaseHeroName(_main).heroName : _main;
+                    const _df = getDefaultFusion(cardName) || getDefaultFusion(_main) || getDefaultFusion(_base) || '';
+                    if (_df && typeof getFusionParts === 'function' && getFusionParts(_df)) cardName = _df;
+                }
+            } catch (e) {}
             const isEngineering = card.dataset.engineering === 'true';
             const profession = card.dataset.profession;
             const cardType = card.dataset.type;
