@@ -33,9 +33,11 @@
         window.ACTIVITY_SKINS_DEFAULT = ACTIVITY_SKINS.map(function (s) { return { name: s.name, cost: s.cost, category: String(s.cost) }; });
         const OLD_ITEMS_FILE = 'old_activity_items.json';
         const OLD_ACTIVITY_NAME_DEFAULT = '旧活动·轮回';
+        const OLD_ACTIVITY_DAYS_DEFAULT = 21;
         let _oldItemsCache = null;
         let _oldItemsFlat = [];
         let _oldActivityName = OLD_ACTIVITY_NAME_DEFAULT;   // 🟢 2026-11-03 旧活动名字也由管理端维护（old_activity_items.json 的 name）
+        let _oldActivityDays = OLD_ACTIVITY_DAYS_DEFAULT;   // 🟢 2026-11-03 旧活动总天数（old_activity_items.json 的 days）
         // 读云端配置（管理员维护的清单），失败/无配置 → 内置默认
         async function loadOldActivityItems(force) {
             if (_oldItemsCache && !force) return _oldItemsCache;
@@ -48,6 +50,7 @@
                         const d = JSON.parse(c);
                         if (d && Array.isArray(d.items) && d.items.length) {
                             _oldActivityName = String(d.name || '').trim() || OLD_ACTIVITY_NAME_DEFAULT;
+                            _oldActivityDays = Math.max(1, Number(d.days) || OLD_ACTIVITY_DAYS_DEFAULT);
                             _oldItemsCache = d.items.filter(function (x) { return x && x.name; })
                                 .map(function (x) { const cost = Number(x.cost) || 0; return { name: String(x.name), cost: cost, category: String(cost) }; });
                             return _oldItemsCache;
@@ -56,11 +59,13 @@
                 }
             } catch (e) {}
             _oldActivityName = OLD_ACTIVITY_NAME_DEFAULT;
+            _oldActivityDays = OLD_ACTIVITY_DAYS_DEFAULT;
             _oldItemsCache = window.ACTIVITY_SKINS_DEFAULT.slice();
             return _oldItemsCache;
         }
         function getOldActivityItems() { return _oldItemsCache || window.ACTIVITY_SKINS_DEFAULT; }
         function getOldActivityName() { return _oldActivityName || OLD_ACTIVITY_NAME_DEFAULT; }
+        function getOldActivityDays() { return Math.max(1, Number(_oldActivityDays) || OLD_ACTIVITY_DAYS_DEFAULT); }
         // 管理员保存后调用：清缓存 → 重拉 → 重渲染
         window.__reloadOldActivityItems = async function () {
             _oldItemsCache = null;
@@ -109,7 +114,7 @@
                 icon: '🆕',
                 noParams: true,
                 items: BEIXIANG_ITEMS_DEFAULT.map(function (x) { return { name: x.name, cost: x.cost }; }),
-                params: {}
+                params: { days: 23 }   // 🟢 2026-11-03 活动总天数（管理端「📅 活动总天数」可改，每期 21/23 天不一样）
             },
             {
                 id: 'shop',
@@ -201,8 +206,31 @@
             setBtn('calcTopShop', shop.icon || '🏪', shop.name || '状元商店');
             const tNew = document.getElementById('calcNewTitle');
             if (tNew) tNew.textContent = '🏆 ' + String(bx.title || bx.name || '活动对战杯');
+            // 活动总天数（每个活动一个，管理端「📅 活动总天数」可改）
+            try { await applyActivityDays(); } catch (e) {}
         }
         window.applyActivityNames = applyActivityNames;
+        // 🟢 2026-11-03 每个活动的「活动总天数」由管理端配置，打开计算器时回填到各自输入框
+        //   对战杯 calcBeixiangTotalDays / 旧活动 calcDaysInput / 状元商店 calcShopTotalDaysInput
+        function _setInputVal(id, v) {
+            const el = document.getElementById(id);
+            if (!el) return false;
+            if (String(el.value) !== String(v)) el.value = String(v);
+            return true;
+        }
+        async function applyActivityDays() {
+            let oldDays = getOldActivityDays();
+            try { await loadOldActivityItems(); oldDays = getOldActivityDays(); } catch (e) {}
+            try { await loadActivityTabs(); } catch (e) {}
+            const bx = (function () { try { return getActTab('beixiang') || {}; } catch (e) { return {}; } })();
+            const shop = (function () { try { return getActTab('shop') || {}; } catch (e) { return {}; } })();
+            const bxDays = Math.max(1, Number((bx.params || {}).days) || 23);
+            const shopDays = Math.max(1, Number((shop.params || {}).days) || 21);
+            if (_setInputVal('calcBeixiangTotalDays', bxDays)) { try { updateBeixiangRemainDays(); } catch (e) {} }
+            _setInputVal('calcDaysInput', oldDays);
+            if (_setInputVal('calcShopTotalDaysInput', shopDays)) { try { updateShopRemainDays(); } catch (e) {} }
+        }
+        window.applyActivityDays = applyActivityDays;
         // 首屏也套一次（DOM 就绪后再跑，避免拿不到按钮节点）
         try {
             const _bootNames = function () { setTimeout(function () { try { applyActivityNames(); } catch (e) {} }, 1200); };
@@ -408,7 +436,7 @@
             const total = parseInt(document.getElementById('calcShopTotalDaysInput') && document.getElementById('calcShopTotalDaysInput').value) || 0;
             const cur = parseInt(document.getElementById('calcShopCurrentDayInput') && document.getElementById('calcShopCurrentDayInput').value) || 1;
             const rem = total - cur + 1;
-            return rem > 0 ? rem : (total > 0 ? 1 : 21);
+            return rem > 0 ? rem : (total > 0 ? 1 : (Number(((getActTab('shop') || {}).params || {}).days) || 21));
         }
         window.updateShopRemainDays = function () {
             const el = document.getElementById('calcShopRemainDaysShow');
@@ -543,7 +571,8 @@
             return d + '天' + h + '小时' + (m > 0 ? m + '分' : '');
         }
         function getBeixiangRemainingDays() {
-            const total = parseInt(document.getElementById('calcBeixiangTotalDays')?.value) || 23;
+            const cfgDays = Number(((getActTab('beixiang') || {}).params || {}).days) || 23;
+            const total = parseInt(document.getElementById('calcBeixiangTotalDays')?.value) || cfgDays;
             const cur = parseInt(document.getElementById('calcBeixiangCurrentDay')?.value) || 1;
             const now = new Date();
             const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());

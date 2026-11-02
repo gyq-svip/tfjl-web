@@ -29537,6 +29537,7 @@ ${maSection}
         const ACT_TABS_GIST_FILE = 'activity_tabs.json';
         let _oldItemsAdminDraft = null;     // 旧活动道具草稿
         let _oldItemsNameDraft = '';        // 🟢 2026-11-03 旧活动名字草稿（可改，存 old_activity_items.json 的 name）
+        let _oldDaysDraft = 21;             // 🟢 2026-11-03 旧活动总天数草稿（存 old_activity_items.json 的 days）
         let _actTabsAdminDraft = null;      // 可扩展活动草稿（tabs 数组）
         let _actAdminCur = 'beixiang';      // 当前正在维护哪个活动：'old' 或 tab.id（默认=计算器第 1 个 tab：活动对战杯）
         let _actAdminLoaded = false;
@@ -29686,16 +29687,18 @@ ${maSection}
             // ① 旧活动道具 + 名字
             let items = [];
             let oldName = '';
+            let oldDays = 0;
             try {
                 const token = getGistToken();
                 if (token && typeof wallReadGistFile === 'function') {
                     const c = await wallReadGistFile(GIST_ID, OLD_ITEMS_GIST_FILE, token);
-                    if (c) { const d = JSON.parse(c); if (d && Array.isArray(d.items)) items = d.items; if (d && d.name) oldName = String(d.name); }
+                    if (c) { const d = JSON.parse(c); if (d && Array.isArray(d.items)) items = d.items; if (d && d.name) oldName = String(d.name); if (d && d.days) oldDays = Number(d.days) || 0; }
                 }
             } catch (e) {}
             if (!items || !items.length) items = (window.ACTIVITY_SKINS_DEFAULT || []).map(s => ({ name: s.name, cost: s.cost }));
             _oldItemsAdminDraft = items.map(x => ({ name: String(x.name || ''), cost: Number(x.cost) || 0 }));
             _oldItemsNameDraft = String(oldName || '').trim() || '旧活动·轮回';
+            _oldDaysDraft = Math.max(1, Number(oldDays) || 21);
             // ② 可扩展活动
             let tabs = null;
             try {
@@ -29768,7 +29771,7 @@ ${maSection}
             let h = '<div style="margin-top:14px;background:rgba(78,205,196,0.07);border:1px solid rgba(78,205,196,0.25);border-radius:8px;padding:10px;">';
             h += '<div style="color:#4ecdc4;font-size:0.82rem;font-weight:600;margin-bottom:8px;">⚙️ 该活动的参数（这一期的波数规则和其他活动不一样，改这里）</div>';
             h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">';
-            h += I('days', '活动天数（默认）', p.days == null ? 21 : p.days);
+            // 活动总天数已上移到上方统一的「📅 活动总天数」（三个活动都有），这里不再重复
             h += I('maxWaves', '每天最多波数', p.maxWaves == null ? 200 : p.maxWaves);
             h += I('waveStepWaves', '产出：每 N 波', p.waveStepWaves == null ? 10 : p.waveStepWaves);
             h += I('waveStepShards', '产出：得 M 碎片', p.waveStepShards == null ? 2 : p.waveStepShards);
@@ -29793,6 +29796,9 @@ ${maSection}
             const isTab = _actAdminCur !== 'old';
             const curTab = _actAdminCurTab();
             const curName = isTab ? ((curTab && curTab.name) || '') : (_oldItemsNameDraft || '旧活动·轮回');
+            const curDays = isTab
+                ? Math.max(1, Number(((curTab && curTab.params) || {}).days) || ((curTab && curTab.id === 'beixiang') ? 23 : 21))
+                : Math.max(1, Number(_oldDaysDraft) || 21);
             let html = '';
             // 🔴 2026-11-03 顺序必须与计算器顶部 tab 完全一致：① 🆕 活动对战杯(每天5局) ② 📦 旧活动 ③ 🏪 状元商店
             //   之前「旧活动」固定排第一，管理员打开看到的第 1 项不是用户端第 1 个 tab（用户反馈「对应错」）。
@@ -29819,11 +29825,16 @@ ${maSection}
             html += '<div style="background:rgba(255,215,0,0.06);border:1px solid rgba(255,215,0,0.25);border-radius:8px;padding:10px;margin-bottom:12px;">';
             html += '<div style="color:#ffd700;font-size:0.8rem;font-weight:600;margin-bottom:6px;">🏷️ 活动名字（计算器顶部按钮显示这个）</div>';
             html += '<input id="actAdminNameInput" value="' + _esc(curName) + '" placeholder="如 活动对战杯 / 旧活动·轮回" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.35);border-radius:6px;color:#fff;font-size:0.82rem;padding:6px 8px;outline:none;">';
+            // 🟢 2026-11-03 活动总天数（每个活动都要有；每期 21 天 / 23 天不一样）
+            html += '<div style="color:#ffd700;font-size:0.8rem;font-weight:600;margin:10px 0 4px;">📅 活动总天数<span style="color:rgba(255,255,255,0.4);font-weight:400;font-size:0.68rem;margin-left:6px;">用户端计算器默认按这个天数算剩余</span></div>';
+            html += '<div style="display:flex;align-items:center;gap:6px;">'
+                + '<input id="actAdminDaysInput" type="number" min="1" max="90" value="' + curDays + '" style="width:110px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.35);border-radius:6px;color:#ffd700;font-size:0.9rem;font-weight:700;padding:6px 8px;outline:none;">'
+                + '<span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">天（每期不一样：21 / 23 …）</span></div>';
             if (isTab && curTab) {
                 html += '<div style="color:#4ecdc4;font-size:0.75rem;font-weight:600;margin:8px 0 4px;">📰 页面内大标题（可留空，留空就用上面的名字）</div>';
                 html += '<input id="actAdminTitleInput" value="' + _esc(curTab.title || '') + '" placeholder="如 第四话·丐帮 · 活动对战杯" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.3);border:1px solid rgba(78,205,196,0.35);border-radius:6px;color:#fff;font-size:0.82rem;padding:6px 8px;outline:none;">';
             }
-            html += '<div style="color:rgba(255,255,255,0.4);font-size:0.68rem;margin-top:6px;line-height:1.5;">换赛季只改名字即可（玩法/道具结构不变）；改完点下面「💾 保存并立即生效」。</div>';
+            html += '<div style="color:rgba(255,255,255,0.4);font-size:0.68rem;margin-top:6px;line-height:1.5;">换赛季只改「名字 + 📅 活动总天数」即可（玩法/道具结构不变）；改完点下面「💾 保存并立即生效」。</div>';
             html += '</div>';
             // 道具清单（按档位分组）
             html += '<div style="color:#ffd700;font-size:0.82rem;font-weight:600;margin-bottom:6px;">🎁 道具清单（档位 = 材料数）</div>';
@@ -29900,6 +29911,16 @@ ${maSection}
                     if (t) t.title = String(this.value || '').trim();
                 });
             }
+            // 🟢 2026-11-03 活动总天数：旧活动存 old_activity_items.json 的 days；其他活动存 params.days
+            const daysInp = box.querySelector('#actAdminDaysInput');
+            if (daysInp) {
+                daysInp.addEventListener('change', function () {
+                    const v = Math.max(1, Math.min(90, Number(this.value) || 21));
+                    this.value = String(v);
+                    if (_actAdminCur === 'old') _oldDaysDraft = v;
+                    else { const t = _actAdminCurTab(); if (t) { t.params = t.params || {}; t.params.days = v; } }
+                });
+            }
         }
         window.oldItemsAdminAdd = function () {
             const n = document.getElementById('oldItemsNewName');
@@ -29925,6 +29946,7 @@ ${maSection}
                 if (!confirm('恢复为内置默认清单（当前云端配置将被覆盖）？')) return;
                 _oldItemsAdminDraft = (window.ACTIVITY_SKINS_DEFAULT || []).map(s => ({ name: s.name, cost: s.cost }));
                 _oldItemsNameDraft = '旧活动·轮回';
+                _oldDaysDraft = 21;
             } else {
                 const t = _actAdminCurTab();
                 if (!t) return;
@@ -29950,9 +29972,10 @@ ${maSection}
                         .map(x => ({ name: String(x.name).trim(), cost: Math.max(0, Number(x.cost) || 0) }));
                     if (!items.length) { alert('清单为空，至少要有一个道具'); return; }
                     const nm = String(_oldItemsNameDraft || '').trim() || '旧活动·轮回';
-                    await _actGistPatch(OLD_ITEMS_GIST_FILE, { name: nm, items: items });
+                    const dys = Math.max(1, Math.min(90, Number(_oldDaysDraft) || 21));
+                    await _actGistPatch(OLD_ITEMS_GIST_FILE, { name: nm, days: dys, items: items });
                     if (typeof window.__reloadOldActivityItems === 'function') await window.__reloadOldActivityItems();
-                    alert('✅「' + nm + '」已保存并生效（' + items.length + ' 个道具）');
+                    alert('✅「' + nm + '」已保存并生效（' + items.length + ' 个道具 · ' + dys + ' 天）');
                 } else {
                     const t = _actAdminCurTab();
                     if (!t) return;
