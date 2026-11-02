@@ -19533,6 +19533,28 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         // 内容 = 管理员公告里「分类=功能简介」的最新一条生效公告的正文；多条取 active_time 最新。
         // 淡色随主题：面板正文用 CSS 变量 --introPanelColor（默认 rgba(255,255,255,0.32)）。
         // 可最小化折叠：每次打开默认展开；折叠只是收起正文，不跨刷新记忆（2026-09-29 由"关闭"改为"最小化"）。
+        // 🟢 2026-11-03 修复「公告发布后窗口标题/功能简介不更新」：
+        //   旧写法 `if (ta >= tb) latest = it` 在两条都没设「生效时间」时 ta=tb=0 恒真 →
+        //   循环结束取到数组**最后一条（最老的）**；而 adminPublishNews 是把新条目 unshift 到**最前面**，
+        //   于是「再发布新的永远不生效，标题一直是第一次那条」。
+        //   统一改为：发布时间 > 生效时间 > 数组顺序（越靠前越新）。窗口标题 / 功能简介板共用。
+        function _pickLatestNews(items) {
+            const ts = function (s) {
+                if (!s) return 0;
+                const t = new Date(String(s).replace(' ', 'T')).getTime();
+                return isNaN(t) ? 0 : t;
+            };
+            let latest = null, key = null;
+            (items || []).forEach(function (it, idx) {
+                const k = [ts(it.publish_time), ts(it.active_time), -idx];
+                if (!latest) { latest = it; key = k; return; }
+                for (let i = 0; i < k.length; i++) {
+                    if (k[i] !== key[i]) { if (k[i] > key[i]) { latest = it; key = k; } return; }
+                }
+            });
+            return latest;
+        }
+
         function renderIntroPanel() {
             const panel = document.getElementById('introPanel');
             if (!panel) return;
@@ -19540,13 +19562,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             const items = (newsItems || []).filter(it => it && it.category === '功能简介'
                 && !(it.active_time && new Date(it.active_time) > now)
                 && !(it.expire_time && new Date(it.expire_time) <= now));
-            let latest = null;
-            for (const it of items) {
-                if (!latest) { latest = it; continue; }
-                const ta = it.active_time ? new Date(it.active_time).getTime() : 0;
-                const tb = latest.active_time ? new Date(latest.active_time).getTime() : 0;
-                if (ta >= tb) latest = it;
-            }
+            const latest = _pickLatestNews(items);
             const bodyEl = document.getElementById('introPanelBody');
             if (!latest || !latest.content || !bodyEl) { panel.style.display = 'none'; return; }
             const changed = (bodyEl.textContent !== latest.content);
@@ -19563,13 +19579,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                 && it.content && String(it.content).trim()
                 && !(it.active_time && new Date(it.active_time) > now)
                 && !(it.expire_time && new Date(it.expire_time) <= now));
-            let latest = null;
-            for (const it of items) {
-                if (!latest) { latest = it; continue; }
-                const ta = it.active_time ? new Date(it.active_time).getTime() : 0;
-                const tb = latest.active_time ? new Date(latest.active_time).getTime() : 0;
-                if (ta >= tb) latest = it;
-            }
+            const latest = _pickLatestNews(items);   // 🟢 2026-11-03 统一取最新（原来 ta>=tb 恒真会取到最旧那条）
             if (!latest) return;
             const APP_PREFIX = '塔防精灵助手 - 阵容卡搭配｜';
             let title = String(latest.content).trim();
@@ -19611,6 +19621,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                     }
                 }
                 renderIntroPanel(); // 每分钟兜底：生效/到期时间切换后简介板跟随更新
+                try { renderWindowTitle(); } catch (e) {}   // 🟢 2026-11-03 窗口标题也每分钟兜底（管理员改完，在线用户不刷新也能跟上）
             }, 60000);
         }
         
