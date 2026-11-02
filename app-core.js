@@ -11574,7 +11574,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             //   （悬停放大 + 头顶属性预览，点击即切），魔化走图标点击开关（见上方按钮构建）。
 
             // ③ 融合（官方版式：左副卡 / 右主卡 + 底部变体切换 + 副卡等级/皮肤设置）
-            const fuseBtn = actions.children[3]
+            // 🔴 2026-11-02 修复「管理员新加的融合卡没有副卡属性面板」（小丑猫咪等）：
+            //   原来写死 actions.children[3] 取融合按钮，但「魔化」按钮是按 hasMoHuaData(mainName) 条件渲染的：
+            //   主卡没有魔化数据（小丑/猫咪等）时整排只有 [皮肤, 洗炼, 融合]，融合落在 index 2，
+            //   children[3] === undefined → 本段永不执行 → 官方版式融合面板（副卡技能/等级/皮肤/魔化/被融合卡列表）
+            //   全部不绑定，只剩 actions 里那个简易「融合变体（点击切换副卡）」弹层。
+            //   改为按图标 alt / title 查找按钮，不再依赖位置；以后再加融合卡（无论主卡有无魔化）都能出面板。
+            const fuseBtn = [...actions.querySelectorAll('button')].find((b) => {
+                const img = b.querySelector('img')
+                return (img && img.alt === '融合') || b.title === '融合'
+            })
             if (fuseBtn) {
                 fuseBtn.onclick = () => {
                     if (card.querySelector('.hd-sub-fuse')) { card.querySelector('.hd-sub-fuse').remove(); return }
