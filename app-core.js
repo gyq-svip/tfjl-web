@@ -32338,8 +32338,9 @@ ${maSection}
             }
             if (cfg) window.__fabQrCfg = cfg;
             const info = fabQrExpiryInfo(cfg);
-            if (!info) { el.style.display = 'none'; return; }
-            el.style.display = 'block';
+            // 🟢 2026-11-03 常驻占位：只切 visibility（占位不塌陷），不用 display —— 避免异步出现时把菜单项整体顶下去
+            if (!info) { el.style.visibility = 'hidden'; el.innerHTML = ''; return; }
+            el.style.visibility = 'visible';
             let bg, bd, txt;
             if (info.unknown) { bg = 'rgba(255,255,255,0.06)'; bd = 'rgba(255,255,255,0.22)'; txt = '⏳ 群二维码：未记录设置时间（重新保存后开始计时）'; }
             else if (info.left > 2) { bg = 'rgba(76,175,80,0.14)'; bd = 'rgba(76,175,80,0.5)'; txt = '⏳ 群二维码剩余 <b>' + info.left + '</b> 天（' + info.expStr + ' 到期）'; }

@@ -1640,7 +1640,6 @@
                     </div>
                     <div id="adminApiUsageDetail" style="color:rgba(255,255,255,0.6);font-size:0.7rem;margin-top:4px;"></div>
                 </div>
-                <div id="adminFabQrExpiry" onclick="adminShowPage('featureToggles')" title="群二维码有效期（点此去功能开关页更换）" style="display:none;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:0.78rem;line-height:1.5;cursor:pointer;"></div>
                 <div id="adminMenuGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-height:60vh;overflow-y:auto;padding-right:3px;">
                     <style>
                         .admin-draggable{cursor:grab;}
@@ -1780,6 +1779,9 @@
                     </div>
 
                 </div>
+                <!-- 🟢 2026-11-03 群二维码有效期条：挪到菜单网格「下方」并常驻占位（visibility 控制），
+                     原来在网格上方且异步出现 → 一出现就把所有菜单项往下顶，容易点错。 -->
+                <div id="adminFabQrExpiry" onclick="adminShowPage('featureToggles')" title="群二维码有效期（点此去功能开关页更换）" style="visibility:hidden;min-height:34px;box-sizing:border-box;border-radius:8px;padding:8px 12px;margin-top:8px;font-size:0.78rem;line-height:1.5;cursor:pointer;"></div>
                 <div id="adminSortEditBtn" style="display:flex;gap:8px;margin-top:8px;">
                     <button class="admin-btn admin-btn-secondary" onclick="adminMenuEnterSort()" style="flex:1;font-size:0.8rem;">✏️ 拖动排序</button>
                 </div>
