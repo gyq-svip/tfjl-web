@@ -400,7 +400,7 @@
             box.innerHTML = html;
             area.style.display = 'block';
         };
-        // 封神杯襄商店皮肤/战车清单（第四话·封神台）
+        // 活动对战杯皮肤/战车清单（第四话·封神台）
         const BEIXIANG_SKINS = [
             // 480战旗档
             { name: '卷帘大将·斧客', cost: 480, category: '480' },
@@ -889,7 +889,10 @@
         //    （上限本应 3×6=18），正是用户反馈「还剩6天最多买18次，他却算20次」的成因。
         //    现由调用方把「剩余天数」传进来，上限 = 每日限购 × 剩余天数。
         function calcOptimalPurchase(need, days) {
-            days = Math.max(1, Number(days) || 21);
+            // 🔴 2026-11-02 修复：剩余天数若带小数（如 21.16 天），会让 cap=3×days 变小数，
+            //   进而 for(c30=max30...) 的循环起点变小数 → bestPlan 里出现 62.49 这种「半个礼包」。
+            //   礼包只能整买，天数向上取整为整天，保证 cap/循环/plan 全为整数。
+            days = Math.max(1, Math.ceil(Number(days) || 21));
             const DAILY_LIMIT = 3;          // 30/128/328 每日限购次数（648 不限购）
             const cap30 = DAILY_LIMIT * days;
             const cap128 = DAILY_LIMIT * days;
