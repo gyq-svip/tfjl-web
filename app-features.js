@@ -7841,8 +7841,17 @@
             return output;
         }
 
+        // 🔴 老马脚本兼容：官方4字工程卡名 → 老马短名。仅脚本生成输出时转换；
+        //    识别 / 显示 / 手牌仍用官方名（邪能火炮等），生成的脚本一律适配老马（火炮等）。
+        function toLaoMaScriptName(s) {
+            if (!s) return s;
+            const MAP = { '邪能火炮':'火炮', '地精宝库':'宝库', '侏儒射线':'射线', '微型潜艇':'潜艇', '咬人娃娃':'咬人娃娃' };
+            return String(s).replace(/邪能火炮|地精宝库|侏儒射线|微型潜艇|咬人娃娃/g, m => MAP[m] || m);
+        }
+
         // 共用收尾：计算总减伤 + 渲染结果面板
         function finishScriptOutput(ctx, output, label) {
+            output = toLaoMaScriptName(output);  // 🔴 生成脚本适配老马：官方工程卡名→短名
             const resultEl = document.getElementById('parserResult');
             const overLimitCards = ctx.overLimitCards;
             const arrangedCards = ctx.arrangedCards;
@@ -8298,6 +8307,9 @@
                 dungeonBattleCards = [...arrangedCards];
             }
             const totalDamageReduction = calculateDamageReductionForCards(dungeonBattleCards);
+
+            // 🔴 生成脚本适配老马：官方工程卡名→短名（邪能火炮→火炮 等）
+            output = toLaoMaScriptName(output);
 
             // 显示结果
             const overLimitHtml2 = overLimitCards.length > 0 ? '<div style="color:#ff5722;font-size:0.85rem;margin-bottom:8px;">⚠️ 超出10张上限，已忽略：' + overLimitCards.join('、') + '</div>' : '';
