@@ -1132,6 +1132,30 @@
             gap: 6px !important;
         }
         .collapsible-section .card-item { width: auto !important; min-width: 0 !important; max-width: none !important; }
+        /* 🟢 2026-11-03 卡池 Dock 式放大：鼠标悬停时当前卡放大，同排卡片轻微抬起（近似 macOS Dock）。
+           只用 transform，不改宽高 → 不触发重排；放大倍数按内层 8px padding 收着放，避免被 .collapsible-section 的 overflow:hidden 切边。 */
+        .collapsible-section .cards-grid .card-item {
+            transition: transform .16s cubic-bezier(.2,.7,.3,1), box-shadow .16s ease, filter .16s ease;
+            transform-origin: center center;
+            will-change: transform;
+        }
+        /* 左右两列朝内侧放大（Dock 贴边效果），避免放大后被面板 overflow 切边 */
+        .collapsible-section .cards-grid .card-item:nth-child(3n+1) { transform-origin: left center; }
+        .collapsible-section .cards-grid .card-item:nth-child(3n) { transform-origin: right center; }
+        @media (hover: hover) {
+            .collapsible-section .cards-grid:hover .card-item { transform: scale(1.06); }
+            .collapsible-section .cards-grid .card-item:hover {
+                transform: scale(1.28);
+                z-index: 60;
+                box-shadow: 0 10px 24px rgba(0,0,0,0.6), 0 0 0 2px rgba(255,215,0,0.55);
+                filter: brightness(1.06);
+            }
+        }
+        /* 英雄面板里的皮肤缩略图：同款悬停抬起（原来只有选中描边，没有动效） */
+        .skin-thumb-btn { transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
+        @media (hover: hover) {
+            .skin-thumb-btn:hover { transform: translateY(-3px) scale(1.08); box-shadow: 0 6px 16px rgba(0,0,0,0.55); }
+        }
         /* 🔴 2026-09-18 收藏面板不再特殊化（旧：252px 宽 + 卡片 min-height:72px + 字号 0.82rem），
            那套规则让收藏卡比卡池卡「又高又窄」，视觉不一致。现在与卡池完全同规格：
            面板 232px + 内层 .cards-grid 3 列 / 6px 间距，卡片尺寸/字号沿用上面的通用规则。 */
