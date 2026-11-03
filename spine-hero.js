@@ -1006,12 +1006,16 @@
     const idxScale = (window.__heroSpineIndex && folder && window.__heroSpineIndex[folder] && window.__heroSpineIndex[folder].scale > 0)
       ? window.__heroSpineIndex[folder].scale : 1
     const scale = SC[model] ? (idxScale * SC[model]) : undefined
+    // 🟢 2026-11-04 精灵球（pokeball）：本体就是一颗球，视觉主要靠 fx 光效/粒子；
+    //   剔掉 fx 后只剩一个白球（用户反馈"精灵动画太土"）。故精灵默认保留特效。
+    const _isElf = /^(jingling\d*|caijingling|tujingling|bingjingling)$/i.test(String(folder || '')) ||
+                   /^(jingling\d*|jinfanwan|kongmingdeng|huanjinglingpifu|hunjinglingpifu|caijingling|tujingling|bingjingling)/i.test(String(model || ''))
     return {
       fitPadding: fitPadding,
       pngs: pngs || 0,
       model: model,
       tight: true,
-      hideFx: !opt.noHideFx,
+      hideFx: _isElf ? false : !opt.noHideFx,
       dedupe: true,
       hideSlots: (man.hideSlots || []).concat((man.modelHideSlots || {})[model] || []),
       fitByHeight: true,

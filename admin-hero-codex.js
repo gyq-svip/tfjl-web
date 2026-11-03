@@ -295,12 +295,14 @@
       }
       const pngs = effModel ? ((man.modelPngs || {})[effModel] || 0) : (man.pngs || 0)
       const moff = (man.modelOffsets && (man.modelOffsets[effModel] || man.modelOffsets[man.model])) || {}
+      // 🟢 2026-11-04 精灵（occupation=6）：视觉主要靠 fx 光效，剔 fx 后只剩白球 → 保留特效
+      const _isElf = Number(h && h.occupation) === 6
       if (fallbackTip && st) { st.style.display = 'block'; st.textContent = fallbackTip }
       window.spineHero.play(canvas, h.modelFolder, {
         model: effModel || undefined,
         pngs: pngs,
         tight: true,
-        hideFx: !noHideFx,
+        hideFx: _isElf ? false : !noHideFx,
         dedupe: true,
         // 🟢 统一观感：所有模型按「可见高度」归一化到同一档。
         //   逐模型 scale 原本是为「特效撑大包围盒」做补偿的（我们不剔特效时必须套），

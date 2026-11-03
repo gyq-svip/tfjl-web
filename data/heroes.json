@@ -316,7 +316,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "星陨·冰骑",
-    "model": "bingqipifu"
+    "model": "bingqipifu",
+    "folder": "aersasi"
    }
   ]
  },
@@ -655,7 +656,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "花满楼·恶魔",
-    "model": "huamanlou"
+    "model": "huamanlou",
+    "folder": "yilidan"
    }
   ]
  },
@@ -1261,7 +1263,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "竖·剑客",
-    "model": "jianshishu"
+    "model": "jianshishu",
+    "folder": "jiansheng"
    },
    {
     "id": "211",
@@ -1278,7 +1281,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "小白龙·剑客",
-    "model": "xiaobailong"
+    "model": "xiaobailong",
+    "folder": "jiansheng"
    }
   ]
  },
@@ -1875,7 +1879,8 @@
     "extraInfo": "",
     "heroSkinHp": "1200",
     "note": "千年蟠桃·小鹿",
-    "model": "xiaolupifu2"
+    "model": "xiaolupifu2",
+    "folder": "xiaolu"
    },
    {
     "id": "167",
@@ -1892,7 +1897,8 @@
     "extraInfo": "",
     "heroSkinHp": "1200",
     "note": "蟠桃·小鹿",
-    "model": "xiaolupifu"
+    "model": "xiaolupifu",
+    "folder": "xiaolu"
    }
   ]
  },
@@ -2213,7 +2219,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "圣诞女郎·冰法",
-    "model": "bingnv_shengdan"
+    "model": "bingnv_shengdan",
+    "folder": "jianna"
    },
    {
     "id": "299",
@@ -2230,7 +2237,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "风暴·冰法",
-    "model": "bingnvpifu2"
+    "model": "bingnvpifu2",
+    "folder": "jianna"
    }
   ]
  },
@@ -2569,7 +2577,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "丝西娜·蛇女",
-    "model": "najiapifu"
+    "model": "najiapifu",
+    "folder": "najia"
    },
    {
     "id": "151",
@@ -2586,7 +2595,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "蛇精·蛇女",
-    "model": "jinshejing"
+    "model": "jinshejing",
+    "folder": "najia"
    },
    {
     "id": "195",
@@ -2603,7 +2613,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "春三十娘·蛇女",
-    "model": "chunsanshiniang"
+    "model": "chunsanshiniang",
+    "folder": "najia"
    },
    {
     "id": "233",
@@ -2620,7 +2631,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "玉罗刹·蛇女",
-    "model": "baifamonv"
+    "model": "baifamonv",
+    "folder": "najia"
    }
   ]
  },
@@ -2932,7 +2944,8 @@
     "extraInfo": "",
     "heroSkinHp": "1800",
     "note": "万圣猎手·绿弓",
-    "model": "wanshenglieshou"
+    "model": "wanshenglieshou",
+    "folder": "fengxingzhe"
    }
   ]
  },
@@ -3235,7 +3248,8 @@
     "extraInfo": "",
     "heroSkinHp": "1200",
     "note": "雪莲·冰弓",
-    "model": "binggongpifu"
+    "model": "binggongpifu",
+    "folder": "heianyouxia"
    }
   ]
  },
@@ -3868,7 +3882,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "科学怪人·雷神",
-    "model": "zhousi_pifu"
+    "model": "zhousi_pifu",
+    "folder": "zhousi"
    },
    {
     "id": "202",
@@ -3885,7 +3900,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "钢铁·雷神",
-    "model": "gangtiexia01"
+    "model": "gangtiexia01",
+    "folder": "zhousi"
    },
    {
     "id": "203",
@@ -3902,7 +3918,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "暗月·雷神",
-    "model": "gangtiexia02"
+    "model": "gangtiexia02",
+    "folder": "zhousi"
    },
    {
     "id": "294",
@@ -3919,7 +3936,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "华太师·雷神",
-    "model": "huataishi"
+    "model": "huataishi",
+    "folder": "zhousi"
    },
    {
     "id": "309",
@@ -3936,7 +3954,8 @@
     "extraInfo": "4",
     "heroSkinHp": "3600",
     "note": "深海科学家·雷神",
-    "model": "shenhaikexuejia"
+    "model": "shenhaikexuejia",
+    "folder": "zhousi"
    }
   ]
  },
@@ -4275,7 +4294,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "虹猫·战将",
-    "model": "hongmao"
+    "model": "hongmao",
+    "folder": "jumo"
    },
    {
     "id": "120",
@@ -4292,7 +4312,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "刀马·战将",
-    "model": "daoma"
+    "model": "daoma",
+    "folder": "jumo"
    },
    {
     "id": "157",
@@ -4309,7 +4330,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "冰雪·战将",
-    "model": "jumopifu"
+    "model": "jumopifu",
+    "folder": "jumo"
    },
    {
     "id": "174",
@@ -4326,7 +4348,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "许仕林·战将",
-    "model": "xushilin"
+    "model": "xushilin",
+    "folder": "jumo"
    },
    {
     "id": "175",
@@ -4343,7 +4366,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "许仙·战将",
-    "model": "xuxian"
+    "model": "xuxian",
+    "folder": "jumo"
    },
    {
     "id": "225",
@@ -4360,7 +4384,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "萧十一郎·战将",
-    "model": "xiaoshiyilang"
+    "model": "xiaoshiyilang",
+    "folder": "jumo"
    },
    {
     "id": "246",
@@ -4377,7 +4402,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "武松·战将",
-    "model": "wusong"
+    "model": "wusong",
+    "folder": "jumo"
    },
    {
     "id": "267",
@@ -4394,7 +4420,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "吕布·战将",
-    "model": "lvbu"
+    "model": "lvbu",
+    "folder": "jumo"
    },
    {
     "id": "296",
@@ -4411,7 +4438,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "风暴·战将",
-    "model": "fengbao"
+    "model": "fengbao",
+    "folder": "jumo"
    },
    {
     "id": "311",
@@ -4428,7 +4456,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "黄飞鸿·战将",
-    "model": "huangfeihong"
+    "model": "huangfeihong",
+    "folder": "jumo"
    },
    {
     "id": "350",
@@ -4445,7 +4474,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "林平之·战将",
-    "model": "linpingzhi"
+    "model": "linpingzhi",
+    "folder": "jumo"
    }
   ]
  },
@@ -4784,7 +4814,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "圣诞怪杰·刀客",
-    "model": "daokepifu"
+    "model": "daokepifu",
+    "folder": "siwen"
    }
   ]
  },
@@ -5105,7 +5136,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "巨灵神·海妖",
-    "model": "julingshen"
+    "model": "julingshen",
+    "folder": "chaoxi"
    }
   ]
  },
@@ -5720,7 +5752,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "银河之光·铁骑",
-    "model": "tieqipifu"
+    "model": "tieqipifu",
+    "folder": "juntuanshibing"
    },
    {
     "id": "162",
@@ -5737,7 +5770,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "大娃·铁骑",
-    "model": "tieqi_liwa"
+    "model": "tieqi_liwa",
+    "folder": "juntuanshibing"
    },
    {
     "id": "224",
@@ -5754,7 +5788,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "花无缺·铁骑",
-    "model": "huawuque"
+    "model": "huawuque",
+    "folder": "juntuanshibing"
    },
    {
     "id": "240",
@@ -5771,7 +5806,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "林冲·铁骑",
-    "model": "linchong"
+    "model": "linchong",
+    "folder": "juntuanshibing"
    },
    {
     "id": "282",
@@ -5788,7 +5824,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "祝枝山·铁骑",
-    "model": "zhuzhishan"
+    "model": "zhuzhishan",
+    "folder": "juntuanshibing"
    },
    {
     "id": "339",
@@ -5805,7 +5842,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "方唐镜·铁骑",
-    "model": "fangtangjing"
+    "model": "fangtangjing",
+    "folder": "juntuanshibing"
    },
    {
     "id": "348",
@@ -5822,7 +5860,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "嵩山掌门·铁骑",
-    "model": "songshanzhangmen"
+    "model": "songshanzhangmen",
+    "folder": "juntuanshibing"
    }
   ]
  },
@@ -6143,7 +6182,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "UFO·飞机",
-    "model": "feidie"
+    "model": "feidie",
+    "folder": "feiji"
    },
    {
     "id": "300",
@@ -6160,7 +6200,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "深海魔鬼·飞机",
-    "model": "shenhaimogui"
+    "model": "shenhaimogui",
+    "folder": "feiji"
    }
   ]
  },
@@ -6820,7 +6861,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "黑山老妖·谜云",
-    "model": "heishanlaoyao"
+    "model": "heishanlaoyao",
+    "folder": "mituan"
    }
   ]
  },
@@ -7426,7 +7468,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "冰雪·骨弓",
-    "model": "gugong_pifu"
+    "model": "gugong_pifu",
+    "folder": "gugong"
    },
    {
     "id": "241",
@@ -7443,7 +7486,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "花荣·骨弓",
-    "model": "huarong"
+    "model": "huarong",
+    "folder": "gugong"
    },
    {
     "id": "283",
@@ -7460,7 +7504,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "文徵明·骨弓",
-    "model": "wenzhengming"
+    "model": "wenzhengming",
+    "folder": "gugong"
    },
    {
     "id": "364",
@@ -7477,7 +7522,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "衡山掌门·骨弓",
-    "model": "modaxiansheng"
+    "model": "modaxiansheng",
+    "folder": "gugong"
    }
   ]
  },
@@ -8083,7 +8129,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "卷帘大将·斧客",
-    "model": "shaheshang"
+    "model": "shaheshang",
+    "folder": "fuwang"
    }
   ]
  },
@@ -8404,7 +8451,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "万圣节·死神",
-    "model": "sishenpifu"
+    "model": "sishenpifu",
+    "folder": "fashi"
    },
    {
     "id": "334",
@@ -8421,7 +8469,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "粉色南瓜·死神",
-    "model": "sishenpifu2"
+    "model": "sishenpifu2",
+    "folder": "fashi"
    },
    {
     "id": "365",
@@ -8438,7 +8487,8 @@
     "extraInfo": "9",
     "heroSkinHp": "2400",
     "note": "一指名医·死神",
-    "model": "pingyizhi"
+    "model": "pingyizhi",
+    "folder": "fashi"
    }
   ]
  },
@@ -8759,7 +8809,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "水娃·电法",
-    "model": "shuiwa"
+    "model": "shuiwa",
+    "folder": "dianhun"
    },
    {
     "id": "239",
@@ -8776,7 +8827,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "戴宗·电法",
-    "model": "daizong"
+    "model": "daizong",
+    "folder": "dianhun"
    },
    {
     "id": "280",
@@ -8793,7 +8845,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "春香·电法",
-    "model": "chunxiang"
+    "model": "chunxiang",
+    "folder": "dianhun"
    },
    {
     "id": "353",
@@ -8810,7 +8863,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "华山掌门·电法",
-    "model": "huashanzhangmen"
+    "model": "huashanzhangmen",
+    "folder": "dianhun"
    }
   ]
  },
@@ -9131,7 +9185,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "吉利服·火枪",
-    "model": "huoqiangpifu"
+    "model": "huoqiangpifu",
+    "folder": "huoqiang"
    }
   ]
  },
@@ -9434,7 +9489,8 @@
     "extraInfo": "",
     "heroSkinHp": "1200",
     "note": "石狮子·石头",
-    "model": "shishizi"
+    "model": "shishizi",
+    "folder": "xiaoxiao"
    }
   ]
  },
@@ -10361,7 +10417,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "无头骑士·圣骑",
-    "model": "wutouqishi"
+    "model": "wutouqishi",
+    "folder": "shengqi"
    },
    {
     "id": "270",
@@ -10378,7 +10435,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "孙权·圣骑",
-    "model": "sunquan"
+    "model": "sunquan",
+    "folder": "shengqi"
    },
    {
     "id": "303",
@@ -10395,7 +10453,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "风暴·圣骑",
-    "model": "fengbaoshengqi"
+    "model": "fengbaoshengqi",
+    "folder": "shengqi"
    }
   ]
  },
@@ -10716,7 +10775,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "七娃·巫医",
-    "model": "qiwa_wuyi"
+    "model": "qiwa_wuyi",
+    "folder": "wuyi"
    },
    {
     "id": "243",
@@ -10733,7 +10793,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "柴进·巫医",
-    "model": "chaijin"
+    "model": "chaijin",
+    "folder": "wuyi"
    },
    {
     "id": "291",
@@ -10750,7 +10811,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "夏香·巫医",
-    "model": "xiaxiang"
+    "model": "xiaxiang",
+    "folder": "wuyi"
    },
    {
     "id": "301",
@@ -10767,7 +10829,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "深海刺豚·巫医",
-    "model": "shenhaicitun"
+    "model": "shenhaicitun",
+    "folder": "wuyi"
    },
    {
     "id": "361",
@@ -10784,7 +10847,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "恒山掌门·巫医",
-    "model": "hengshanzhangmen"
+    "model": "hengshanzhangmen",
+    "folder": "wuyi"
    }
   ]
  },
@@ -11123,7 +11187,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "冰雪·女王",
-    "model": "nvwang_bingxue"
+    "model": "nvwang_bingxue",
+    "folder": "tongkunvwang"
    },
    {
     "id": "133",
@@ -11140,7 +11205,8 @@
     "extraInfo": "9999",
     "heroSkinHp": "3600",
     "note": "虚空兽·女王",
-    "model": "zhizhunvwang"
+    "model": "zhizhunvwang",
+    "folder": "tongkunvwang"
    },
    {
     "id": "168",
@@ -11157,7 +11223,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "白娘子·女王",
-    "model": "baisuzhen"
+    "model": "baisuzhen",
+    "folder": "tongkunvwang"
    },
    {
     "id": "254",
@@ -11174,7 +11241,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "潘金莲·女王",
-    "model": "panjinlian"
+    "model": "panjinlian",
+    "folder": "tongkunvwang"
    },
    {
     "id": "338",
@@ -11191,7 +11259,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "如烟·女王",
-    "model": "ruyan"
+    "model": "ruyan",
+    "folder": "tongkunvwang"
    },
    {
     "id": "355",
@@ -11208,7 +11277,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "任盈盈·女王",
-    "model": "renyingying"
+    "model": "renyingying",
+    "folder": "tongkunvwang"
    },
    {
     "id": "372",
@@ -11225,7 +11295,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "如霜·女王",
-    "model": "rushuang"
+    "model": "rushuang",
+    "folder": "tongkunvwang"
    }
   ]
  },
@@ -11564,7 +11635,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "神葫芦·光精灵",
-    "model": "shenhulu_guang"
+    "model": "shenhulu_guang",
+    "folder": "jingling"
    },
    {
     "id": "268",
@@ -11581,7 +11653,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "传国玉玺·光精灵",
-    "model": "chuanguoyuxi"
+    "model": "chuanguoyuxi",
+    "folder": "jingling"
    },
    {
     "id": "324",
@@ -11598,7 +11671,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "狮王令牌·光精灵",
-    "model": "shiwanglingpai"
+    "model": "shiwanglingpai",
+    "folder": "jingling"
    },
    {
     "id": "380",
@@ -11614,7 +11688,9 @@
     "extraInfoType": "",
     "extraInfo": "",
     "heroSkinHp": "3600",
-    "note": "金饭碗·光精灵"
+    "note": "金饭碗·光精灵",
+    "model": "jinfanwan",
+    "folder": "jingling"
    }
   ]
  },
@@ -11935,7 +12011,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "电葫芦·雷精灵",
-    "model": "baohulu_lei"
+    "model": "baohulu_lei",
+    "folder": "jingling"
    },
    {
     "id": "260",
@@ -11952,7 +12029,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "太平符咒·雷精灵",
-    "model": "taipingfuzhou"
+    "model": "taipingfuzhou",
+    "folder": "jingling"
    }
   ]
  },
@@ -12273,7 +12351,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "太平乐·悟空",
-    "model": "sunwukong_xinnian"
+    "model": "sunwukong_xinnian",
+    "folder": "sunwukong"
    },
    {
     "id": "149",
@@ -12290,7 +12369,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "二娃·悟空",
-    "model": "wukong_2wa"
+    "model": "wukong_2wa",
+    "folder": "sunwukong"
    },
    {
     "id": "198",
@@ -12307,7 +12387,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "暗月·悟空",
-    "model": "jiqihoupifu"
+    "model": "jiqihoupifu",
+    "folder": "sunwukong"
    }
   ]
  },
@@ -12646,7 +12727,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "二郎真君·幽灵",
-    "model": "erlangshen"
+    "model": "erlangshen",
+    "folder": "yougui"
    },
    {
     "id": "250",
@@ -12663,7 +12745,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "卢俊义·幽灵",
-    "model": "lujunyi"
+    "model": "lujunyi",
+    "folder": "yougui"
    }
   ]
  },
@@ -12984,7 +13067,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "医疗机甲·工匠",
-    "model": "jiqiren"
+    "model": "jiqiren",
+    "folder": "fatiao"
    },
    {
     "id": "345",
@@ -13001,7 +13085,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "包婆婆·工匠",
-    "model": "baopopo"
+    "model": "baopopo",
+    "folder": "fatiao"
    },
    {
     "id": "367",
@@ -13018,7 +13103,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "暗月·工匠",
-    "model": "anyuegongjiang"
+    "model": "anyuegongjiang",
+    "folder": "fatiao"
    }
   ]
  },
@@ -13357,7 +13443,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "紫金铃铛·幻精灵",
-    "model": "huanjinglingpifu"
+    "model": "huanjinglingpifu",
+    "folder": "jingling"
    },
    {
     "id": "277",
@@ -13374,7 +13461,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "孔明灯·幻精灵",
-    "model": "kongmingdeng"
+    "model": "kongmingdeng",
+    "folder": "jingling"
    }
   ]
  },
@@ -13695,7 +13783,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "宝葫芦·暗精灵",
-    "model": "baohulu_an"
+    "model": "baohulu_an",
+    "folder": "jingling"
    }
   ]
  },
@@ -14178,7 +14267,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "冰雪·萌萌",
-    "model": "xiongmao_shengdan"
+    "model": "xiongmao_shengdan",
+    "folder": "xiongmao"
    },
    {
     "id": "209",
@@ -14195,7 +14285,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "唐三藏·萌萌",
-    "model": "tangsanzang"
+    "model": "tangsanzang",
+    "folder": "xiongmao"
    },
    {
     "id": "248",
@@ -14212,7 +14303,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "武大郎·萌萌",
-    "model": "wudalang"
+    "model": "wudalang",
+    "folder": "xiongmao"
    },
    {
     "id": "264",
@@ -14229,7 +14321,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "诸葛亮·萌萌",
-    "model": "zhugeliang"
+    "model": "zhugeliang",
+    "folder": "xiongmao"
    },
    {
     "id": "316",
@@ -14246,7 +14339,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "太平乐·萌萌",
-    "model": "mengmengtaipingle"
+    "model": "mengmengtaipingle",
+    "folder": "xiongmao"
    },
    {
     "id": "342",
@@ -14263,7 +14357,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "烈火奶奶·萌萌",
-    "model": "liehuonainai"
+    "model": "liehuonainai",
+    "folder": "xiongmao"
    },
    {
     "id": "375",
@@ -14280,7 +14375,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "花好月圆·萌萌",
-    "model": "mengmengzhongqiupifu"
+    "model": "mengmengzhongqiupifu",
+    "folder": "xiongmao"
    }
   ]
  },
@@ -14601,7 +14697,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "金钹法王·恶匪",
-    "model": "jinbofawang"
+    "model": "jinbofawang",
+    "folder": "tufu"
    }
   ]
  },
@@ -14940,7 +15037,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "黑小虎·虎弓",
-    "model": "heixiaohu"
+    "model": "heixiaohu",
+    "folder": "huniu"
    },
    {
     "id": "187",
@@ -14957,7 +15055,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "嫦娥·虎弓",
-    "model": "change1"
+    "model": "change1",
+    "folder": "huniu"
    },
    {
     "id": "188",
@@ -14974,7 +15073,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "月神·虎弓",
-    "model": "change2"
+    "model": "change2",
+    "folder": "huniu"
    },
    {
     "id": "272",
@@ -14991,7 +15091,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "小乔·虎弓",
-    "model": "xiaoqiao"
+    "model": "xiaoqiao",
+    "folder": "huniu"
    },
    {
     "id": "302",
@@ -15008,7 +15109,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "风暴·虎弓",
-    "model": "fengbaohugong"
+    "model": "fengbaohugong",
+    "folder": "huniu"
    },
    {
     "id": "359",
@@ -15025,7 +15127,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "东方不败·虎弓",
-    "model": "dongfangbubai"
+    "model": "dongfangbubai",
+    "folder": "huniu"
    }
   ]
  },
@@ -15364,7 +15467,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "仙葫芦·木精灵",
-    "model": "shenhulu_mu"
+    "model": "shenhulu_mu",
+    "folder": "jingling"
    }
   ]
  },
@@ -15703,7 +15807,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "龙的传人·霸王",
-    "model": "jietouheiba"
+    "model": "jietouheiba",
+    "folder": "jietoubawang"
    },
    {
     "id": "132",
@@ -15720,7 +15825,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "奥特曼赛文·霸王",
-    "model": "Seven_Ultraman"
+    "model": "Seven_Ultraman",
+    "folder": "jietoubawang"
    },
    {
     "id": "139",
@@ -15737,7 +15843,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "银河之光·霸王",
-    "model": "yihaoji"
+    "model": "yihaoji",
+    "folder": "jietoubawang"
    },
    {
     "id": "164",
@@ -15754,7 +15861,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "龙年·霸王",
-    "model": "bawangchunjie"
+    "model": "bawangchunjie",
+    "folder": "jietoubawang"
    },
    {
     "id": "234",
@@ -15771,7 +15879,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "李寻欢·霸王",
-    "model": "lixunhuan"
+    "model": "lixunhuan",
+    "folder": "jietoubawang"
    },
    {
     "id": "285",
@@ -15788,7 +15897,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "唐伯虎·霸王",
-    "model": "tangbohu"
+    "model": "tangbohu",
+    "folder": "jietoubawang"
    },
    {
     "id": "331",
@@ -15805,7 +15915,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "常威·霸王",
-    "model": "changwei"
+    "model": "changwei",
+    "folder": "jietoubawang"
    },
    {
     "id": "369",
@@ -15822,7 +15933,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "苏乞儿·霸王",
-    "model": "sucan"
+    "model": "sucan",
+    "folder": "jietoubawang"
    }
   ]
  },
@@ -16143,7 +16255,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "暗月财阀·地精",
-    "model": "dijingpifu"
+    "model": "dijingpifu",
+    "folder": "dijing"
    }
   ]
  },
@@ -16482,7 +16595,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "谛听·毒王",
-    "model": "diting"
+    "model": "diting",
+    "folder": "duye"
    },
    {
     "id": "219",
@@ -16499,7 +16613,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "叶孤城·毒王",
-    "model": "yegucheng"
+    "model": "yegucheng",
+    "folder": "duye"
    },
    {
     "id": "247",
@@ -16516,7 +16631,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "杨志·毒王",
-    "model": "yangzhi"
+    "model": "yangzhi",
+    "folder": "duye"
    }
   ]
  },
@@ -16837,7 +16953,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "鸦人·萨满",
-    "model": "samanpifu"
+    "model": "samanpifu",
+    "folder": "daize"
    },
    {
     "id": "356",
@@ -16854,7 +16971,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "青城掌门·萨满",
-    "model": "qingcheng"
+    "model": "qingcheng",
+    "folder": "daize"
    }
   ]
  },
@@ -17193,7 +17311,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "烈焰·神龙",
-    "model": "shenlongpifu"
+    "model": "shenlongpifu",
+    "folder": "panglong"
    },
    {
     "id": "292",
@@ -17210,7 +17329,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "武状元·神龙",
-    "model": "wuzhuangyuan"
+    "model": "wuzhuangyuan",
+    "folder": "panglong"
    }
   ]
  },
@@ -17549,7 +17669,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "黑葫芦·魔精灵",
-    "model": "mohulu"
+    "model": "mohulu",
+    "folder": "jingling"
    },
    {
     "id": "191",
@@ -17566,7 +17687,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "星光宝盒·魔精灵",
-    "model": "yueguangbaohe01"
+    "model": "yueguangbaohe01",
+    "folder": "jingling"
    },
    {
     "id": "192",
@@ -17583,7 +17705,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "月光宝盒·魔精灵",
-    "model": "yueguangbaohe02"
+    "model": "yueguangbaohe02",
+    "folder": "jingling"
    },
    {
     "id": "325",
@@ -17600,7 +17723,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "绝影·魔精灵",
-    "model": "jueying"
+    "model": "jueying",
+    "folder": "jingling"
    }
   ]
  },
@@ -17939,7 +18063,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "奥特曼艾斯·狂龙",
-    "model": "Ace_Ultraman"
+    "model": "Ace_Ultraman",
+    "folder": "ken"
    },
    {
     "id": "138",
@@ -17956,7 +18081,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "银河之光·狂龙",
-    "model": "erhaoji"
+    "model": "erhaoji",
+    "folder": "ken"
    },
    {
     "id": "249",
@@ -17973,7 +18099,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "秦明·狂龙",
-    "model": "qinming"
+    "model": "qinming",
+    "folder": "ken"
    },
    {
     "id": "293",
@@ -17990,7 +18117,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "唐天豪·狂龙",
-    "model": "tangtianhao"
+    "model": "tangtianhao",
+    "folder": "ken"
    }
   ]
  },
@@ -18311,7 +18439,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "奶牛·酋长",
-    "model": "nainiu"
+    "model": "nainiu",
+    "folder": "niutouguai"
    },
    {
     "id": "317",
@@ -18328,7 +18457,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "粉色奶牛·酋长",
-    "model": "nainiufen"
+    "model": "nainiufen",
+    "folder": "niutouguai"
    },
    {
     "id": "368",
@@ -18345,7 +18475,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "七夕·酋长",
-    "model": "qixiqiuzhang"
+    "model": "qixiqiuzhang",
+    "folder": "niutouguai"
    }
   ]
  },
@@ -18684,7 +18815,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "阿育娅·后羿",
-    "model": "ayuya"
+    "model": "ayuya",
+    "folder": "houyi"
    },
    {
     "id": "183",
@@ -18701,7 +18833,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "仙·后羿",
-    "model": "houyipifu1"
+    "model": "houyipifu1",
+    "folder": "houyi"
    },
    {
     "id": "184",
@@ -18718,7 +18851,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "真仙·后羿",
-    "model": "houyipifu2"
+    "model": "houyipifu2",
+    "folder": "houyi"
    },
    {
     "id": "313",
@@ -18735,7 +18869,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "太平乐·后羿",
-    "model": "taipinglehouyi"
+    "model": "taipinglehouyi",
+    "folder": "houyi"
    },
    {
     "id": "374",
@@ -18752,7 +18887,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "博达尔多·后羿",
-    "model": "bodaerduo"
+    "model": "bodaerduo",
+    "folder": "houyi"
    }
   ]
  },
@@ -19073,7 +19209,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "兔宝宝·松鼠",
-    "model": "songshupifu"
+    "model": "songshupifu",
+    "folder": "songshu"
    }
   ]
  },
@@ -19412,7 +19549,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "法海·亡将",
-    "model": "fahai"
+    "model": "fahai",
+    "folder": "kulouwang"
    },
    {
     "id": "232",
@@ -19429,7 +19567,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "番僧·亡将",
-    "model": "fanseng"
+    "model": "fanseng",
+    "folder": "kulouwang"
    }
   ]
  },
@@ -19750,7 +19889,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "冰霜·炎魔",
-    "model": "yanmopifu"
+    "model": "yanmopifu",
+    "folder": "yanmo"
    },
    {
     "id": "358",
@@ -19767,7 +19907,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "向左使·炎魔",
-    "model": "xiangzuoshi"
+    "model": "xiangzuoshi",
+    "folder": "yanmo"
    }
   ]
  },
@@ -20106,7 +20247,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "虚空兽·小丑",
-    "model": "xiaochoupifu"
+    "model": "xiaochoupifu",
+    "folder": "xiaochou"
    },
    {
     "id": "221",
@@ -20123,7 +20265,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "川谱·白·小丑",
-    "model": "chuanjulianpu01"
+    "model": "chuanjulianpu01",
+    "folder": "xiaochou"
    },
    {
     "id": "222",
@@ -20140,7 +20283,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "川谱·金·小丑",
-    "model": "chuanjulianpu02"
+    "model": "chuanjulianpu02",
+    "folder": "xiaochou"
    },
    {
     "id": "279",
@@ -20157,7 +20301,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "如花·小丑",
-    "model": "ruhua"
+    "model": "ruhua",
+    "folder": "xiaochou"
    },
    {
     "id": "371",
@@ -20174,7 +20319,8 @@
     "extraInfo": "9999",
     "heroSkinHp": "3600",
     "note": "师爷·小丑",
-    "model": "shiye"
+    "model": "shiye",
+    "folder": "xiaochou"
    }
   ]
  },
@@ -20513,7 +20659,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "虚空兽·咕咕",
-    "model": "xiaoshoupifu"
+    "model": "xiaoshoupifu",
+    "folder": "gugu"
    },
    {
     "id": "150",
@@ -20530,7 +20677,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "老爷爷·咕咕",
-    "model": "yeye"
+    "model": "yeye",
+    "folder": "gugu"
    },
    {
     "id": "229",
@@ -20547,7 +20695,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "天机星·咕咕",
-    "model": "tianjixing"
+    "model": "tianjixing",
+    "folder": "gugu"
    },
    {
     "id": "244",
@@ -20564,7 +20713,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "宋江·咕咕",
-    "model": "songjiang"
+    "model": "songjiang",
+    "folder": "gugu"
    },
    {
     "id": "275",
@@ -20581,7 +20731,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "华佗·咕咕",
-    "model": "huatuo"
+    "model": "huatuo",
+    "folder": "gugu"
    },
    {
     "id": "290",
@@ -20598,7 +20749,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "华夫人·咕咕",
-    "model": "huafuren"
+    "model": "huafuren",
+    "folder": "gugu"
    },
    {
     "id": "297",
@@ -20615,7 +20767,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "深海异兽·咕咕",
-    "model": "shenhai"
+    "model": "shenhai",
+    "folder": "gugu"
    },
    {
     "id": "326",
@@ -20632,7 +20785,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "太平乐·咕咕",
-    "model": "nianshougugu"
+    "model": "nianshougugu",
+    "folder": "gugu"
    },
    {
     "id": "362",
@@ -20649,7 +20803,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "少林掌门·咕咕",
-    "model": "fangzhengdashi"
+    "model": "fangzhengdashi",
+    "folder": "gugu"
    }
   ]
  },
@@ -20988,7 +21143,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "龙吼·邪能火炮",
-    "model": "huopaopifu"
+    "model": "huopaopifu",
+    "folder": "jianongpao"
    },
    {
     "id": "216",
@@ -21005,7 +21161,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "小李飞刀·邪能火炮",
-    "model": "xiaolifeidao"
+    "model": "xiaolifeidao",
+    "folder": "jianongpao"
    },
    {
     "id": "346",
@@ -21022,7 +21179,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "尚方宝剑·邪能火炮",
-    "model": "shangfangbaojian"
+    "model": "shangfangbaojian",
+    "folder": "jianongpao"
    },
    {
     "id": "378",
@@ -21378,7 +21536,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "宁王·领主",
-    "model": "ningwang"
+    "model": "ningwang",
+    "folder": "mori"
    },
    {
     "id": "307",
@@ -21395,7 +21554,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "深海典狱长·领主",
-    "model": "dianyuguan"
+    "model": "dianyuguan",
+    "folder": "mori"
    }
   ]
  },
@@ -21734,7 +21894,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "小青·沙皇",
-    "model": "xiaoqing1"
+    "model": "xiaoqing1",
+    "folder": "shawang"
    },
    {
     "id": "171",
@@ -21751,7 +21912,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "青蛇·沙皇",
-    "model": "xiaoqing2"
+    "model": "xiaoqing2",
+    "folder": "shawang"
    },
    {
     "id": "255",
@@ -21768,7 +21930,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "西门庆·沙皇",
-    "model": "ximenqing"
+    "model": "ximenqing",
+    "folder": "shawang"
    },
    {
     "id": "330",
@@ -21785,7 +21948,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "包有为·沙皇",
-    "model": "baoyouwei"
+    "model": "baoyouwei",
+    "folder": "shawang"
    }
   ]
  },
@@ -22124,7 +22288,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "和伊玄·孤星",
-    "model": "heyixuan"
+    "model": "heyixuan",
+    "folder": "shangjin"
    }
   ]
  },
@@ -22784,7 +22949,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "蓝兔·鲛女",
-    "model": "lantu"
+    "model": "lantu",
+    "folder": "renyu"
    },
    {
     "id": "169",
@@ -22801,7 +22967,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "碧莲·鲛女",
-    "model": "bilian"
+    "model": "bilian",
+    "folder": "renyu"
    },
    {
     "id": "256",
@@ -22818,7 +22985,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "李师师·鲛女",
-    "model": "lishishi"
+    "model": "lishishi",
+    "folder": "renyu"
    },
    {
     "id": "351",
@@ -22835,7 +23003,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "岳灵珊·鲛女",
-    "model": "yuelingshan"
+    "model": "yuelingshan",
+    "folder": "renyu"
    }
   ]
  },
@@ -23174,7 +23343,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "幽冥·船长",
-    "model": "haidao_boss"
+    "model": "haidao_boss",
+    "folder": "haidao"
    },
    {
     "id": "286",
@@ -23191,7 +23361,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "对穿肠·船长",
-    "model": "duichuanchang"
+    "model": "duichuanchang",
+    "folder": "haidao"
    },
    {
     "id": "340",
@@ -23208,7 +23379,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "刑部尚书·船长",
-    "model": "xingbushangshu"
+    "model": "xingbushangshu",
+    "folder": "haidao"
    }
   ]
  },
@@ -23547,7 +23719,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "泰坦·土精灵",
-    "model": "tujinglingpifu01"
+    "model": "tujinglingpifu01",
+    "folder": "tujingling"
    },
    {
     "id": "207",
@@ -23564,7 +23737,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "创世泰坦·土精灵",
-    "model": "tujinglingpifu02"
+    "model": "tujinglingpifu02",
+    "folder": "tujingling"
    }
   ]
  },
@@ -23903,7 +24077,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "海象人·龟相",
-    "model": "guixiangpifu"
+    "model": "guixiangpifu",
+    "folder": "guixianren"
    },
    {
     "id": "196",
@@ -23920,7 +24095,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "龙宫·龟相",
-    "model": "guichengxiang01"
+    "model": "guichengxiang01",
+    "folder": "guixianren"
    },
    {
     "id": "197",
@@ -23937,7 +24113,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "东海龙宫·龟相",
-    "model": "guichengxiang02"
+    "model": "guichengxiang02",
+    "folder": "guixianren"
    },
    {
     "id": "329",
@@ -23954,7 +24131,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "包龙星·龟相",
-    "model": "baolongxing"
+    "model": "baolongxing",
+    "folder": "guixianren"
    },
    {
     "id": "373",
@@ -23971,7 +24149,8 @@
     "extraInfo": "1",
     "heroSkinHp": "3600",
     "note": "莫大叔·龟相",
-    "model": "modashu"
+    "model": "modashu",
+    "folder": "guixianren"
    }
   ]
  },
@@ -24310,7 +24489,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "杨广·龙王",
-    "model": "yangguang"
+    "model": "yangguang",
+    "folder": "longwang"
    },
    {
     "id": "161",
@@ -24327,7 +24507,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "太平乐·龙王",
-    "model": "longwangpifu"
+    "model": "longwangpifu",
+    "folder": "longwang"
    },
    {
     "id": "186",
@@ -24344,7 +24525,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "玉帝·龙王",
-    "model": "yudi"
+    "model": "yudi",
+    "folder": "longwang"
    },
    {
     "id": "259",
@@ -24361,7 +24543,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "张角·龙王",
-    "model": "zhangjiao"
+    "model": "zhangjiao",
+    "folder": "longwang"
    }
   ]
  },
@@ -24700,7 +24883,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "黑旋风·狂将",
-    "model": "kuangjiang_likui"
+    "model": "kuangjiang_likui",
+    "folder": "kuangjiang"
    },
    {
     "id": "252",
@@ -24717,7 +24901,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "李逵·狂将",
-    "model": "likui"
+    "model": "likui",
+    "folder": "kuangjiang"
    }
   ]
  },
@@ -25056,7 +25241,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "燕青·爱神",
-    "model": "yanqing"
+    "model": "yanqing",
+    "folder": "aishen"
    },
    {
     "id": "327",
@@ -25073,7 +25259,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "永恒之心·爱神",
-    "model": "aishenpifu"
+    "model": "aishenpifu",
+    "folder": "aishen"
    }
   ]
  },
@@ -25412,7 +25599,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "知世郎·影",
-    "model": "zhishilang"
+    "model": "zhishilang",
+    "folder": "ying"
    },
    {
     "id": "181",
@@ -25429,7 +25617,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "太上老君·影",
-    "model": "taishanglaojun"
+    "model": "taishanglaojun",
+    "folder": "ying"
    }
   ]
  },
@@ -25768,7 +25957,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "小七·小野",
-    "model": "xiaoqi"
+    "model": "xiaoqi",
+    "folder": "qiqi"
    },
    {
     "id": "143",
@@ -25785,7 +25975,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "万圣甜心·小野",
-    "model": "xiaoyepifu"
+    "model": "xiaoyepifu",
+    "folder": "qiqi"
    },
    {
     "id": "194",
@@ -25802,7 +25993,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "紫霞仙子·小野",
-    "model": "zixiaxianzi"
+    "model": "zixiaxianzi",
+    "folder": "qiqi"
    },
    {
     "id": "226",
@@ -25819,7 +26011,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "沈璧君·小野",
-    "model": "shenbijun"
+    "model": "shenbijun",
+    "folder": "qiqi"
    },
    {
     "id": "235",
@@ -25836,7 +26029,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "万圣女巫·小野",
-    "model": "xiaoyewansheng"
+    "model": "xiaoyewansheng",
+    "folder": "qiqi"
    },
    {
     "id": "266",
@@ -25853,7 +26047,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "貂蝉·小野",
-    "model": "diaochan"
+    "model": "diaochan",
+    "folder": "qiqi"
    },
    {
     "id": "289",
@@ -25870,7 +26065,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "秋香·小野",
-    "model": "qiuxiang"
+    "model": "qiuxiang",
+    "folder": "qiqi"
    },
    {
     "id": "310",
@@ -25887,7 +26083,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "十三姨·小野",
-    "model": "shisanyi"
+    "model": "shisanyi",
+    "folder": "qiqi"
    },
    {
     "id": "319",
@@ -25904,7 +26101,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "太平乐·小野",
-    "model": "xiaoyetaipingle"
+    "model": "xiaoyetaipingle",
+    "folder": "qiqi"
    },
    {
     "id": "347",
@@ -25921,7 +26119,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "仪琳·小野",
-    "model": "yilin"
+    "model": "yilin",
+    "folder": "qiqi"
    },
    {
     "id": "379",
@@ -25938,7 +26137,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "苏小妹·小野",
-    "model": "suxiaomei"
+    "model": "suxiaomei",
+    "folder": "qiqi"
    }
   ]
  },
@@ -26277,7 +26477,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "哪吒·阿翼",
-    "model": "nezha"
+    "model": "nezha",
+    "folder": "qiuwang"
    }
   ]
  },
@@ -26616,7 +26817,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "银河之光·龙拳",
-    "model": "sanhaoji"
+    "model": "sanhaoji",
+    "folder": "gangquan"
    },
    {
     "id": "245",
@@ -26633,7 +26835,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "鲁智深·龙拳",
-    "model": "luzhishen"
+    "model": "luzhishen",
+    "folder": "gangquan"
    },
    {
     "id": "314",
@@ -26650,7 +26853,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "鬼脚七·龙拳",
-    "model": "guijiaoqi"
+    "model": "guijiaoqi",
+    "folder": "gangquan"
    }
   ]
  },
@@ -26971,7 +27175,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "冰雪·钢鬃",
-    "model": "gangbeipifu"
+    "model": "gangbeipifu",
+    "folder": "gangbei"
    },
    {
     "id": "180",
@@ -26988,7 +27193,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "天蓬元帅·钢鬃",
-    "model": "zhubajie"
+    "model": "zhubajie",
+    "folder": "gangbei"
    }
   ]
  },
@@ -27327,7 +27533,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "白晶晶·女妖",
-    "model": "baijingjing"
+    "model": "baijingjing",
+    "folder": "nvyao"
    },
    {
     "id": "304",
@@ -27344,7 +27551,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "深海幽影·女妖",
-    "model": "shuimu"
+    "model": "shuimu",
+    "folder": "nvyao"
    }
   ]
  },
@@ -27665,7 +27873,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "招财·猫咪",
-    "model": "maopifu"
+    "model": "maopifu",
+    "folder": "maomi"
    },
    {
     "id": "199",
@@ -27682,7 +27891,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "暗月·猫咪",
-    "model": "jiqimaomi"
+    "model": "jiqimaomi",
+    "folder": "maomi"
    }
   ]
  },
@@ -28021,7 +28231,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "虚空兽·魇",
-    "model": "yemopifu"
+    "model": "yemopifu",
+    "folder": "yemo"
    },
    {
     "id": "201",
@@ -28038,7 +28249,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "牛魔王·魇",
-    "model": "niumowang"
+    "model": "niumowang",
+    "folder": "yemo"
    },
    {
     "id": "251",
@@ -28055,7 +28267,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "高俅·魇",
-    "model": "gaoqiu"
+    "model": "gaoqiu",
+    "folder": "yemo"
    },
    {
     "id": "274",
@@ -28072,7 +28285,8 @@
     "extraInfo": "9999",
     "heroSkinHp": "3600",
     "note": "曹操·魇",
-    "model": "caocao"
+    "model": "caocao",
+    "folder": "yemo"
    },
    {
     "id": "328",
@@ -28089,7 +28303,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "雷豹·魇",
-    "model": "leibao"
+    "model": "leibao",
+    "folder": "yemo"
    },
    {
     "id": "360",
@@ -28106,7 +28321,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "魔教教主·魇",
-    "model": "renwoxing"
+    "model": "renwoxing",
+    "folder": "yemo"
    }
   ]
  },
@@ -28427,7 +28643,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "隐身娃·闪",
-    "model": "liuwa"
+    "model": "liuwa",
+    "folder": "shan"
    },
    {
     "id": "205",
@@ -28444,7 +28661,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "菩提老祖·闪",
-    "model": "putilaozu"
+    "model": "putilaozu",
+    "folder": "shan"
    },
    {
     "id": "242",
@@ -28461,7 +28679,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "呼延灼·闪",
-    "model": "huyanzhuo"
+    "model": "huyanzhuo",
+    "folder": "shan"
    },
    {
     "id": "281",
@@ -28478,7 +28697,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "冬香·闪",
-    "model": "dongxiang"
+    "model": "dongxiang",
+    "folder": "shan"
    },
    {
     "id": "333",
@@ -28495,7 +28715,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "莫再讲·闪",
-    "model": "mozaijiang"
+    "model": "mozaijiang",
+    "folder": "shan"
    },
    {
     "id": "363",
@@ -28512,7 +28733,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "泰山掌门·闪",
-    "model": "taishanzhangmen"
+    "model": "taishanzhangmen",
+    "folder": "shan"
    }
   ]
  },
@@ -28851,7 +29073,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "冰雪·葵",
-    "model": "kuipifu"
+    "model": "kuipifu",
+    "folder": "kui"
    },
    {
     "id": "306",
@@ -28868,7 +29091,8 @@
     "extraInfo": "4",
     "heroSkinHp": "3600",
     "note": "深海公主·葵",
-    "model": "shenhaigongzhu"
+    "model": "shenhaigongzhu",
+    "folder": "kui"
    },
    {
     "id": "332",
@@ -28885,7 +29109,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "莫再提·葵",
-    "model": "mozaiti"
+    "model": "mozaiti",
+    "folder": "kui"
    }
   ]
  },
@@ -29224,7 +29449,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "金刚石·地精宝库",
-    "model": "baokupifu01"
+    "model": "baokupifu01",
+    "folder": "baoxiangui"
    },
    {
     "id": "214",
@@ -29241,7 +29467,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "暗月·地精宝库",
-    "model": "baokupifu02"
+    "model": "baokupifu02",
+    "folder": "baoxiangui"
    }
   ]
  },
@@ -29580,7 +29807,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "雷峰塔·侏儒射线",
-    "model": "leifengta"
+    "model": "leifengta",
+    "folder": "zhurushexian"
    },
    {
     "id": "231",
@@ -29597,7 +29825,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "剑冢·侏儒射线",
-    "model": "jianzhong"
+    "model": "jianzhong",
+    "folder": "zhurushexian"
    },
    {
     "id": "276",
@@ -29614,7 +29843,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "日晷·侏儒射线",
-    "model": "rigui"
+    "model": "rigui",
+    "folder": "zhurushexian"
    }
   ]
  },
@@ -29953,7 +30183,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "还魂丹·魂精灵",
-    "model": "hunjinglingpifu"
+    "model": "hunjinglingpifu",
+    "folder": "jingling7"
    }
   ]
  },
@@ -30292,7 +30523,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "蜈蚣精·傀",
-    "model": "wugongjing"
+    "model": "wugongjing",
+    "folder": "daocaoren"
    },
    {
     "id": "200",
@@ -30309,7 +30541,8 @@
     "extraInfo": "3",
     "heroSkinHp": "3600",
     "note": "铁扇公主·傀",
-    "model": "tieshangongzhu"
+    "model": "tieshangongzhu",
+    "folder": "daocaoren"
    },
    {
     "id": "269",
@@ -30326,7 +30559,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "左慈·傀",
-    "model": "zuoci"
+    "model": "zuoci",
+    "folder": "daocaoren"
    },
    {
     "id": "284",
@@ -30343,7 +30577,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "石榴姐·傀",
-    "model": "shiliujie"
+    "model": "shiliujie",
+    "folder": "daocaoren"
    },
    {
     "id": "337",
@@ -30360,7 +30595,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "李公公·傀",
-    "model": "ligonggong"
+    "model": "ligonggong",
+    "folder": "daocaoren"
    }
   ]
  },
@@ -30699,7 +30935,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "王子·火神",
-    "model": "huoshenpifu"
+    "model": "huoshenpifu",
+    "folder": "hongkai"
    }
   ]
  },
@@ -31038,7 +31275,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "蝎子精·邪",
-    "model": "xiezijingpifu"
+    "model": "xiezijingpifu",
+    "folder": "xie"
    },
    {
     "id": "218",
@@ -31055,7 +31293,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "西门吹雪·邪",
-    "model": "ximenchuixue"
+    "model": "ximenchuixue",
+    "folder": "xie"
    },
    {
     "id": "287",
@@ -31072,7 +31311,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "夺命书生·邪",
-    "model": "duomingshusheng"
+    "model": "duomingshusheng",
+    "folder": "xie"
    },
    {
     "id": "376",
@@ -31428,7 +31668,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "美猴王·大圣",
-    "model": "qitiandasheng2"
+    "model": "qitiandasheng2",
+    "folder": "dasheng"
    },
    {
     "id": "179",
@@ -31445,7 +31686,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "齐天·大圣",
-    "model": "qitiandasheng3"
+    "model": "qitiandasheng3",
+    "folder": "dasheng"
    },
    {
     "id": "193",
@@ -31462,7 +31704,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "至尊宝·大圣",
-    "model": "zhizunbao"
+    "model": "zhizunbao",
+    "folder": "dasheng"
    },
    {
     "id": "322",
@@ -31479,7 +31722,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "太平乐·大圣",
-    "model": "dashengtaipingle"
+    "model": "dashengtaipingle",
+    "folder": "dasheng"
    }
   ]
  },
@@ -31818,7 +32062,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "炼丹炉·咬人娃娃",
-    "model": "liandanlu"
+    "model": "liandanlu",
+    "folder": "dazui"
    },
    {
     "id": "253",
@@ -31835,7 +32080,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "触须·咬人娃娃",
-    "model": "chushouguai"
+    "model": "chushouguai",
+    "folder": "dazui"
    }
   ]
  },
@@ -32174,7 +32420,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "陆小凤·凤凰",
-    "model": "luxiaofeng"
+    "model": "luxiaofeng",
+    "folder": "yuhuofenghuang"
    },
    {
     "id": "271",
@@ -32191,7 +32438,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "周瑜·凤凰",
-    "model": "zhouyu"
+    "model": "zhouyu",
+    "folder": "yuhuofenghuang"
    },
    {
     "id": "357",
@@ -32208,7 +32456,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "五毒教主·凤凰",
-    "model": "wudujiaozhu"
+    "model": "wudujiaozhu",
+    "folder": "yuhuofenghuang"
    }
   ]
  },
@@ -32547,7 +32796,8 @@
     "extraInfo": "3",
     "heroSkinHp": "3600",
     "note": "小鱼儿·鱼人",
-    "model": "xiaoyuer"
+    "model": "xiaoyuer",
+    "folder": "xiaoyuren"
    },
    {
     "id": "257",
@@ -32564,7 +32814,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "张顺·鱼人",
-    "model": "zhangshun"
+    "model": "zhangshun",
+    "folder": "xiaoyuren"
    },
    {
     "id": "273",
@@ -32581,7 +32832,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "甘宁·鱼人",
-    "model": "ganning"
+    "model": "ganning",
+    "folder": "xiaoyuren"
    },
    {
     "id": "312",
@@ -32598,7 +32850,8 @@
     "extraInfo": "9",
     "heroSkinHp": "3600",
     "note": "梁宽·鱼人",
-    "model": "liangkuan"
+    "model": "liangkuan",
+    "folder": "xiaoyuren"
    },
    {
     "id": "354",
@@ -32615,7 +32868,8 @@
     "extraInfo": "7",
     "heroSkinHp": "3600",
     "note": "田伯光·鱼人",
-    "model": "tianboguang"
+    "model": "tianboguang",
+    "folder": "xiaoyuren"
    }
   ]
  },
@@ -32936,7 +33190,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "雪莲·冰精灵",
-    "model": "lanlianhua"
+    "model": "lanlianhua",
+    "folder": "bingjingling"
    },
    {
     "id": "352",
@@ -32953,7 +33208,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "寒冰真气·冰精灵",
-    "model": "hanbingzhenqi"
+    "model": "hanbingzhenqi",
+    "folder": "bingjingling"
    }
   ]
  },
@@ -33274,7 +33530,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "武圣·土灵",
-    "model": "guangong"
+    "model": "guangong",
+    "folder": "tuling"
    },
    {
     "id": "262",
@@ -33291,7 +33548,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "关羽·土灵",
-    "model": "guanyu"
+    "model": "guanyu",
+    "folder": "tuling"
    },
    {
     "id": "323",
@@ -33308,7 +33566,8 @@
     "extraInfo": "",
     "heroSkinHp": "2400",
     "note": "太平乐·土灵",
-    "model": "tulingtaipingle"
+    "model": "tulingtaipingle",
+    "folder": "tuling"
    }
   ]
  },
@@ -33647,7 +33906,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "潮汐·水灵",
-    "model": "shuimaopifu"
+    "model": "shuimaopifu",
+    "folder": "shuimao"
    },
    {
     "id": "261",
@@ -33664,7 +33924,8 @@
     "extraInfo": "3",
     "heroSkinHp": "3600",
     "note": "刘备·水灵",
-    "model": "liubei"
+    "model": "liubei",
+    "folder": "shuimao"
    },
    {
     "id": "320",
@@ -33681,7 +33942,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "太平乐·水灵",
-    "model": "taipingleshuiling"
+    "model": "taipingleshuiling",
+    "folder": "shuimao"
    }
   ]
  },
@@ -34020,7 +34282,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "谢晓峰·火灵",
-    "model": "xiexiaofeng"
+    "model": "xiexiaofeng",
+    "folder": "huoling"
    },
    {
     "id": "263",
@@ -34037,7 +34300,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "张飞·火灵",
-    "model": "zhangfei"
+    "model": "zhangfei",
+    "folder": "huoling"
    },
    {
     "id": "321",
@@ -34054,7 +34318,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "太平乐·火灵",
-    "model": "zhaotianba"
+    "model": "zhaotianba",
+    "folder": "huoling"
    },
    {
     "id": "349",
@@ -34071,7 +34336,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "令狐冲·火灵",
-    "model": "linghuchong"
+    "model": "linghuchong",
+    "folder": "huoling"
    }
   ]
  },
@@ -34410,7 +34676,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "智多星·吴用·钟馗",
-    "model": "wuyong"
+    "model": "wuyong",
+    "folder": "zhongkui"
    },
    {
     "id": "298",
@@ -34427,7 +34694,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "风暴·钟馗",
-    "model": "fengbaozhongkui"
+    "model": "fengbaozhongkui",
+    "folder": "zhongkui"
    }
   ]
  },
@@ -34766,7 +35034,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "司令官·小炮",
-    "model": "kuangtupifu"
+    "model": "kuangtupifu",
+    "folder": "kuangtu"
    },
    {
     "id": "305",
@@ -34783,7 +35052,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "风暴·小炮",
-    "model": "fengbaoxiaopao"
+    "model": "fengbaoxiaopao",
+    "folder": "kuangtu"
    },
    {
     "id": "341",
@@ -34800,7 +35070,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "水师提督·小炮",
-    "model": "changkun"
+    "model": "changkun",
+    "folder": "kuangtu"
    }
   ]
  },
@@ -35139,7 +35410,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "神炎·天使",
-    "model": "tianshipifu"
+    "model": "tianshipifu",
+    "folder": "tianshi"
    },
    {
     "id": "335",
@@ -35156,7 +35428,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "戚秦氏·天使",
-    "model": "qiqinshi"
+    "model": "qiqinshi",
+    "folder": "tianshi"
    },
    {
     "id": "366",
@@ -35173,7 +35446,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "风清扬·天使",
-    "model": "fengqingyang"
+    "model": "fengqingyang",
+    "folder": "tianshi"
    }
   ]
  },
@@ -35512,7 +35786,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "鲨鱼号·微型潜艇",
-    "model": "qianshuitingpifu"
+    "model": "qianshuitingpifu",
+    "folder": "qianting"
    }
   ]
  },
@@ -35851,7 +36126,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "太平乐·风灵",
-    "model": "taipinglefengling"
+    "model": "taipinglefengling",
+    "folder": "fengling"
    },
    {
     "id": "370",
@@ -35868,7 +36144,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "苏老爹·风灵",
-    "model": "sulaodie"
+    "model": "sulaodie",
+    "folder": "fengling"
    }
   ]
  },
@@ -36527,7 +36804,9 @@
     "extraInfoType": "",
     "extraInfo": "",
     "heroSkinHp": "3600",
-    "note": "洪日庆·水人"
+    "note": "洪日庆·水人",
+    "model": "hongriqing",
+    "folder": "shuiren"
    }
   ]
  },

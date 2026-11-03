@@ -11196,6 +11196,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const core = hdStatBlockHtml(meta, curLevel)
                 // 🟢 2026-10-23 洗炼词条横排一行（窄栏图标放不下，按用户要求去图标）：减伤·纯粹·魔抗·护甲，与洗炼面板同一存储实时同步
                 try {
+                    // 🟢 2026-11-04 精灵球（occupation=6）不支持洗炼：不显示减伤/纯粹/魔抗/护甲，改显示说明
+                    const _isElf = Number(meta && meta.occupation) === 6 || /精灵$/.test(String(mainName || ''))
+                    if (_isElf) {
+                        return core +
+                            '<div class="hap-row" style="display:flex;align-items:flex-start;height:auto;min-height:40px;flex-wrap:wrap;margin-bottom:6px;padding:6px 10px;box-sizing:border-box;">' +
+                            '<div style="width:100%;">' +
+                            '<div style="color:rgba(255,255,255,0.6);font-size:0.72rem;margin-bottom:3px;">洗炼词条</div>' +
+                            '<div style="font-size:0.86rem;color:#9fc7ff;">精灵球不支持洗炼</div>' +
+                            '</div></div>'
+                    }
                     const drT = getDrTable(drSide)
                     const drVal = (drT.洗炼 && drT.洗炼[mainName] != null) ? drT.洗炼[mainName] : null
                     const ex = (window.cardWashExtras || {})[mainName] || {}
@@ -11374,7 +11384,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 { key: '攻击力', unit: '', max: 600 }
             ]
             const washEntries = () => Math.max(1, Math.min(4, Number(meta && meta.heroColor) || 4))
-            actions.appendChild(roundBtn('hero-ui/icon-wash2.png', '洗炼', () => {
+            const _washBtn = roundBtn('hero-ui/icon-wash2.png', '洗炼', () => {
                 if (pop.dataset.mode === 'wash') { pop.style.display = 'none'; pop.dataset.mode = ''; return }
                 pop.dataset.mode = 'wash'
                 pop.style.display = 'block'
@@ -11459,7 +11469,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     writeVal(cur, v)
                 }
                 syncUi()
-            }))
+            })
+            // 精灵球不支持洗炼：不显示洗炼按钮（其余职业照常 append）
+            if (Number(meta && meta.occupation) === 6) { _washBtn.style.display = 'none' } else { actions.appendChild(_washBtn) }
 
             // 魔化（图标带文字，点击即开/关；开启时金色光环高亮，不再弹提示层）
             if (hasMoHuaData(mainName)) {
@@ -12212,7 +12224,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             function hdPlaySpine() {
                 try {
                     if (!window.spineHero || !meta || !meta.spine || !cv.isConnected) return
-                    const man = window.__heroSpineIndex && window.__heroSpineIndex[meta.spine]
+                    // 🟢 2026-11-04 皮肤可指定独立目录（幻精灵的紫金铃铛/孔明灯模型在 jingling，英雄默认在 jingling1）
+                    const _skinRow = (meta.skins || []).find(function (s) { return s.note === curSkin })
+                    const _folder = (_skinRow && _skinRow.folder) || meta.spine
+                    const man = window.__heroSpineIndex && window.__heroSpineIndex[_folder]
                     if (!man) return
                     const model = hdSkinModel(curSkin) || (meta.spineModel || '')
                     const pngs = model ? ((man.modelPngs && man.modelPngs[model]) || 0) : (man.pngs || 0)
@@ -12236,7 +12251,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     //    压在下面（少林掌门·咕咕「多一串不动的佛珠」即此；历史「两个死神」同源）。
                     //    另两个入口（10960 / 12505）本来就有 stop，这里补齐。
                     try { window.spineHero.stop(cv) } catch (e) {}
-                    window.spineHero.play(cv, meta.spine, window.spineHero.fitOptions(meta.spine, model, man, pngs))
+                    window.spineHero.play(cv, _folder, window.spineHero.fitOptions(_folder, model, man, pngs))
                     // 🟢 2026-10-23 空渲染兜底提示：个别模型（如龟相）主体是 PathAttachment，
                     //   Spine canvas 运行时画不出路径附件 → 起播 6s 后画布仍全透明就提示一句，
                     //   免得用户对着一座空石台。换皮肤/重播会重置计时。
@@ -12672,7 +12687,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         await ensureOfficialHeroes();
                         if (!csCanvas.isConnected) return;
                         const oh = window.heroesOfficialMap && window.heroesOfficialMap[mainName];
-                        const folder = (oh && oh.spine) || '';
+                        // 🟢 2026-11-04 皮肤可指定独立目录（幻精灵紫金铃铛/孔明灯在 jingling）
+                        const _skinRow = ((oh && oh.skins) || []).find(function (s) { return s.note === curSkin });
+                        const folder = (_skinRow && _skinRow.folder) || (oh && oh.spine) || '';
                         if (!folder) { csStage.style.display = 'none'; return; }
                         if (!window.__heroSpineIndex) {
                             try {
@@ -12684,7 +12701,6 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         const man = window.__heroSpineIndex && window.__heroSpineIndex[folder];
                         if (!man || !csCanvas.isConnected) { csStage.style.display = 'none'; return; }
                         // 当前皮肤的独立骨骼（官方每皮肤一套模型）
-                        const _skinRow = ((oh && oh.skins) || []).find(function (s) { return s.note === curSkin });
                         const _model = (_skinRow && _skinRow.model) || (oh && oh.spineModel) || '';
                         const _pngs = _model ? ((man.modelPngs && man.modelPngs[_model]) || 0) : (man.pngs || 0);
                         window.spineHero.play(csCanvas, folder, window.spineHero.fitOptions(folder, _model, man, _pngs));
