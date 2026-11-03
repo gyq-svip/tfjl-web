@@ -209,10 +209,12 @@
     _spineIdxPromise = (async () => {
       let j = window.__heroSpineIndex
       if (!j) {
-        try { j = await (await fetch(baseUrl() + 'data/hero-spine/index.json')).json() } catch (e) { j = null }
+        try { j = await (await fetch(baseUrl() + 'data/hero-spine/index.json?t=' + Date.now())).json() } catch (e) { j = null }
       }
       try {
-        const jo = await (await fetch(baseUrl() + 'data/hero-spine/index.json', { cache: 'no-store' })).json()
+        // 🔴 2026-11-04 带时间戳回源：sw.js 曾对 index.json 走 cacheFirst 且无视 cache:'no-store'，
+        //   桌面端因此一直拿到旧清单，补配置补了个寂寞（死神飞起 / 精灵本体被 dedupe 删）。
+        const jo = await (await fetch(baseUrl() + 'data/hero-spine/index.json?t=' + Date.now(), { cache: 'no-store' })).json()
         if (j && jo && typeof jo === 'object') {
           for (const k of Object.keys(jo)) {
             const o = jo[k]
@@ -224,8 +226,19 @@
             //   否则本地旧皮肤包（缺这两项）被 spineIndex() 写回 __heroSpineIndex 时会把
             //   已合并的 modelHideSlots 丢掉 → 死神 fashi 的 shen01/shen02 特效槽不再隐藏 → 飞起。
             //   与 modelFxKeep 同一来源、同一补齐逻辑（资源 URL 仍走本地 base，只同步配置数值）。
-            if (o.modelHideSlots != null && j[k].modelHideSlots == null) j[k].modelHideSlots = o.modelHideSlots
+            // 🔴 2026-11-04 改为「逐模型键合并」：旧本地包可能只有部分模型（如仅 fashi），
+            //   原来只在整项为 null 时才补 → 新增模型（jingling 的 玉玺/令牌/金饭碗）永远补不进来。
+            if (o.modelHideSlots && typeof o.modelHideSlots === 'object') {
+              j[k].modelHideSlots = Object.assign({}, j[k].modelHideSlots || {}, o.modelHideSlots)
+            }
+            if (o.modelFxKeep && typeof o.modelFxKeep === 'object') {
+              j[k].modelFxKeep = Object.assign({}, j[k].modelFxKeep || {}, o.modelFxKeep)
+            }
             if (o.hideSlots != null && j[k].hideSlots == null) j[k].hideSlots = o.hideSlots
+            // 🔴 2026-11-04 新补：modelNoDedupe 之前完全不在补齐名单内 →
+            //   桌面端拿旧本地包索引时 dedupe 仍为 true，光精灵 玉玺/令牌/金饭碗 的
+            //   本体（yuxi）与阴影同骨骼，被 demo 当「重复槽」整槽删掉 → 面板只剩飘带/空白。
+            if (o.modelNoDedupe != null && j[k].modelNoDedupe == null) j[k].modelNoDedupe = o.modelNoDedupe
           }
         }
         // 本地索引缺失的英雄目录直接采用线上条目（资源加载失败会走既有回退）

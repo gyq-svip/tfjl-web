@@ -439,12 +439,31 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // 🔴 英雄 Spine 动画资源（data/hero-spine/ skeleton.json/atlas.txt/p*.png/index.json）：
+    // 🔴 英雄 Spine 动画资源（data/hero-spine/ skeleton.json/atlas.txt/p*.png）：
     // 内容随版本稳定，但 request.destination 为空会被下方「其他 GET」归入 networkFirst，
     // 导致每次打开详情都重新联网拉（github.io 国内慢 → 几秒延迟）。资产走 cacheFirst + 持久 assets 缓存
-    // （跨部署保留，不再因每次 CACHE_VERSION+1 清空而全部重下）；index.json 清单走 runtime 跟部署更新。
+    // （跨部署保留，不再因每次 CACHE_VERSION+1 清空而全部重下）。
+    //
+    // 🔴 2026-11-04 修复「网页版正常、桌面 APP 的模型仍然错/飞起」：
+    //   index.json 之前也走 cacheFirst —— 而 cacheFirst 会**无视请求里的 cache:'no-store'**
+    //   （cache.match 命中就直接 return）。桌面端启动时 `_idxPromise` 与「本地补配置」的
+    //   `fetch(..., {cache:'no-store'})` 都读这份清单，于是**永远拿到首次缓存下来的旧清单**：
+    //     ① 旧清单缺 modelHideSlots → 死神 fashi 的 shen01/shen02 特效槽不隐藏 → 模型飞起；
+    //     ② 旧清单缺 modelNoDedupe → 光精灵 玉玺/令牌/金饭碗 的本体被 dedupe 当重复槽删掉 → 面板不显示。
+    //   清单只有 ~90KB 且是「配置真源」，必须每次回源 → 改为 networkFirst。
+    //   骨骼/图集/贴图仍走 cacheFirst（文件名不变但内容由整包版本决定，跨部署保留省流量）。
     if (url.pathname.indexOf('/data/hero-spine/') >= 0) {
-        event.respondWith(cacheFirst(request, url.pathname.endsWith('/index.json') ? CACHE_RUNTIME : CACHE_ASSETS, _offline));
+        const _isSpineIndex = url.pathname.endsWith('/data/hero-spine/index.json')
+        if (_isSpineIndex) {
+            // 🔴 缓存键归一化：页面侧为绕开旧 SW 的 cacheFirst，会给清单加 `?t=<时间戳>`。
+            //   若直接按带参 URL 写缓存，每打开一次就多存一条 90KB 清单（CACHE_RUNTIME 无限膨胀）。
+            //   这里统一用「去掉查询串 + cache:'no-store'」的请求去回源：
+            //   缓存键恒定、且一定走网络（Pages 的 HTTP 缓存也绕开）。
+            const _cleanReq = new Request(url.origin + url.pathname, { cache: 'no-store' })
+            event.respondWith(networkFirst(_cleanReq, CACHE_RUNTIME, _offline))
+        } else {
+            event.respondWith(cacheFirst(request, CACHE_ASSETS, _offline))
+        }
         return;
     }
 

@@ -12292,7 +12292,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (window.__heroSpineIndex) return window.__heroSpineIndex
                     const p = location.pathname
                     const b = p.endsWith('/') ? p : (p.lastIndexOf('/') >= 0 ? p.slice(0, p.lastIndexOf('/') + 1) : '/')
-                    window.__heroSpineIndex = await (await fetch(b + 'data/hero-spine/index.json')).json()
+                    // 🔴 2026-11-04 索引清单必须回源（带时间戳绕开 SW 缓存键）：
+                    //   https 下 sw.js 曾把 data/hero-spine/index.json 走 cacheFirst，且 cacheFirst 会无视
+                    //   cache:'no-store' → 桌面端永远读到旧清单（缺 modelHideSlots/modelNoDedupe）→
+                    //   死神飞起、光精灵玉玺/令牌/金饭碗面板不显示。加时间戳后缓存键必 miss，强制回源。
+                    window.__heroSpineIndex = await (await fetch(b + 'data/hero-spine/index.json?t=' + Date.now())).json()
                 } catch (e) { window.__heroSpineIndex = window.__heroSpineIndex || {} }
                 return window.__heroSpineIndex
             })()
@@ -12378,7 +12382,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                                 try {
                                     const _p = location.pathname
                                     const _siteBase = _p.endsWith('/') ? _p : _p.slice(0, _p.lastIndexOf('/') + 1)
-                                    const ro = await fetch(_siteBase + 'data/hero-spine/index.json', { cache: 'no-store' })
+                                    const ro = await fetch(_siteBase + 'data/hero-spine/index.json?t=' + Date.now(), { cache: 'no-store' })
                                     let _merged = false
                                     if (ro && ro.ok) {
                                         const jo = await ro.json()
@@ -12503,7 +12507,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     const _bb = _pp.endsWith('/') ? _pp : _pp.slice(0, _pp.lastIndexOf('/') + 1)
                     Promise.all([
                         fetch(_bb + 'skins-index.json', { cache: 'no-store' }).then(function (r) { return r.json() }).catch(function () { return null }),
-                        fetch(_bb + 'data/hero-spine/index.json', { cache: 'no-store' }).then(function (r) { return r.json() }).catch(function () { return null })
+                        fetch(_bb + 'data/hero-spine/index.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json() }).catch(function () { return null })
                     ]).then(function (arr) {
                         const si = arr[0] || {}, oi = arr[1] || {}
                         let latest = ''
@@ -12695,7 +12699,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             try {
                                 const _p = location.pathname;
                                 const _b = _p.endsWith('/') ? _p : (_p.lastIndexOf('/') >= 0 ? _p.slice(0, _p.lastIndexOf('/') + 1) : '/');
-                                window.__heroSpineIndex = await (await fetch(_b + 'data/hero-spine/index.json')).json();
+                                // 🔴 2026-11-04 同样带时间戳回源，避免 SW 缓存命中旧清单
+                                window.__heroSpineIndex = await (await fetch(_b + 'data/hero-spine/index.json?t=' + Date.now())).json();
                             } catch (e) { window.__heroSpineIndex = {}; }
                         }
                         const man = window.__heroSpineIndex && window.__heroSpineIndex[folder];

@@ -268,25 +268,45 @@
   async function loadAssets(folder, pngCount, model) {
     const key = folder + '@' + (model || '')
     if (assetCache[key]) return assetCache[key]
-    const dir = assetBase() + folder + (model ? '/models/' + model : '') + '/'
+    const rel = folder + (model ? '/models/' + model : '') + '/'
     // 骨架 / 图集 / 全部贴图页同时拉取，避免串行逐个等 RTT（首次打开会多等数秒）
     const pageCount = pngCount > 0 ? pngCount : 9
     const jobs = []
     for (let i = 0; i < pageCount; i++) jobs.push(i)
-    const bundle = await Promise.all([
-      fetch(dir + 'skeleton.json').then(function (r) { return r.json() }),
-      fetch(dir + 'atlas.txt').then(function (r) { return r.text() }),
-      Promise.all(jobs.map(function (i) {
-        return loadImage(dir + 'p' + i + '.png').then(
-          function (image) { return { index: i, image: image } },
-          function () { return null }
-        )
-      })).then(collectPages)
-    ])
-    const skeletonJson = bundle[0]
-    const atlasText = bundle[1]
-    const sheets = bundle[2]
-    if (!sheets.length) throw new Error('无贴图')
+    // 🔴 2026-11-04 桌面端本地整包缺模型 → 在线兜底。
+    //   桌面版把 __HERO_SPINE_ASSET_BASE 指到本地解压目录后，本地包若早于线上
+    //   （如新增皮肤 金饭碗/洪日庆/孔明灯/紫金铃铛 的模型目录还没解压进来），
+    //   就会 404 → 面板一片空白，而网页版正常。这里按「本地 → 线上」逐个 base 尝试，
+    //   只补拉缺失的那一个模型（几百 KB），不需要用户重下 84MB 整包。
+    const _onlineBase = baseUrl() + 'data/hero-spine/'
+    const _bases = [assetBase()]
+    if (_onlineBase && _bases[0] !== _onlineBase) _bases.push(_onlineBase)
+    let skeletonJson = null, atlasText = '', sheets = null, _lastErr = null
+    for (let bi = 0; bi < _bases.length; bi++) {
+      const dir = _bases[bi] + rel
+      try {
+        const r = await Promise.all([
+          fetch(dir + 'skeleton.json').then(function (x) {
+            if (!x.ok) throw new Error('skeleton ' + x.status)
+            return x.json()
+          }),
+          fetch(dir + 'atlas.txt').then(function (x) {
+            if (!x.ok) throw new Error('atlas ' + x.status)
+            return x.text()
+          }),
+          Promise.all(jobs.map(function (i) {
+            return loadImage(dir + 'p' + i + '.png').then(
+              function (image) { return { index: i, image: image } },
+              function () { return null }
+            )
+          })).then(collectPages)
+        ])
+        if (!r[2] || !r[2].length) throw new Error('无贴图')
+        skeletonJson = r[0]; atlasText = r[1]; sheets = r[2]
+        break
+      } catch (e) { _lastErr = e }
+    }
+    if (!sheets || !sheets.length) throw (_lastErr || new Error('资源加载失败'))
     // 图集里的页面按 atlas.txt 出现顺序依次对应 p0、p1…
     let cursor = 0
     const atlas = new spine.TextureAtlas(atlasText, function () {
