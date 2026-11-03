@@ -275,7 +275,11 @@
     if (!canvas) return
     if (st) { st.style.display = 'block'; st.textContent = '加载动画…' }
     spineIndex().then((idx) => {
-      const man = (window.spineHero && h.modelFolder) ? idx[h.modelFolder] : null
+      // 🟢 2026-11-04 皮肤可指定独立目录（幻精灵 紫金铃铛/孔明灯 在 jingling，英雄默认在 jingling1）
+      const _form = allForms[h.id] || {}
+      const _skinRow = model ? ((_form.skins || []).find(function (s) { return s.model === model; }) || null) : null
+      const _folder = (_skinRow && _skinRow.folder) || h.modelFolder
+      const man = (window.spineHero && _folder) ? idx[_folder] : null
       if (!man) throw new Error('no-spine')
       // 模型选择：皮肤指定 > snapshot 的 defaultModel（每英雄权威）> index 默认。
       // 不能直接用 index.model——多英雄共用目录时（jingling 放了 6 个精灵）那是别的英雄的模型。
@@ -298,7 +302,7 @@
       // 🟢 2026-11-04 精灵（occupation=6）：视觉主要靠 fx 光效，剔 fx 后只剩白球 → 保留特效
       const _isElf = Number(h && h.occupation) === 6
       if (fallbackTip && st) { st.style.display = 'block'; st.textContent = fallbackTip }
-      window.spineHero.play(canvas, h.modelFolder, {
+      window.spineHero.play(canvas, _folder, {
         model: effModel || undefined,
         pngs: pngs,
         tight: true,
@@ -316,7 +320,7 @@
         // 🟢 2026-10-27 传入「fx 路径下的身体部件」保留名单（如苏小妹的风车），避免被特效剔除误删
         fxKeep: (man.modelFxKeep || {})[effModel] || undefined,
         // scale 覆写：部分模型 index 自带 scale（补偿特效撑盒），显式替代以绕过宽度约束
-        scale: (SCALE_BY_MODEL[effModel] ? ((window.__heroSpineIndex && h.modelFolder && window.__heroSpineIndex[h.modelFolder] && window.__heroSpineIndex[h.modelFolder].scale > 0) ? window.__heroSpineIndex[h.modelFolder].scale : 1) * SCALE_BY_MODEL[effModel] : undefined),
+        scale: (SCALE_BY_MODEL[effModel] ? ((window.__heroSpineIndex && _folder && window.__heroSpineIndex[_folder] && window.__heroSpineIndex[_folder].scale > 0) ? window.__heroSpineIndex[_folder].scale : 1) * SCALE_BY_MODEL[effModel] : undefined),
         // 不套官方 x/y 偏移：那是给「特效撑大包围盒 + 官方 scale」做补偿的；
         // tight 包围盒（已剔 fx）本身居中，再偏移反而歪（蛇女/炸弹/虎弓偏移的来源）
         hideSlots: (man.hideSlots || []).concat((man.modelHideSlots || {})[effModel] || []),
