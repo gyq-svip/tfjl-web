@@ -2252,6 +2252,13 @@
                     保存后存云端 Gist（activity_lineup.json），<b style="color:#4ecdc4;">所有人刷新页面 → 阵容图库 → 🏆 活动阵容 即显示最新</b>，不用改代码也不用重新部署。
                 </div>
                 <div id="adminActLineupInfo" style="font-size:0.75rem;color:#4ecdc4;margin-bottom:8px;">加载中…</div>
+                <!-- 🟢 2026-11-03 活动名称：独立输入框（存 activity_lineup.json 的 title），用户端「🏆 活动阵容」标签与面板顶部都会显示 -->
+                <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px;">
+                    <div style="flex:1 1 320px;min-width:0;">
+                        <div style="font-size:0.7rem;color:rgba(255,255,255,0.5);margin-bottom:3px;">🏷️ 活动名称（显示在用户端「🏆 …」标签和面板顶部；留空则显示「活动阵容」）</div>
+                        <input id="adminActLineupTitle" class="admin-input" placeholder="如 第四话·丐帮 7日卡组轮转" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.4);border:1px solid rgba(255,215,0,0.35);border-radius:8px;color:#fff;font-size:0.85rem;padding:8px 10px;outline:none;">
+                    </div>
+                </div>
                 <textarea id="adminActLineupText" spellcheck="false" style="width:100%;height:min(52vh,440px);box-sizing:border-box;background:rgba(0,0,0,0.4);color:#fff;border:1px solid rgba(255,215,0,0.3);border-radius:8px;padding:10px;font-size:0.8rem;line-height:1.7;font-family:Consolas,Monaco,monospace;white-space:pre;overflow:auto;"></textarea>
                 <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
                     <button class="admin-btn" onclick="saveActLineupAdmin()" style="flex:1;min-width:150px;background:linear-gradient(135deg,#ffd700,#f0932b);color:#1a1a2e;font-weight:700;">☁ 保存并下发</button>

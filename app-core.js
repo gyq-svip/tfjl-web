@@ -30180,6 +30180,7 @@ ${maSection}
         window.renderActLineupAdmin = async function () {
             const box = document.getElementById('adminActLineupText');
             const info = document.getElementById('adminActLineupInfo');
+            const titleEl = document.getElementById('adminActLineupTitle');
             if (!box) return;
             box.value = '加载中…';
             if (info) info.textContent = '正在读取云端数据…';
@@ -30188,9 +30189,12 @@ ${maSection}
             if (!d) {
                 const L = window.LINEUP_LIBRARY || {};
                 box.value = _actLineupToText({ title: '', list: L.activity || [] });
+                if (titleEl) titleEl.value = '';
                 if (info) info.textContent = '☁ 云端暂无数据 —— 当前显示的是本地内置阵容。粘贴新文本后点「保存并下发」即可覆盖所有人。';
             } else {
-                box.value = _actLineupToText(d);
+                // 🟢 2026-11-03 标题改由上方独立输入框维护 → 正文不再重复输出标题行
+                box.value = _actLineupToText({ title: '', list: d.list });
+                if (titleEl) titleEl.value = d.title || '';
                 if (info) info.textContent = '☁ 云端已生效：' + (d.title || '（无标题）') + ' · ' + d.list.length + ' 天 · 更新于 ' + new Date(d.ts || Date.now()).toLocaleString('zh-CN');
             }
             try { if (typeof window._actPackRender === 'function') window._actPackRender('actPackArea', { upload: true, del: true }); } catch (e) {}
@@ -30202,6 +30206,10 @@ ${maSection}
             let data;
             try { data = _actLineupFromText(box.value); }
             catch (e) { alert('❌ 解析失败：' + ((e && e.message) || e)); return; }
+            // 🟢 2026-11-03 活动名称以独立输入框为准（留空则回落到正文第一行解析出的标题）
+            const titleEl = document.getElementById('adminActLineupTitle');
+            const manualTitle = titleEl ? String(titleEl.value || '').trim() : '';
+            if (manualTitle) data.title = manualTitle;
             const bad = data.list.filter(function (it) { return (it.A.length !== 10 && it.A.length !== 0) || (it.B.length !== 10 && it.B.length !== 0); });
             if (bad.length && !confirm('有 ' + bad.length + ' 天的卡数不是 10 张（第' + bad.map(function (b) { return b.day; }).join('、') + '天）。\n仍要保存吗？')) return;
             data.ts = Date.now();
@@ -30209,7 +30217,7 @@ ${maSection}
                 await _actGistPatch(ACT_LINEUP_GIST_FILE, data);
                 await window.__reloadActLineup();
                 await window.renderActLineupAdmin();
-                alert('✅ 已保存并下发（' + data.list.length + ' 天）\n所有人刷新页面即可看到最新活动阵容。');
+                alert('✅ 已保存并下发（' + data.list.length + ' 天）' + (data.title ? '\n活动名称：' + data.title : '\n（未填活动名称，用户端显示「活动阵容」）') + '\n所有人刷新页面即可看到最新活动阵容。');
             } catch (e) { alert('❌ 保存失败：' + ((e && e.message) || e)); }
         };
         // 载入本地内置（用于对照/回滚）
@@ -30227,8 +30235,11 @@ ${maSection}
             if (!box) return;
             try {
                 const d = _actLineupFromText(box.value);
+                const titleEl = document.getElementById('adminActLineupTitle');
+                const manualTitle = titleEl ? String(titleEl.value || '').trim() : '';
+                const shownTitle = manualTitle || d.title || '';
                 const bad = d.list.filter(function (it) { return it.A.length !== 10 || it.B.length !== 10; });
-                let msg = '✅ 解析成功：' + d.list.length + ' 天' + (d.title ? '，标题「' + d.title + '」' : '') + '\n';
+                let msg = '✅ 解析成功：' + d.list.length + ' 天' + (shownTitle ? '，活动名称「' + shownTitle + '」' : '，未填活动名称（用户端显示「活动阵容」）') + '\n';
                 msg += d.list.map(function (it) { return '第' + it.day + '天 A' + it.A.length + '/B' + it.B.length; }).join('，');
                 if (bad.length) msg += '\n⚠️ 卡数不是 10 的：第' + bad.map(function (b) { return b.day; }).join('、') + '天';
                 alert(msg);

@@ -164,6 +164,12 @@
         return L;
     }
     function _parseNames(txt) { return String(txt || '').split(/[,，、\n\r]+/).map(s => s.trim()).filter(Boolean); }
+    // 🟢 2026-11-03 活动名称由管理员维护（activity_lineup.json 的 title）→ 标签直接显示活动名，留空才用「活动阵容」
+    function _actTabName(D) {
+        const t = String((D && D.title) || '').trim();
+        if (!t) return '活动阵容';
+        return t.length > 12 ? (t.slice(0, 12) + '…') : t;
+    }
     // ---------- 悬浮窗（拖动 + 缩放） ----------
     window.openLineupLibraryPanel = function () {
         let ov = document.getElementById('lineupLibWin');
@@ -248,7 +254,7 @@
             + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
             + '<button onclick="_llTab(&quot;featured&quot;)" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (state.tab === 'featured' ? 'rgba(156,39,176,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (state.tab === 'featured' ? 'rgba(156,39,176,0.18)' : 'transparent') + ';color:' + (state.tab === 'featured' ? '#ce93d8' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">精选</button>'
             + '<button onclick="_llTab(\'sail\')" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (isSail ? 'rgba(78,205,196,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (isSail ? 'rgba(78,205,196,0.18)' : 'transparent') + ';color:' + (isSail ? '#4ecdc4' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">🚢 大航海(' + D.sailing.length + ')</button>'
-            + '<button onclick="_llTab(\'act\')" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (state.tab === 'act' ? 'rgba(255,215,0,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (state.tab === 'act' ? 'rgba(255,215,0,0.15)' : 'transparent') + ';color:' + (state.tab === 'act' ? '#ffd700' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">🏆 活动阵容(' + D.activity.length + '天)</button>'
+            + '<button onclick="_llTab(\'act\')" title="' + _esc(D.title || '活动阵容') + '（管理员可在后台改活动名称）" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (state.tab === 'act' ? 'rgba(255,215,0,0.6)' : 'rgba(255,255,255,0.2)') + ';background:' + (state.tab === 'act' ? 'rgba(255,215,0,0.15)' : 'transparent') + ';color:' + (state.tab === 'act' ? '#ffd700' : 'rgba(255,255,255,0.7)') + ';cursor:pointer;font-size:0.85rem;font-weight:700;">🏆 ' + _esc(_actTabName(D)) + '(' + D.activity.length + '天)</button>'
             + '</div>'
             // 右侧：当前 tab 的其他功能（精选=添加按钮；大航海/活动=搜索框）
             + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
