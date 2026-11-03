@@ -32029,20 +32029,20 @@ ${maSection}
                         // ============ 全量上报文件（🔴 2026-09-10 改为表格 + 搜索 + 点用户跳转）============
                         const sortedFiles = fileMetas.slice().sort((a, b) => b.last - a.last);
                         html += '<div style="margin-bottom:16px;">';
-                        html += '<div style="color:#ffd700;margin-bottom:6px;font-weight:700;">📋 全量上报文件 <span style="color:#94a3b8;font-size:0.7rem;font-weight:400;">（按最后上报时间倒序 · 点用户名就地展开/收起该用户详情）</span></div>';
+                        html += '<div style="color:#ffd700;margin-bottom:6px;font-weight:700;">📋 全量上报文件 <span style="color:#94a3b8;font-size:0.7rem;font-weight:400;">（默认按最后上报时间倒序 · <b style="color:#60a5fa;">点表头按 写入/版本/总数 等排序</b>，再点切换升降 · 点用户名就地展开/收起该用户详情）</span></div>';
                         html += '<input id="diagFileSearch" type="text" placeholder="🔍 搜索用户 / 昵称 / ID / 版本 / 平台…" oninput="diagFilterFiles(this.value)" style="width:100%;box-sizing:border-box;margin-bottom:6px;padding:6px 10px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(0,0,0,0.3);color:#fff;font-size:0.78rem;outline:none;">';
                         html += '<div style="overflow-x:auto;"><table id="diagFileTable" style="border-collapse:collapse;width:100%;font-size:0.74rem;">';
                         html += '<tr style="font-size:0.68rem;color:#94a3b8;background:rgba(255,215,0,0.08);">'
                             + '<th style="text-align:left;padding:4px 6px;">#</th>'
-                            + '<th style="text-align:left;padding:4px 6px;">用户</th>'
+                            + '<th onclick="diagSortFiles(\'name\')" style="text-align:left;padding:4px 6px;cursor:pointer;user-select:none;" title="点此按用户名排序（再点切换升降）">用户 <span class="diagSortArrow" data-k="name"></span></th>'
                             + '<th style="text-align:left;padding:4px 6px;">状态</th>'
-                            + '<th style="text-align:left;padding:4px 6px;color:#60a5fa;">小版本(前端)</th>'
-                            + '<th style="text-align:left;padding:4px 6px;color:#a78bfa;">大版本(桌面)</th>'
+                            + '<th onclick="diagSortFiles(\'ver\')" style="text-align:left;padding:4px 6px;color:#60a5fa;cursor:pointer;user-select:none;" title="点此按小版本(前端)排序（再点切换升降）">小版本(前端) <span class="diagSortArrow" data-k="ver"></span></th>'
+                            + '<th onclick="diagSortFiles(\'ever\')" style="text-align:left;padding:4px 6px;color:#a78bfa;cursor:pointer;user-select:none;" title="点此按大版本(桌面)排序（再点切换升降）">大版本(桌面) <span class="diagSortArrow" data-k="ever"></span></th>'
                             + '<th style="text-align:left;padding:4px 6px;">平台</th>'
-                            + '<th style="text-align:right;padding:4px 6px;color:#fbbf24;">Gist写入</th>'
-                            + '<th style="text-align:right;padding:4px 6px;color:#7dd3fc;">非写入(本地)</th>'
-                            + '<th style="text-align:right;padding:4px 6px;color:#4ade80;">总操数</th>'
-                            + '<th style="text-align:left;padding:4px 6px;">最后上报</th>'
+                            + '<th onclick="diagSortFiles(\'write\')" style="text-align:right;padding:4px 6px;color:#fbbf24;cursor:pointer;user-select:none;" title="点此按 Gist 写入次数排序（再点切换升降）">Gist写入 <span class="diagSortArrow" data-k="write"></span></th>'
+                            + '<th onclick="diagSortFiles(\'local\')" style="text-align:right;padding:4px 6px;color:#7dd3fc;cursor:pointer;user-select:none;" title="点此按非写入(本地)次数排序（再点切换升降）">非写入(本地) <span class="diagSortArrow" data-k="local"></span></th>'
+                            + '<th onclick="diagSortFiles(\'total\')" style="text-align:right;padding:4px 6px;color:#4ade80;cursor:pointer;user-select:none;" title="点此按总操数排序（再点切换升降）">总操数 <span class="diagSortArrow" data-k="total"></span></th>'
+                            + '<th onclick="diagSortFiles(\'last\')" style="text-align:left;padding:4px 6px;cursor:pointer;user-select:none;" title="点此按最后上报时间排序（再点切换升降）">最后上报 <span class="diagSortArrow" data-k="last"></span></th>'
                             + '<th style="text-align:left;padding:4px 6px;">封禁</th>'
                             + '</tr>';
                         sortedFiles.forEach(function (m, i) {
@@ -32056,7 +32056,15 @@ ${maSection}
                             const _devKey = (m.payload && m.payload.deviceId) || m.anonId || '';
                             const _bl = (window.__diagBlacklist && window.__diagBlacklist[_devKey]) ? '<span style="color:#f87171;">🔒已拉黑</span>' : '<span style="color:#94a3b8;">—</span>';
                             const _kw = (m.who + ' ' + m.anonId + ' ' + (m.ver || '') + ' ' + (m.plat || '') + ' ' + ((m.payload && m.payload.appExeVersion) || '') + ' ' + m.fn).toLowerCase().replace(/"/g, '');
-                            html += '<tr class="diagFileRow" data-kw="' + _kw + '" style="border-top:1px dashed rgba(255,255,255,0.08);">'
+                            html += '<tr class="diagFileRow diagFileMain" data-idx="' + i + '" data-kw="' + _kw + '"'
+                                + ' data-s-last="' + (m.last || 0) + '"'
+                                + ' data-s-write="' + (m.count || 0) + '"'
+                                + ' data-s-local="' + (m.local || 0) + '"'
+                                + ' data-s-total="' + ((m.count || 0) + (m.local || 0)) + '"'
+                                + ' data-s-ver="' + String(m.ver || '').replace(/"/g, '&quot;') + '"'
+                                + ' data-s-ever="' + String((m.payload && m.payload.appExeVersion) || '').replace(/"/g, '&quot;') + '"'
+                                + ' data-s-name="' + String(m.who || '').replace(/"/g, '&quot;') + '"'
+                                + ' style="border-top:1px dashed rgba(255,255,255,0.08);">'
                                 + '<td style="padding:3px 6px;color:#64748b;">' + (i + 1) + '</td>'
                                 + '<td style="padding:3px 6px;cursor:pointer;" onclick="diagToggleInlineUser(\'' + _aid + '\',' + i + ')" title="点击就地展开/收起该用户详情">' + _colorWho(m.who) + ' <span style="color:#60a5fa;font-size:0.68rem;">▶</span></td>'
                                 + '<td style="padding:3px 6px;">' + _hb + ' ' + _wk + '</td>'
@@ -37008,6 +37016,59 @@ ${maSection}
         })();
 
         // ==================== 诊断面板：全量上报表格的搜索 / 跳转（2026-09-10）====================
+        // 🔴 2026-11-04 全量上报表格排序：点表头按 写入 / 版本 / 总数 / 最后上报 等排序（再点切换升降）
+        //   实现：每个设备的主行带 diagFileMain + data-s-*，按「主行 + err 行 + 内联详情行」整组重排 DOM；
+        //   不影响搜索（diagFilterFiles 按 .diagFileRow 过滤）与就地展开（inlineDetailRow_i 用原始 idx）。
+        window.diagSortFiles = function (key) {
+            const table = document.getElementById('diagFileTable');
+            if (!table) return;
+            const prev = window.__diagSortState || { key: 'last', dir: -1 };
+            // 文本列默认升序，数值列默认降序；同一列再点切换方向
+            let dir = (prev.key === key) ? -prev.dir
+                : ((key === 'name' || key === 'ver' || key === 'ever') ? 1 : -1);
+            window.__diagSortState = { key: key, dir: dir };
+            // 按「主行 + 其后的 err 行 + 内联详情行」分组（主行带 diagFileMain）
+            // ⚠️ innerHTML 写 <table><tr> 时浏览器会自动包一层 <tbody>，必须从 tbody.children 取行，
+            //    否则 table.children 只有 tbody 一个节点 → 找不到任何 TR，排序会静默失效。
+            const tbody = (table.tBodies && table.tBodies[0]) ? table.tBodies[0] : table;
+            const kids = Array.prototype.slice.call(tbody.children).filter(function (r) { return r.tagName === 'TR'; });
+            const groups = [];
+            let g = null;
+            kids.forEach(function (r) {
+                if (r.classList.contains('diagFileMain')) { g = [r]; groups.push(g); }
+                else if (g) { g.push(r); }
+            });
+            if (!groups.length) return;
+            const num = function (r, k) { return Number(r.getAttribute('data-s-' + k) || 0) || 0; };
+            const txt = function (r, k) { return String(r.getAttribute('data-s-' + k) || ''); };
+            groups.sort(function (a, b) {
+                const ra = a[0], rb = b[0];
+                if (key === 'name' || key === 'ver' || key === 'ever') {
+                    const va = txt(ra, key), vb = txt(rb, key);
+                    // 版本用自然排序（数字按数值比，如 s1.1.9 < s1.1.10）
+                    try { return dir * va.localeCompare(vb, 'zh-Hans-CN', { numeric: true, sensitivity: 'base' }); }
+                    catch (e) { return dir * (va < vb ? -1 : (va > vb ? 1 : 0)); }
+                }
+                return dir * (num(ra, key) - num(rb, key));
+            });
+            // 整组重新挂回（表头 tr 始终是 table 的第一个子节点，不会被移动）
+            const frag = document.createDocumentFragment();
+            groups.forEach(function (gp) { gp.forEach(function (r) { frag.appendChild(r); }); });
+            tbody.appendChild(frag);
+            // 重排后刷新行号（onclick 里的原始 idx 保持不变，内联详情仍能对上）
+            groups.forEach(function (gp, idx) {
+                const first = gp[0].querySelector('td');
+                if (first) first.textContent = String(idx + 1);
+            });
+            // 刷新表头箭头：当前排序列显示 ▲/▼，其余清空
+            const arrows = table.querySelectorAll('.diagSortArrow');
+            for (let i = 0; i < arrows.length; i++) {
+                const a = arrows[i];
+                const on = a.getAttribute('data-k') === key;
+                a.textContent = on ? (dir < 0 ? ' ▼' : ' ▲') : '';
+                a.style.color = on ? '#fbbf24' : '#94a3b8';
+            }
+        };
         window.diagFilterFiles = function (kw) {
             const q = String(kw || '').trim().toLowerCase();
             const rows = document.querySelectorAll('#diagFileTable tr.diagFileRow');
