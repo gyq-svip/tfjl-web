@@ -1449,7 +1449,64 @@
     "y": -33.16431493585402,
     "scale": 1.32
    }
-  }
+  },
+  "modelHideSlots": {
+   "chuanguoyuxi": [
+    "fxg01",
+    "fxg02",
+    "fxg03",
+    "fxg04",
+    "fxg05",
+    "fxg1",
+    "fxg2",
+    "fxg3",
+    "fxg4",
+    "fxg5",
+    "fx/xing1",
+    "fx/xing2",
+    "fx/xing3",
+    "yuxi2"
+   ],
+   "jinfanwan": [
+    "fxg01",
+    "fxg02",
+    "fxg03",
+    "fxg04",
+    "fxg05",
+    "fxg1",
+    "fxg2",
+    "fxg3",
+    "fxg4",
+    "fxg5",
+    "fx/xing1",
+    "fx/xing2",
+    "fx/xing3",
+    "yuxi2"
+   ],
+   "shiwanglingpai": [
+    "fxg01",
+    "fxg02",
+    "fxg03",
+    "fxg04",
+    "fxg05",
+    "fxg1",
+    "fxg2",
+    "fxg3",
+    "fxg4",
+    "fxg5",
+    "fx/xing1",
+    "fx/xing2",
+    "fx/xing3",
+    "yuxi4",
+    "yuxi2",
+    "yuxi3"
+   ]
+  },
+  "modelNoDedupe": [
+   "chuanguoyuxi",
+   "jinfanwan",
+   "shiwanglingpai"
+  ]
  },
  "sunwukong": {
   "hero": "悟空",

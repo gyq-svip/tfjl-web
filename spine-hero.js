@@ -1016,7 +1016,8 @@
       model: model,
       tight: true,
       hideFx: _isElf ? false : !opt.noHideFx,
-      dedupe: true,
+      // 🟢 2026-11-04 个别模型（光精灵 玉玺/令牌/金饭碗）本体与阴影在同一骨骼上，dedupe 会把本体误删 → 按 index 关闭
+      dedupe: !((man.modelNoDedupe || []).indexOf(model) >= 0),
       hideSlots: (man.hideSlots || []).concat((man.modelHideSlots || {})[model] || []),
       fitByHeight: true,
       anchorFeet: anchorFeet,
