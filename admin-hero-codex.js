@@ -1,8 +1,9 @@
 /* 英雄图鉴 —— 独立模块，与 app-core.js 完全解耦。
- * 数据源：游戏资源更新包产出的 hero-snapshot.json / hero-assets.json
- *         （scripts/sync-hero-deck.mjs 同步到 data/hero-deck/，版本随资源包 e9937+）。
+ * 数据源：游戏官方数据（微信小游戏缓存的 staticTableData 配置表 + resources 资源包，
+ *         以及官方资源 CDN），由 scripts/sync-hero-deck.mjs 解析生成 data/hero-deck/ 下的
+ *         hero-snapshot.json / hero-assets.json 与立绘图集、铭牌图集。
  * 还原游戏「英雄图鉴」页面：金框卡片 + 图集切片立绘 + 搜索/排序/按品质 + 详情。
- * 说明：Spine 模型（105MB）仅本地同步不入库，部署站上详情面板自动回退为立绘展示。
+ * 说明：Spine 模型由官方 resources bundle 提取，部署站上详情面板自动回退为立绘展示。
  */
 (function () {
   const OCCUPATION = { 1: ['战士', '⚔️'], 2: ['猎人', '🏹'], 3: ['法师', '🔮'], 4: ['牧师', '✨'], 5: ['召唤', '🐾'], 6: ['精灵', '🌿'], 7: ['熊猫', '🐼'], 8: ['工程', '⚙️'], 9: ['术士', '👻'], 10: ['龙族', '🐉'] }
@@ -324,7 +325,6 @@
         }
       }
       const pngs = effModel ? ((man.modelPngs || {})[effModel] || 0) : (man.pngs || 0)
-      const moff = (man.modelOffsets && (man.modelOffsets[effModel] || man.modelOffsets[man.model])) || {}
       // 🟢 2026-11-04 精灵（occupation=6）：视觉主要靠 fx 光效，剔 fx 后只剩白球 → 保留特效
       const _isElf = Number(h && h.occupation) === 6
       if (fallbackTip && st) { st.style.display = 'block'; st.textContent = fallbackTip }
@@ -337,7 +337,7 @@
         dedupe: !((man.modelNoDedupe || []).indexOf(effModel) >= 0),
         // 🟢 统一观感：所有模型按「可见高度」归一化到同一档。
         //   逐模型 scale 原本是为「特效撑大包围盒」做补偿的（我们不剔特效时必须套），
-        //   而图鉴已剔除 fx，再套会导致 200/161/128/113 这种参差；官方 x/y 居中偏移仍然保留。
+        //   而图鉴已剔除 fx，再套会导致 200/161/128/113 这种参差（运行时不使用逐模型 x/y 偏移）。
         fitByHeight: true,
         // 🟢 2026-10-25 按模型覆写（与「英雄详情弹窗」同一套死神 fashi 专项）：
         //   默认模型 fashi 的可见包围盒含大片透明留白，统一 pad 下身高明显小于三个皮肤，
@@ -462,7 +462,7 @@
     })
   }
 
-  /* —— 英雄铭牌图集（官方名字美术字，data/hero-deck/nameatlas/，随资源包同步）—— */
+  /* —— 英雄铭牌图集（官方名字美术字，data/hero-deck/nameatlas/，提取自官方 resources bundle）—— */
   let npMeta = null
   function nameplateMeta() {
     if (npMeta) return Promise.resolve(npMeta)
@@ -552,7 +552,7 @@
       renderGrid()
     } catch (e) {
       document.getElementById('hdcGrid').innerHTML =
-        `<div style="grid-column:1/-1;color:#f87171;padding:30px;text-align:center;">英雄数据加载失败：${esc(e.message || e)}<br><span style="color:rgba(255,255,255,.5);font-size:.8rem;">请先运行 scripts/sync-hero-deck.mjs（或在更新游戏资源后重新同步）</span></div>`
+        `<div style="grid-column:1/-1;color:#f87171;padding:30px;text-align:center;">英雄数据加载失败：${esc(e.message || e)}<br><span style="color:rgba(255,255,255,.5);font-size:.8rem;">请运行 scripts/sync-hero-deck.mjs 从官方微信小游戏缓存重新同步数据</span></div>`
     }
   }
 })()

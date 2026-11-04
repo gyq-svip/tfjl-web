@@ -1,11 +1,14 @@
 {
   "meta": {
     "generated": "2026-09-29T17:34:24.103Z",
+    "sourceType": "official",
     "sources": [
-      "hero_attrs_full.csv",
-      "hero_talents.csv",
-      "hero_skins_full.csv"
+      "微信小游戏官方缓存 staticTableData 配置表包（APPID wxa46b2910643e4c31）",
+      "官方 HeroTableData / HeroTalentTableData / HeroSkinTableData 等"
     ],
+    "note": "早期经 CSV 中间格式（hero_attrs_full.csv 等）落地，内容全部解析自上述官方配置表；不含第三方工具箱数据",
+    "verifiedAgainst": "data/official/hero-table.json（官方 HeroTableData 快照）",
+    "verifiedResult": "102 英雄 name / profession 与官方表零差异",
     "totalHeroes": 102
   },
   "heroes": {

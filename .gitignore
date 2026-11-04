@@ -75,6 +75,8 @@ scripts/
 !scripts/
 scripts/*
 !scripts/export-heroes/
+# 官方数据同步/校验脚本（从微信小游戏官方缓存解析，需入库以便复现）
+!scripts/sync-hero-deck.mjs
 # 例外：GitHub Actions 用的 CI 脚本必须入库（定时备份等）
 !.github/scripts/
 
@@ -152,13 +154,16 @@ tools/
 # 英雄 Spine 动画资源（官方导出，图鉴面板播放用；目录清单 index.json + 各英雄 skeleton/atlas/png）
 !/data/hero-spine/
 !/data/hero-spine/**
-# 英雄图鉴：数据与立绘图集入库（avatar 17.9MB）；Spine 模型仅本地（scripts/sync-hero-deck.mjs 可重新同步）
+# 英雄图鉴：数据与立绘图集入库（avatar 17.9MB）；Spine 骨骼由官方 resources bundle 提取（scripts/export-heroes/extract-official-spine.py）
 !/data/hero-deck/
 !/data/hero-deck/**
 /data/hero-deck/_tables/
 /data/hero-deck/_tmp/
 /data/hero-deck/assets/*
 !/data/hero-deck/assets/avatar/
+# 官方配置表快照（scripts/sync-hero-deck.mjs --emit 从微信小游戏缓存解析生成，不含第三方数据）
+!/data/official/
+!/data/official/**
 # 图标等静态资源（Tauri 图标已编译进二进制，网页用 src-tauri/icons）
 /assets/
 # 安装包 + 签名（本地保留，下载源在 Gitee 发行版附件）
