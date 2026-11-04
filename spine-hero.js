@@ -890,14 +890,18 @@
       const c = navigator.connection
       if (c && (c.saveData || /(^|-)2g$|3g/.test(c.effectiveType || ''))) return
     } catch (e) {}
-    if (!window.__heroSpineIndex) {
+    // 🔴 2026-11-04 不再把这份清单写回 window.__heroSpineIndex！
+    //   桌面端这里读的是**本地皮肤包**的 index.json（assetBase 指向本地），旧包缺
+    //   modelHideSlots/modelNoDedupe。一旦写进全局，详情弹窗 _idxPromise 看到「已存在」
+    //   就不再拉线上清单 → 桌面端永远用旧配置（死神飞起、光精灵玉玺/令牌/金饭碗带灰刀/空白），
+    //   而网页端跳过预热、所以正常。预热只需要知道「要下哪些文件」，用局部变量即可。
+    let idx = window.__heroSpineIndex
+    if (!idx) {
       try {
-        const p = location.pathname
-        const b = p.endsWith('/') ? p : (p.lastIndexOf('/') >= 0 ? p.slice(0, p.lastIndexOf('/') + 1) : '/')
-        window.__heroSpineIndex = await (await fetch(assetBase() + 'index.json')).json()
-        } catch (e) { return }
-        }
-    const idx = window.__heroSpineIndex || {}
+        idx = await (await fetch(assetBase() + 'index.json')).json()
+      } catch (e) { return }
+    }
+    idx = idx || {}
     const jobs = []
     Object.keys(idx).forEach(function (f) {
       const e = idx[f] || {}

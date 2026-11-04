@@ -211,10 +211,12 @@
       if (!j) {
         try { j = await (await fetch(baseUrl() + 'data/hero-spine/index.json?t=' + Date.now())).json() } catch (e) { j = null }
       }
+      let _gotOnline = false
       try {
         // 🔴 2026-11-04 带时间戳回源：sw.js 曾对 index.json 走 cacheFirst 且无视 cache:'no-store'，
         //   桌面端因此一直拿到旧清单，补配置补了个寂寞（死神飞起 / 精灵本体被 dedupe 删）。
         const jo = await (await fetch(baseUrl() + 'data/hero-spine/index.json?t=' + Date.now(), { cache: 'no-store' })).json()
+        if (jo && typeof jo === 'object') _gotOnline = true
         if (j && jo && typeof jo === 'object') {
           for (const k of Object.keys(jo)) {
             const o = jo[k]
@@ -239,12 +241,23 @@
             //   桌面端拿旧本地包索引时 dedupe 仍为 true，光精灵 玉玺/令牌/金饭碗 的
             //   本体（yuxi）与阴影同骨骼，被 demo 当「重复槽」整槽删掉 → 面板只剩飘带/空白。
             if (o.modelNoDedupe != null && j[k].modelNoDedupe == null) j[k].modelNoDedupe = o.modelNoDedupe
+            // 🟢 2026-11-04 顺带把「模型清单/贴图页数」也逐键合并：
+            //   本地旧包缺新增皮肤（金饭碗/孔明灯/紫金铃铛/水人）时，图鉴的皮肤下拉与尺寸计算才能对齐线上。
+            if (o.models && typeof o.models === 'object') {
+              j[k].models = Object.assign({}, j[k].models || {}, o.models)
+            }
+            if (o.modelPngs && typeof o.modelPngs === 'object') {
+              j[k].modelPngs = Object.assign({}, j[k].modelPngs || {}, o.modelPngs)
+            }
           }
         }
         // 本地索引缺失的英雄目录直接采用线上条目（资源加载失败会走既有回退）
         if (j && jo) for (const k of Object.keys(jo)) if (!j[k]) j[k] = jo[k]
       } catch (e) {}
       window.__heroSpineIndex = j || window.__heroSpineIndex || {}
+      // 🟢 2026-11-04 标记「清单已含线上配置」：详情弹窗 _idxPromise 只复用带此标记的清单，
+      //   否则桌面端会一直沿用本地旧包索引（缺 modelHideSlots/modelNoDedupe）。
+      if (j && typeof j === 'object' && _gotOnline) window.__heroSpineIdxOnline = true
       return window.__heroSpineIndex
     })()
     return _spineIdxPromise

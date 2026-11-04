@@ -12289,14 +12289,27 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             } catch (e) {}
             const _idxPromise = (async () => {
                 try {
-                    if (window.__heroSpineIndex) return window.__heroSpineIndex
+                    // 🔴 2026-11-04 只有「确认来自线上的清单」才直接复用。
+                    //   桌面端 spine-hero.preloadAll 会在启动 8s 后用**本地皮肤包**的 index.json
+                    //   填 window.__heroSpineIndex（旧包缺 modelHideSlots/modelNoDedupe）→
+                    //   这里若只判「已存在」就直接返回，桌面端永远拿不到线上配置：
+                    //   死神 shen01/shen02 不隐藏（飞起）、光精灵 玉玺/令牌/金饭碗 本体被 dedupe 删（带灰刀/空白）。
+                    //   故用 __heroSpineIdxOnline 标记「这份是线上/已合并线上」，没标记就重新拉。
+                    if (window.__heroSpineIndex && window.__heroSpineIdxOnline) return window.__heroSpineIndex
                     const p = location.pathname
                     const b = p.endsWith('/') ? p : (p.lastIndexOf('/') >= 0 ? p.slice(0, p.lastIndexOf('/') + 1) : '/')
                     // 🔴 2026-11-04 索引清单必须回源（带时间戳绕开 SW 缓存键）：
                     //   https 下 sw.js 曾把 data/hero-spine/index.json 走 cacheFirst，且 cacheFirst 会无视
                     //   cache:'no-store' → 桌面端永远读到旧清单（缺 modelHideSlots/modelNoDedupe）→
                     //   死神飞起、光精灵玉玺/令牌/金饭碗面板不显示。加时间戳后缓存键必 miss，强制回源。
-                    window.__heroSpineIndex = await (await fetch(b + 'data/hero-spine/index.json?t=' + Date.now())).json()
+                    //   本地包独有条目（线上没有的英雄目录）继续保留，避免本地包独有的模型失联。
+                    const _j = await (await fetch(b + 'data/hero-spine/index.json?t=' + Date.now())).json()
+                    const _old = window.__heroSpineIndex
+                    if (_old && typeof _old === 'object') {
+                        for (const k of Object.keys(_old)) if (!_j[k]) _j[k] = _old[k]
+                    }
+                    window.__heroSpineIndex = _j
+                    window.__heroSpineIdxOnline = true
                 } catch (e) { window.__heroSpineIndex = window.__heroSpineIndex || {} }
                 return window.__heroSpineIndex
             })()
@@ -12417,6 +12430,9 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                                 //   （不覆盖 _idxPromise 已拉到的在线索引），定时器继续重试，网络恢复即补上。
                                 if (_merged) {
                                     window.__heroSpineIndex = j
+                                    // 🟢 2026-11-04 标记「已合并线上配置」：详情弹窗的 _idxPromise 只会直接复用带此标记的清单，
+                                    //   否则会用本地旧包的清单（缺 modelHideSlots/modelNoDedupe）。
+                                    window.__heroSpineIdxOnline = true
                                     clearInterval(timer)
                                 } else if (!window.__heroSpineIndex) {
                                     window.__heroSpineIndex = j
