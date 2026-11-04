@@ -1056,7 +1056,8 @@
             user-select: none;
             width: 56px;
         }
-        .pool-tab:hover { background: rgba(255,255,255,0.16); transform: translateX(2px); }
+        /* 🔴 2026-11-04 去掉 translateX(2px)：右边缘 hover 同理会自激抖动，只保留底色反馈 */
+        .pool-tab:hover { background: rgba(255,255,255,0.16); }
         .pool-tab.active {
             background: linear-gradient(135deg, rgba(255,215,0,0.9), rgba(255,107,107,0.9));
             color: #1a1a2e;
@@ -1156,9 +1157,12 @@
                 z-index: 40;
                 box-shadow: 0 6px 16px rgba(0,0,0,0.5);
             }
-            /* 鼠标所在那张：最大 + 金边光晕 */
+            /* 鼠标所在那张：最大 + 金边光晕
+               🔴 2026-11-04 去掉 translateY：hover 时把元素从光标下挪走，鼠标停在卡片
+                  下边缘会形成「命中→移开→落回→再命中」的自激振荡（实测 1.5s 内 48 次
+                  mouseenter/leave，肉眼就是疯狂抖动）。放大本身已足够，不靠位移抬升。 */
             .collapsible-section .cards-grid .card-item:hover {
-                transform: scale(1.5) translateY(-2px);
+                transform: scale(1.5);
                 z-index: 60;
                 box-shadow: 0 14px 32px rgba(0,0,0,0.65), 0 0 0 2px rgba(255,215,0,0.75), 0 0 22px rgba(255,215,0,0.35);
                 filter: brightness(1.1) saturate(1.08);
@@ -1170,8 +1174,11 @@
             transform-origin: center bottom;
         }
         @media (hover: hover) {
+            /* 🔴 2026-11-04 同样去掉 translateY(-9px)：9px 位移会让鼠标停在缩略图下边缘时
+               反复 enter/leave（实测 1.5s 内 48 次，就是用户说的「鼠标放到这里跳的厉害」）。
+               以 bottom 为原点 scale 已经是从底部弹起的手感，不需要再位移。 */
             .skin-thumb-btn:hover {
-                transform: translateY(-9px) scale(1.22);
+                transform: scale(1.22);
                 z-index: 5;
                 box-shadow: 0 10px 22px rgba(0,0,0,0.6);
                 filter: brightness(1.08);

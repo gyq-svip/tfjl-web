@@ -11335,7 +11335,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         items.forEach((it, j) => {
                             const d = Math.abs(j - items.indexOf(wrapEl))
                             const s = d === 0 ? 1.5 : d === 1 ? 1.22 : d === 2 ? 1.08 : 1
-                            it.style.transform = 'scale(' + s + ') translateY(' + (d === 0 ? '-6px' : '0') + ')'
+                            // 🔴 2026-11-04 去掉 translateY(-6px)：位移会把格子从光标底下挪走，
+                        //   鼠标停在格子下边缘时反复 enter/leave → 视觉上疯狂抖动（实测 1.5s 48 次）。
+                        //   transform-origin 是 bottom center，scale 本身就是「从底边弹起」。
+                        it.style.transform = 'scale(' + s + ')'
                             it.style.zIndex = d === 0 ? '4' : '1'
                         })
                         tip.style.opacity = '1'
