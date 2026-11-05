@@ -241,7 +241,14 @@
             // 🔴 2026-11-04 新补：modelNoDedupe 之前完全不在补齐名单内 →
             //   桌面端拿旧本地包索引时 dedupe 仍为 true，光精灵 玉玺/令牌/金饭碗 的
             //   本体（yuxi）与阴影同骨骼，被 demo 当「重复槽」整槽删掉 → 面板只剩飘带/空白。
-            if (o.modelNoDedupe != null && j[k].modelNoDedupe == null) j[k].modelNoDedupe = o.modelNoDedupe
+            // 🔴 2026-11-05 改为「数组并集」：旧逻辑只在本地整项缺失时才补，但本地旧包
+            //   已有 3 项旧值（玉玺/令牌/金饭碗），线上新增的精灵皮肤（太平符咒/紫金铃铛/
+            //   星光宝盒/月光宝盒/绝影）永远补不进来 → 图鉴侧 dedupe 仍误删本体。
+            //   与 modelHideSlots 同样逐项合并：线上优先、本地独有项保留、去重。
+            if (Array.isArray(o.modelNoDedupe)) {
+              const _cur = Array.isArray(j[k].modelNoDedupe) ? j[k].modelNoDedupe : []
+              j[k].modelNoDedupe = Array.from(new Set(_cur.concat(o.modelNoDedupe)))
+            }
             // 🟢 2026-11-04 顺带把「模型清单/贴图页数」也逐键合并：
             //   本地旧包缺新增皮肤（金饭碗/孔明灯/紫金铃铛/水人）时，图鉴的皮肤下拉与尺寸计算才能对齐线上。
             if (o.models && typeof o.models === 'object') {

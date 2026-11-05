@@ -817,12 +817,26 @@
     "yuxi4",
     "yuxi2",
     "yuxi3"
+   ],
+   "taipingfuzhou": [
+    "fx/d1",
+    "fx/d2",
+    "fx/d3",
+    "fx/d4"
+   ],
+   "jueying": [
+    "fx/1/Liquid"
    ]
   },
   "modelNoDedupe": [
    "chuanguoyuxi",
    "jinfanwan",
-   "shiwanglingpai"
+   "shiwanglingpai",
+   "taipingfuzhou",
+   "huanjinglingpifu",
+   "yueguangbaohe01",
+   "yueguangbaohe02",
+   "jueying"
   ]
  },
  "sunwukong": {
