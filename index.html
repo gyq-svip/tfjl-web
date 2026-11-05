@@ -547,12 +547,13 @@
         </div>
 
         <!-- 活动氪金计算器面板 -->
-        <div id="activityCalcPanel" style="display:none;position:fixed;top:80px;right:20px;width:520px;max-height:88vh;z-index:9997;background:rgba(30,30,60,0.98);border:2px solid rgba(255,107,107,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.6);overflow:auto;resize:both;min-width:400px;min-height:500px;">
-            <div id="activityCalcPanelHeader" style="background:linear-gradient(135deg,#ff6b6b,#feca57);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;cursor:move;">
+        <!-- 标题栏固定不滚动：外层 flex 列 + 不滚动，calcPanelBody 独立滚动（2026-11-05） -->
+        <div id="activityCalcPanel" style="display:none;position:fixed;top:80px;right:20px;width:520px;height:88vh;max-height:900px;z-index:9997;background:rgba(30,30,60,0.98);border:2px solid rgba(255,107,107,0.5);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.6);overflow:hidden;resize:both;min-width:400px;min-height:500px;flex-direction:column;">
+            <div id="activityCalcPanelHeader" style="flex:0 0 auto;background:linear-gradient(135deg,#ff6b6b,#feca57);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;cursor:move;">
                 <span style="color:white;font-weight:bold;font-size:1rem;">🧮 计算器</span>
                 <button onclick="toggleActivityCalcPanel()" style="background:transparent;border:none;color:white;font-size:1.5rem;cursor:pointer;">×</button>
             </div>
-            <div id="calcPanelBody" style="padding:15px;">
+            <div id="calcPanelBody" style="flex:1 1 auto;min-height:0;overflow-y:auto;padding:15px;">
                 <!-- 顶层 Tab：新活动 / 旧活动 / 🏪活动tab / Boss减伤 / 龙珠升星 -->
                 <div style="display:flex;gap:5px;margin-bottom:15px;flex-wrap:wrap;">
                     <button onclick="switchCalcTopTab('new')" id="calcTopNew" data-tip="活动对战杯计算器：选目标皮肤/战车 → 算出需要氪多少钱、攒多少天" style="flex:1;min-width:110px;padding:8px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;">🆕 活动对战杯</button>

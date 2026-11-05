@@ -768,7 +768,9 @@
           const _cxBody = _bodyOk ? (vbBody.off.x + vbBody.size.x / 2) : (vbVis.off.x + boxW / 2)
           ctx.translate(w / 2, h * opts.anchorFeet)
           ctx.scale(zoom, -zoom)
-          ctx.translate(-_cxBody, -vbVis.off.y)
+          // 🟢 2026-11-05 按模型横向定心微调（世界单位，正值 = 取景中心右移 → 画面左移）
+          //   仅 OFFSET_X_BY_MODEL 登记的模型生效：单侧长柄挂件拉宽包围盒会把人物本体推离石台中心
+          ctx.translate(-_cxBody - (Number(opts.offsetX) || 0), -vbVis.off.y)
         } else {
           // 包围盒中心对准画布中心，offsetX/offsetY 为世界单位偏移
           const targetX = vbVis.off.x + boxW / 2 + (Number(opts.offsetX) || 0)
@@ -1023,6 +1025,8 @@
     const FP = (T && T.FIT_PAD_BY_MODEL) || { fashi: 0.78, sishenpifu: 0.66, sishenpifu2: 0.66, pingyizhi: 0.66 }
     const AF = (T && T.ANCHOR_FEET_BY_MODEL) || { fashi: 0.76 }
     const SC = (T && T.SCALE_BY_MODEL) || {}
+    // 🟢 2026-11-05 横向定心表（世界单位），与 admin-hero-codex.js 单一数据源共用
+    const OX = (T && T.OFFSET_X_BY_MODEL) || {}
     // 缺省值与图鉴对齐（图鉴 0.65/0.76）；图鉴表不可用时才退回旧弹窗基线 0.58/0.78
     const fitPadding = FP[model] || (T ? 0.65 : 0.58)
     const anchorFeet = AF[model] || (T ? 0.76 : 0.78)
@@ -1046,6 +1050,7 @@
       fitByHeight: true,
       anchorFeet: anchorFeet,
       scale: scale,
+      offsetX: OX[model] || 0,
       autoFxFallback: true,
       fxKeep: (man.modelFxKeep || {})[model] || undefined
     }

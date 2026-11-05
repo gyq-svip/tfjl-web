@@ -707,8 +707,9 @@
 
         function toggleActivityCalcPanel() {
             const panel = document.getElementById('activityCalcPanel');
-            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-            if (panel.style.display === 'block') {
+            // 面板为 flex 列布局（标题栏固定 + 内容区独立滚动），打开时用 flex 而非 block
+            panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+            if (panel.style.display === 'flex') {
                 if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('计算器');
                 switchCalcTopTab('new');
                 // 🟢 2026-11-03 每次打开计算器都刷一次活动名字（管理端改完名字后，用户重开面板即生效）

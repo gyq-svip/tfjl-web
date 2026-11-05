@@ -286,6 +286,12 @@
   const ANCHOR_FEET_BY_MODEL = {"huanyingcike":0.826,"xiaolupifu2":0.786,"xiaolupifu":0.786,"jianna":0.778,"najiapifu":0.776,"fengxingzhe":0.79,"feiji1":0.853,"feidie":0.826,"wushi":0.778,"jingling1":0.781,"jingling2":0.799,"baohulu_lei":0.774,"taipingfuzhou":0.826,"yougui":0.776,"jingling3":0.837,"huniu":0.776,"jingling4":0.78,"jingling6_1":0.78,"yueguangbaohe01":0.778,"yueguangbaohe02":0.78,"houyi":0.759,"songshupifu":0.774,"xiaolifeidao":0.792,"caijingling":0.808,"tujingling":0.781,"tujinglingpifu01":0.785,"tujinglingpifu02":0.785,"guichengxiang01":0.773,"guichengxiang02":0.773,"aishen":0.774,"baijingjing":0.774,"jingling7":0.806,"fenghuang":0.826,"bingjingling":0.794,"lanlianhua":0.796,"zhangfei":0.78,"qianshuiting":0.821,"qianshuitingpifu":0.815,"bingniao":0.794,"xuemo":0.776,"fashi":0.79,"sishenpifu":0.766,"sishenpifu2":0.766}
   // pad 无效的模型（包围盒极宽，fitByHeight 的 min() 被宽度项卡住）改用 scale 直接缩放
   const SCALE_BY_MODEL = {"huopaopifu":0.939,"xiaolifeidao":0.95,"shangfangbaojian":1.003,"tujinglingpifu02":0.946,"leifengta":1.024,"chushouguai":1.049,"lanlianhua":0.95,"xiongmao_shengdan":0.928,"houyi":0.494,"ayuya":0.621,"houyipifu1":0.623,"houyipifu2":0.623,"taipinglehouyi":0.623,"bodaerduo":0.623,"gangquan":0.736,"sanhaoji":0.736,"luzhishen":0.763,"guijiaoqi":0.727,"leibao":0.98,"daocaoren":0.734,"wugongjing":0.727,"tieshangongzhu":0.731,"zuoci":0.731,"shiliujie":0.734,"ligonggong":0.731,"qitiandasheng1":0.734,"qitiandasheng2":0.806,"qitiandasheng3":0.749,"zhizunbao":0.738,"dashengtaipingle":0.734,"shenhulu_guang":0.985,"jingling3":1.007,"baohulu_an":0.997,"mohulu":0.982,"luxiaofeng":0.965,"tianshi":1.005}
+  // 🟢 2026-11-05 横向定心覆写（世界单位，正值 = 取景中心右移 → 画面左移）。
+  //   死神「万圣节/粉色南瓜」整张图只有一个附件 idle/a0000，左侧长柄镰刀把包围盒拉宽，
+  //   按包围盒居中会把人物本体推到石台右侧：实测脚底触地中心 0.5334/0.5355（石台中心应 0.500）。
+  //   该模型无法按槽分离挂件（visN=1），故按模型给固定横向取景偏移把本体拉回石台中心。
+  //   992×496 画布 zoom≈1.37，需左移 ≈35px ⇒ 35/1.37 ≈ 25 世界单位。
+  const OFFSET_X_BY_MODEL = {"sishenpifu":25,"sishenpifu2":25}
   // 🟢 2026-10-27 单一数据源：把图鉴这套完整校准表共享给「英雄详情弹窗 / 卡牌设置弹窗」。
   //    此前弹窗只有 4+1 条私有小表，与图鉴 ~90 条实测表长期漂移（死神 fashi：图鉴 0.71/0.78
   //    而弹窗 0.78/0.76），同一模型在两个入口大小/站位不一致 → 用户看到「死神又飞起来了」。
@@ -293,7 +299,8 @@
   window.__SPINE_FIT_TABLES = {
     FIT_PAD_BY_MODEL: FIT_PAD_BY_MODEL,
     ANCHOR_FEET_BY_MODEL: ANCHOR_FEET_BY_MODEL,
-    SCALE_BY_MODEL: SCALE_BY_MODEL
+    SCALE_BY_MODEL: SCALE_BY_MODEL,
+    OFFSET_X_BY_MODEL: OFFSET_X_BY_MODEL
   }
   let _lastSpineCanvas = null
   let _spineRetry = 0
@@ -351,6 +358,8 @@
         //   故按 model 名单独给 pad（数值经图鉴画布实测校准，目标：四皮肤身高一致）。
         fitPadding: FIT_PAD_BY_MODEL[effModel] || 0.65,
         anchorFeet: ANCHOR_FEET_BY_MODEL[effModel] || 0.76,
+        // 🟢 2026-11-05 单侧挂件模型横向定心（见 OFFSET_X_BY_MODEL 注释；图鉴与弹窗共用同一张表）
+        offsetX: OFFSET_X_BY_MODEL[effModel] || 0,
         // 🟢 2026-10-27 传入「fx 路径下的身体部件」保留名单（如苏小妹的风车），避免被特效剔除误删
         fxKeep: (man.modelFxKeep || {})[effModel] || undefined,
         // scale 覆写：部分模型 index 自带 scale（补偿特效撑盒），显式替代以绕过宽度约束
