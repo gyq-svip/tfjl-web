@@ -1335,7 +1335,10 @@
    "dagoubang": 1,
    "jianongpao": 1
   },
-  "updated": "2026-10-20"
+  "modelNoDedupe": [
+   "huopaopifu"
+  ],
+  "updated": "2026-11-05"
  },
  "mori": {
   "hero": "领主",
