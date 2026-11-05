@@ -10576,16 +10576,47 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
         // 🟢 2026-10-23 只取皮肤专属的「额外被动」一句话（动态表 extraPassive，回退旧静态皮肤表）。
         //   面板上方已有技能/被动/等级全文，皮肤属性卡与 Dock 悬停提示不能重复搬整段；皮肤加血也不显示（用户口径）。
+        // 🟢 2026-11-06 皮肤名容错：云端注册表存在短名（打狗棒·火炮），官方表用全名（打狗棒·邪能火炮）。
+        //   同前缀 + 后缀互相包含 → 视为同一皮肤；只有唯一命中才采用，避免误配。
+        function _resolveSkinKey(table, skinName) {
+            if (!table || !skinName) return ''
+            if (table[skinName]) return skinName
+            const parts = String(skinName).split('·')
+            if (parts.length !== 2) return ''
+            const pre = parts[0], suf = parts[1]
+            const hits = Object.keys(table).filter(function (k) {
+                const kp = String(k).split('·')
+                return kp.length === 2 && kp[0] === pre && (kp[1].endsWith(suf) || suf.endsWith(kp[1]))
+            })
+            return hits.length === 1 ? hits[0] : ''
+        }
+
         function getSkinExtraPassive(cardName, skinName) {
             if (!skinName || skinName === '默认') return ''
             const mainCardName = getMainCardName(cardName)
             try {
                 const d = window.heroAttrsData && window.heroAttrsData.heroes && window.heroAttrsData.heroes[mainCardName]
-                const s = d && d.skins && d.skins[skinName]
-                if (s && s.extraPassive) return String(s.extraPassive)
+                const skins = d && d.skins
+                if (skins) {
+                    const key = _resolveSkinKey(skins, skinName)
+                    const s = key && skins[key]
+                    if (s && s.extraPassive) return String(s.extraPassive)
+                }
             } catch (e) {}
-            const st = SKIN_ATTRIBUTES[mainCardName] && SKIN_ATTRIBUTES[mainCardName][skinName]
-            return (st && st.desc) ? String(st.desc) : ''
+            try {
+                const local = SKIN_ATTRIBUTES[mainCardName]
+                const key = _resolveSkinKey(local, skinName)
+                if (key && local[key] && local[key].desc) return String(local[key].desc)
+            } catch (e) {}
+            // 云端皮肤属性表（admin 维护，随皮肤包发布）——此前未参与查找，
+            // 只在云端表里的皮肤（赵无极·邪 / 苏小妹·小野）悬停会空白
+            try {
+                const cloud = window.skinAttributesCloud
+                const tbl = cloud && cloud[mainCardName]
+                const key = _resolveSkinKey(tbl, skinName)
+                if (key && tbl[key] && tbl[key].desc) return String(tbl[key].desc)
+            } catch (e) {}
+            return ''
         }
 
         // 🔴 2026-10-19 官方英雄数据（data/heroes.json，由官方配置表自动导出）按英雄名索引；
