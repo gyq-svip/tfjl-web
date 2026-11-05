@@ -550,11 +550,13 @@
    "pingyizhi": 1,
    "fashi": 1
   },
-  "updated": "2026-10-19",
+  "updated": "2026-11-05",
   "modelHideSlots": {
    "fashi": [
     "shen01",
-    "shen02"
+    "shen02",
+    "bone2",
+    "zha01"
    ]
   }
  },
