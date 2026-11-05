@@ -82,10 +82,25 @@
   }
   function loadImage(src) {
     return new Promise(function (res, rej) {
-      const i = new Image()
-      i.onload = function () { res(i) }
-      i.onerror = function () { rej(new Error('img ' + src)) }
-      i.src = src
+      // 🔴 2026-11-05 桌面端「本地整包」根治：spine 贴图走 asset://（跨源），直接 new Image 会把
+      //   canvas 标记为「被污染」→ measureVisualBounds 里 getImageData 抛 SecurityError →
+      //   紧包围盒测量失败 → 回退骨架包围盒 vb（含大片透明留白；死神 fashi 实测 227×344
+      //   而真实身体仅 184×299）→ 角色被缩放得更小、脚底悬在石台上方 = 用户看到的「飞起」。
+      //   web 端贴图同源（github.io）所以正常，这就是「web 正常 / APP 飞」的真正差异。
+      //   改为优先 fetch→blob→objectURL（blob URL 与页面同源，绘制不污染画布），失败再退回直连。
+      function useUrl(u, isBlob) {
+        const i = new Image()
+        i.onload = function () { if (isBlob) { try { URL.revokeObjectURL(u) } catch (e) {} } res(i) }
+        i.onerror = function () { if (isBlob) { try { URL.revokeObjectURL(u) } catch (e) {} } rej(new Error('img ' + src)) }
+        i.src = u
+      }
+      try {
+        fetch(src).then(function (r) {
+          if (!r.ok) throw new Error('http ' + r.status)
+          return r.blob()
+        }).then(function (b) { useUrl(URL.createObjectURL(b), true) })
+          .catch(function () { useUrl(src, false) })
+      } catch (e) { useUrl(src, false) }
     })
   }
   // 隐藏/恢复「特效骨」挂件：冰晶/光效(fx/*)会把包围盒撑大，使人物被算小、站偏
@@ -644,7 +659,11 @@
             state.setAnimation(0, idle, true); state.update(0); state.apply(skeleton); skeleton.updateWorldTransform()
             if (_maxX > _minX && _maxY > _minY) liveBounds = { offX: _minX, offY: _minY, w: _maxX - _minX, h: _maxY - _minY }
           } catch (e) {}
-          vbVis = measureVisualBounds(spine, skData, animObj, vb, !!fxHide, hideIdx, liveBounds, fxKeep) || vb
+          const _tightBox = measureVisualBounds(spine, skData, animObj, vb, !!fxHide, hideIdx, liveBounds, fxKeep)
+          // 🔴 2026-11-05 诊断：true = 紧包围盒测量失败（桌面端画布被 asset:// 贴图污染时），
+          //   此时会回退骨架盒 vb → 角色飞起。修复后 APP 端应变为 false。
+          try { window.__spineTightFail = !_tightBox } catch (e) {}
+          vbVis = _tightBox || vb
           vbCache[vbKey] = vbVis
           // 🟢 2026-10-27 「手持/挂件」类部件（fxKeep 白名单，如苏小妹的风车 fx/suxiaomei08）
           //   不该影响站位：包围盒含挂件后按「包围盒居中」会把人物本体推向反侧
