@@ -1046,7 +1046,16 @@
       hideFx: _isElf ? false : !opt.noHideFx,
       // 🟢 2026-11-04 个别模型（光精灵 玉玺/令牌/金饭碗）本体与阴影在同一骨骼上，dedupe 会把本体误删 → 按 index 关闭
       dedupe: !((man.modelNoDedupe || []).indexOf(model) >= 0),
-      hideSlots: (man.hideSlots || []).concat((man.modelHideSlots || {})[model] || []),
+      // 🔴 2026-11-05 APP 兜底：死神 fashi 默认模型 bone2/zha01 是特效残影槽，
+      //   旧本地包 / 旧 SW 缓存 / 合并时序问题常导致线上索引缺这两项 → 死神 APP 版飞起（web 正常）。
+      //   这里作为数据驱动的兜底（不替代 index.json），fashi 强制隐藏这两个槽，确保任何来源/缓存下都不飞。
+      hideSlots: (function () {
+        const _hs = (man.hideSlots || []).concat((man.modelHideSlots || {})[model] || [])
+        if (folder === 'fashi' || model === 'fashi') {
+          ;['bone2', 'zha01'].forEach(function (s) { if (_hs.indexOf(s) < 0) _hs.push(s) })
+        }
+        return _hs
+      })(),
       fitByHeight: true,
       anchorFeet: anchorFeet,
       scale: scale,

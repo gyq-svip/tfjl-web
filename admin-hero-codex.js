@@ -366,7 +366,15 @@
         scale: (SCALE_BY_MODEL[effModel] ? ((window.__heroSpineIndex && _folder && window.__heroSpineIndex[_folder] && window.__heroSpineIndex[_folder].scale > 0) ? window.__heroSpineIndex[_folder].scale : 1) * SCALE_BY_MODEL[effModel] : undefined),
         // 不套官方 x/y 偏移：那是给「特效撑大包围盒 + 官方 scale」做补偿的；
         // tight 包围盒（已剔 fx）本身居中，再偏移反而歪（蛇女/炸弹/虎弓偏移的来源）
-        hideSlots: (man.hideSlots || []).concat((man.modelHideSlots || {})[effModel] || []),
+        // 🔴 2026-11-05 APP 兜底：死神 fashi 默认模型 bone2/zha01 特效残影槽，旧本地包/SW缓存/合并时序
+        //   缺这两项 → APP 飞起（web 正常）。与 spine-hero.fitOptions 同源兜底，强制隐藏，不替代 index.json。
+        hideSlots: (function () {
+          const _hs = (man.hideSlots || []).concat((man.modelHideSlots || {})[effModel] || [])
+          if (_folder === 'fashi' || effModel === 'fashi') {
+            ;['bone2', 'zha01'].forEach(function (s) { if (_hs.indexOf(s) < 0) _hs.push(s) })
+          }
+          return _hs
+        })(),
         onStatus: (s) => {
           const el = document.getElementById('hdcSpineStatus')
           if (!el) return

@@ -1222,7 +1222,7 @@
             modal.id = 'bgSettingsModal';
             modal.style.cssText = 'position:fixed;top:78px;right:18px;width:332px;max-width:92vw;z-index:100000;background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:14px 16px 16px;max-height:86vh;overflow:auto;box-shadow:0 12px 44px rgba(0,0,0,0.6);';
             modal.innerHTML = '' +
-                '<div id="bgSettingsHeader" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;cursor:move;user-select:none;">' +
+                '<div id="bgSettingsHeader" style="position:sticky;top:0;z-index:6;display:flex;justify-content:space-between;align-items:center;margin:-14px -16px 10px;padding:14px 16px 10px;background:#1a1a2e;border-bottom:1px solid rgba(255,215,0,0.25);cursor:move;user-select:none;">' +
                 '  <span style="color:#ffd700;font-size:1.1rem;font-weight:bold;">🎨 背景设置</span>' +
                 '  <button onclick="window.__bgCloseSettings()" onmousedown="event.stopPropagation()" title="关闭" style="background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;">✕</button>' +
                 '</div>' +
