@@ -663,8 +663,17 @@
           // 🔴 2026-11-05 诊断：true = 紧包围盒测量失败（桌面端画布被 asset:// 贴图污染时），
           //   此时会回退骨架盒 vb → 角色飞起。修复后 APP 端应变为 false。
           try { window.__spineTightFail = !_tightBox } catch (e) {}
-          vbVis = _tightBox || vb
-          vbCache[vbKey] = vbVis
+          if (_tightBox) {
+            vbVis = _tightBox
+            vbCache[vbKey] = vbVis
+          } else {
+            // 🔴 2026-11-05 防反弹保险（第二道）：像素测量失败时**不再回退松散骨架盒 vb**。
+            //   vb 含大量空槽 extent（死神 fashi 实测 227×344，真实身体仅约 184×299），
+            //   用它当渲染盒 → 角色被缩小约 40% + 脚底悬在石台上方 = 用户看到的「飞起」。
+            //   改由下方纯几何的 vbFoot 顶替（逐帧 getBounds 并集、排除全部隐藏槽、不读像素，
+            //   故画布被 asset:// 贴图污染时依然可靠）。先置 null，vbFoot 算完回填。
+            vbVis = null
+          }
           // 🟢 2026-10-27 「手持/挂件」类部件（fxKeep 白名单，如苏小妹的风车 fx/suxiaomei08）
           //   不该影响站位：包围盒含挂件后按「包围盒居中」会把人物本体推向反侧
           //   （苏小妹实测本体中心 0.4839、石台中心 0.498 → 偏左 1.4%）。
@@ -726,6 +735,14 @@
             // 横向居中用的本体盒：有 fxKeep 时已在上方排除手持挂件；否则用身体盒即可，
             // 保证 vbBody 永远非空 → 渲染横向定心走本体而非整盒（修苏小妹风车推偏）。
             if (!vbBody) vbBody = vbFoot
+          }
+          // 🔴 2026-11-05 防反弹保险（回填）：像素测量失败（vbVis 仍为 null）时用 vbFoot 当渲染盒。
+          //   vbFoot 是纯几何结果（确定性），缓存它可避免每次重开都重算像素；无论 fetch/blob 是否
+          //   成功，角色都不会再因「回退松散骨架盒」而缩小悬空。两者都不可用时才退回 vb。
+          if (!vbVis) {
+            vbVis = (vbFoot && vbFoot.size && vbFoot.size.x > 0 && vbFoot.size.y > 0) ? vbFoot : vb
+            vbCache[vbKey] = vbVis
+            try { window.__spineDbgFallback = vbFoot ? 'vbFoot' : 'vb' } catch (e) {}
           }
           try { window.__spineDbg = { folder: folder, model: opts.model || '', hideIdx: hideIdx, union: { w: +vbVis.size.x.toFixed(0), h: +vbVis.size.y.toFixed(0) }, chosen: 'union' } } catch (e) {}
         }
