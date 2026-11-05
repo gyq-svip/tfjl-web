@@ -3983,8 +3983,9 @@ if (true) {
                 if (fResp.ok) {
                     const fData = await fResp.json();
                     if (fData && fData.fusions) {
-                        window.cloudFusions = fData.fusions;
-                        console.log('[SKIN] cloud fusions loaded:', Object.keys(fData.fusions).length);
+                        // 🟢 2026-11-06 融合表键/components 统一官方名（兼容旧版短名 fusions.json）
+                        window.cloudFusions = (typeof window.normalizeFusionTable === 'function') ? window.normalizeFusionTable(fData.fusions) : fData.fusions;
+                        console.log('[SKIN] cloud fusions loaded:', Object.keys(window.cloudFusions).length);
                         if (typeof window.renderFusionCardsToPool === 'function') window.renderFusionCardsToPool();
                     }
                 }
@@ -4319,7 +4320,7 @@ if (true) {
     // 网页版：下载到 IndexedDB
     let _preheatStarted = false;
     // 王城低配版阵容优先预热（用户主阵容，开项目秒开）：这些英雄皮肤先拉/先落地磁盘
-    const PRIORITY_HEROES = new Set(['水灵','萌萌','咕咕','钢鬃','木精灵','光精灵','幻精灵','火炮射线','小野酋长','死神海妖','火炮','风灵','死神','骨弓','电法','铁骑','悟空','魂精灵','魔精灵']);
+    const PRIORITY_HEROES = new Set(['水灵','萌萌','咕咕','钢鬃','木精灵','光精灵','幻精灵','火炮射线','小野酋长','死神海妖','火炮','风灵','死神','骨弓','电法','铁骑','悟空','魂精灵','魔精灵','邪能火炮','地精宝库','侏儒射线','微型潜艇','邪能火炮侏儒射线']);
 
     async function _preheatSkins(heroes) {
         if (_preheatStarted) return;

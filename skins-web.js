@@ -30,7 +30,7 @@
   window.heroSkinSelections = {};  // { 英雄名: 皮肤名 }
 
   // 王城低配版阵容优先预热（用户主阵容，开项目秒开）：这些英雄皮肤先拉
-  var PRIORITY_HEROES = new Set(['水灵','水人','萌萌','咕咕','钢鬃','木精灵','光精灵','幻精灵','火炮射线','小野酋长','死神海妖','火炮','风灵','死神','骨弓','电法','铁骑','悟空','魂精灵','魔精灵']);
+  var PRIORITY_HEROES = new Set(['水灵','水人','萌萌','咕咕','钢鬃','木精灵','光精灵','幻精灵','火炮射线','小野酋长','死神海妖','火炮','风灵','死神','骨弓','电法','铁骑','悟空','魂精灵','魔精灵','邪能火炮','地精宝库','侏儒射线','微型潜艇','邪能火炮侏儒射线']);
 
   // 解析 "皮肤名·英雄名" 格式，返回基础英雄名
   function getBaseHeroName(fullName) {
@@ -333,6 +333,9 @@
     for (var hn in heroesObj) {
       if (!Object.prototype.hasOwnProperty.call(heroesObj, hn)) continue;
       var skinList = heroesObj[hn];
+      // 🟢 2026-11-06 注册表键统一官方名：旧缓存/旧注册表里的短名（火炮/宝库/射线/潜艇）就地归一，
+      //    避免同一英雄在皮肤库里出现「短名 + 官方名」两套键（切皮/预热各走一套）。
+      if (typeof toOfficialHeroName === 'function') { try { hn = toOfficialHeroName(hn); } catch (e) {} }
       if (!Array.isArray(skinList)) continue;
       if (!window.skinRegistry[hn]) window.skinRegistry[hn] = [];
       var localSkins = window.skinRegistry[hn];

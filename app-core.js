@@ -13,6 +13,76 @@
             } catch (e) {}
         })();
 
+        // ==================== 旧工程名迁移（一次性，2026-11-06） ====================
+        // 历史版本内部用老马短名（火炮/宝库/射线/潜艇）当英雄 key 存设置；现统一官方名。
+        // 这里就地改名，避免老用户升级后丢「皮肤选择 / 魔化 / 减伤 / 融合默认形态」。
+        // 只用静态映射，不依赖后续才声明的表，保证在任何模块加载前完成。
+        (function migrateLegacyEngineerNames() {
+            try {
+                var MAP = { '火炮': '邪能火炮', '宝库': '地精宝库', '射线': '侏儒射线', '潜艇': '微型潜艇' };
+                var OFFICIAL = { '邪能火炮': 1, '地精宝库': 1, '侏儒射线': 1, '微型潜艇': 1 };
+                function mapName(n) {
+                    if (!n) return n;
+                    var s = String(n);
+                    if (MAP[s]) return MAP[s];
+                    var out = '', i = 0;
+                    while (i < s.length) {
+                        var hit = null;
+                        for (var len = Math.min(4, s.length - i); len >= 1; len--) {
+                            var piece = s.substring(i, i + len);
+                            if (MAP[piece] || OFFICIAL[piece]) { hit = piece; break; }
+                        }
+                        if (!hit) return n;          // 不能完整切分 → 非融合串，保持原样
+                        out += MAP[hit] || hit;
+                        i += hit.length;
+                    }
+                    return out || n;
+                }
+                // 对象型：key = 英雄名（tdjl_fusion_defaults 的 value 也是融合名）
+                var OBJ_KEYS = [
+                    'tdjl_heroSkinSelections', 'tdjl_defaultCardSkins', 'tdjl_damageReduction',
+                    'tdjl_fusion_levels', 'tdjl_fusion_mohua', 'tdjl_fusion_defaults',
+                    'tdjl_customSkinAttributes'
+                ];
+                OBJ_KEYS.forEach(function (k) {
+                    var raw = localStorage.getItem(k);
+                    if (!raw) return;
+                    var o = JSON.parse(raw);
+                    if (!o || typeof o !== 'object' || Array.isArray(o)) return;
+                    var changed = false;
+                    Object.keys(o).forEach(function (n) {
+                        var t = mapName(n);
+                        if (t !== n) {
+                            if (o[t] === undefined) o[t] = o[n];
+                            delete o[n]; changed = true;
+                        }
+                    });
+                    if (k === 'tdjl_fusion_defaults') {
+                        Object.keys(o).forEach(function (n) {
+                            var v = mapName(o[n]);
+                            if (v !== o[n]) { o[n] = v; changed = true; }
+                        });
+                    }
+                    if (changed) localStorage.setItem(k, JSON.stringify(o));
+                });
+                // 数组型：元素里带 name 字段（收藏卡 / 自定义卡）
+                ['tdjl_favoriteCards', 'tdjl_customCards'].forEach(function (k) {
+                    var raw = localStorage.getItem(k);
+                    if (!raw) return;
+                    var arr = JSON.parse(raw);
+                    if (!Array.isArray(arr)) return;
+                    var changed = false;
+                    arr.forEach(function (it) {
+                        if (it && typeof it === 'object' && it.name) {
+                            var t = mapName(it.name);
+                            if (t !== it.name) { it.name = t; changed = true; }
+                        }
+                    });
+                    if (changed) localStorage.setItem(k, JSON.stringify(arr));
+                });
+            } catch (e) { /* 迁移失败不阻塞启动 */ }
+        })();
+
         // 🔴 2026-09-04 根治「正在编辑阵容却突然刷新，编辑半天的内容没了」：
         //   app-picker.js 里 4 处 isEditing() 都调用 window.__tfjlIsEditing，但该函数【从未定义】，
         //   保护退化成只认 window.__tfjlProjectDirty（项目编辑脏标记）——编辑阵容/手牌并不置该标记
@@ -2017,14 +2087,15 @@
                     if (project) {
                         clearCurrentData();
                         
-                        myHandCards = Array.isArray(project.myHandCards) ? project.myHandCards : [];
-                        teammateHandCards = Array.isArray(project.teammateHandCards) ? project.teammateHandCards : [];
-                        myPlacedCards = Array.isArray(project.myPlacedCards) ? project.myPlacedCards : [];
-                        teammatePlacedCards = Array.isArray(project.teammatePlacedCards) ? project.teammatePlacedCards : [];
+                        // 🟢 2026-11-06 载入旧项目时把工程英雄短名归一到官方名
+                        myHandCards = _normCardList(project.myHandCards);
+                        teammateHandCards = _normCardList(project.teammateHandCards);
+                        myPlacedCards = _normCardList(project.myPlacedCards);
+                        teammatePlacedCards = _normCardList(project.teammatePlacedCards);
                         cardLevels = project.cardLevels || {};
                         // 直接用项目自己的皮肤设置覆盖（避免上一个项目的皮肤串到这个项目）
                         cardSkins = project.cardSkins || {};
-                        window.fusionSkins = project.fusionSkins || {}; // 副卡皮肤按项目独立保存，不污染全局
+                        window.fusionSkins = _normHeroKeyed(project.fusionSkins); // 副卡皮肤按项目独立保存，不污染全局
                         cardMoHua = project.cardMoHua || {};
                         // 🚂 战车：按项目恢复（导入/打开项目时与分享方一致）
                         if (typeof applyChariotData === 'function') applyChariotData(project.myChariot, project.teammateChariot);
@@ -3115,13 +3186,14 @@
         // 把共享项目数据渲染到 UI（不写 IndexedDB）
         function _hubApplyProjectDataToUI(projectData, projectName, projectCategory) {
             clearCurrentData();
-            myHandCards = Array.isArray(projectData.myHandCards) ? projectData.myHandCards : [];
-            teammateHandCards = Array.isArray(projectData.teammateHandCards) ? projectData.teammateHandCards : [];
-            myPlacedCards = Array.isArray(projectData.myPlacedCards) ? projectData.myPlacedCards : [];
-            teammatePlacedCards = Array.isArray(projectData.teammatePlacedCards) ? projectData.teammatePlacedCards : [];
+            // 🟢 2026-11-06 共享/导入项目同样归一工程英雄名
+            myHandCards = _normCardList(projectData.myHandCards);
+            teammateHandCards = _normCardList(projectData.teammateHandCards);
+            myPlacedCards = _normCardList(projectData.myPlacedCards);
+            teammatePlacedCards = _normCardList(projectData.teammatePlacedCards);
             cardLevels = projectData.cardLevels || {};
             cardSkins = projectData.cardSkins || {};
-            window.fusionSkins = projectData.fusionSkins || {};
+            window.fusionSkins = _normHeroKeyed(projectData.fusionSkins);
             cardMoHua = projectData.cardMoHua || {};
             // 🚂 战车：共享/导入项目同样恢复战车设置（与分享方一致）
             if (typeof applyChariotData === 'function') applyChariotData(projectData.myChariot, projectData.teammateChariot);
@@ -4168,6 +4240,9 @@
                 return;
             }
 
+            // 🟢 2026-11-06 脚本里是老马短名（火炮…）→ 统一转官方名再查卡池
+            if (typeof normalizeScriptCardNames === 'function') heroNames = normalizeScriptCardNames(heroNames);
+
             // 限制最多10张
             if (heroNames.length > 10) {
                 heroNames = heroNames.slice(0, 10);
@@ -4842,6 +4917,8 @@
                 if (resultEl) resultEl.innerHTML = '<span style="color:#f44336;">未找到英雄名称！</span>';
                 return;
             }
+            // 🟢 2026-11-06 脚本里是老马短名（火炮…）→ 统一转官方名再查卡池
+            if (typeof normalizeScriptCardNames === 'function') heroNames = normalizeScriptCardNames(heroNames);
             if (heroNames.length > 10) heroNames = heroNames.slice(0, 10);
 
             const targetHand = target === 'my' ? myHandCards : teammateHandCards;
@@ -7259,6 +7336,9 @@
                 return;
             }
 
+            // 🟢 2026-11-06 脚本里是老马短名（火炮…）→ 统一转官方名再查卡池
+            if (typeof normalizeScriptCardNames === 'function') heroNames = normalizeScriptCardNames(heroNames);
+
             // 限制最多10张
             if (heroNames.length > 10) {
                 heroNames = heroNames.slice(0, 10);
@@ -7901,6 +7981,141 @@
         const MAX_HAND_CARDS = 10;
         const MAX_PLACED_CARDS = 7;
         
+        // ==================== 工程类英雄命名：全项目唯一映射（2026-11-06） ====================
+        // 规则（用户定稿）：
+        //   · 内部（数据表/卡池/属性/融合/识别）**一律用官方名**：邪能火炮 / 地精宝库 / 侏儒射线 / 微型潜艇；
+        //   · 老马侧（脚本输出、老马导出的数据源）用短名：火炮 / 宝库 / 射线 / 潜艇；
+        //   · 只在两个边界转换：① 读老马数据/识别 短→官方；② 生成脚本输出 官方→短。
+        // ⚠️ 工程英雄官方名都是 4 字，两卡融合后是 8 字（邪能火炮侏儒射线），
+        //    绝不能再用 substring(0,2)/substring(2) 硬切，必须按「英雄名分词 + 融合 components」解析。
+        const HERO_NAME_ALIAS = { '火炮': '邪能火炮', '宝库': '地精宝库', '射线': '侏儒射线', '潜艇': '微型潜艇' };
+        const HERO_NAME_ALIAS_REV = { '邪能火炮': '火炮', '地精宝库': '宝库', '侏儒射线': '射线', '微型潜艇': '潜艇' };
+        // 内置融合表：一律用「官方名 components」描述，key = 两段拼合。
+        // 工程融合 key 因此是 8 字（邪能火炮侏儒射线）——绝不能再按 substring(0,2)/substring(2) 硬切。
+        const BUILTIN_FUSION_PAIRS = [
+            ['邪能火炮', '侏儒射线'], ['侏儒射线', '微型潜艇'], ['邪能火炮', '微型潜艇'],
+            ['地精宝库', '侏儒射线'], ['地精宝库', '微型潜艇'], ['地精宝库', '邪能火炮'],
+            ['微型潜艇', '侏儒射线'], ['微型潜艇', '邪能火炮'], ['侏儒射线', '邪能火炮'],
+            ['水灵', '刀客'], ['刀客', '水灵'], ['蛇女', '爱神'], ['爱神', '蛇女'],
+            ['咕咕', '天使'], ['天使', '咕咕'], ['圣骑', '天使'], ['天使', '圣骑'],
+            ['战将', '鱼人'], ['鱼人', '战将'], ['电法', '冰法'], ['冰法', '电法'],
+            ['萌萌', '水灵'], ['水灵', '萌萌'], ['火灵', '风灵'], ['风灵', '火灵']
+        ];
+        let _builtinFusionMapCache = null;
+        function _builtinFusionMap() {
+            if (_builtinFusionMapCache) return _builtinFusionMapCache;
+            const m = new Map();
+            BUILTIN_FUSION_PAIRS.forEach(p => m.set(p[0] + p[1], p.slice()));
+            _builtinFusionMapCache = m;
+            return m;
+        }
+        // 云端融合表归一：key 与 components 全部转官方名。
+        // 旧缓存（tfjl_cloud_fusions）里是短名 → 不转换会导致 getAllFusionNames 返回两套、融合按钮重复。
+        function normalizeFusionTable(src) {
+            if (!src || typeof src !== 'object') return src || {};
+            const out = {};
+            Object.keys(src).forEach(k => {
+                const def = src[k] || {};
+                const comps = Array.isArray(def.components) ? def.components.map(toOfficialHeroName) : def.components;
+                const key = Array.isArray(comps) && comps.length >= 2 ? comps.join('') : toOfficialHeroName(k);
+                out[key] = Object.assign({}, def, comps ? { components: comps } : {});
+            });
+            return out;
+        }
+        try { window.normalizeFusionTable = normalizeFusionTable; } catch (e) {}
+        // 官方工程名静态兜底：即使 heroesOfficialMap / 注册表还没加载完，也必须能整名匹配，
+        // 否则「地精宝库」会被拆成 [地精] + [宝库] 变成「地精地精宝库」。
+        const _HERO_NAME_BASE = ['邪能火炮', '地精宝库', '侏儒射线', '微型潜艇', '咬人娃娃'];
+        const _HERO_NAME_SET = new Set(_HERO_NAME_BASE.concat(Object.keys(HERO_NAME_ALIAS)));
+
+        function _heroNameSet() {
+            try { Object.keys(DEFAULT_CARD_SKINS).forEach(n => _HERO_NAME_SET.add(n)); } catch (e) {}
+            try { Object.keys(SKIN_ATTRIBUTES).forEach(n => _HERO_NAME_SET.add(n)); } catch (e) {}
+            try { Object.keys(window.heroesOfficialMap || {}).forEach(n => _HERO_NAME_SET.add(n)); } catch (e) {}
+            try { Object.keys(window.skinRegistry || {}).forEach(n => _HERO_NAME_SET.add(n)); } catch (e) {}
+            try { Object.keys(window.cloudCards || {}).forEach(n => _HERO_NAME_SET.add(n)); } catch (e) {}
+            try {
+                document.querySelectorAll('.card-item[data-name]').forEach(el => {
+                    const n = el.getAttribute('data-name');
+                    if (n) _HERO_NAME_SET.add(n);
+                });
+            } catch (e) {}
+            return _HERO_NAME_SET;
+        }
+
+        // 短名 → 官方名；也支持「融合串」整体转换（火炮射线 → 邪能火炮侏儒射线）。
+        // 无法整串切分（如皮肤名「龙吼·邪能火炮」）时原样返回，避免误伤。
+        function toOfficialHeroName(name) {
+            if (!name) return name;
+            const s0 = String(name).trim();
+            if (!s0) return s0;
+            if (HERO_NAME_ALIAS[s0]) return HERO_NAME_ALIAS[s0];
+            if (_HERO_NAME_BASE.indexOf(s0) >= 0) return s0;
+            const dict = _heroNameSet();
+            // 已能整体命中已知英雄 → 直接返回（避免把「地精宝库」拆成「地精」+「宝库」）
+            if (dict.has(s0) && !HERO_NAME_ALIAS[s0]) return s0;
+            const parts = [];
+            let i = 0;
+            while (i < s0.length) {
+                let matched = false;
+                for (let len = Math.min(4, s0.length - i); len >= 1; len--) {
+                    const piece = s0.substring(i, i + len);
+                    if (dict.has(piece)) {
+                        parts.push(HERO_NAME_ALIAS[piece] || piece);
+                        i += len;
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched) return s0;   // 无法完整切分 → 原样返回
+            }
+            return parts.length ? parts.join('') : s0;
+        }
+
+        // 官方名 → 老马短名（脚本输出/写老马数据时用），同样支持融合串
+        function toLamaHeroName(name) {
+            if (!name) return name;
+            return String(name).replace(/邪能火炮|地精宝库|侏儒射线|微型潜艇/g, m => HERO_NAME_ALIAS_REV[m] || m);
+        }
+        // 🟢 2026-11-06 脚本导入手牌边界：老马脚本里是短名（火炮/宝库/射线/潜艇），
+        //   卡池/手牌/皮肤一律用官方名 → 导入时必须先转官方名再查卡池，否则「火炮」查不到卡。
+        function normalizeScriptCardNames(list) {
+            if (!Array.isArray(list)) return [];
+            return list.map((n) => toOfficialHeroName(String(n == null ? '' : n).trim())).filter(Boolean);
+        }
+        // 🟢 2026-11-06 减伤「洗炼」表读值的键兼容：工程英雄卡名改为官方名（地精宝库）后，
+        //   历史表里仍存着短名键（宝库）→ 先按官方名读，读不到再按短名兜底，老数据不丢。
+        function drRefineVal(tb, name) {
+            if (!tb || !name) return 0;
+            if (tb[name] !== undefined && tb[name] !== null && tb[name] !== '') return Number(tb[name]) || 0;
+            if (typeof toLamaHeroName === 'function') {
+                const s = toLamaHeroName(name);
+                if (s !== name && tb[s] !== undefined && tb[s] !== null && tb[s] !== '') return Number(tb[s]) || 0;
+            }
+            return 0;
+        }
+        try {
+            window.toOfficialHeroName = toOfficialHeroName;
+            window.toLamaHeroName = toLamaHeroName;
+            window.normalizeScriptCardNames = normalizeScriptCardNames;
+            window.drRefineVal = drRefineVal;
+        } catch (e) {}
+
+        // 历史项目/共享项目里存的是短名（火炮）→ 载入时就地转官方名，保证后续皮肤/魔化/融合判定一致
+        function _normCardList(list) {
+            if (!Array.isArray(list)) return [];
+            return list.map(c => (c && c.name) ? Object.assign({}, c, { name: toOfficialHeroName(c.name) }) : c);
+        }
+        function _normHeroKeyed(obj) {
+            if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj || {};
+            const out = {};
+            Object.keys(obj).forEach(k => {
+                const t = toOfficialHeroName(k);
+                if (out[t] === undefined) out[t] = obj[k];
+            });
+            return out;
+        }
+
         // ==================== 卡牌皮肤定义 ====================
         // 默认皮肤列表（每个英雄的基础皮肤）
         const DEFAULT_CARD_SKINS = {
@@ -7908,16 +8123,16 @@
             "鱼人": ["默认", "小鱼儿·鱼人", "张顺·鱼人", "甘宁·鱼人", "梁宽·鱼人", "田伯光·鱼人"],
             "风灵": ["默认", "太平乐·风灵"],
             "圣骑": ["默认", "无头骑士·圣骑", "孙权·圣骑", "风暴·圣骑"],
-            "射线": ["默认", "雷峰塔·侏儒射线", "剑冢·侏儒射线", "日晷·侏儒射线"],
-            "宝库": ["默认", "金刚石·地精宝库", "暗月·地精宝库"],
-            "潜艇": ["默认", "鲨鱼号·微型潜艇"],
+            "侏儒射线": ["默认", "雷峰塔·侏儒射线", "剑冢·侏儒射线", "日晷·侏儒射线"],
+            "地精宝库": ["默认", "金刚石·地精宝库", "暗月·地精宝库"],
+            "微型潜艇": ["默认", "鲨鱼号·微型潜艇"],
             "死神": ["默认", "万圣节·死神", "粉色南瓜·死神"],
             "酋长": ["默认", "奶牛·酋长", "粉色奶牛·酋长"],
             "电法": ["默认", "水娃·电法", "戴宗·电法", "春香·电法", "华山掌门·电法"],
             "火灵": ["默认", "谢晓峰·火灵", "张飞·火灵", "太平乐·火灵", "令狐冲·火灵"],
             "战将": ["默认", "虹猫·战将", "刀马·战将", "冰雪·战将", "许仕林·战将", "许仙·战将", "萧十一郎·战将", "武松·战将", "吕布·战将", "风暴·战将", "黄飞鸿·战将", "林平之·战将"],
             "咕咕": ["默认", "虚空兽·咕咕", "老爷爷·咕咕", "天机星·咕咕", "宋江·咕咕", "华佗·咕咕", "华夫人·咕咕", "深海异兽·咕咕", "太平乐·咕咕", "少林掌门·咕咕"],
-            "火炮": ["默认", "龙吼·邪能火炮", "小李飞刀·邪能火炮", "尚方宝剑·邪能火炮"],
+            "邪能火炮": ["默认", "龙吼·邪能火炮", "小李飞刀·邪能火炮", "尚方宝剑·邪能火炮"],
             "水灵": ["默认", "潮汐·水灵", "刘备·水灵", "太平乐·水灵"],
             "萌萌": ["默认", "冰雪·萌萌", "唐三藏·萌萌", "武大郎·萌萌", "诸葛亮·萌萌", "太平乐·萌萌", "烈火奶奶·萌萌"],
             "小野": ["默认", "小七·小野", "万圣甜心·小野", "紫霞仙子·小野", "沈璧君·小野", "万圣女巫·小野", "貂蝉·小野", "秋香·小野", "十三姨·小野", "太平乐·小野", "仪琳·小野"]
@@ -7982,6 +8197,9 @@
             Object.keys(DEFAULT_CARD_SKINS).forEach(n => set.add(n));
             Object.keys(SKIN_ATTRIBUTES).forEach(n => set.add(n));
             if (window.cloudCards) Object.keys(window.cloudCards).forEach(n => set.add(n));
+            // 🟢 2026-11-06 旧短名（火炮/宝库/射线/潜艇）也并入分词表：
+            //    老马数据/旧项目/旧脚本里仍是短名，融合串「火炮射线」要能拆成 [火炮,射线] 再转官方名。
+            Object.keys(HERO_NAME_ALIAS).forEach(n => set.add(n));
             return set;
         }
 
@@ -8020,40 +8238,28 @@
 
         function getMainCardName(cardName) {
             if (!cardName) return cardName;
-            // 云端已启用(有≥1条融合定义)时，严格只认云端：云端定义的融合卡取主卡(part[0])，
-            // 其余一律按单卡/英雄名返回，禁用内置硬编码融合表与兜底拆分，避免假融合卡污染。
-            const cloudEnabled = window.cloudFusions && typeof window.cloudFusions === 'object' && Object.keys(window.cloudFusions).length > 0;
-            if (cloudEnabled) {
-                const cf = window.cloudFusions[cardName];
-                if (cf && Array.isArray(cf.components) && cf.components.length >= 2) return cf.components[0];
-                // 云端未收录 → 回退内置识别（fusionCards 表 + splitIntoHeroes），
-                // 避免内置融合卡(死神海妖/小野酋长/咕咕萨满等)被当单卡导致皮肤全丢(2026-08-08 回归)
-            }
-            const fusionCards = [
-                '火炮射线', '射线潜艇', '火炮潜艇', '宝库射线', '宝库潜艇', '宝库火炮',
-                '潜艇射线', '潜艇火炮', '射线火炮',
-                '水灵刀客', '刀客水灵', '蛇女爱神', '爱神蛇女',
-                '咕咕天使', '天使咕咕', '圣骑天使', '天使圣骑',
-                '战将鱼人', '鱼人战将', '电法冰法', '冰法电法',
-                '萌萌水灵', '水灵萌萌', '火灵风灵', '风灵火灵'
-            ];
-            if (fusionCards.includes(cardName)) {
-                return cardName.substring(0, 2);
-            }
+            // 🟢 2026-11-06 入口统一规范：短名/旧融合名 → 官方名（火炮射线 → 邪能火炮侏儒射线）
+            const name = toOfficialHeroName(cardName);
+            // 云端融合定义优先（管理员维护，components 已是官方名）
+            const cf = window.cloudFusions && typeof window.cloudFusions === 'object' ? window.cloudFusions[name] : null;
+            if (cf && Array.isArray(cf.components) && cf.components.length >= 2) return toOfficialHeroName(cf.components[0]);
+            // 内置融合表（按 components 解析，不用 substring —— 工程官方名 4 字，融合后 8 字）
+            const builtin = _builtinFusionMap().get(name);
+            if (builtin) return builtin[0];
             const heroSet = getAllHeroNames();
             // 官方英雄整名（含工程类 4 字卡）→ 单卡
-            if (isOfficialSingleCard(cardName)) return cardName;
+            if (isOfficialSingleCard(name)) return name;
             // 单卡：直接返回
-            if (heroSet.has(cardName)) return cardName;
+            if (heroSet.has(name)) return name;
             // 通用融合检测：术士等"1字英雄组成的2字融合"(如 影魇) 也能识别，返回第一个英雄
-            const parts = splitIntoHeroes(cardName, heroSet);
-            if (parts.length >= 2) return parts[0];
+            const parts = splitIntoHeroes(name, heroSet);
+            if (parts.length >= 2) return toOfficialHeroName(parts[0]);
             // 兼容旧逻辑：4字融合且前2字为已知英雄
-            if (cardName.length === 4 && !DEFAULT_CARD_SKINS[cardName]) {
-                const firstTwo = cardName.substring(0, 2);
-                if (heroSet.has(firstTwo)) return firstTwo;
+            if (name.length === 4 && !DEFAULT_CARD_SKINS[name]) {
+                const firstTwo = name.substring(0, 2);
+                if (heroSet.has(firstTwo)) return toOfficialHeroName(firstTwo);
             }
-            return cardName;
+            return name;
         }
 
         // ===== 融合卡对角切割皮肤 =====
@@ -8072,27 +8278,17 @@
         // 🔴 2026-10-22 内置融合表（游戏原生融合卡，双方向各算一张）。政策修订：融合名单 = 云端 fusions.json ∪ 内置表。
         //   旧政策"严格只认云端"导致 fusions.json 为空时所有英雄都没有融合按钮/变体列表，
         //   拖单卡完全无法融合（2026-10-22 用户反馈）。云端管理员定义仍然全部叠加、优先解析。
-        const BUILTIN_FUSION_CARDS = [
-            '火炮射线', '射线潜艇', '火炮潜艇', '宝库射线', '宝库潜艇', '宝库火炮',
-            '潜艇射线', '潜艇火炮', '射线火炮',
-            '水灵刀客', '刀客水灵', '蛇女爱神', '爱神蛇女',
-            '咕咕天使', '天使咕咕', '圣骑天使', '天使圣骑',
-            '战将鱼人', '鱼人战将', '电法冰法', '冰法电法',
-            '萌萌水灵', '水灵萌萌', '火灵风灵', '风灵火灵'
-        ];
         function getFusionParts(cardName) {
             if (!cardName) return null;
-            // 云端融合定义优先（管理员维护，含2基础卡校验）
-            if (window.cloudFusions && window.cloudFusions[cardName] && Array.isArray(window.cloudFusions[cardName].components) && window.cloudFusions[cardName].components.length >= 2) {
-                return window.cloudFusions[cardName].components.slice();
+            // 🟢 2026-11-06 入口统一规范：旧短融合名（火炮射线）→ 官方 8 字融合名（邪能火炮侏儒射线）
+            const name = toOfficialHeroName(cardName);
+            // 云端融合定义优先（管理员维护，components 已是官方名）
+            if (window.cloudFusions && window.cloudFusions[name] && Array.isArray(window.cloudFusions[name].components) && window.cloudFusions[name].components.length >= 2) {
+                return window.cloudFusions[name].components.map(toOfficialHeroName);
             }
-            // 云端优先，但云端未收录的内置/兜底融合卡回退内置识别（fusionCards 表 + splitIntoHeroes）。
-            // 若云端只收录部分融合卡仍"严格只认云端"，其余内置融合卡(死神海妖/小野酋长/咕咕萨满等)
-            // 会被当单卡 → 融合皮肤全丢(2026-08-08 用户反馈回归)。内置识别即云端未启用时的既有可靠逻辑。
-            const fusionCards = BUILTIN_FUSION_CARDS;
-            if (fusionCards.includes(cardName)) {
-                return [cardName.substring(0, 2), cardName.substring(2)];
-            }
+            // 内置融合表（components 解析）
+            const builtin = _builtinFusionMap().get(name);
+            if (builtin) return builtin.slice();
             const heroSet = getAllHeroNames();
             // 🔴 2026-08-30 加固：把「皮肤库已注册英雄名」也并入拆分用 heroSet。
             //    原因：融合副英雄(海妖/萨满等)只要有皮肤就必然出现在 window.skinRegistry 的键里，
@@ -8104,14 +8300,14 @@
             //    真单卡（如 咬人娃娃）整名已录入 DEFAULT_CARD_SKINS / cloudCards（二者都进 heroSet），
             //    一旦在 heroSet 中即直接判单卡返回 null，避免 splitIntoHeroes 按前缀把它拆成 [咬人,娃娃] 误判融合。
             //    即便某真单卡意外没进 heroSet，也显式再查一次 DEFAULT_CARD_SKINS / cloudCards 兜底拦截。
-            if (isOfficialSingleCard(cardName)) return null;
-            if (heroSet.has(cardName)) return null;
-            if (DEFAULT_CARD_SKINS[cardName] || (window.cloudCards && window.cloudCards[cardName])) return null;
-            const parts = splitIntoHeroes(cardName, heroSet);
-            if (parts.length >= 2) return parts;
+            if (isOfficialSingleCard(name)) return null;
+            if (heroSet.has(name)) return null;
+            if (DEFAULT_CARD_SKINS[name] || (window.cloudCards && window.cloudCards[name])) return null;
+            const parts = splitIntoHeroes(name, heroSet);
+            if (parts.length >= 2) return parts.map(toOfficialHeroName);
             // 兜底：4字融合且前2字为已知英雄（已排除整名是真单卡的情况）
-            if (cardName.length === 4 && !DEFAULT_CARD_SKINS[cardName] && !(window.cloudCards && window.cloudCards[cardName]) && heroSet.has(cardName.substring(0, 2))) {
-                return [cardName.substring(0, 2), cardName.substring(2)];
+            if (name.length === 4 && !DEFAULT_CARD_SKINS[name] && !(window.cloudCards && window.cloudCards[name]) && heroSet.has(name.substring(0, 2))) {
+                return [name.substring(0, 2), name.substring(2)].map(toOfficialHeroName);
             }
             return null;
         }
@@ -8169,7 +8365,8 @@
         //   注：BUILTIN_FUSION_CARDS 仅供 getFusionParts 解析历史融合名用，不参与名单枚举。
         function getAllFusionNames() {
             const names = new Set();
-            if (window.cloudFusions) Object.keys(window.cloudFusions).forEach(n => names.add(n));
+            // 云端缓存可能是旧短名键（tfjl_cloud_fusions）→ 统一转官方名后去重
+            if (window.cloudFusions) Object.keys(window.cloudFusions).forEach(n => names.add(toOfficialHeroName(n)));
             return [...names];
         }
         // 🔴 2026-09-22 阵容图库复用主页融合体系（现成数据，用户要求"直接拿过来用"）：只暴露，不改逻辑
@@ -8186,10 +8383,11 @@
         // 基础英雄 → 以其为主卡(part[0])的融合卡列表
         function getFusionVariantsForBase(baseHero) {
             if (!baseHero) return [];
+            const base = toOfficialHeroName(baseHero);   // 卡池/旧数据可能传短名
             const out = new Set();
             getAllFusionNames().forEach(fn => {
                 const parts = (typeof getFusionParts === 'function') ? getFusionParts(fn) : null;
-                if (parts && parts.length >= 2 && parts[0] === baseHero) out.add(fn);
+                if (parts && parts.length >= 2 && parts[0] === base) out.add(fn);
             });
             return [...out];
         }
@@ -9472,20 +9670,20 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 "风暴·圣骑": { desc: "额外被动：满星后，己方天使获得祝福，攻速+300%" },
                 "魔化": { desc: "每次攻击后使所在战车攻击最高的英雄连击次数+1(仅对连击英雄有效，且优先连击英雄)，持续6秒" }
             },
-            "射线": {
+            "侏儒射线": {
                 "默认": { desc: "技能:安装在战车前部，无法主动攻击。\n初始被动(光环) 真实伤害减免+35%，且敌方攻击-20%（唯一）\n满星被动(光环) 真实伤害减免+70%，且敌方攻击-20%（唯一）" },
                 "雷峰塔·侏儒射线": { desc: "额外被动：光环：真实伤害减免+5%，且附加伤害减免+25%" },
                 "剑冢·侏儒射线": { desc: "额外被动：光环：真实伤害减免" },
                 "日晷·侏儒射线": { desc: "额外被动：将敌方战车上攻击最高的英雄技能百分比变为50%" },
                 "魔化": { desc: "光环：真实伤害减免+5%" }
             },
-            "宝库": {
+            "地精宝库": {
                 "默认": { desc: "技能:安装在战车前部，无法主动攻击。\n初始被动 每9秒为所在战车提供1%*银币数量的银币\n满星被动 每9秒为所在战车提供1.5%*银币数量的银币" },
                 "金刚石·地精宝库": { desc: "额外被动：每100银币战车伤害减免+0.01%" },
                 "暗月·地精宝库": { desc: "额外被动：每100银币战车伤害减免+0.02%" },
                 "魔化": { desc: "每10000银币，全体附加伤害加成+1%" }
             },
-            "潜艇": {
+            "微型潜艇": {
                 "默认": { desc: "技能:安装在战车前部，无法主动攻击。\n初始被动(光环) 百分比伤害减免+30%，且水下作战时氧气不再消耗（唯一）\n满星被动(光环) 百分比伤害减免+60%，且水下作战时氧气不再消耗（唯一）" },
                 "鲨鱼号·微型潜艇": { desc: "额外被动：光环：百分比伤害减免+10%" },
                 "魔化": { desc: "光环：百分比伤害减免+10%" }
@@ -9546,7 +9744,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 "少林掌门·咕咕": { desc: "额外被动：己方每上阵一个职业核心，全体附加伤害加成+30%" },
                 "魔化": { desc: "己方每上阵一个魔化英雄，全体附加伤害加成+10%" }
             },
-            "火炮": {
+            "邪能火炮": {
                 "默认": { desc: "技能:安装在战车前部，对范围目标造成150%攻击伤害。\n初始被动 每次攻击后增加自身8%攻击\n满星被动 每次攻击后增加自身15%攻击，1%攻速" },
                 "龙吼·邪能火炮": { desc: "额外被动：基础攻速+25%" },
                 "小李飞刀·邪能火炮": { desc: "额外被动：战斗中每秒自身伤害加成+0.8%，且攻击必定命中" },
@@ -11238,7 +11436,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             '</div></div>'
                     }
                     const drT = getDrTable(drSide)
-                    const drVal = (drT.洗炼 && drT.洗炼[mainName] != null) ? drT.洗炼[mainName] : null
+                    const drVal = (drT.洗炼 && drT.洗炼[mainName] != null) ? drT.洗炼[mainName] : ((typeof drRefineVal === 'function' && drRefineVal(drT.洗炼, mainName) > 0) ? drRefineVal(drT.洗炼, mainName) : null)
                     const ex = (window.cardWashExtras || {})[mainName] || {}
                     const seg = (label, val) => '<span style="white-space:nowrap;"><b style="color:#ffd75e;font-weight:800;">' + label + '</b> ' + val + '</span>'
                     const washes = seg('减伤', drVal != null ? drVal + '%' : '—') +
@@ -11465,7 +11663,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 pop.appendChild(row2)
                 let cur = WASH_ATTRS[0]
                 const readVal = (a) => {
-                    if (a.computed) { const tb = getDrTable(drSide); return (tb.洗炼 && tb.洗炼[mainName] != null) ? Number(tb.洗炼[mainName]) : 0 }
+                    if (a.computed) { const tb = getDrTable(drSide); return (typeof drRefineVal === 'function') ? drRefineVal(tb.洗炼, mainName) : ((tb.洗炼 && tb.洗炼[mainName] != null) ? Number(tb.洗炼[mainName]) : 0) }
                     return Number(ex[a.key]) || 0
                 }
                 const writeVal = (a, v) => {
@@ -13017,7 +13215,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         const drInput = box.querySelector('#csDrInput');
                         if (drInput) {
                             const drTable = (window.drTables && window.drTables[_csResolveDrTableName()]) || { 洗炼: {} };
-                            drInput.value = (drTable.洗炼 && baseHero && drTable.洗炼[baseHero] !== undefined) ? drTable.洗炼[baseHero] : '';
+                            drInput.value = (drTable.洗炼 && baseHero && drTable.洗炼[baseHero] !== undefined) ? drTable.洗炼[baseHero] : ((typeof drRefineVal === 'function' && baseHero && drRefineVal(drTable.洗炼, baseHero) > 0) ? drRefineVal(drTable.洗炼, baseHero) : '');
                         }
                     };
                     fvWrap.appendChild(b);
@@ -13240,7 +13438,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             try {
                 const _drTableName = _csResolveDrTableName();
                 const drTable = (window.drTables && window.drTables[_drTableName]) || { 洗炼: {} };
-                const drVal = (drTable.洗炼 && baseHero && drTable.洗炼[baseHero] !== undefined) ? drTable.洗炼[baseHero] : '';
+                const drVal = (drTable.洗炼 && baseHero && drTable.洗炼[baseHero] !== undefined) ? drTable.洗炼[baseHero] : ((typeof drRefineVal === 'function' && baseHero && drRefineVal(drTable.洗炼, baseHero) > 0) ? drRefineVal(drTable.洗炼, baseHero) : '');
                 const drTitle = document.createElement('div');
                 drTitle.id = 'csDrSection';
                 drTitle.style.cssText = 'color:#ffd700;margin:14px 0 6px;border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;';
@@ -16100,11 +16298,11 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 { name: '火灵', profession: 'panda' },
                 { name: '风灵', profession: 'panda' },
                 // 金卡 - 工程
-                { name: '火炮', profession: 'engineering' },
-                { name: '宝库', profession: 'engineering' },
-                { name: '射线', profession: 'engineering' },
+                { name: '邪能火炮', profession: 'engineering' },
+                { name: '地精宝库', profession: 'engineering' },
+                { name: '侏儒射线', profession: 'engineering' },
                 { name: '咬人娃娃', profession: 'engineering' },
-                { name: '潜艇', profession: 'engineering' },
+                { name: '微型潜艇', profession: 'engineering' },
                 // 紫卡 - 战士
                 { name: '铁骑', profession: 'warrior' },
                 { name: '剑客', profession: 'warrior' },
@@ -16321,8 +16519,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             const isFav = c => favs.indexOf(c) >= 0;
 
             const renderRow = (cardName) => {
-                const value = currentData[cardName] || 0;
-                const isSpecial = ['小野', '酋长', '宝库'].includes(cardName);
+                const value = (typeof drRefineVal === 'function') ? drRefineVal(currentData, cardName) : (currentData[cardName] || 0);
+                const isSpecial = ['小野', '酋长', '宝库'].includes((typeof toLamaHeroName === 'function') ? toLamaHeroName(cardName) : cardName);
                 const starred = isFav(cardName);
                 return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-radius:6px;${isSpecial ? 'background:rgba(255,152,0,0.12);border:1px solid rgba(255,152,0,0.45);' : 'background:rgba(255,255,255,0.05);'}">
                     <span style="color:#fff;font-size:0.85rem;">${escapeHtml(cardName)}${isSpecial ? ' <span style="color:#ff9800;font-size:0.7rem;">(自身洗炼)</span>' : ''}</span>
@@ -16663,7 +16861,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     } else {
                         usedKey = parts[0];
                         // 回退：非分隔符融合卡（如"火炮射线"）→ 匹配基础卡（如"火炮"）
-                        if (tableData[usedKey] === undefined || tableData[usedKey] <= 0) {
+                        if (!(drRefineVal(tableData, usedKey) > 0)) {
                             const baseCard = findBaseCardInFusion(usedKey, tableData);
                             if (baseCard) usedKey = baseCard;
                         }
@@ -16672,8 +16870,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     if (!seenCards.has(usedKey)) {
                         seenCards.add(usedKey);
                         // 洗炼减伤永远只算主卡（usedKey=parts[0] 天然排除副卡洗炼）
-                        if (tableData[usedKey] && tableData[usedKey] > 0) {
-                            const v = tableData[usedKey];
+                        if (drRefineVal(tableData, usedKey) > 0) {
+                            const v = drRefineVal(tableData, usedKey);
                             bd.refine += v;
                             bd.total += v;
                         }
@@ -16938,7 +17136,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     } else {
                         usedKey = parts[0];
                         // 回退：非分隔符融合卡（如"火炮射线"）→ 匹配基础卡（如"火炮"）
-                        if (tableData[usedKey] === undefined || tableData[usedKey] <= 0) {
+                        if (!(drRefineVal(tableData, usedKey) > 0)) {
                             const baseCard = findBaseCardInFusion(usedKey, tableData);
                             if (baseCard) usedKey = baseCard;
                         }
@@ -16948,8 +17146,8 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         seenCards.add(usedKey);
                         // 洗炼减伤永远只算主卡（usedKey=parts[0] 天然排除副卡洗炼）；
                         // 小野/酋长/宝库的技能减伤走下方共享技能栏（出现就算，哪怕副卡），此处不混入。
-                        if (tableData[usedKey] && tableData[usedKey] > 0) {
-                            total += tableData[usedKey];
+                        if (drRefineVal(tableData, usedKey) > 0) {
+                            total += drRefineVal(tableData, usedKey);
                         }
                     }
 

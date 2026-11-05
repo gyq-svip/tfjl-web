@@ -7231,23 +7231,18 @@
                 return null;
             }
 
+            // 🟢 2026-11-06 脚本导入手牌边界：老马脚本里是短名（火炮/宝库/射线/潜艇），
+            //   卡池/手牌统一用官方名 → 先转官方名再查 `.card-item[data-name]`，否则「火炮」查不到卡。
+            if (typeof normalizeScriptCardNames === 'function') heroNames = normalizeScriptCardNames(heroNames);
+
             // 过滤融合卡（融合卡不能用于脚本，需拆分为单卡）
-            const fusionNames = [
-                '火炮射线', '射线潜艇', '火炮潜艇', '宝库射线', '宝库潜艇', '宝库火炮',
-                '潜艇射线', '潜艇火炮', '射线火炮',
-                '水灵刀客', '刀客水灵', '蛇女爱神', '爱神蛇女',
-                '咕咕天使', '天使咕咕', '圣骑天使', '天使圣骑',
-                '战将鱼人', '鱼人战将', '电法冰法', '冰法电法',
-                '萌萌水灵', '水灵萌萌', '火灵风灵', '风灵火灵'
-            ];
+            // 🟢 2026-11-06 改为按「英雄名 components」判定，不再用「长度为4且为偶数 + 前2后2都是英雄」硬切：
+            //    · 工程官方名本身就是 4 字、融合后是 8 字；
+            //    · 「地精宝库」前两字「地精」恰是独立英雄，旧算法会把它误判成融合卡整张丢弃（用户实测）。
             const filteredFusion = [];
             heroNames = heroNames.filter(name => {
-                const isFusion = fusionNames.includes(name) ||
-                    (name.length >= 4 && name.length % 2 === 0 &&
-                     !Object.keys(SKIN_ATTRIBUTES).includes(name) &&
-                     Object.keys(SKIN_ATTRIBUTES).includes(name.substring(0, 2)) &&
-                     Object.keys(SKIN_ATTRIBUTES).includes(name.substring(2)));
-                if (isFusion) {
+                const parts = (typeof getFusionParts === 'function') ? getFusionParts(name) : null;
+                if (parts && parts.length >= 2) {
                     filteredFusion.push(name);
                     return false;
                 }
@@ -7501,23 +7496,13 @@
             }
 
             // 过滤融合卡（融合卡不能用于脚本，需拆分为单卡）
-            const fusionNames = [
-                '火炮射线', '射线潜艇', '火炮潜艇', '宝库射线', '宝库潜艇', '宝库火炮',
-                '潜艇射线', '潜艇火炮', '射线火炮',
-                '水灵刀客', '刀客水灵', '蛇女爱神', '爱神蛇女',
-                '咕咕天使', '天使咕咕', '圣骑天使', '天使圣骑',
-                '战将鱼人', '鱼人战将', '电法冰法', '冰法电法',
-                '萌萌水灵', '水灵萌萌', '火灵风灵', '风灵火灵'
-            ];
-            const allSkinKeys = Object.keys(SKIN_ATTRIBUTES);
+            // 🟢 2026-11-06 改为按「英雄名 components」判定，不再用「长度为4且为偶数 + 前2后2都是英雄」硬切：
+            //    · 工程官方名本身就是 4 字、融合后是 8 字；
+            //    · 「地精宝库」前两字「地精」恰是独立英雄，旧算法会把它误判成融合卡整张丢弃（用户实测）。
             const filteredFusion = [];
             heroNames = heroNames.filter(name => {
-                const isFusion = fusionNames.includes(name) ||
-                    (name.length >= 4 && name.length % 2 === 0 &&
-                     !allSkinKeys.includes(name) &&
-                     allSkinKeys.includes(name.substring(0, 2)) &&
-                     allSkinKeys.includes(name.substring(2)));
-                if (isFusion) {
+                const parts = (typeof getFusionParts === 'function') ? getFusionParts(name) : null;
+                if (parts && parts.length >= 2) {
                     filteredFusion.push(name);
                     return false;
                 }
@@ -7846,8 +7831,11 @@
         //    识别 / 显示 / 手牌仍用官方名（邪能火炮等），生成的脚本一律适配老马（火炮等）。
         function toLaoMaScriptName(s) {
             if (!s) return s;
-            const MAP = { '邪能火炮':'火炮', '地精宝库':'宝库', '侏儒射线':'射线', '微型潜艇':'潜艇', '咬人娃娃':'咬人娃娃' };
-            return String(s).replace(/邪能火炮|地精宝库|侏儒射线|微型潜艇|咬人娃娃/g, m => MAP[m] || m);
+            // 统一走 app-core 的唯一映射（官方名 → 老马短名），避免两处表各自维护漂移。
+            // 8 字融合名同样适用：邪能火炮侏儒射线 → 火炮射线。
+            if (typeof toLamaHeroName === 'function') return toLamaHeroName(s);
+            const MAP = { '邪能火炮':'火炮', '地精宝库':'宝库', '侏儒射线':'射线', '微型潜艇':'潜艇' };
+            return String(s).replace(/邪能火炮|地精宝库|侏儒射线|微型潜艇/g, m => MAP[m] || m);
         }
 
         // 共用收尾：计算总减伤 + 渲染结果面板
@@ -7997,23 +7985,13 @@
             }
 
             // 过滤融合卡（融合卡不能用于脚本，需拆分为单卡）
-            const fusionNames = [
-                '火炮射线', '射线潜艇', '火炮潜艇', '宝库射线', '宝库潜艇', '宝库火炮',
-                '潜艇射线', '潜艇火炮', '射线火炮',
-                '水灵刀客', '刀客水灵', '蛇女爱神', '爱神蛇女',
-                '咕咕天使', '天使咕咕', '圣骑天使', '天使圣骑',
-                '战将鱼人', '鱼人战将', '电法冰法', '冰法电法',
-                '萌萌水灵', '水灵萌萌', '火灵风灵', '风灵火灵'
-            ];
-            const allSkinKeys = Object.keys(SKIN_ATTRIBUTES);
+            // 🟢 2026-11-06 改为按「英雄名 components」判定，不再用「长度为4且为偶数 + 前2后2都是英雄」硬切：
+            //    · 工程官方名本身就是 4 字、融合后是 8 字；
+            //    · 「地精宝库」前两字「地精」恰是独立英雄，旧算法会把它误判成融合卡整张丢弃（用户实测）。
             const filteredFusion = [];
             heroNames = heroNames.filter(name => {
-                const isFusion = fusionNames.includes(name) ||
-                    (name.length >= 4 && name.length % 2 === 0 &&
-                     !allSkinKeys.includes(name) &&
-                     allSkinKeys.includes(name.substring(0, 2)) &&
-                     allSkinKeys.includes(name.substring(2)));
-                if (isFusion) {
+                const parts = (typeof getFusionParts === 'function') ? getFusionParts(name) : null;
+                if (parts && parts.length >= 2) {
                     filteredFusion.push(name);
                     return false;
                 }

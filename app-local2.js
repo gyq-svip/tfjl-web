@@ -4475,7 +4475,11 @@ if (true) {
         try {
             if (!window.cloudFusions || !Object.keys(window.cloudFusions).length) {
                 const c = _readCloudJson('tfjl_cloud_fusions');
-                if (c) { window.cloudFusions = c; console.log('[SKIN] cloud fusions 从本地缓存恢复:', Object.keys(c).length, '条（网络恢复后会自动更新）'); }
+                if (c) {
+                    // 🟢 2026-11-06 旧缓存可能是短名键 → 归一为官方名
+                    window.cloudFusions = (typeof window.normalizeFusionTable === 'function') ? window.normalizeFusionTable(c) : c;
+                    console.log('[SKIN] cloud fusions 从本地缓存恢复:', Object.keys(window.cloudFusions).length, '条（网络恢复后会自动更新）');
+                }
             }
             if (!window.cloudCards || !Object.keys(window.cloudCards).length) {
                 const c = _readCloudJson('tfjl_cloud_cards');
@@ -4547,9 +4551,10 @@ if (true) {
                 if (fResp.ok) {
                     const fData = await fResp.json();
                     if (fData && fData.fusions) {
-                        window.cloudFusions = fData.fusions;
-                        _cacheCloudJson('tfjl_cloud_fusions', fData.fusions);
-                        console.log('[SKIN] cloud fusions loaded:', Object.keys(fData.fusions).length);
+                        // 🟢 2026-11-06 融合表键/components 统一官方名
+                        window.cloudFusions = (typeof window.normalizeFusionTable === 'function') ? window.normalizeFusionTable(fData.fusions) : fData.fusions;
+                        _cacheCloudJson('tfjl_cloud_fusions', window.cloudFusions);
+                        console.log('[SKIN] cloud fusions loaded:', Object.keys(window.cloudFusions).length);
                         if (typeof window.renderFusionCardsToPool === 'function') window.renderFusionCardsToPool();
                         // 🔴 2026-10-20 云端融合定义更新 → 英雄面板「融合对象」切换行重建（新加融合立即可见）
                         if (typeof window.__hdFuseRefreshPartnerRow === 'function') { try { window.__hdFuseRefreshPartnerRow(); } catch (e2) {} }
@@ -4979,7 +4984,7 @@ if (true) {
     // 网页版：下载到 IndexedDB
     let _preheatStarted = false;
     // 王城低配版阵容优先预热（用户主阵容，开项目秒开）：这些英雄皮肤先拉/先落地磁盘
-    const PRIORITY_HEROES = new Set(['水灵','萌萌','咕咕','钢鬃','木精灵','光精灵','幻精灵','火炮射线','小野酋长','死神海妖','火炮','风灵','死神','骨弓','电法','铁骑','悟空','魂精灵','魔精灵']);
+    const PRIORITY_HEROES = new Set(['水灵','萌萌','咕咕','钢鬃','木精灵','光精灵','幻精灵','火炮射线','小野酋长','死神海妖','火炮','风灵','死神','骨弓','电法','铁骑','悟空','魂精灵','魔精灵','邪能火炮','地精宝库','侏儒射线','微型潜艇','邪能火炮侏儒射线']);
 
     async function _preheatSkins(heroes) {
         if (_preheatStarted) return;
@@ -5148,9 +5153,9 @@ if (true) {
         } catch (e) {}
         return null;
     }
-    // 皮肤读取链路诊断（用户可在控制台执行：testSkin('火炮') 看某英雄皮肤能否正常 resolve）
+    // 皮肤读取链路诊断（用户可在控制台执行：testSkin('邪能火炮') 看某英雄皮肤能否正常 resolve）
     window.testSkin = async function (hero) {
-        hero = hero || '火炮';
+        hero = hero || '邪能火炮';
         const reg = window.skinRegistry || {};
         const names = Object.keys(reg);
         console.log('[TEST] 皮肤库英雄数:', names.length, '| skinRoot:', (typeof getSkinRootDir === 'function') ? getSkinRootDir() : 'n/a');

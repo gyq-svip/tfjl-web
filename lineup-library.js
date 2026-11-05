@@ -146,10 +146,13 @@
         const o = _load(); const L = (o[tab] && o[tab][lid]) || {};
         return _skinOf(L, hero, side);
     };
-    // 🔴 2026-09-23 英雄名别名（游戏显示名 → 库名）：recognize.js 同款。微型潜艇就是潜艇，
-    //    阵容数据若用「微型潜艇」也能正确查减伤/融合/皮肤（主页按「潜艇」存）。
-    const _ALIASES = { '微型潜艇': '潜艇' };
-    function _norm(h) { return _ALIASES[h] || h; }
+    // 🟢 2026-11-06 英雄名统一：图库一律归一到官方名（邪能火炮/地精宝库/侏儒射线/微型潜艇）。
+    //    历史阵容数据里仍是老马短名（火炮/宝库/射线/潜艇）→ 由 toOfficialHeroName 兜底转换。
+    const _ALIASES = { '火炮': '邪能火炮', '宝库': '地精宝库', '射线': '侏儒射线', '潜艇': '微型潜艇' };
+    function _norm(h) {
+      if (typeof toOfficialHeroName === 'function') { try { return toOfficialHeroName(h); } catch (e) {} }
+      return _ALIASES[h] || h;
+    }
     // 🔴 2026-09-23 功能埋点（与主页 __recordFeatureUse 同一 buffer，管理员可在「按 Gist×功能 TOP」看到使用情况）
     function _llTrack(fn) { try { if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse(fn); } catch (e) {} }
     function _escJs(s) { return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }

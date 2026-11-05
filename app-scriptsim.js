@@ -79,10 +79,10 @@ window.EQUIP_IMG = {
             { id: '11', name: '死神', type: 'gold', profession: 'warlock', engineering: 'false' },
             { id: '12', name: '骨弓', type: 'gold', profession: 'archer', engineering: 'false' },
             { id: '13', name: '地精', type: 'gold', profession: 'warrior', engineering: 'false' },
-            { id: '14', name: '宝库', type: 'gold', profession: 'engineering', engineering: 'true' },
-            { id: '15', name: '射线', type: 'gold', profession: 'engineering', engineering: 'true' },
+            { id: '14', name: '地精宝库', type: 'gold', profession: 'engineering', engineering: 'true' },
+            { id: '15', name: '侏儒射线', type: 'gold', profession: 'engineering', engineering: 'true' },
             { id: '16', name: '咬人娃娃', type: 'gold', profession: 'engineering', engineering: 'true' },
-            { id: '17', name: '火炮', type: 'gold', profession: 'engineering', engineering: 'true' },
+            { id: '17', name: '邪能火炮', type: 'gold', profession: 'engineering', engineering: 'true' },
             { id: '18', name: '魔精灵', type: 'gold', profession: 'pokeball', engineering: 'false' },
             { id: '19', name: '幻精灵', type: 'gold', profession: 'pokeball', engineering: 'false' },
             { id: '20', name: '魂精灵', type: 'gold', profession: 'pokeball', engineering: 'false' },
@@ -116,7 +116,9 @@ window.EQUIP_IMG = {
 
     // 🔴 2026-10-13 工程卡识别：「侏儒射线 / 地精宝库 / 邪能火炮」这类变体名的主卡名是战士等普通职业，
     //    但本质是工程卡 → 只按 profession 判会漏，导致被塞进普通卡位。这里再按工程卡名做子串匹配。
-    const ENG_HEROES = ['火炮', '宝库', '射线', '咬人娃娃', '潜艇'];
+    // 🟢 2026-11-06 用官方名做子串匹配（邪能火炮含「火炮」、地精宝库含「宝库」…），
+    //    这样新旧两套名字都能命中，且不会把「地精宝库」误当成 [地精]+[宝库]。
+    const ENG_HEROES = ['邪能火炮', '地精宝库', '侏儒射线', '微型潜艇', '咬人娃娃'];
     function isEngineering(name) {
         const info = getCardInfo(name);
         if (info.profession === 'engineering' || info.engineering === 'true') return true;
