@@ -366,12 +366,14 @@
         scale: (SCALE_BY_MODEL[effModel] ? ((window.__heroSpineIndex && _folder && window.__heroSpineIndex[_folder] && window.__heroSpineIndex[_folder].scale > 0) ? window.__heroSpineIndex[_folder].scale : 1) * SCALE_BY_MODEL[effModel] : undefined),
         // 不套官方 x/y 偏移：那是给「特效撑大包围盒 + 官方 scale」做补偿的；
         // tight 包围盒（已剔 fx）本身居中，再偏移反而歪（蛇女/炸弹/虎弓偏移的来源）
-        // 🔴 2026-11-05 APP 兜底：死神 fashi 默认模型 bone2/zha01 特效残影槽，旧本地包/SW缓存/合并时序
-        //   缺这两项 → APP 飞起（web 正常）。与 spine-hero.fitOptions 同源兜底，强制隐藏，不替代 index.json。
+        // 🔴 2026-11-05 APP 兜底（加固）：死神 fashi 飞起根因是 shen01/shen02（镰刀/红环特效槽）。
+        //   线上索引 modelHideSlots 含 shen01/shen02/bone2/zha01 四项，web 因此正常；桌面端走本地整包，
+        //   合并线上配置失败时只剩后两项被藏 → shen01/shen02 残留 → 飞起。四项全部硬编码兜底
+        //   （与 spine-hero.fitOptions 同源），强制隐藏，不替代 index.json。
         hideSlots: (function () {
           const _hs = (man.hideSlots || []).concat((man.modelHideSlots || {})[effModel] || [])
           if (_folder === 'fashi' || effModel === 'fashi') {
-            ;['bone2', 'zha01'].forEach(function (s) { if (_hs.indexOf(s) < 0) _hs.push(s) })
+            ;['shen01', 'shen02', 'bone2', 'zha01'].forEach(function (s) { if (_hs.indexOf(s) < 0) _hs.push(s) })
           }
           return _hs
         })(),
