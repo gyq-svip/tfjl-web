@@ -37563,39 +37563,47 @@ ${maSection}
             else _createFab();
         })();
     
-/* ==================== 「1000 刷新」真相演示（2026-11-06） ====================
-   取证：用户提供的 4.64s 手机拍摄录屏（HEVC 960x544 / 30fps），画面是塔防精灵主界面，
-   全片没有任何「1000」/Hz/刷新率/倍速参数，音轨无解说 —— 「1000 刷新」是口头话术。
-   能让游戏动画飞快的只有一类做法：改游戏自己的时钟/帧步进（timeScale、把帧循环 tick
-   压到 1ms、或 hook Date.now/performance.now）。屏幕刷新率全程不变。
-   本面板：① 固定 1 秒实测两种 tick 间隔各推进多少逻辑步；② 甩出一句损友式调侃并可复制。
-   纯前端，不碰微信运行时、不改游戏、不重打包 exe。打开方式：window.showHzTruth()
-   或 URL 带 ?hz=1（可直接把链接甩给朋友）。
+/* ==================== 「1000 刷新」真相演示 · 刷新率可调版（2026-11-06） ====================
+   认知更新（用户现场实证）：500Hz 虚拟显示器 vs 60Hz，游戏主页面那个小车速度不一样。
+   → 塔防精灵主页面逐帧动画是 frame-locked（每渲染一帧推一帧，不按 deltaTime）。
+   提高虚拟刷新率 → 渲染帧率上去 → 逐帧动画整体飞快。改的是显示层 / EDID 通告，
+   不碰游戏包、不注入进程、不 hook 时间函数，与「改游戏数据」不是一回事。
+   本面板：自己拖刷新率（30~1000Hz），看帧间隔、相对 60Hz 倍率、小车赛跑、1 秒逻辑步实测。
+   纯前端，不改微信 / 游戏 / 显示器固件。入口 window.showHzTruth() 或 ?hz=<n>（?hz=1 兼容旧链接）。
 =========================================================================== */
 (function () {
     'use strict';
     var PANEL_ID = 'hzTruthPanel';
-    var QUIP = '你那「1000 刷新」刷的不是屏幕，是把游戏帧循环的间隔从 16.7ms 压到 1ms —— 一行定时器的事，系统自带、还免费。动画当然飞快，因为快进的是游戏自己的时钟。再说这段是手机 30fps 拍的，拿什么证明 1000Hz？屏幕该 60Hz 还是 60Hz。';
+    var MIN_HZ = 30, MAX_HZ = 1000, BASE_HZ = 60;
+    var curHz = BASE_HZ;
 
-    function esc(s) {
-        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    function esc(t) {
+        return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) {
             return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
         });
     }
+    function clampHz(n) {
+        n = Number(n);
+        if (!isFinite(n)) return BASE_HZ;
+        return Math.min(MAX_HZ, Math.max(MIN_HZ, Math.round(n)));
+    }
+    function urlSpec() {
+        try {
+            var m = /(?:^|[?&])hz=(\d+)(?:&|$)/.exec(location.search);
+            if (!m) return null;
+            var n = Number(m[1]);
+            return { open: true, hz: (n === 1 ? BASE_HZ : clampHz(n)) };
+        } catch (e) { return null; }
+    }
 
-    // 固定一段真实时间（1 秒），数各模式推进了多少逻辑步。
-    // 不用「跑固定步数测耗时」：浏览器 performance.now() 在 1ms 级会被量化，
-    // 实测会出现「120 步 / 0.00s、快了 2028 倍」这种失真值，拿去打脸反而被反打。
-    // 也不让高频侧空转：MessageChannel 每轮只有几微秒，1 秒能跑几十万步，
-    // 会把「1ms 间隔」演成 200kHz 并撞上 MAX 上限提前截断（实测间隔被算成 0.00ms），
-    // 反而对不上标称的 1000Hz。
-    // 做法：按 t0 起算的等间隔网格推进，只有跨过下一个网格点才记一步。
-    // normal = 16.7ms 网格（≈60Hz），fast = 1ms 网格（≈1000Hz）；
-    // fast 用 MessageChannel 做泵（setTimeout(1) 在 Chromium 会被钳到约 4ms）。
-    function runSteps(mode, durationMs, done) {
+    // 固定 1 秒，按 t0 + N*(1000/hz) 等间隔网格记步，数各刷新率推进了多少逻辑步。
+    // 不用「跑固定步数测耗时」：performance.now() 在 1ms 级被量化，会出 0.00s / 2028 倍的假值。
+    // 也不让 MessageChannel 空转无上限：那样 1 秒几十万步，会把 1ms 演成 200kHz 并撞上限提前截断。
+    // setTimeout(1) 在 Chromium 被钳到约 4ms，高频侧统一用 MessageChannel 做泵。
+    function runSteps(hz, durationMs, done) {
         var steps = 0, t0 = performance.now(), ch = null, stopped = false;
-        var interval = mode === 'fast' ? 1 : 16.7;
-        var MAX = 200000; // 仅作死循环保险，正常 1 秒远达不到
+        var interval = 1000 / hz;
+        var MAX = 200000; // 仅作死循环保险
         function finish() {
             stopped = true;
             if (ch) { try { ch.port1.close(); ch.port2.close(); } catch (e) {} }
@@ -37607,15 +37615,14 @@ ${maSection}
             if (stopped) return;
             var now = performance.now();
             if (now - t0 >= durationMs) { finish(); return; }
-            // 严格按 t0 + N*interval 网格记步，不因每次 pump 的落点累积漂移
             if (now >= t0 + (steps + 1) * interval) {
                 steps++;
                 if (steps >= MAX) { finish(); return; }
             }
-            if (mode === 'fast' && ch) ch.port2.postMessage(0);
-            else setTimeout(pump, 16.7);
+            if (ch) ch.port2.postMessage(0);
+            else setTimeout(pump, Math.max(1, interval));
         }
-        if (mode === 'fast' && typeof MessageChannel !== 'undefined') {
+        if (typeof MessageChannel !== 'undefined') {
             try {
                 ch = new MessageChannel();
                 ch.port1.onmessage = pump;
@@ -37623,7 +37630,7 @@ ${maSection}
                 return;
             } catch (e) { ch = null; }
         }
-        setTimeout(pump, mode === 'fast' ? 1 : 16.7);
+        setTimeout(pump, Math.max(1, interval));
     }
 
     function copyText(txt, btn) {
@@ -37647,93 +37654,163 @@ ${maSection}
         } else fallback();
     }
 
+    var QUIP = '以前我以为「1000 刷」只是把定时器压到 1ms，结果人家改的是虚拟显示器的 EDID 刷新率 —— 游戏主页面小车是逐帧播放的，帧率一上去，动画整体就飞快。500Hz 和 60Hz 放一起，小车速度真不一样。这回是我被上了一课：改显示层不等于改游戏数据。';
+
     function build() {
+        var spec = urlSpec();
+        curHz = spec ? spec.hz : BASE_HZ;
         var old = document.getElementById(PANEL_ID);
         if (old && old.parentNode) old.parentNode.removeChild(old);
 
         var wrap = document.createElement('div');
         wrap.id = PANEL_ID;
-        wrap.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(92vw,560px);max-height:88vh;overflow:auto;z-index:100010;background:#101a2b;border:1px solid rgba(120,180,255,.45);border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.62);color:#e8f0ff;font:13px/1.65 system-ui,-apple-system,"Microsoft YaHei",sans-serif;padding:18px 20px;box-sizing:border-box;';
+        wrap.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(94vw,600px);max-height:96vh;overflow:auto;z-index:100010;background:#101a2b;border:1px solid rgba(120,180,255,.45);border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.62);color:#e8f0ff;font:13px/1.6 system-ui,-apple-system,"Microsoft YaHei",sans-serif;padding:12px 16px;box-sizing:border-box;';
 
         var box = function (t, st) { return '<div style="' + (st || '') + '">' + t + '</div>'; };
         var head = box(
             '<span style="font-size:16px;font-weight:700;color:#ffd700;">1000 刷新 · 真相演示</span>' +
+            '<span style="font-size:11px;opacity:.7;margin-left:8px;">刷新率可调版</span>' +
             '<button id="hzClose" style="float:right;background:transparent;border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:6px;width:26px;height:26px;line-height:22px;cursor:pointer;font-size:16px;">×</button>',
-            'margin-bottom:12px;overflow:hidden;'
+            'margin-bottom:10px;overflow:hidden;'
         );
         var intro = box(
-            '视频里游戏动画飞快，是<b style="color:#ffd700;">游戏自己的时钟被快进</b>，不是屏幕刷新率变了。' +
-            '所谓「1000」＝把帧循环 tick 间隔压到 <b>1ms（1000Hz）</b>；正常是 <b>16.7ms（60Hz）</b>。' +
-            '<br><span style="opacity:.72;font-size:12px;">改的是游戏内部步进（或 timeScale / hook 时间函数），显示器该多少 Hz 还是多少 Hz。</span>',
-            'background:rgba(255,255,255,.05);border-radius:8px;padding:10px 12px;margin-bottom:10px;'
+            '主页面小车是<b style="color:#ffd700;">逐帧播放</b>（每渲染一帧推一帧，不按 deltaTime）。' +
+            '把<b>虚拟显示器刷新率</b>调高 → 渲染帧率上去 → 逐帧动画整体飞快。' +
+            '500Hz 和 60Hz 下小车速度不一样，就是这么来的。<br>' +
+            '<span style="opacity:.72;font-size:12px;">改的是显示层 / EDID 通告，不碰游戏包、不注入进程、不 hook 时间函数 —— 和「改游戏数据」不是一回事。</span>',
+            'background:rgba(255,255,255,.05);border-radius:8px;padding:9px 11px;margin-bottom:9px;'
         );
-        var code = box(
-            '<code style="color:#7ee0c0;">setInterval(step, 1)</code>' +
-            '<span style="opacity:.6;">　vs　</span>' +
-            '<code style="color:#9ecbff;">requestAnimationFrame()</code>' +
-            '<span style="opacity:.6;">　←　老把戏就这一行</span>',
-            'background:#0a1220;border:1px solid rgba(120,180,255,.2);border-radius:8px;padding:9px 12px;margin-bottom:10px;font-family:Consolas,Monaco,monospace;font-size:12px;'
+        var ctrl = box(
+            '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+            '<span style="font-size:12px;white-space:nowrap;">虚拟刷新率</span>' +
+            '<input id="hzRange" type="range" min="30" max="1000" step="1" value="60" style="flex:1;min-width:150px;accent-color:#ffd700;">' +
+            '<input id="hzNum" type="number" min="30" max="1000" step="1" value="60" style="width:74px;background:#0a1220;border:1px solid rgba(120,180,255,.35);color:#ffd700;border-radius:6px;padding:4px 6px;font-weight:700;text-align:center;">' +
+            '<span style="font-size:12px;">Hz</span></div>' +
+            '<div id="hzPresets" style="margin-top:8px;display:flex;gap:5px;flex-wrap:wrap;">' +
+            [60, 120, 144, 240, 360, 500, 1000].map(function (v) {
+                return '<button type="button" data-hz="' + v + '" style="background:rgba(255,255,255,.08);color:#cfe0ff;border:1px solid rgba(255,255,255,.18);border-radius:5px;padding:3px 9px;cursor:pointer;font-size:11px;">' + v + '</button>';
+            }).join('') + '</div>' +
+            '<div id="hzRead" style="margin-top:8px;font-size:12px;color:#cfe0ff;"></div>',
+            'background:rgba(255,215,0,.05);border:1px solid rgba(255,215,0,.2);border-radius:8px;padding:9px 11px;margin-bottom:9px;'
         );
-        var runBtn = '<button id="hzRun" style="background:linear-gradient(135deg,#4ecdc4,#2e7d32);color:#fff;border:none;padding:8px 18px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:700;">跑一次实测（各 1 秒）</button>';
-        var out = '<div id="hzOut" style="margin-top:10px;min-height:86px;background:rgba(0,0,0,.28);border-radius:8px;padding:10px 12px;font-size:12px;color:#cfe0ff;">点上面的按钮，实测同样 1 秒里两种 tick 各推进多少逻辑步。</div>';
+        var race = box(
+            '<div id="hzLane" style="position:relative;height:76px;background:#0a1220;border:1px solid rgba(120,180,255,.2);border-radius:8px;overflow:hidden;">' +
+            '<div style="position:absolute;left:8px;top:6px;font-size:11px;color:#7ee0c0;">60Hz 基准</div>' +
+            '<div style="position:absolute;left:8px;top:26px;width:calc(100% - 16px);height:2px;background:rgba(126,224,192,.18);"></div>' +
+            '<div id="hzCarBase" style="position:absolute;left:8px;top:17px;width:26px;height:14px;border-radius:3px;background:#7ee0c0;box-shadow:0 0 8px rgba(126,224,192,.6);"></div>' +
+            '<div style="position:absolute;left:8px;top:44px;font-size:11px;color:#ffd700;">设定 Hz</div>' +
+            '<div style="position:absolute;left:8px;top:64px;width:calc(100% - 16px);height:2px;background:rgba(255,215,0,.18);"></div>' +
+            '<div id="hzCarFast" style="position:absolute;left:8px;top:55px;width:26px;height:14px;border-radius:3px;background:#ffd700;box-shadow:0 0 8px rgba(255,215,0,.6);"></div>' +
+            '</div>' +
+            '<div style="display:flex;justify-content:space-between;font-size:11px;opacity:.78;margin-top:5px;">' +
+            '<span id="hzLblBase">60Hz 基准</span><span id="hzLblFast">设定刷新率</span></div>',
+            'margin-bottom:9px;'
+        );
+        var runBtn = '<button id="hzRun" style="background:linear-gradient(135deg,#4ecdc4,#2e7d32);color:#fff;border:none;padding:7px 16px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:700;">跑一次实测（各 1 秒）</button>';
+        var out = '<div id="hzOut" style="margin-top:9px;min-height:74px;background:rgba(0,0,0,.28);border-radius:8px;padding:9px 11px;font-size:12px;color:#cfe0ff;">拖上面的滑块选刷新率，或直接点预设档位；点按钮看 1 秒里各推进多少逻辑步。</div>';
         var quip = box(
-            '<div style="color:#ffd700;font-weight:700;margin-bottom:6px;">甩给朋友这句</div>' +
-            '<div id="hzQuip" style="background:rgba(255,215,0,.07);border-left:3px solid #ffd700;border-radius:0 6px 6px 0;padding:10px 12px;">' + esc(QUIP) + '</div>' +
-            '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">' +
-            '<button id="hzCopy" style="background:#ffd700;color:#1a1400;border:none;padding:7px 14px;border-radius:6px;cursor:pointer;font-weight:700;font-size:12px;">复制这句</button>' +
-            '<button id="hzLink" style="background:rgba(255,255,255,.1);color:#e8f0ff;border:1px solid rgba(255,255,255,.25);padding:7px 14px;border-radius:6px;cursor:pointer;font-size:12px;">复制演示链接</button>' +
+            '<div style="color:#ffd700;font-weight:700;margin-bottom:5px;">甩给朋友这句</div>' +
+            '<div style="background:rgba(255,215,0,.07);border-left:3px solid #ffd700;border-radius:0 6px 6px 0;padding:9px 11px;font-size:12px;">' + esc(QUIP) + '</div>' +
+            '<div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap;">' +
+            '<button id="hzCopy" style="background:#ffd700;color:#1a1400;border:none;padding:6px 13px;border-radius:6px;cursor:pointer;font-weight:700;font-size:12px;">复制这句</button>' +
+            '<button id="hzLink" style="background:rgba(255,255,255,.1);color:#e8f0ff;border:1px solid rgba(255,255,255,.25);padding:6px 13px;border-radius:6px;cursor:pointer;font-size:12px;">复制当前刷新率链接</button>' +
             '</div>',
-            'margin-top:12px;'
+            'margin-top:10px;'
         );
         var note = box(
-            '注：浏览器会把 <code>setTimeout(1)</code> 钳到约 4ms，高频侧改用 MessageChannel 按 1ms 网格泵；' +
-            '标称 1000Hz 是逻辑 tick 参数，实测值以这里跑出来的为准。' +
-            '这段演示只动自己的时钟，不改微信、不改游戏、不改显示器。手机拍摄的 30fps 视频也证明不了任何刷新率。',
-            'margin-top:12px;opacity:.6;font-size:11px;line-height:1.6;'
+            '实际倍数取决于 GPU 能否跑满、垂直同步、以及引擎 / 平台自身帧率上限，不严格等于 Hz 之比。' +
+            '本机改法：MuMu 设备设置 → 显示 → 帧率设置；NVIDIA 控制面板自定义分辨率；CRU 加自定义刷新率后 restart64.exe 生效。' +
+            'CRU 只改 EDID 通告、不写显示器固件，留好恢复路径，别一次拉太猛。' +
+            '本演示只调自己的虚拟时钟，不改微信、不改游戏、不改显示器硬件。',
+            'margin-top:10px;opacity:.62;font-size:11px;line-height:1.6;'
         );
 
-        wrap.innerHTML = head + intro + code + runBtn + out + quip + note;
+        wrap.innerHTML = head + intro + ctrl + race + runBtn + out + quip + note;
         document.body.appendChild(wrap);
+
+        var range = document.getElementById('hzRange');
+        var num = document.getElementById('hzNum');
+        var read = document.getElementById('hzRead');
+        var lane = document.getElementById('hzLane');
+        var carBase = document.getElementById('hzCarBase');
+        var carFast = document.getElementById('hzCarFast');
+        var lblBase = document.getElementById('hzLblBase');
+        var lblFast = document.getElementById('hzLblFast');
+
+        function startRace(hz) {
+            var W = Math.max(120, (lane.clientWidth || 400) - 44);
+            [carBase, carFast].forEach(function (el) {
+                el.style.transition = 'none';
+                el.style.transform = 'translateX(0)';
+            });
+            void lane.offsetWidth; // 强制回流，让 transition 生效
+            carBase.style.transition = 'transform 1000ms linear';
+            carFast.style.transition = 'transform 1000ms linear';
+            carBase.style.transform = 'translateX(' + (W * (BASE_HZ / hz)).toFixed(1) + 'px)';
+            carFast.style.transform = 'translateX(' + W + 'px)';
+            lblBase.textContent = '60Hz 基准：跑 ' + ((BASE_HZ / hz) * 100).toFixed(1) + '%';
+            lblFast.textContent = hz + 'Hz：跑完全程';
+        }
+        function updateHz(n) {
+            curHz = clampHz(n);
+            range.value = curHz;
+            num.value = curHz;
+            read.innerHTML = '当前 <b style="color:#ffd700;">' + curHz + ' Hz</b>　帧间隔 <b>' +
+                (1000 / curHz).toFixed(2) + ' ms</b>　相对 60Hz <b style="color:#ffd700;">' +
+                (curHz / BASE_HZ).toFixed(1) + '×</b>';
+            startRace(curHz);
+        }
+
+        range.oninput = function () { updateHz(this.value); };
+        num.onchange = function () { updateHz(this.value); };
+        document.getElementById('hzPresets').onclick = function (e) {
+            var b = e.target.closest ? e.target.closest('button[data-hz]') : null;
+            if (b) updateHz(b.getAttribute('data-hz'));
+        };
 
         document.getElementById('hzClose').onclick = function () {
             if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
         };
         document.getElementById('hzCopy').onclick = function () { copyText(QUIP, this); };
         document.getElementById('hzLink').onclick = function () {
-            var u = location.href.split('#')[0].split('?')[0] + '?hz=1';
+            var u = location.href.split('#')[0].split('?')[0] + '?hz=' + curHz;
             copyText(u, this);
         };
         document.getElementById('hzRun').onclick = function () {
             var btn = this, outEl = document.getElementById('hzOut');
+            var hz = clampHz(num.value);
+            updateHz(hz);
             btn.disabled = true; btn.textContent = '实测中…';
             outEl.innerHTML = '正在跑 60Hz 基准（1 秒）…';
-            runSteps('normal', 1000, function (a) {
-                outEl.innerHTML = '60Hz 基准完成，正在跑 1ms 高频（1 秒）…';
-                runSteps('fast', 1000, function (b) {
+            runSteps(BASE_HZ, 1000, function (a) {
+                outEl.innerHTML = '基准完成，正在跑 ' + hz + 'Hz（1 秒）…';
+                runSteps(hz, 1000, function (b) {
                     var ratio = a.steps > 0 ? (b.steps / a.steps) : 0;
                     var maxSteps = Math.max(a.steps, b.steps, 1);
                     var line = function (label, r, color) {
-                        return '<div style="margin:5px 0;">' + label +
+                        return '<div style="margin:4px 0;">' + label +
                             '　1 秒推进 <b>' + r.steps + ' 步</b>' +
                             '　实测间隔 <b>' + r.avg.toFixed(2) + ' ms</b>（≈ ' + Math.round(r.hz) + ' Hz）' +
-                            '<div style="height:6px;background:rgba(255,255,255,.08);border-radius:3px;margin-top:3px;"><div style="height:6px;width:' +
+                            '<div style="height:5px;background:rgba(255,255,255,.08);border-radius:3px;margin-top:3px;"><div style="height:5px;width:' +
                             Math.min(100, (r.steps / maxSteps) * 100).toFixed(1) + '%;background:' + color + ';border-radius:3px;"></div></div></div>';
                     };
                     outEl.innerHTML =
-                        line('正常 60Hz', a, '#7ee0c0') +
-                        line('老把戏 1ms', b, '#ffd700') +
-                        '<div style="margin-top:8px;color:#ffd700;font-weight:700;">→ 同样 1 秒，逻辑帧被多推了 ' + ratio.toFixed(1) + ' 倍，' +
-                        '所以动画看着飞快。实测的 ≈1000Hz 是游戏自己的逻辑 tick，' +
-                        '显示器该多少 Hz 还是多少 Hz —— 刷的不是屏幕。</div>';
+                        line('60Hz 基准', a, '#7ee0c0') +
+                        line('设定 ' + hz + 'Hz', b, '#ffd700') +
+                        '<div style="margin-top:7px;color:#ffd700;font-weight:700;">→ 同样 1 秒，逻辑帧被多推了 ' + ratio.toFixed(1) + ' 倍，' +
+                        '逐帧动画（主页面小车）就跟着快这么多。改的是虚拟刷新率 / 帧率上限，不碰游戏数据。</div>';
                     btn.disabled = false; btn.textContent = '再跑一次';
                 });
             });
         };
+
+        updateHz(curHz);
     }
 
     window.showHzTruth = build;
     window.copyHzTruth = function () { copyText(QUIP); };
     try {
-        if (/(?:^|[?&])hz=1(?:&|$)/.test(location.search)) setTimeout(build, 1200);
+        var _spec = urlSpec();
+        if (_spec && _spec.open) setTimeout(build, 1200);
     } catch (e) {}
 })();
