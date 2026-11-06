@@ -37563,3 +37563,177 @@ ${maSection}
             else _createFab();
         })();
     
+/* ==================== 「1000 刷新」真相演示（2026-11-06） ====================
+   取证：用户提供的 4.64s 手机拍摄录屏（HEVC 960x544 / 30fps），画面是塔防精灵主界面，
+   全片没有任何「1000」/Hz/刷新率/倍速参数，音轨无解说 —— 「1000 刷新」是口头话术。
+   能让游戏动画飞快的只有一类做法：改游戏自己的时钟/帧步进（timeScale、把帧循环 tick
+   压到 1ms、或 hook Date.now/performance.now）。屏幕刷新率全程不变。
+   本面板：① 固定 1 秒实测两种 tick 间隔各推进多少逻辑步；② 甩出一句损友式调侃并可复制。
+   纯前端，不碰微信运行时、不改游戏、不重打包 exe。打开方式：window.showHzTruth()
+   或 URL 带 ?hz=1（可直接把链接甩给朋友）。
+=========================================================================== */
+(function () {
+    'use strict';
+    var PANEL_ID = 'hzTruthPanel';
+    var QUIP = '你那「1000 刷新」刷的不是屏幕，是把游戏帧循环的间隔从 16.7ms 压到 1ms —— 一行定时器的事，系统自带、还免费。动画当然飞快，因为快进的是游戏自己的时钟。再说这段是手机 30fps 拍的，拿什么证明 1000Hz？屏幕该 60Hz 还是 60Hz。';
+
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
+    // 固定一段真实时间（1 秒），数各模式推进了多少逻辑步。
+    // 不用「跑固定步数测耗时」：浏览器 performance.now() 在 1ms 级会被量化，
+    // 实测会出现「120 步 / 0.00s、快了 2028 倍」这种失真值，拿去打脸反而被反打。
+    // 也不让高频侧空转：MessageChannel 每轮只有几微秒，1 秒能跑几十万步，
+    // 会把「1ms 间隔」演成 200kHz 并撞上 MAX 上限提前截断（实测间隔被算成 0.00ms），
+    // 反而对不上标称的 1000Hz。
+    // 做法：按 t0 起算的等间隔网格推进，只有跨过下一个网格点才记一步。
+    // normal = 16.7ms 网格（≈60Hz），fast = 1ms 网格（≈1000Hz）；
+    // fast 用 MessageChannel 做泵（setTimeout(1) 在 Chromium 会被钳到约 4ms）。
+    function runSteps(mode, durationMs, done) {
+        var steps = 0, t0 = performance.now(), ch = null, stopped = false;
+        var interval = mode === 'fast' ? 1 : 16.7;
+        var MAX = 200000; // 仅作死循环保险，正常 1 秒远达不到
+        function finish() {
+            stopped = true;
+            if (ch) { try { ch.port1.close(); ch.port2.close(); } catch (e) {} }
+            var elapsed = performance.now() - t0;
+            var avg = elapsed / Math.max(steps, 1);
+            done({ steps: steps, elapsed: elapsed, avg: avg, hz: 1000 / Math.max(avg, 0.01) });
+        }
+        function pump() {
+            if (stopped) return;
+            var now = performance.now();
+            if (now - t0 >= durationMs) { finish(); return; }
+            // 严格按 t0 + N*interval 网格记步，不因每次 pump 的落点累积漂移
+            if (now >= t0 + (steps + 1) * interval) {
+                steps++;
+                if (steps >= MAX) { finish(); return; }
+            }
+            if (mode === 'fast' && ch) ch.port2.postMessage(0);
+            else setTimeout(pump, 16.7);
+        }
+        if (mode === 'fast' && typeof MessageChannel !== 'undefined') {
+            try {
+                ch = new MessageChannel();
+                ch.port1.onmessage = pump;
+                ch.port2.postMessage(0);
+                return;
+            } catch (e) { ch = null; }
+        }
+        setTimeout(pump, mode === 'fast' ? 1 : 16.7);
+    }
+
+    function copyText(txt, btn) {
+        var ok = function () {
+            if (!btn) return;
+            var old = btn.textContent;
+            btn.textContent = '已复制';
+            setTimeout(function () { btn.textContent = old; }, 1200);
+        };
+        var fallback = function () {
+            var ta = document.createElement('textarea');
+            ta.value = txt;
+            ta.style.cssText = 'position:fixed;opacity:0;left:-9999px;';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); ok(); } catch (e) {}
+            if (ta.parentNode) ta.parentNode.removeChild(ta);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(txt).then(ok, fallback);
+        } else fallback();
+    }
+
+    function build() {
+        var old = document.getElementById(PANEL_ID);
+        if (old && old.parentNode) old.parentNode.removeChild(old);
+
+        var wrap = document.createElement('div');
+        wrap.id = PANEL_ID;
+        wrap.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(92vw,560px);max-height:88vh;overflow:auto;z-index:100010;background:#101a2b;border:1px solid rgba(120,180,255,.45);border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.62);color:#e8f0ff;font:13px/1.65 system-ui,-apple-system,"Microsoft YaHei",sans-serif;padding:18px 20px;box-sizing:border-box;';
+
+        var box = function (t, st) { return '<div style="' + (st || '') + '">' + t + '</div>'; };
+        var head = box(
+            '<span style="font-size:16px;font-weight:700;color:#ffd700;">1000 刷新 · 真相演示</span>' +
+            '<button id="hzClose" style="float:right;background:transparent;border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:6px;width:26px;height:26px;line-height:22px;cursor:pointer;font-size:16px;">×</button>',
+            'margin-bottom:12px;overflow:hidden;'
+        );
+        var intro = box(
+            '视频里游戏动画飞快，是<b style="color:#ffd700;">游戏自己的时钟被快进</b>，不是屏幕刷新率变了。' +
+            '所谓「1000」＝把帧循环 tick 间隔压到 <b>1ms（1000Hz）</b>；正常是 <b>16.7ms（60Hz）</b>。' +
+            '<br><span style="opacity:.72;font-size:12px;">改的是游戏内部步进（或 timeScale / hook 时间函数），显示器该多少 Hz 还是多少 Hz。</span>',
+            'background:rgba(255,255,255,.05);border-radius:8px;padding:10px 12px;margin-bottom:10px;'
+        );
+        var code = box(
+            '<code style="color:#7ee0c0;">setInterval(step, 1)</code>' +
+            '<span style="opacity:.6;">　vs　</span>' +
+            '<code style="color:#9ecbff;">requestAnimationFrame()</code>' +
+            '<span style="opacity:.6;">　←　老把戏就这一行</span>',
+            'background:#0a1220;border:1px solid rgba(120,180,255,.2);border-radius:8px;padding:9px 12px;margin-bottom:10px;font-family:Consolas,Monaco,monospace;font-size:12px;'
+        );
+        var runBtn = '<button id="hzRun" style="background:linear-gradient(135deg,#4ecdc4,#2e7d32);color:#fff;border:none;padding:8px 18px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:700;">跑一次实测（各 1 秒）</button>';
+        var out = '<div id="hzOut" style="margin-top:10px;min-height:86px;background:rgba(0,0,0,.28);border-radius:8px;padding:10px 12px;font-size:12px;color:#cfe0ff;">点上面的按钮，实测同样 1 秒里两种 tick 各推进多少逻辑步。</div>';
+        var quip = box(
+            '<div style="color:#ffd700;font-weight:700;margin-bottom:6px;">甩给朋友这句</div>' +
+            '<div id="hzQuip" style="background:rgba(255,215,0,.07);border-left:3px solid #ffd700;border-radius:0 6px 6px 0;padding:10px 12px;">' + esc(QUIP) + '</div>' +
+            '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">' +
+            '<button id="hzCopy" style="background:#ffd700;color:#1a1400;border:none;padding:7px 14px;border-radius:6px;cursor:pointer;font-weight:700;font-size:12px;">复制这句</button>' +
+            '<button id="hzLink" style="background:rgba(255,255,255,.1);color:#e8f0ff;border:1px solid rgba(255,255,255,.25);padding:7px 14px;border-radius:6px;cursor:pointer;font-size:12px;">复制演示链接</button>' +
+            '</div>',
+            'margin-top:12px;'
+        );
+        var note = box(
+            '注：浏览器会把 <code>setTimeout(1)</code> 钳到约 4ms，高频侧改用 MessageChannel 按 1ms 网格泵；' +
+            '标称 1000Hz 是逻辑 tick 参数，实测值以这里跑出来的为准。' +
+            '这段演示只动自己的时钟，不改微信、不改游戏、不改显示器。手机拍摄的 30fps 视频也证明不了任何刷新率。',
+            'margin-top:12px;opacity:.6;font-size:11px;line-height:1.6;'
+        );
+
+        wrap.innerHTML = head + intro + code + runBtn + out + quip + note;
+        document.body.appendChild(wrap);
+
+        document.getElementById('hzClose').onclick = function () {
+            if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+        };
+        document.getElementById('hzCopy').onclick = function () { copyText(QUIP, this); };
+        document.getElementById('hzLink').onclick = function () {
+            var u = location.href.split('#')[0].split('?')[0] + '?hz=1';
+            copyText(u, this);
+        };
+        document.getElementById('hzRun').onclick = function () {
+            var btn = this, outEl = document.getElementById('hzOut');
+            btn.disabled = true; btn.textContent = '实测中…';
+            outEl.innerHTML = '正在跑 60Hz 基准（1 秒）…';
+            runSteps('normal', 1000, function (a) {
+                outEl.innerHTML = '60Hz 基准完成，正在跑 1ms 高频（1 秒）…';
+                runSteps('fast', 1000, function (b) {
+                    var ratio = a.steps > 0 ? (b.steps / a.steps) : 0;
+                    var maxSteps = Math.max(a.steps, b.steps, 1);
+                    var line = function (label, r, color) {
+                        return '<div style="margin:5px 0;">' + label +
+                            '　1 秒推进 <b>' + r.steps + ' 步</b>' +
+                            '　实测间隔 <b>' + r.avg.toFixed(2) + ' ms</b>（≈ ' + Math.round(r.hz) + ' Hz）' +
+                            '<div style="height:6px;background:rgba(255,255,255,.08);border-radius:3px;margin-top:3px;"><div style="height:6px;width:' +
+                            Math.min(100, (r.steps / maxSteps) * 100).toFixed(1) + '%;background:' + color + ';border-radius:3px;"></div></div></div>';
+                    };
+                    outEl.innerHTML =
+                        line('正常 60Hz', a, '#7ee0c0') +
+                        line('老把戏 1ms', b, '#ffd700') +
+                        '<div style="margin-top:8px;color:#ffd700;font-weight:700;">→ 同样 1 秒，逻辑帧被多推了 ' + ratio.toFixed(1) + ' 倍，' +
+                        '所以动画看着飞快。实测的 ≈1000Hz 是游戏自己的逻辑 tick，' +
+                        '显示器该多少 Hz 还是多少 Hz —— 刷的不是屏幕。</div>';
+                    btn.disabled = false; btn.textContent = '再跑一次';
+                });
+            });
+        };
+    }
+
+    window.showHzTruth = build;
+    window.copyHzTruth = function () { copyText(QUIP); };
+    try {
+        if (/(?:^|[?&])hz=1(?:&|$)/.test(location.search)) setTimeout(build, 1200);
+    } catch (e) {}
+})();
