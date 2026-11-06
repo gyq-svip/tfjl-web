@@ -48,6 +48,7 @@ window.EQUIP_IMG = {
         waveIndex: 0,      // timeline 下标
         playing: false,
         speed: 1.0,
+        loop: false,      // 播到末波自动回到第 1 波
         timer: null,
         root: null,
         overrides: { my: {}, teammate: {} }, // [side][脚本英雄名] -> { level:'满|N级|', skin:'', mohua:'on|off|', fusion:'' }
@@ -319,54 +320,59 @@ window.EQUIP_IMG = {
         div.id = 'scriptSimRoot';
         div.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);z-index:99998;display:flex;align-items:center;justify-content:center;font-family:inherit;';
         div.innerHTML =
-            '<div id="scriptSimPanel" style="position:relative;width:min(99vw,1340px);height:94vh;background:linear-gradient(180deg,#1a1a2e,#16213e);border:1px solid rgba(78,205,196,0.4);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,0.6);display:flex;flex-direction:column;overflow:hidden;">'
+            '<div id="scriptSimPanel" style="position:relative;width:min(98vw,1060px);height:min(94vh,760px);background:linear-gradient(180deg,#1a1a2e,#16213e);border:1px solid rgba(78,205,196,0.4);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.6);display:flex;flex-direction:column;overflow:hidden;">'
             // 标题栏
-            + '<div style="flex:0 0 auto;padding:8px 16px;background:rgba(0,0,0,0.35);border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between;">'
-            + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
-            + '<span style="color:#4ecdc4;font-weight:700;font-size:1rem;">🎮 脚本推演模拟器</span>'
-            + '<label style="padding:4px 10px;border-radius:6px;border:1px solid rgba(78,205,196,0.4);background:rgba(78,205,196,0.12);color:#4ecdc4;cursor:pointer;font-size:0.75rem;">📂 导入脚本①<input type="file" id="simImportMain" accept=".txt" style="display:none;"></label>'
-            + '<label style="padding:4px 10px;border-radius:6px;border:1px solid rgba(255,107,107,0.4);background:rgba(255,107,107,0.12);color:#ff6b6b;cursor:pointer;font-size:0.75rem;">📂 导入脚本②<input type="file" id="simImportSub" accept=".txt" style="display:none;"></label>'
-            + '<button id="simRefresh" style="padding:4px 10px;border-radius:6px;border:1px solid rgba(255,215,0,0.4);background:rgba(255,215,0,0.12);color:#ffd700;cursor:pointer;font-size:0.75rem;">🔄 刷新</button>'
-            + '<span style="color:rgba(255,255,255,0.5);font-size:0.7rem;">（点卡可设 等级/魔化/皮肤/融合，点战车可设战车，整局保留）</span>'
+            + '<div style="flex:0 0 auto;padding:6px 10px;background:rgba(0,0,0,0.35);border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:space-between;">'
+            + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
+            + '<span style="color:#4ecdc4;font-weight:700;font-size:0.9rem;">🎮 脚本推演模拟器</span>'
+            + '<label style="padding:3px 7px;border-radius:6px;border:1px solid rgba(78,205,196,0.4);background:rgba(78,205,196,0.12);color:#4ecdc4;cursor:pointer;font-size:0.7rem;">📂 导入①<input type="file" id="simImportMain" accept=".txt" style="display:none;"></label>'
+            + '<label style="padding:3px 7px;border-radius:6px;border:1px solid rgba(255,107,107,0.4);background:rgba(255,107,107,0.12);color:#ff6b6b;cursor:pointer;font-size:0.7rem;">📂 导入②<input type="file" id="simImportSub" accept=".txt" style="display:none;"></label>'
+            + '<button id="simRefresh" style="padding:3px 7px;border-radius:6px;border:1px solid rgba(255,215,0,0.4);background:rgba(255,215,0,0.12);color:#ffd700;cursor:pointer;font-size:0.7rem;">🔄 刷新</button>'
+            + '<span id="simFileNames" style="color:rgba(255,255,255,0.45);font-size:0.66rem;max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="当前导入的脚本文件">①—　②—</span>'
+            + '<span style="color:rgba(255,255,255,0.4);font-size:0.66rem;">空格 播放 · ←→ 切波 · R 重播</span>'
             + '</div>'
-            + '<div style="display:flex;align-items:center;gap:10px;">'
-            + '<span id="simWaveDisplay" style="color:#ffd700;font-weight:700;font-size:1.1rem;">第 1 波</span>'
-            + '<button id="simClose" style="padding:4px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.75rem;">✕ 关闭</button>'
+            + '<div style="display:flex;align-items:center;gap:6px;">'
+            + '<span id="simWaveDisplay" style="color:#ffd700;font-weight:700;font-size:0.95rem;">第 1 波</span>'
+            + '<button id="simClose" style="padding:3px 7px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.7rem;">✕ 关闭</button>'
             + '</div>'
             + '</div>'
             // 主体
-            + '<div style="flex:1 1 auto;display:flex;overflow:auto;padding:10px;gap:14px;justify-content:center;">'
-            // 左：脚本①歌词（只显示 上一条/当前/下一条，小框跟随波数）
-            + '<div style="flex:0 0 175px;display:flex;flex-direction:column;gap:6px;align-self:flex-start;margin-top:30px;">'
-            + '<div style="color:#4ecdc4;font-size:0.8rem;font-weight:700;">脚本① · 歌词</div>'
-            + '<div id="simMainLyric" style="min-height:80px;background:rgba(0,0,0,0.35);border-radius:8px;border:1px solid rgba(78,205,196,0.15);padding:6px 8px;overflow:hidden;font-size:0.72rem;line-height:1.6;color:rgba(255,255,255,0.7);"></div>'
+            + '<div style="flex:1 1 auto;display:flex;overflow:auto;padding:8px;gap:8px;justify-content:center;">'
+            // 左：脚本①歌词
+            + '<div style="flex:0 0 120px;display:flex;flex-direction:column;gap:4px;align-self:flex-start;margin-top:22px;">'
+            + '<div style="color:#4ecdc4;font-size:0.74rem;font-weight:700;">脚本① · 歌词</div>'
+            + '<div id="simMainLyric" style="min-height:60px;max-height:150px;background:rgba(0,0,0,0.35);border-radius:8px;border:1px solid rgba(78,205,196,0.15);padding:5px 6px;overflow:auto;font-size:0.68rem;line-height:1.5;color:rgba(255,255,255,0.7);"></div>'
             + '</div>'
             // 中：双卡组
-            + '<div style="flex:0 0 auto;display:flex;flex-direction:column;gap:8px;align-items:center;overflow:auto;">'
-            + '<div id="simWaveBanner" style="color:#ffd700;font-size:1.4rem;font-weight:700;text-shadow:0 0 8px rgba(255,215,0,0.4);">第 1 波</div>'
-            + '<div style="display:flex;gap:20px;align-items:flex-start;justify-content:center;flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;">'
+            + '<div style="flex:0 0 auto;display:flex;flex-direction:column;gap:6px;align-items:center;overflow:auto;">'
+            + '<div id="simWaveBanner" style="color:#ffd700;font-size:1.1rem;font-weight:700;text-shadow:0 0 8px rgba(255,215,0,0.4);">第 1 波</div>'
+            + '<div style="display:flex;gap:10px;align-items:flex-start;justify-content:center;flex-wrap:nowrap;overflow-x:auto;padding-bottom:3px;">'
             + renderDeckColumn(SIDE_MY, '📋 脚本①（我的卡组）', 'simMyDr', 'simMyBattleSlots', 'sim-hand-my')
             + renderDeckColumn(SIDE_TEAMMATE, '📋 脚本②（队友卡组）', 'simTeammateDr', 'simTeammateBattleSlots', 'sim-hand-teammate')
             + '</div>'
-            + '<div id="simEquipmentArea" style="padding:8px 16px;border-radius:10px;border:1px solid rgba(255,215,0,0.3);background:rgba(255,215,0,0.08);display:flex;align-items:center;gap:16px;flex-wrap:wrap;color:#ffd700;font-size:0.85rem;font-weight:700;">装备区</div>'
+            + '<div id="simEquipmentArea" style="padding:5px 10px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);background:rgba(255,215,0,0.08);display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:#ffd700;font-size:0.75rem;font-weight:700;">装备区</div>'
+            // 🟢 本波动作明细：直接把解析出的指令摊开，方便核对脚本特殊写法是否被正确识别
+            + '<div id="simWaveActions" style="align-self:stretch;max-width:690px;padding:5px 8px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);background:rgba(0,0,0,0.22);font-size:0.68rem;line-height:1.5;color:rgba(255,255,255,0.75);max-height:86px;overflow:auto;"></div>'
             + '</div>'
             // 右：脚本②歌词
-            + '<div style="flex:0 0 175px;display:flex;flex-direction:column;gap:6px;align-self:flex-start;margin-top:30px;">'
-            + '<div style="color:#ff6b6b;font-size:0.8rem;font-weight:700;">脚本② · 歌词</div>'
-            + '<div id="simSubLyric" style="min-height:80px;background:rgba(0,0,0,0.35);border-radius:8px;border:1px solid rgba(255,107,107,0.15);padding:6px 8px;overflow:hidden;font-size:0.72rem;line-height:1.6;color:rgba(255,255,255,0.7);"></div>'
+            + '<div style="flex:0 0 120px;display:flex;flex-direction:column;gap:4px;align-self:flex-start;margin-top:22px;">'
+            + '<div style="color:#ff6b6b;font-size:0.74rem;font-weight:700;">脚本② · 歌词</div>'
+            + '<div id="simSubLyric" style="min-height:60px;max-height:150px;background:rgba(0,0,0,0.35);border-radius:8px;border:1px solid rgba(255,107,107,0.15);padding:5px 6px;overflow:auto;font-size:0.68rem;line-height:1.5;color:rgba(255,255,255,0.7);"></div>'
             + '</div>'
             + '</div>'
             // 底部控制器
-            + '<div style="flex:0 0 auto;padding:10px 16px;background:rgba(0,0,0,0.35);border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;">'
-            + '<span id="simSpeedLabel" style="color:rgba(255,255,255,0.7);font-size:0.75rem;">1.0s/波</span>'
-            + '<button id="simSlower" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.75rem;">减速</button>'
-            + '<button id="simFaster" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.75rem;">加速</button>'
-            + '<button id="simPrev" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.75rem;">⏮</button>'
-            + '<button id="simPlay" style="padding:5px 12px;border-radius:6px;border:1px solid rgba(78,205,196,0.5);background:rgba(78,205,196,0.18);color:#4ecdc4;cursor:pointer;font-size:0.75rem;font-weight:700;">▶ 自动</button>'
-            + '<button id="simNext" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.75rem;">⏭</button>'
-            + '<button id="simPrevEvent" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(255,215,0,0.4);background:rgba(255,215,0,0.12);color:#ffd700;cursor:pointer;font-size:0.75rem;">⏪上一变化</button>'
-            + '<button id="simSkipEvent" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(255,215,0,0.4);background:rgba(255,215,0,0.12);color:#ffd700;cursor:pointer;font-size:0.75rem;">⏩下一变化</button>'
-            + '<input type="range" id="simWaveSlider" min="0" max="0" value="0" style="width:180px;">'
+            + '<div style="flex:0 0 auto;padding:6px 10px;background:rgba(0,0,0,0.35);border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:flex-end;gap:5px;flex-wrap:wrap;">'
+            + '<span id="simSpeedLabel" style="color:rgba(255,255,255,0.7);font-size:0.7rem;">1.0s/波</span>'
+            + '<button id="simSlower" style="padding:4px 7px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.7rem;">减速</button>'
+            + '<button id="simFaster" style="padding:4px 7px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.7rem;">加速</button>'
+            + '<button id="simPrev" style="padding:4px 7px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.7rem;">⏮</button>'
+            + '<button id="simPlay" style="padding:4px 10px;border-radius:6px;border:1px solid rgba(78,205,196,0.5);background:rgba(78,205,196,0.18);color:#4ecdc4;cursor:pointer;font-size:0.7rem;font-weight:700;">▶ 自动</button>'
+            + '<button id="simNext" style="padding:4px 7px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:0.7rem;">⏭</button>'
+            + '<button id="simReplay" title="回到第 1 波重新播放" style="padding:4px 7px;border-radius:6px;border:1px solid rgba(78,205,196,0.5);background:rgba(78,205,196,0.14);color:#4ecdc4;cursor:pointer;font-size:0.7rem;font-weight:700;">🔁 重播</button>'
+            + '<button id="simLoop" title="播放到最后一波后自动回到第 1 波" style="padding:4px 7px;border-radius:6px;border:1px solid rgba(255,215,0,0.4);background:rgba(255,215,0,0.12);color:#ffd700;cursor:pointer;font-size:0.7rem;">🔂 循环</button>'
+            + '<button id="simPrevEvent" title="跳到上一个有脚本动作的波" style="padding:4px 7px;border-radius:6px;border:1px solid rgba(255,215,0,0.4);background:rgba(255,215,0,0.12);color:#ffd700;cursor:pointer;font-size:0.7rem;">⏪上变化</button>'
+            + '<button id="simSkipEvent" title="跳到下一个有脚本动作的波" style="padding:4px 7px;border-radius:6px;border:1px solid rgba(255,215,0,0.4);background:rgba(255,215,0,0.12);color:#ffd700;cursor:pointer;font-size:0.7rem;">⏩下变化</button>'
+            + '<input type="range" id="simWaveSlider" min="0" max="0" value="0" style="width:120px;">'
             + '</div>'
             + '</div>';
         return div;
@@ -380,15 +386,15 @@ window.EQUIP_IMG = {
             heroSlots += '<div class="battle-slot empty" data-slot="sim-' + side + '-' + n + '">空</div>';
         });
         // 布局照主页：卡槽在上，手牌 5列×2行 网格紧贴卡槽正下方
-        return '<div class="battle-column" style="display:flex;flex-direction:column;align-items:center;gap:4px;width:452px;">'
-            + '<h4 style="margin:0;color:#fff;font-size:0.85rem;">' + title + ' <span id="' + drId + '" style="color:#4ecdc4;font-size:0.78rem;margin-left:6px;">减伤:0</span></h4>'
-            + '<div class="battle-slots-container" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px;border-radius:10px;background:rgba(0,0,0,0.22);border:1px solid rgba(255,255,255,0.08);">'
+        return '<div class="battle-column" style="display:flex;flex-direction:column;align-items:center;gap:4px;width:330px;">'
+            + '<h4 style="margin:0;color:#fff;font-size:0.78rem;">' + title + ' <span id="' + drId + '" style="color:#4ecdc4;font-size:0.72rem;margin-left:6px;">减伤:0</span></h4>'
+            + '<div class="battle-slots-container" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px;border-radius:10px;background:rgba(0,0,0,0.22);border:1px solid rgba(255,255,255,0.08);">'
             + '<div class="battle-slot engineering-slot empty" data-slot="sim-' + side + '-0" data-type="engineering" style="margin:0;"><span class="slot-label">🔧</span><span class="slot-empty">空</span></div>'
             + '<div class="battle-slots" id="' + slotContainerId + '">' + heroSlots + '</div>'
             + '</div>'
             + '<div class="chariot-box" id="simChariot-' + side + '" title="点击设置战车" style="margin-top:4px;font-size:0.7rem;color:#ffd700;cursor:pointer;padding:2px 8px;border-radius:6px;border:1px dashed rgba(255,215,0,0.35);">🚗 战车：未设置</div>'
             + '<div style="width:100%;color:rgba(255,255,255,0.6);font-size:0.68rem;text-align:center;margin-top:2px;">上阵手牌（灰=已上场）</div>'
-            + '<div class="sim-hand-container" id="' + handId + '" style="display:grid;grid-template-columns:repeat(5,84px);grid-auto-rows:52px;gap:4px;justify-content:center;min-height:52px;"></div>'
+            + '<div class="sim-hand-container" id="' + handId + '" style="display:grid;grid-template-columns:repeat(5,60px);grid-auto-rows:42px;gap:3px;justify-content:center;min-height:42px;"></div>'
             + '</div>';
     }
 
@@ -403,6 +409,8 @@ window.EQUIP_IMG = {
                 case 'simNext': changeWave(1); return;
                 case 'simSkipEvent': skipToNextEvent(); return;
                 case 'simPlay': togglePlay(); return;
+                case 'simReplay': replay(); return;
+                case 'simLoop': toggleLoop(); return;
                 case 'simSlower': adjustSpeed(0.5); return;   // 减速=每波秒数+0.5
                 case 'simFaster': adjustSpeed(-0.5); return;  // 加速=每波秒数-0.5（跑得更快）
                 case 'simPrevEvent': skipToPrevEvent(); return;
@@ -448,6 +456,23 @@ window.EQUIP_IMG = {
                 }
             });
         }
+        // 🟢 键盘快捷键（只挂一次）：空格 播放/暂停、←→ 切波、R 重播、Home/End 首末波
+        if (!state._keyBound) {
+            state._keyBound = true;
+            document.addEventListener('keydown', function (e) {
+                if (!state.root || state.root.style.display === 'none') return;
+                const tag = ((e.target && e.target.tagName) || '').toLowerCase();
+                if (tag === 'input' || tag === 'textarea' || tag === 'select' || (e.target && e.target.isContentEditable)) return;
+                switch (e.key) {
+                    case ' ': e.preventDefault(); togglePlay(); break;
+                    case 'ArrowLeft': e.preventDefault(); changeWave(-1); break;
+                    case 'ArrowRight': e.preventDefault(); changeWave(1); break;
+                    case 'r': case 'R': e.preventDefault(); replay(); break;
+                    case 'Home': e.preventDefault(); state.waveIndex = 0; render(); break;
+                    case 'End': e.preventDefault(); state.waveIndex = Math.max(0, state.timeline.length - 1); render(); break;
+                }
+            });
+        }
     }
 
     function importScript(input, which) {
@@ -456,6 +481,7 @@ window.EQUIP_IMG = {
         const reader = new FileReader();
         reader.onload = function (e) {
             const sc = parseScript(e.target.result);
+            sc._fileName = file.name;
             if (which === 'main') state.mainScript = sc; else state.subScript = sc;
             // 战车跟随脚本（每人有主车+副车；手动设置过则保留用户设置）
             const sideKey = which === 'main' ? SIDE_MY : SIDE_TEAMMATE;
@@ -465,6 +491,7 @@ window.EQUIP_IMG = {
             rebuildTimeline();
             state.waveIndex = 0;
             pause();
+            updateSimFileNames();
             render();
             if (typeof window.__recordFeatureUse === 'function') window.__recordFeatureUse('模拟器-导入脚本' + (which === 'main' ? '①' : '②'));
         };
@@ -631,9 +658,82 @@ window.EQUIP_IMG = {
         const btn = state.root.querySelector('#simPlay');
         if (btn) { btn.textContent = '⏸ 暂停'; btn.style.color = '#ff5252'; btn.style.borderColor = 'rgba(255,82,82,0.5)'; btn.style.background = 'rgba(255,82,82,0.15)'; }
         state.timer = setInterval(function () {
-            if (state.waveIndex >= state.timeline.length - 1) { pause(); return; }
+            if (state.waveIndex >= state.timeline.length - 1) {
+                // 🟢 循环开启时回到第 1 波继续，而不是停下
+                if (state.loop && state.timeline.length > 1) {
+                    state.waveIndex = 0;
+                    const sl = state.root.querySelector('#simWaveSlider');
+                    if (sl) sl.value = 0;
+                    render();
+                    return;
+                }
+                pause(); return;
+            }
             changeWave(1);
         }, Math.max(100, state.speed * 1000));
+    }
+
+    // 🟢 重播：停 → 回第 1 波 → 重新自动播放
+    function replay() {
+        pause();
+        state.waveIndex = 0;
+        const sl = state.root && state.root.querySelector('#simWaveSlider');
+        if (sl) sl.value = 0;
+        render();
+        if (state.timeline.length > 1) togglePlay();
+    }
+
+    // 🟢 循环开关
+    function toggleLoop() {
+        state.loop = !state.loop;
+        const btn = state.root && state.root.querySelector('#simLoop');
+        if (!btn) return;
+        btn.textContent = state.loop ? '🔂 循环开' : '🔂 循环';
+        btn.style.color = state.loop ? '#4ecdc4' : '#ffd700';
+        btn.style.borderColor = state.loop ? 'rgba(78,205,196,0.6)' : 'rgba(255,215,0,0.4)';
+        btn.style.background = state.loop ? 'rgba(78,205,196,0.18)' : 'rgba(255,215,0,0.12)';
+    }
+
+    // 🟢 本波动作明细：把当前波解析出的指令摊开，便于核对脚本特殊写法是否被正确识别
+    function renderWaveActions(W) {
+        const box = state.root && state.root.querySelector('#simWaveActions');
+        if (!box) return;
+        const escTxt = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+        const fmt = function (sc, label, color) {
+            if (!sc) return '';
+            const ws = (sc.waves || []).filter(function (w) { return w.wave === W; });
+            const items = [];
+            ws.forEach(function (w) {
+                (w.actions || []).forEach(function (a) {
+                    let txt = '';
+                    if (a.type === 'place') txt = '上 ' + a.hero + (a.level ? '(' + a.level + ')' : '') + (a.forceSeq ? ' [强顺]' : '');
+                    else if (a.type === 'remove') txt = '下 ' + a.hero;
+                    else if (a.type === 'equip') txt = '换 ' + a.name;
+                    else if (a.type === 'sameRow') txt = (a.heroes || []).join(' 与 ') + ' 同排';
+                    else if (a.type === 'sameRowCancel') txt = '同排取消';
+                    else txt = a.text || '';
+                    if (txt) items.push(txt);
+                });
+            });
+            if (!items.length) return '';
+            return '<span style="color:' + color + ';font-weight:700;">' + label + '</span> ' +
+                items.map(function (s) { return '<span style="display:inline-block;padding:1px 5px;margin:1px 3px 1px 0;border-radius:4px;background:rgba(255,255,255,0.09);">' + escTxt(s) + '</span>'; }).join('');
+        };
+        const a = fmt(state.mainScript, '①', '#4ecdc4');
+        const b = fmt(state.subScript, '②', '#ff6b6b');
+        box.innerHTML = (a || b)
+            ? '<span style="color:rgba(255,255,255,0.45);">本波动作　</span>' + a + (a && b ? '　' : '') + b
+            : '<span style="color:rgba(255,255,255,0.35);">本波无脚本动作（仅波数推进）</span>';
+    }
+
+    // 🟢 标题栏显示当前导入的脚本文件名，避免「不知道导没导 / 导的哪份」
+    function updateSimFileNames() {
+        const el = state.root && state.root.querySelector('#simFileNames');
+        if (!el) return;
+        const n = function (sc) { return sc && sc._fileName ? sc._fileName : '—'; };
+        const txt = '①' + n(state.mainScript) + '　②' + n(state.subScript);
+        el.textContent = txt;
+        el.title = txt;
     }
 
     function pause() {
@@ -711,6 +811,7 @@ window.EQUIP_IMG = {
         renderDamageReduction(myState, tmState);
         renderLyric(state.root.querySelector('#simMainLyric'), state.mainScript, W, 'main');
         renderLyric(state.root.querySelector('#simSubLyric'), state.subScript, W, 'sub');
+        renderWaveActions(W);
     }
 
     function renderSide(side, sideState) {

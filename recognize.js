@@ -1140,6 +1140,15 @@
       if(!results.length){ alert('请先识别（或别把卡都删光了）'); return; }
       const heroes = results.filter(r=>r.valid && r.valid.ok).map(r=>r.hero);
       if(!heroes.length){ alert('没有通过校验的英雄可填入'); return; }
+      // 🟢 2026-11-06 先清掉上一次填入的内容，再填入本次识别结果：
+      //   selectQuickCard 是「按行追加」，旧识别的卡会一直留在「上阵」行后面，
+      //   导致填入的不是最新解析数据；同时清掉上次的生成结果，避免误读。
+      try {
+        if (typeof clearParserInputBox === 'function') clearParserInputBox();
+        else { const ta0 = $('parserInput'); if (ta0) ta0.value = ''; }
+        const pr = $('parserResult'); if (pr) pr.innerHTML = '';
+        const qi = $('quickCardInput'); if (qi) qi.value = '';
+      } catch (e) {}
       if(typeof selectQuickCard === 'function'){
         heroes.forEach(h=> selectQuickCard(h));
         $('recStatus').textContent = `已填入 ${heroes.length} 个英雄到脚本生成`;
@@ -1148,9 +1157,11 @@
         const ta = $('parserInput');
         if(ta){ ta.value = '上阵：' + heroes.join(','); ta.dispatchEvent(new Event('input')); }
       }
-      // 打开“脚本生成”界面，让用户直接看到灌入结果
+      // 🟢 强制切到「脚本解析与生成」tab：toggleTxtFilesPanel 默认切到「脚本文件」tab，
+      //   且面板已打开时本函数不会调用 toggle —— 两种情况都必须显式切一次 parser。
       const p = $('txtFilesPanel');
       if(p && p.style.display === 'none' && typeof toggleTxtFilesPanel === 'function') toggleTxtFilesPanel();
+      if (typeof switchTxtPanelTab === 'function') switchTxtPanelTab('parser');
       setTimeout(()=>{ overlay.style.display='none'; }, 600);
     };
 
