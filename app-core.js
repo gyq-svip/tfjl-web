@@ -19554,6 +19554,8 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             if (allTexts.length === 0) return '暂无公告';
             return allTexts.join('　　◆　　');
         }
+        // 🟢 2026-11-08 各浮窗标题栏的公告条与主界面跑马灯共用这一份文本（读到的是同一个 newsItems）
+        try { window.__tfjlGetAnnounceText = getNewsMarqueeText; } catch (e) {}
 
         // 拍卖快讯显示开关（全网云端 config）：关闭后全网公告弹窗只显示普通公告+需求咨询，隐藏拍卖快讯
         // 默认关闭：仅当云端明确配置 auctionNews===true（管理员手动开启）时才显示
@@ -19947,6 +19949,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             }
             renderIntroPanel(); // 功能简介板：公告加载/刷新后同步渲染
             renderWindowTitle(); // 窗口标题：公告加载/刷新后同步应用（分类=窗口标题 最新一条）
+            try { if (window.__tfjlUpdatePanelAnnounce) window.__tfjlUpdatePanelAnnounce(); } catch (e) {} // 浮窗标题栏公告条同步
         }
 
         // ==================== 功能简介板（出战区右侧） ====================
@@ -37605,3 +37608,198 @@ ${maSection}
             if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _createFab);
             else _createFab();
         })();
+
+/* ==================== 浮动弹窗标题栏：滚动钉住 + 动态公告条（2026-11-08） ====================
+   用户要求（原话）：
+     ① 「计算器弹窗、脚本管理弹窗、还有所有弹窗，标题栏不参与下滑滚动」——滚到最下面也能直接点 × 关闭；
+     ② 「弹窗的标题栏显示我那个动态公告，和阵容图库那个一样的」——把主界面那条滚动公告搬进标题栏。
+   做法（不改各面板自身结构，避免连锁回归）：
+     · 钉住：捕获阶段监听 scroll，谁真滚起来才把它的第一个子元素（标题栏）识别出来打 .tfjl-pin-head
+       （position:sticky;top:0）。没滚过的面板零影响；以后新加的面板也自动覆盖。
+     · 公告条：扫描「浮窗第一个子元素」且 display:flex 的标题栏，在关闭按钮前插入 .tfjl-annbar，
+       文本与主界面跑马灯同源（window.__tfjlGetAnnounceText），装不下才滚动、同样 45px/s，
+       点击打开全部公告；公告刷新时由 initMarquee 调 __tfjlUpdatePanelAnnounce() 同步。
+   ============================================================================ */
+(function () {
+    'use strict';
+    var PIN_CLS = 'tfjl-pin-head';
+    var ANN_CLS = 'tfjl-annbar';
+    var SCAN_SEL = 'div[id$="Header"], div[id$="Title"], div[id$="Drag"], div[id$="Toolbar"]';
+    var clickT = null;
+
+    function _esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+        });
+    }
+    function _cs(el) { try { return getComputedStyle(el); } catch (e) { return null; } }
+    function _isCloseTxt(t) { return t === '×' || t === '✕' || t === '✖' || t === '✗' || t === 'X'; }
+
+    /* ---------- ① 标题栏钉住（滚到底也能点 ×） ---------- */
+    function _looksLikeHead(el, host) {
+        if (!el || el.nodeType !== 1) return false;
+        var h = el.offsetHeight || 0;
+        if (h < 16 || h > 170) return false;
+        if (host.clientHeight && h > host.clientHeight * 0.6) return false;
+        var cs = _cs(el);
+        if (!cs) return false;
+        if (cs.position === 'absolute' || cs.position === 'fixed' || cs.position === 'sticky') return false;
+        if (/(header|title|hdr|toolbar|drag)$/i.test(el.id || '')) return true;
+        if (cs.cursor === 'move') return true;
+        var btns = el.querySelectorAll('button, span, a');
+        for (var i = 0; i < btns.length && i < 40; i++) {
+            if (_isCloseTxt((btns[i].textContent || '').trim())) return true;
+        }
+        return false;
+    }
+    function _pinHost(host) {
+        if (!host || host.nodeType !== 1) return;
+        if (host.scrollTop <= 2) return;
+        if (host.scrollHeight <= host.clientHeight + 4) return;
+        // 只认「浮窗本体」：内层列表（聊天记录、卡片网格）滚起来不该把第一条钉住
+        var hs = _cs(host);
+        if (!hs || (hs.position !== 'fixed' && hs.position !== 'absolute')) return;
+        var head = host.firstElementChild;
+        if (!head || head.classList.contains(PIN_CLS)) return;
+        if (!_looksLikeHead(head, host)) return;
+        head.classList.add(PIN_CLS);
+    }
+    document.addEventListener('scroll', function (e) {
+        var t = e.target;
+        if (!t || t.nodeType !== 1) return;
+        if (t === document.documentElement || t === document.body) return;
+        _pinHost(t);
+    }, true);
+
+    /* ---------- ② 标题栏动态公告条 ---------- */
+    function _annText() {
+        try {
+            var t = window.__tfjlGetAnnounceText ? window.__tfjlGetAnnounceText() : '';
+            t = String(t || '').replace(/\s+/g, ' ').trim();
+            if (!t || t === '暂无公告') return '';
+            return t;
+        } catch (e) { return ''; }
+    }
+    // 只挂「浮窗的第一个子元素」标题栏：避免误伤表格头 / 弹窗内部小标题 / 主界面页头
+    function _isPanelHead(el) {
+        var p = el.parentElement;
+        if (!p || p === document.body) return false;
+        if (p.firstElementChild !== el) return false;
+        var cs = _cs(p);
+        if (!cs) return false;
+        if (cs.position !== 'fixed' && cs.position !== 'absolute') return false;
+        var r = p.getBoundingClientRect();
+        if (r.width < 320 || r.height < 120) return false;
+        return true;
+    }
+    function _fitBar(bar) {
+        var inner = bar.firstElementChild;
+        if (!inner) return;
+        var avail = bar.clientWidth;
+        if (!avail) return;
+        // 宽度/文本没变就不重排，避免每轮扫描把滚动动画打回起点
+        if (bar._fitW === avail && bar._fitTxt === inner.textContent) return;
+        bar._fitW = avail;
+        bar._fitTxt = inner.textContent;
+        inner.style.paddingLeft = '0';
+        inner.style.animation = 'none';
+        var need = inner.scrollWidth;
+        if (need <= avail + 2) return;          // 装得下：静止显示
+        // 从左往左滚（没有「从右边进场」那几秒空白，标题栏本来就窄）
+        var dur = Math.max(10, need / 45);
+        inner.style.animation = 'marqueeScroll ' + dur.toFixed(1) + 's linear infinite';
+    }
+    function _makeBar(text) {
+        var bar = document.createElement('span');
+        bar.className = ANN_CLS;
+        bar.title = '📢 ' + text + '\n（点击查看全部公告）';
+        bar.innerHTML = '<span class="tfjl-annbar-in">📢 ' + _esc(text) + '</span>';
+        bar.addEventListener('click', function (ev) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            try { if (typeof window.showNewsListModal === 'function') window.showNewsListModal(); } catch (e) {}
+        });
+        ['pointerdown', 'mousedown', 'touchstart'].forEach(function (k) {
+            bar.addEventListener(k, function (ev) { ev.stopPropagation(); }, { passive: true });
+        });
+        return bar;
+    }
+    function _inject(head, text) {
+        if (!head || head.getAttribute('data-tfjl-ann') === '1') return;
+        var cs = _cs(head);
+        if (!cs || (cs.display !== 'flex' && cs.display !== 'inline-flex')) return;
+        if ((head.offsetHeight || 0) > 140) return;
+        if (!_isPanelHead(head)) return;
+        var bar = _makeBar(text);
+        // 关闭按钮有三种形态：本身就是 ×、包在「上传文件 + ×」这层容器里、或整行都是按钮
+        //   → 统一找「最后一个含 × 的顶层子元素」，把公告条插在它前面
+        var closeEl = null, kids = head.children;
+        for (var i = kids.length - 1; i >= 0; i--) {
+            var k = kids[i];
+            if (!k || k.nodeType !== 1) continue;
+            if (k.classList && k.classList.contains(ANN_CLS)) continue;
+            if (_isCloseTxt((k.textContent || '').trim())) { closeEl = k; break; }
+            var cand = k.querySelectorAll ? k.querySelectorAll('button, span, a') : [];
+            var hit = false;
+            for (var j = 0; j < cand.length && j < 12; j++) {
+                if (_isCloseTxt((cand[j].textContent || '').trim())) { hit = true; break; }
+            }
+            if (hit) { closeEl = k; break; }
+        }
+        if (closeEl) head.insertBefore(bar, closeEl); else head.appendChild(bar);
+        head.setAttribute('data-tfjl-ann', '1');
+        _fitBar(bar);
+        // 面板刚显示时可能还没排版完（量到 0）→ 下一帧补量一次
+        setTimeout(function () { _fitBar(bar); }, 140);
+    }
+    function _scan() {
+        var text = _annText();
+        if (!text) return;
+        var list = document.querySelectorAll(SCAN_SEL);
+        for (var i = 0; i < list.length; i++) {
+            var h = list[i];
+            if (h.getAttribute('data-tfjl-ann') === '1') continue;
+            if (!h.getBoundingClientRect().width) continue;
+            _inject(h, text);
+        }
+        // 之前量不到宽度没排版的公告条，补量
+        var bars = document.querySelectorAll('.' + ANN_CLS);
+        for (var j = 0; j < bars.length; j++) { if (bars[j]._fitW === undefined) _fitBar(bars[j]); }
+    }
+    // 公告刷新后由 initMarquee 调用：同步文本 + 补挂新面板
+    window.__tfjlUpdatePanelAnnounce = function () {
+        var text = _annText();
+        var bars = document.querySelectorAll('.' + ANN_CLS);
+        for (var i = 0; i < bars.length; i++) {
+            var bar = bars[i], inner = bar.firstElementChild;
+            if (!inner) continue;
+            var next = '📢 ' + text;
+            if (inner.textContent !== next) inner.textContent = next;
+            bar.style.display = text ? '' : 'none';
+            bar.title = text ? ('📢 ' + text + '\n（点击查看全部公告）') : '';
+            if (text) _fitBar(bar);
+        }
+        _scan();
+    };
+
+    function _boot() {
+        _scan();
+        [600, 1800, 4000, 8000].forEach(function (d) { setTimeout(_scan, d); });
+        setInterval(function () { if (!document.hidden) _scan(); }, 6000);
+        // 任何点击后补扫一次（面板基本都是点开的；capture 保证 stopPropagation 也拦不住）
+        document.addEventListener('click', function () {
+            clearTimeout(clickT);
+            clickT = setTimeout(_scan, 90);
+        }, true);
+        var rzT = null;
+        window.addEventListener('resize', function () {
+            clearTimeout(rzT);
+            rzT = setTimeout(function () {
+                var bars = document.querySelectorAll('.' + ANN_CLS);
+                for (var i = 0; i < bars.length; i++) _fitBar(bars[i]);
+            }, 200);
+        });
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _boot);
+    else _boot();
+})();
