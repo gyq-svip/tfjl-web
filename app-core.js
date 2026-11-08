@@ -19554,8 +19554,6 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             if (allTexts.length === 0) return '暂无公告';
             return allTexts.join('　　◆　　');
         }
-        // 🟢 2026-11-08 各浮窗标题栏的公告条与主界面跑马灯共用这一份文本（读到的是同一个 newsItems）
-        try { window.__tfjlGetAnnounceText = getNewsMarqueeText; } catch (e) {}
 
         // 拍卖快讯显示开关（全网云端 config）：关闭后全网公告弹窗只显示普通公告+需求咨询，隐藏拍卖快讯
         // 默认关闭：仅当云端明确配置 auctionNews===true（管理员手动开启）时才显示
@@ -19948,8 +19946,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                 }, 3000);
             }
             renderIntroPanel(); // 功能简介板：公告加载/刷新后同步渲染
-            renderWindowTitle(); // 窗口标题：公告加载/刷新后同步应用（分类=窗口标题 最新一条）
-            try { if (window.__tfjlUpdatePanelAnnounce) window.__tfjlUpdatePanelAnnounce(); } catch (e) {} // 浮窗标题栏公告条同步
+            renderWindowTitle(); // 窗口标题：公告加载/刷新后同步应用（分类=窗口标题 最新一条，内部会顺带同步各浮窗标题栏的网址）
         }
 
         // ==================== 功能简介板（出战区右侧） ====================
@@ -20019,6 +20016,8 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             } catch (e2) {}
             // 把「｜」后的 标签+网址 暴露给阵容图库页头等复用（与标题栏同一份公告内容）
             try { window.__tfjlSiteUrlText = title.replace(/^塔防精灵助手 - 阵容卡搭配｜/, ''); } catch (e3) {}
+            // 各浮窗标题栏右侧显示的「官网网址」与这里同源（分类=窗口标题 的公告正文），改完即同步
+            try { if (window.__tfjlSyncPanelSiteUrl) window.__tfjlSyncPanelSiteUrl(); } catch (e4) {}
         }
         function toggleIntroPanelMin() {
             const panel = document.getElementById('introPanel');
@@ -37609,21 +37608,23 @@ ${maSection}
             else _createFab();
         })();
 
-/* ==================== 浮动弹窗标题栏：滚动钉住 + 动态公告条（2026-11-08） ====================
+/* ==================== 浮动弹窗标题栏：滚动钉住 + 官网网址（2026-11-08） ====================
    用户要求（原话）：
      ① 「计算器弹窗、脚本管理弹窗、还有所有弹窗，标题栏不参与下滑滚动」——滚到最下面也能直接点 × 关闭；
-     ② 「弹窗的标题栏显示我那个动态公告，和阵容图库那个一样的」——把主界面那条滚动公告搬进标题栏。
+     ② 「标题栏要显示我官网网址，参看阵容图库是怎么做的」——阵容图库页头右上是
+        `#llSiteUrl`（文本来自公告管理→发布公告→分类「窗口标题」的正文 = window.__tfjlSiteUrlText）。
    做法（不改各面板自身结构，避免连锁回归）：
      · 钉住：捕获阶段监听 scroll，谁真滚起来才把它的第一个子元素（标题栏）识别出来打 .tfjl-pin-head
        （position:sticky;top:0）。没滚过的面板零影响；以后新加的面板也自动覆盖。
-     · 公告条：扫描「浮窗第一个子元素」且 display:flex 的标题栏，在关闭按钮前插入 .tfjl-annbar，
-       文本与主界面跑马灯同源（window.__tfjlGetAnnounceText），装不下才滚动、同样 45px/s，
-       点击打开全部公告；公告刷新时由 initMarquee 调 __tfjlUpdatePanelAnnounce() 同步。
+     · 网址：扫描「浮窗第一个子元素」且 display:flex 的标题栏，在关闭按钮前插入 .tfjl-site-url，
+       文本 = window.__tfjlSiteUrlText（与阵容图库页头同一份「窗口标题」公告），装不下才滚动 45px/s；
+       阵容图库自己已有 #llSiteUrl，跳过不重复插入。
    ============================================================================ */
 (function () {
     'use strict';
     var PIN_CLS = 'tfjl-pin-head';
-    var ANN_CLS = 'tfjl-annbar';
+    var URL_CLS = 'tfjl-site-url';
+    var FALLBACK_URL = 'gyq-svip.github.io/tfjl-web';   // 与 lineup-library.js 的 #llSiteUrl 兜底一致
     var SCAN_SEL = 'div[id$="Header"], div[id$="Title"], div[id$="Drag"], div[id$="Toolbar"]';
     var clickT = null;
 
@@ -37671,14 +37672,14 @@ ${maSection}
         _pinHost(t);
     }, true);
 
-    /* ---------- ② 标题栏动态公告条 ---------- */
-    function _annText() {
+    /* ---------- ② 标题栏官网网址（与阵容图库页头同源） ---------- */
+    function _siteText() {
         try {
-            var t = window.__tfjlGetAnnounceText ? window.__tfjlGetAnnounceText() : '';
-            t = String(t || '').replace(/\s+/g, ' ').trim();
-            if (!t || t === '暂无公告') return '';
-            return t;
-        } catch (e) { return ''; }
+            var t = window.__tfjlSiteUrlText;
+            if (t == null || String(t).trim() === '') t = FALLBACK_URL;
+            t = String(t).replace(/\s+/g, ' ').trim();
+            return t || FALLBACK_URL;
+        } catch (e) { return FALLBACK_URL; }
     }
     // 只挂「浮窗的第一个子元素」标题栏：避免误伤表格头 / 弹窗内部小标题 / 主界面页头
     function _isPanelHead(el) {
@@ -37711,33 +37712,31 @@ ${maSection}
     }
     function _makeBar(text) {
         var bar = document.createElement('span');
-        bar.className = ANN_CLS;
-        bar.title = '📢 ' + text + '\n（点击查看全部公告）';
-        bar.innerHTML = '<span class="tfjl-annbar-in">📢 ' + _esc(text) + '</span>';
-        bar.addEventListener('click', function (ev) {
-            ev.preventDefault();
-            ev.stopPropagation();
-            try { if (typeof window.showNewsListModal === 'function') window.showNewsListModal(); } catch (e) {}
-        });
+        bar.className = URL_CLS;
+        bar.title = text;
+        bar.innerHTML = '<span class="tfjl-site-url-in">' + _esc(text) + '</span>';
         ['pointerdown', 'mousedown', 'touchstart'].forEach(function (k) {
             bar.addEventListener(k, function (ev) { ev.stopPropagation(); }, { passive: true });
         });
         return bar;
     }
     function _inject(head, text) {
-        if (!head || head.getAttribute('data-tfjl-ann') === '1') return;
+        if (!head || head.getAttribute('data-tfjl-site') === '1') return;
         var cs = _cs(head);
         if (!cs || (cs.display !== 'flex' && cs.display !== 'inline-flex')) return;
         if ((head.offsetHeight || 0) > 140) return;
         if (!_isPanelHead(head)) return;
+        // 阵容图库页头自己就有 #llSiteUrl（同一份文本）→ 跳过，别显示两遍
+        if (head.querySelector('#llSiteUrl')) { head.setAttribute('data-tfjl-site', '1'); return; }
+        if ((head.textContent || '').indexOf(text) >= 0) { head.setAttribute('data-tfjl-site', '1'); return; }
         var bar = _makeBar(text);
         // 关闭按钮有三种形态：本身就是 ×、包在「上传文件 + ×」这层容器里、或整行都是按钮
-        //   → 统一找「最后一个含 × 的顶层子元素」，把公告条插在它前面
+        //   → 统一找「最后一个含 × 的顶层子元素」，把网址插在它前面
         var closeEl = null, kids = head.children;
         for (var i = kids.length - 1; i >= 0; i--) {
             var k = kids[i];
             if (!k || k.nodeType !== 1) continue;
-            if (k.classList && k.classList.contains(ANN_CLS)) continue;
+            if (k.classList && k.classList.contains(URL_CLS)) continue;
             if (_isCloseTxt((k.textContent || '').trim())) { closeEl = k; break; }
             var cand = k.querySelectorAll ? k.querySelectorAll('button, span, a') : [];
             var hit = false;
@@ -37747,40 +37746,41 @@ ${maSection}
             if (hit) { closeEl = k; break; }
         }
         if (closeEl) head.insertBefore(bar, closeEl); else head.appendChild(bar);
-        head.setAttribute('data-tfjl-ann', '1');
+        head.setAttribute('data-tfjl-site', '1');
         _fitBar(bar);
         // 面板刚显示时可能还没排版完（量到 0）→ 下一帧补量一次
         setTimeout(function () { _fitBar(bar); }, 140);
     }
     function _scan() {
-        var text = _annText();
-        if (!text) return;
+        var text = _siteText();
         var list = document.querySelectorAll(SCAN_SEL);
         for (var i = 0; i < list.length; i++) {
             var h = list[i];
-            if (h.getAttribute('data-tfjl-ann') === '1') continue;
+            if (h.getAttribute('data-tfjl-site') === '1') continue;
             if (!h.getBoundingClientRect().width) continue;
             _inject(h, text);
         }
-        // 之前量不到宽度没排版的公告条，补量
-        var bars = document.querySelectorAll('.' + ANN_CLS);
+        // 之前量不到宽度没排版的，补量
+        var bars = document.querySelectorAll('.' + URL_CLS);
         for (var j = 0; j < bars.length; j++) { if (bars[j]._fitW === undefined) _fitBar(bars[j]); }
     }
-    // 公告刷新后由 initMarquee 调用：同步文本 + 补挂新面板
-    window.__tfjlUpdatePanelAnnounce = function () {
-        var text = _annText();
-        var bars = document.querySelectorAll('.' + ANN_CLS);
+    // 「窗口标题」公告变更后由 renderWindowTitle 调用：同步文本 + 补挂新面板
+    window.__tfjlSyncPanelSiteUrl = function () {
+        var text = _siteText();
+        var bars = document.querySelectorAll('.' + URL_CLS);
         for (var i = 0; i < bars.length; i++) {
             var bar = bars[i], inner = bar.firstElementChild;
             if (!inner) continue;
-            var next = '📢 ' + text;
-            if (inner.textContent !== next) inner.textContent = next;
-            bar.style.display = text ? '' : 'none';
-            bar.title = text ? ('📢 ' + text + '\n（点击查看全部公告）') : '';
-            if (text) _fitBar(bar);
+            if (inner.textContent !== text) {
+                inner.textContent = text;
+                bar.title = text;
+                _fitBar(bar);
+            }
         }
         _scan();
     };
+    // 兼容旧名（历史调用点若还在，不至于报错）
+    window.__tfjlUpdatePanelAnnounce = window.__tfjlSyncPanelSiteUrl;
 
     function _boot() {
         _scan();
@@ -37795,7 +37795,7 @@ ${maSection}
         window.addEventListener('resize', function () {
             clearTimeout(rzT);
             rzT = setTimeout(function () {
-                var bars = document.querySelectorAll('.' + ANN_CLS);
+                var bars = document.querySelectorAll('.' + URL_CLS);
                 for (var i = 0; i < bars.length; i++) _fitBar(bars[i]);
             }, 200);
         });

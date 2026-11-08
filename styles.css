@@ -3535,10 +3535,11 @@
     #introPanel { display: none !important; }
 }
 /* ============================================================
-   浮动弹窗标题栏：滚动钉住 + 动态公告条（2026-11-08）
+   浮动弹窗标题栏：滚动钉住 + 官网网址（2026-11-08）
    ① 标题栏不再跟着面板内容一起滚走：滚动代理给「真正滚起来的浮窗」的第一个子元素
       （也就是标题栏）打上 .tfjl-pin-head → position:sticky;top:0，滚到底也能直接点 ×。
-   ② .tfjl-annbar 是标题栏里的公告条，文本与主界面顶部跑马灯同源；装不下才滚动（45px/s）。
+   ② .tfjl-site-url 是标题栏右上角的官网网址：文本来自公告管理→发布公告→分类「窗口标题」的正文，
+      和阵容图库页头 #llSiteUrl 同一份（window.__tfjlSiteUrlText）；装不下才滚动（45px/s）。
    ============================================================ */
 .tfjl-pin-head {
     position: sticky !important;
@@ -3546,30 +3547,30 @@
     z-index: 80 !important;
     flex-shrink: 0 !important;
 }
-.tfjl-annbar {
+.tfjl-site-url {
     flex: 1 1 0%;
     min-width: 0;
     margin: 0 10px;
     overflow: hidden;
     white-space: nowrap;
-    cursor: pointer;
+    cursor: default;
     display: flex;
     align-items: center;
     -webkit-mask-image: linear-gradient(to right, transparent 0, #000 10px, #000 calc(100% - 10px), transparent 100%);
     mask-image: linear-gradient(to right, transparent 0, #000 10px, #000 calc(100% - 10px), transparent 100%);
 }
-.tfjl-annbar-in {
+.tfjl-site-url-in {
     display: inline-block;
     flex: 0 0 auto;
     white-space: nowrap;
-    color: rgba(255, 255, 255, 0.82);
-    font-size: 0.72rem;
-    font-weight: 500;
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 0.7rem;
+    font-family: Consolas, Monaco, monospace;
     line-height: 1.25;
     letter-spacing: 0.2px;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 }
-.tfjl-annbar:hover .tfjl-annbar-in { color: #fff; animation-play-state: paused; }
+.tfjl-site-url:hover .tfjl-site-url-in { color: rgba(255, 255, 255, 0.8); animation-play-state: paused; }
 @media (max-width: 480px) {
-    .tfjl-annbar { display: none !important; }
+    .tfjl-site-url { display: none !important; }
 }
