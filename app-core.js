@@ -10416,9 +10416,20 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
             if (!fusedHero) return;
             _warnSharedReadOnly();
             if (typeof window.fusionSkins === 'undefined') window.fusionSkins = {};
-            window.fusionSkins[fusedHero] = skin; // '' = 关闭副卡显示
+            // 🟢 2026-11-08 key 归一：融合副卡皮肤一律按「官方名」存（地精宝库）。
+            //    历史数据或短名入口（宝库）也归一后再写，否则写入键与读取键（getFusionComponentSkin
+            //    按官方名读）对不上 → 表现为「面板里设好了，卡槽还是默认皮」。
+            let _fsKey = fusedHero;
+            try { if (typeof toOfficialHeroName === 'function') _fsKey = toOfficialHeroName(fusedHero); } catch (e) { _fsKey = fusedHero; }
+            window.fusionSkins[_fsKey] = skin; // '' = 关闭副卡显示
+            if (_fsKey !== fusedHero) { try { delete window.fusionSkins[fusedHero]; } catch (e) {} }
             if (typeof persistFusionSkins === 'function') await persistFusionSkins();
             if (typeof autoSaveProject === 'function') autoSaveProject();
+            // 🔴 2026-11-08 写完立即重绘主页（卡槽 + 手牌）：此前只落盘不重绘，
+            //    任何「调用方忘了自己补刷新」的入口（右键循环切副卡皮等）都会出现
+            //    「设置成功、返回后卡槽没变」。setFusionComponentLevel / setFusionComponentMoHua
+            //    早就这么做，这里补齐，形成同一条铁律。
+            try { if (typeof refreshFusionComponentViews === 'function') await refreshFusionComponentViews(_fsKey); } catch (e) {}
         }
         // 被融合卡（副卡）等级：全局存储（与 fusionSkins 对称，但独立于项目）
         function getFusionComponentLevel(heroName) {
@@ -10428,9 +10439,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         //    此前只写 localStorage，主页不重绘，导致「融合里设好了，回去却没变」。
         async function refreshFusionComponentViews(heroName) {
             if (!heroName) return;
+            const _fNorm = (s) => { try { return (typeof toOfficialHeroName === 'function') ? toOfficialHeroName(s) : s; } catch (e) { return s; } };
+            const _fWant = _fNorm(heroName);
             const isTarget = (nm) => {
                 const p = (typeof getFusionParts === 'function') ? getFusionParts(nm) : null;
-                return !!(p && p.length >= 2 && p[1] === heroName);
+                if (!p || p.length < 2) return false;
+                // 🟢 2026-11-08 归一比较：heroName 可能是短名（射线/宝库），p[1] 是官方名（侏儒射线/地精宝库），
+                //    严格 === 会全部不匹配 → 调用方以为刷新了，实际一张卡都没重绘。
+                return _fNorm(p[1]) === _fWant;
             };
             try { await invalidateFusionHalfCache(heroName); } catch (e) {}
             // 战场卡槽（副卡等级角标 / 魔化图标在渲染时读取）
@@ -12038,6 +12054,23 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     subBoxR.appendChild(subFootR)
                     sh.body.appendChild(subBoxR)
                     // 把「当前预览的融合形态」写回卡牌（图库槽位 / 战场槽位 / 手牌）；皮肤或等级改动后同样要重刷
+                    // 🔴 2026-11-08 手牌入口改融合形态时，必须同步「同 cardId 的战场卡槽」。
+                    //    同一张卡在手牌与卡槽各存一份（同一个 id），而详情弹窗是从哪一份点开就走哪个分支：
+                    //    从卡槽点开 → badge.closest('.battle-slot') 命中 → upgradeCardToFusion 会重绘；
+                    //    从手牌点开 → 命中不了卡槽 → 只改手牌数据+手牌 DOM，卡槽仍停在旧融合形态/旧副卡皮
+                    //    → 用户反馈「面板里设好了，返回后卡槽没变成刚设置的融合、卡槽皮肤和面板里不同步」。
+                    const syncSameCardSlots = async (targetName) => {
+                        let sameSlots = []
+                        try {
+                            const sel = '.battle-slot[data-card-id="' + String(cardId).replace(/"/g, '\\"') + '"]'
+                            sameSlots = [...document.querySelectorAll(sel)]
+                        } catch (e) { sameSlots = [] }
+                        if (!sameSlots.length || typeof upgradeCardToFusion !== 'function') return false
+                        for (const s of sameSlots) {
+                            try { await upgradeCardToFusion(s, targetName) } catch (e) {}
+                        }
+                        return true
+                    }
                     const reapplyPreviewCard = async () => {
                         const slotEl = badge && badge.closest ? badge.closest('.battle-slot') : null
                         if (libSlot) {
@@ -12045,10 +12078,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         } else if (slotEl && typeof upgradeCardToFusion === 'function') {
                             try { await upgradeCardToFusion(slotEl, preview) } catch (e) {}
                         } else {
+                            // 🔴 2026-11-08 先同步同 id 卡槽（upgradeCardToFusion 内部会重建手牌 DOM），再落到手牌数据/DOM
+                            try { await syncSameCardSlots(preview) } catch (e) {}
                             const handArr = (handType === 'my') ? myHandCards : teammateHandCards
                             const hc = handArr && handArr.find((c) => c.id === cardId)
                             if (hc) hc.name = preview
-                            const handCard = badge && badge.closest ? badge.closest('.selected-card.card-item') : null
+                            let handCard = badge && badge.closest ? badge.closest('.selected-card.card-item') : null
+                            if (!handCard || !handCard.isConnected) {
+                                try { handCard = document.querySelector('#myHandContainer .selected-card[data-id="' + cardId + '"], #teammateHandContainer .selected-card[data-id="' + cardId + '"]') } catch (e) {}
+                            }
                             if (handCard) handCard.dataset.name = preview
                             if (typeof reapplySingleHandCard === 'function' && handCard) { try { await reapplySingleHandCard(handCard, cardId, handType) } catch (e) {} }
                             if (typeof autoSaveProject === 'function') autoSaveProject()
@@ -12289,10 +12327,15 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         } else if (slotEl && typeof upgradeCardToFusion === 'function') {
                             try { await upgradeCardToFusion(slotEl, opt) } catch (e) {}
                         } else {
+                            // 🔴 2026-11-08 同 reapplyPreviewCard：手牌入口切融合必须同步同 id 卡槽，否则「卡槽还是旧的融合」
+                            try { await syncSameCardSlots(opt) } catch (e) {}
                             const handArr = (handType === 'my') ? myHandCards : teammateHandCards
                             const hc = handArr && handArr.find((c) => c.id === cardId)
                             if (hc) hc.name = opt
-                            const handCard = badge && badge.closest ? badge.closest('.selected-card.card-item') : null
+                            let handCard = badge && badge.closest ? badge.closest('.selected-card.card-item') : null
+                            if (!handCard || !handCard.isConnected) {
+                                try { handCard = document.querySelector('#myHandContainer .selected-card[data-id="' + cardId + '"], #teammateHandContainer .selected-card[data-id="' + cardId + '"]') } catch (e) {}
+                            }
                             if (handCard) handCard.dataset.name = opt
                             if (typeof reapplySingleHandCard === 'function' && handCard) { try { await reapplySingleHandCard(handCard, cardId, handType) } catch (e) {} }
                             if (typeof autoSaveProject === 'function') autoSaveProject()
