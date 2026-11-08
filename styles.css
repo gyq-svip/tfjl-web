@@ -3556,21 +3556,49 @@
     cursor: default;
     display: flex;
     align-items: center;
-    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 10px, #000 calc(100% - 10px), transparent 100%);
-    mask-image: linear-gradient(to right, transparent 0, #000 10px, #000 calc(100% - 10px), transparent 100%);
 }
+/* 只有「装不下、正在滚」时才做两端淡出；静止时胶囊两端保持完整 */
+.tfjl-site-url.is-scroll {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 8px, #000 calc(100% - 8px), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 8px, #000 calc(100% - 8px), transparent 100%);
+}
+/* 标题栏专用滚动：只移动「溢出那点距离」（--tfjl-url-shift 由 JS 按实际宽度算），
+   首尾各停顿 20%，看得清「官网: …」开头和「（登录密码：xxx）」结尾；
+   不用 marqueeScroll 的 -100%（那会把整条移出视野、尾部留一片空白） */
+@keyframes tfjlUrlSlide {
+    0%, 20%   { transform: translateX(0); }
+    80%, 100% { transform: translateX(var(--tfjl-url-shift, -60px)); }
+}
+/* 标题栏底色是各种彩色渐变（红/绿/紫/蓝），纯半透明白字对比度不够 →
+   改成「深色胶囊底 + 近白字」，任何底色上都读得清 */
 .tfjl-site-url-in {
     display: inline-block;
     flex: 0 0 auto;
     white-space: nowrap;
-    color: rgba(255, 255, 255, 0.45);
-    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.96);
+    font-size: 0.72rem;
+    font-weight: 500;
     font-family: Consolas, Monaco, monospace;
-    line-height: 1.25;
+    line-height: 1.2;
     letter-spacing: 0.2px;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.38);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    /* 可点选复制：不要继承标题栏的 user-select:none */
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    cursor: pointer;
 }
-.tfjl-site-url:hover .tfjl-site-url-in { color: rgba(255, 255, 255, 0.8); animation-play-state: paused; }
+/* 选中态看得见：深色底上默认的选中色太暗 */
+.tfjl-site-url-in::selection { background: rgba(255, 214, 102, 0.55); color: #fff; }
+.tfjl-site-url:hover .tfjl-site-url-in {
+    color: #fff;
+    background: rgba(0, 0, 0, 0.48);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+    animation-play-state: paused;
+}
 @media (max-width: 480px) {
     .tfjl-site-url { display: none !important; }
 }

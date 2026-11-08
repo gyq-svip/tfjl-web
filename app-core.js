@@ -37702,21 +37702,54 @@ ${maSection}
         if (bar._fitW === avail && bar._fitTxt === inner.textContent) return;
         bar._fitW = avail;
         bar._fitTxt = inner.textContent;
-        inner.style.paddingLeft = '0';
         inner.style.animation = 'none';
         var need = inner.scrollWidth;
-        if (need <= avail + 2) return;          // 装得下：静止显示
-        // 从左往左滚（没有「从右边进场」那几秒空白，标题栏本来就窄）
-        var dur = Math.max(10, need / 45);
-        inner.style.animation = 'marqueeScroll ' + dur.toFixed(1) + 's linear infinite';
+        if (need <= avail + 2) {                 // 装得下：静止显示（胶囊两端不淡出）
+            bar.classList.remove('is-scroll');
+            return;
+        }
+        // 只滚「溢出的那点距离」，首尾各停 20%（不把整条移出去留一片空白）
+        bar.classList.add('is-scroll');
+        var shift = Math.max(8, need - avail + 12);
+        bar.style.setProperty('--tfjl-url-shift', (-shift) + 'px');
+        var dur = Math.min(26, Math.max(9, shift / 26 + 5));
+        inner.style.animation = 'tfjlUrlSlide ' + dur.toFixed(1) + 's ease-in-out infinite';
     }
     function _makeBar(text) {
         var bar = document.createElement('span');
         bar.className = URL_CLS;
-        bar.title = text;
+        bar.title = text + '\n（点一下：选中并复制）';
         bar.innerHTML = '<span class="tfjl-site-url-in">' + _esc(text) + '</span>';
         ['pointerdown', 'mousedown', 'touchstart'].forEach(function (k) {
             bar.addEventListener(k, function (ev) { ev.stopPropagation(); }, { passive: true });
+        });
+        // 点一下：选中整串 + 顺手复制到剪贴板（剪贴板不可用时只选中，用户 Ctrl+C 即可）
+        bar.addEventListener('click', function (ev) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            var inner = bar.firstElementChild;
+            if (!inner) return;
+            var txt = inner.textContent || '';
+            try {
+                var sel = window.getSelection();
+                if (sel) {
+                    var r = document.createRange();
+                    r.selectNodeContents(inner);
+                    sel.removeAllRanges();
+                    sel.addRange(r);
+                }
+            } catch (e) {}
+            var done = function () {
+                try {
+                    if (typeof showToast === 'function') showToast('已复制：' + txt, 'success');
+                    else if (window.showToast) window.showToast('已复制：' + txt, 'success');
+                } catch (e) {}
+            };
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(txt).then(done).catch(function () {});
+                }
+            } catch (e2) {}
         });
         return bar;
     }
@@ -37773,7 +37806,7 @@ ${maSection}
             if (!inner) continue;
             if (inner.textContent !== text) {
                 inner.textContent = text;
-                bar.title = text;
+                bar.title = text + '\n（点一下：选中并复制）';
                 _fitBar(bar);
             }
         }
