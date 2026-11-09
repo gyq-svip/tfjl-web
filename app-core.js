@@ -36945,19 +36945,35 @@ ${maSection}
             // 🔴 功能使用统计（新功能埋点）：跨设备求和，按次数倒序取前 12，条形图展示
             try {
                 const fuSrc = (data && data.feature_usage) || (counterData && counterData.feature_usage) || {};
-                const fuEntries = Object.keys(fuSrc).map(k => [k, fuSrc[k] || 0]).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 12);
+                const _fuAll = Object.keys(fuSrc).map(k => [k, fuSrc[k] || 0]).filter(e => e[1] > 0);
+                // 🟢 2026-11-09 背景类埋点已细分到「具体哪张图/哪套预设」→ 单独一张榜，
+                //    否则十几条背景条目会把「前十二」塞满，其他功能全被挤出去。
+                const _BG_PREFIX = ['背景', '内置背景', '内置视频', '本机图片', '本机视频', '删除本机背景', '删除内置背景', '删除内置视频', '上传背景', '恢复默认背景', '随机渐变', '应用自选渐变', '清空渐变色', '面板模糊', '面板底色'];
+                const _isBgFu = (k) => _BG_PREFIX.some(p => String(k).indexOf(p) === 0);
+                const _fuBar = (k, v, max, labelW) => {
+                    const pct = Math.max(4, Math.round(v / max * 100));
+                    const name = escapeHtml(String(k));
+                    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">` +
+                        `<span title="${name}" style="width:${labelW}px;flex-shrink:0;color:rgba(255,255,255,0.75);font-size:0.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</span>` +
+                        `<div style="flex:1;height:10px;background:rgba(255,255,255,0.08);border-radius:5px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:linear-gradient(90deg,#ffd700,#ff9800);"></div></div>` +
+                        `<span style="width:52px;text-align:right;color:#ffd700;font-size:0.78rem;font-weight:bold;">${v}</span></div>`;
+                };
+                const fuEntries = _fuAll.filter(e => !_isBgFu(e[0])).sort((a, b) => b[1] - a[1]).slice(0, 12);
                 if (fuEntries.length) {
                     html += `<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:14px;margin-bottom:20px;">`;
                     html += `<div style="color:#ffd700;font-size:0.9rem;font-weight:bold;margin-bottom:10px;">🧭 新功能使用统计（累计次数 · 前十二）</div>`;
                     const _maxFu = fuEntries[0][1] || 1;
-                    fuEntries.forEach(([k, v]) => {
-                        const pct = Math.max(4, Math.round(v / _maxFu * 100));
-                        html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">` +
-                            `<span style="width:150px;flex-shrink:0;color:rgba(255,255,255,0.75);font-size:0.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${k}</span>` +
-                            `<div style="flex:1;height:10px;background:rgba(255,255,255,0.08);border-radius:5px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:linear-gradient(90deg,#ffd700,#ff9800);"></div></div>` +
-                            `<span style="width:52px;text-align:right;color:#ffd700;font-size:0.78rem;font-weight:bold;">${v}</span></div>`;
-                    });
+                    fuEntries.forEach(([k, v]) => { html += _fuBar(k, v, _maxFu, 150); });
                     html += `</div>`;
+                }
+                const fuBg = _fuAll.filter(e => _isBgFu(e[0])).sort((a, b) => b[1] - a[1]);
+                if (fuBg.length) {
+                    const _maxBg = fuBg[0][1] || 1;
+                    html += `<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:14px;margin-bottom:20px;">`;
+                    html += `<div style="color:#ffd700;font-size:0.9rem;font-weight:bold;margin-bottom:10px;">🎨 背景使用统计（具体到哪张图/哪套预设 · 累计次数）</div>`;
+                    html += `<div style="max-height:320px;overflow:auto;padding-right:4px;">`;
+                    fuBg.forEach(([k, v]) => { html += _fuBar(k, v, _maxBg, 200); });
+                    html += `</div></div>`;
                 }
             } catch (e) {}
 

@@ -1107,6 +1107,8 @@
                 box.innerHTML = '';
                 list.forEach(function (rec) {
                     const isVideo = !!(rec.blob && rec.blob.type && rec.blob.type.indexOf('video/') === 0);
+                    // 埋点取名用：id → 原始文件名（下面 name 会做 HTML 清洗，埋点要用未清洗的）
+                    try { if (rec && rec.id != null) bgImgNameCache[rec.id] = String(rec.name || (isVideo ? '视频' : '背景图')); } catch (e) {}
                     const u = URL.createObjectURL(rec.blob);
                     bgThumbUrls.push(u);
                     const name = String(rec.name || (isVideo ? '视频' : '背景图')).replace(/[<>&"']/g, '');
@@ -1143,13 +1145,51 @@
 
         window.__bgClearColors = function () { bgSelectedColors = []; renderBgColorList(); applyUserBackground(); };
 
+        // 🟢 2026-11-09 埋点细分：原来所有预设都记成「背景预设」、所有内置图都记成「内置背景图」，
+        //   看不出「具体哪张图火」。改成 label 支持函数，调用时按实参取名（背景预设:极光 / 内置背景图:城市 /
+        //   本机图片:xxx.jpg / 内置视频:xxx）。名字统一走 _bgCleanName：去掉冒号/竖线等会破坏埋点 key
+        //   （feature|<name>|USE）解析的字符，超长截断。
+        const bgImgNameCache = Object.create(null);   // IndexedDB 图片库 id → 文件名（面板渲染时填充）
+        const bgThemeNameCache = Object.create(null); // 内置视频主题 id → 主题名（面板渲染时填充）
+        function _bgCleanName(name) {
+            var n = String(name == null ? '' : name).replace(/\s+/g, ' ').trim();
+            n = n.replace(/[|:：\\\/\*\?"<>\u0000-\u001f]/g, '');
+            if (n.length > 18) {
+                var ext = /(\.[a-z0-9]{2,5})$/i.exec(n);
+                n = ext ? (n.slice(0, 12) + '…' + ext[1]) : (n.slice(0, 18) + '…');
+            }
+            return n;
+        }
+        function _bgLbl(prefix, name) {
+            var n = _bgCleanName(name);
+            return prefix + (n ? ':' + n : '');
+        }
+        function _bgBuiltinName(url) {
+            var u = String(url || '');
+            try {
+                for (var i = 0; i < BG_BUILTIN.length; i++) {
+                    if (BG_BUILTIN[i].url === u) return BG_BUILTIN[i].name;
+                }
+            } catch (e) {}
+            return (u.split('/').pop() || '').replace(/\.[a-z0-9]+$/i, '') || '未知';
+        }
+
         // 🔴 2026-09-18 新功能埋点：统一包装背景系统入口（延迟 1.5s 确保全部定义完成；2s 节流在 trackFeature 内）
         setTimeout(function () {
             try {
                 const wrap = function (key, label) {
                     const orig = window[key];
                     if (typeof orig !== 'function' || orig.__tracked) return;
-                    const tracked = function () { if (window.trackFeature) window.trackFeature(label); return orig.apply(this, arguments); };
+                    const tracked = function () {
+                        // 取名失败绝不能影响背景功能本身 → 整段包 try
+                        try {
+                            if (window.trackFeature) {
+                                const lb = (typeof label === 'function') ? label.apply(this, arguments) : label;
+                                if (lb) window.trackFeature(lb);
+                            }
+                        } catch (e) {}
+                        return orig.apply(this, arguments);
+                    };
                     tracked.__tracked = true;
                     window[key] = tracked;
                 };
@@ -1158,15 +1198,18 @@
                 wrap('__bgSetFrost', '面板底色调节');
                 wrap('__bgToggleVideoSound', '背景视频声音开关');
                 wrap('__bgSetVideoVolume', '背景视频音量调节');
-                wrap('__bgApplyTheme', '内置视频主题应用');
-                wrap('__setBgPreset', '背景预设');
-                wrap('__setBgBuiltin', '内置背景图');
+                wrap('__bgApplyTheme', function (id) { return _bgLbl('内置视频', bgThemeNameCache[id]); });
+                wrap('__setBgPreset', function (name) { return (name === 'default') ? '恢复默认背景' : _bgLbl('背景预设', name); });
+                wrap('__setBgBuiltin', function (url) { return _bgLbl('内置背景图', _bgBuiltinName(url)); });
                 wrap('__bgRandomGrad', '随机渐变');
                 wrap('__bgApplyGrad', '应用自选渐变');
-                wrap('__bgUseImage', '背景图切换');
-                wrap('__bgDeleteImage', '背景图删除');
+                wrap('__bgUseImage', function (id, kind) { return _bgLbl(kind === 'video' ? '本机视频' : '本机图片', bgImgNameCache[id]); });
+                wrap('__bgDeleteImage', function (id) { return _bgLbl('删除本机背景', bgImgNameCache[id]); });
                 wrap('__bgClearColors', '清空渐变色');
-                wrap('__bgFile', '上传背景');
+                wrap('__bgFile', function (file) { return _bgLbl('上传背景', (file && String(file.type || '').indexOf('video/') === 0) ? '视频' : '图片'); });
+                // 两个「删除」入口之前没埋：用户删了哪张内置图/哪套内置视频也值得看
+                wrap('__bgHideBuiltin', function (url) { return _bgLbl('删除内置背景', _bgBuiltinName(url)); });
+                wrap('__bgHideTheme', function (id) { return _bgLbl('删除内置视频', bgThemeNameCache[id]); });
             } catch (e) {}
         }, 1500);
         window.__bgApplyGrad = function () {
@@ -1189,6 +1232,8 @@
         };
 
         function openBackgroundSettings() {
+            // 打开面板本身也埋点（菜单项 onclick 直接引用本函数，包 window 属性包不住，所以写在这里）
+            try { if (window.trackFeature) window.trackFeature('背景设置·打开'); } catch (e) {}
             const old = document.getElementById('bgSettingsModal');
             if (old) old.remove();
             bgSelectedColors = [];
@@ -1408,6 +1453,7 @@
                 const hidden = bgHiddenThemes();
                 list.forEach(function (t) {
                     if (hidden.indexOf(t.id) >= 0) return;
+                    try { if (t && t.id) bgThemeNameCache[t.id] = String(t.name || '未命名'); } catch (e) {} // 埋点取名用
                     const active = cur === 'bvid:' + t.id;
                     const div = document.createElement('div');
                     div.style.cssText = 'position:relative;width:96px;text-align:center;';
