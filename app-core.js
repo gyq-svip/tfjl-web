@@ -33072,7 +33072,78 @@ ${maSection}
                         const ctx = c.getContext('2d');
                         ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
                         ctx.drawImage(img, 0, 0, w, h);
-                        try { resolve(c.toDataURL('image/jpeg', quality)); } catch (e) { resolve(dataUrl); }
+                        try {
+                            // 小图（≤420×420，通常是已裁好的二维码）用 PNG：二值图 PNG 体积更小且无损，扫码更稳
+                            const isSmall = w * h <= 420 * 420;
+                            resolve(isSmall ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', quality));
+                        } catch (e) { resolve(dataUrl); }
+                    };
+                    img.onerror = function () { resolve(dataUrl); };
+                    img.src = dataUrl;
+                } catch (e) { resolve(dataUrl); }
+            });
+        }
+        // 🟢 2026-11-09 自动裁出二维码：微信群二维码截图（360×540 这类固定模板）里，
+        //   二维码白块是全图最大的「近白」矩形（上下是深色背景 + 头像 + 群名 + 有效期小字）。
+        //   直接整图塞进方形框 → object-fit:contain 把二维码缩到只剩 ~75px，根本扫不出来。
+        //   这里扫描行列近白比例，取最长连续段当白块边界，裁成正方形再显示/保存。
+        //   不是这种模板（或已经是方图 / 跨域链接 / 太大）→ 原样返回，绝不冒险切坏。
+        function _cropQrImage(dataUrl) {
+            return new Promise(function (resolve) {
+                try {
+                    const img = new Image();
+                    img.onload = function () {
+                        try {
+                            const W = img.naturalWidth || img.width, H = img.naturalHeight || img.height;
+                            if (!W || !H) return resolve(dataUrl);
+                            // 已经接近正方形 → 认为已裁剪过，原样返回（避免二次裁剪越裁越小）
+                            if (Math.abs(W - H) <= Math.max(6, Math.round(Math.min(W, H) * 0.08))) return resolve(dataUrl);
+                            if (W * H > 4000000) return resolve(dataUrl);   // 超大图不做逐像素扫描
+                            const c = document.createElement('canvas');
+                            c.width = W; c.height = H;
+                            const ctx = c.getContext('2d');
+                            ctx.drawImage(img, 0, 0);
+                            const data = ctx.getImageData(0, 0, W, H).data;   // 跨域图会抛错 → 外层 catch 回退原图
+                            const isWhite = function (i) { return data[i] >= 232 && data[i + 1] >= 232 && data[i + 2] >= 232; };
+
+                            // ① 行：近白像素 ≥ 22% 的最长连续段（白块行 ≈ 30~60%，头像/文字行 < 10%）
+                            let best = null, cur = null;
+                            for (let y = 0; y < H; y++) {
+                                let n = 0;
+                                for (let x = 0; x < W; x++) if (isWhite((y * W + x) * 4)) n++;
+                                if (n / W >= 0.22) { if (!cur) cur = { y0: y, y1: y }; else cur.y1 = y; }
+                                else if (cur) { if (!best || cur.y1 - cur.y0 > best.y1 - best.y0) best = cur; cur = null; }
+                            }
+                            if (cur && (!best || cur.y1 - cur.y0 > best.y1 - best.y0)) best = cur;
+                            if (!best || best.y1 - best.y0 < H * 0.25) return resolve(dataUrl);
+
+                            // ② 列：在该行段内近白像素 ≥ 25% 的最长连续段
+                            let bx = null, cx = null;
+                            for (let x = 0; x < W; x++) {
+                                let n = 0;
+                                for (let y = best.y0; y <= best.y1; y++) if (isWhite((y * W + x) * 4)) n++;
+                                if (n / (best.y1 - best.y0 + 1) >= 0.25) { if (!cx) cx = { x0: x, x1: x }; else cx.x1 = x; }
+                                else if (cx) { if (!bx || cx.x1 - cx.x0 > bx.x1 - bx.x0) bx = cx; cx = null; }
+                            }
+                            if (cx && (!bx || cx.x1 - cx.x0 > bx.x1 - bx.x0)) bx = cx;
+                            if (!bx || bx.x1 - bx.x0 < W * 0.25) return resolve(dataUrl);
+
+                            const bw = bx.x1 - bx.x0 + 1, bh = best.y1 - best.y0 + 1;
+                            const ar = bw / bh;
+                            if (ar < 0.75 || ar > 1.34) return resolve(dataUrl);   // 不是方形白块 → 不裁
+
+                            const pad = 3;   // 留一点白边，别贴着定位角切
+                            const x0 = Math.max(0, bx.x0 - pad), y0 = Math.max(0, best.y0 - pad);
+                            const x1 = Math.min(W - 1, bx.x1 + pad), y1 = Math.min(H - 1, best.y1 + pad);
+                            const w = x1 - x0 + 1, h = y1 - y0 + 1;
+                            const c2 = document.createElement('canvas');
+                            c2.width = w; c2.height = h;
+                            const ctx2 = c2.getContext('2d');
+                            ctx2.fillStyle = '#fff'; ctx2.fillRect(0, 0, w, h);
+                            ctx2.drawImage(c, x0, y0, w, h, 0, 0, w, h);
+                            const out = c2.toDataURL('image/png');
+                            resolve(out && out.length > 200 ? out : dataUrl);
+                        } catch (e) { resolve(dataUrl); }
                     };
                     img.onerror = function () { resolve(dataUrl); };
                     img.src = dataUrl;
@@ -33080,6 +33151,8 @@ ${maSection}
             });
         }
         function _fabQrDayStart(t) { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
+        // 调试/自检入口（不影响业务）
+        try { window.__tfjlCropQr = _cropQrImage; } catch (e) {}
         function fabQrExpiryInfo(cfg) {
             const src = (cfg && cfg.fabQrcode) || '';
             if (!src) return null;                       // 未设置二维码 → 不显示倒计时
@@ -33147,7 +33220,15 @@ ${maSection}
                 cfg = real || cfg || {};
                 const src = (cfg && cfg.fabQrcode) || '';
                 const pv = document.getElementById('fabQrPreview');
-                if (pv) pv.innerHTML = src ? '<img src="' + src.replace(/"/g, '&quot;') + '" style="max-width:100%;max-height:100%;object-fit:contain;background:#fff;">' : '未设置';
+                if (pv) {
+                    pv.innerHTML = src ? '<img id="fabQrPreviewImg" src="' + src.replace(/"/g, '&quot;') + '" style="max-width:100%;max-height:100%;object-fit:contain;background:#fff;">' : '未设置';
+                    // 老数据是 360×540 整图 → 预览也按裁剪后的二维码显示（和管理员实际看到的用户端效果一致）
+                    if (src) _cropQrImage(src).then(function (out) {
+                        if (!out || out === src) return;
+                        const im = document.getElementById('fabQrPreviewImg');
+                        if (im) im.src = out;
+                    });
+                }
                 const u = document.getElementById('fabQrUrlInput');
                 if (u && /^https?:/i.test(src)) u.value = src;
                 const t = document.getElementById('fabQrTipInput');
@@ -33186,8 +33267,17 @@ ${maSection}
             }
             window.__fabQrPending = data;
             const pv = document.getElementById('fabQrPreview');
-            if (pv) pv.innerHTML = '<img src="' + data.replace(/"/g, '&quot;') + '" style="max-width:100%;max-height:100%;object-fit:contain;background:#fff;">';
+            if (pv) pv.innerHTML = '<img id="fabQrPreviewImg" src="' + data.replace(/"/g, '&quot;') + '" style="max-width:100%;max-height:100%;object-fit:contain;background:#fff;">';
             if (st) st.textContent = '✅ ' + (srcLabel || '图片') + '已就绪，点「保存」生效';
+            // 先显示原图，随后换成自动裁出的二维码（同时把待保存内容也换成裁剪后的，省一次计算）
+            _cropQrImage(data).then(function (out) {
+                if (!out || out === data) return;
+                window.__fabQrPending = out;
+                const im = document.getElementById('fabQrPreviewImg');
+                if (im) im.src = out;
+                const s2 = document.getElementById('fabQrStatus');
+                if (s2) s2.textContent = '✅ ' + (srcLabel || '图片') + '已就绪（已自动裁出二维码），点「保存」生效';
+            });
             return true;
         }
 
@@ -33233,10 +33323,12 @@ ${maSection}
             const tip = (tipEl && tipEl.value.trim()) ? tipEl.value.trim() : '扫码加群';
             try {
                 if (st) st.textContent = '保存中…';
-                // 粘贴的是图片 → 先压缩（缩到 240px 宽，JPEG），再存到独立 Gist，避免撑爆索引
+                // 粘贴的是图片 → 先自动裁出二维码白块（360×540 模板上只留二维码那 270×270），再压缩
                 if (val && /^data:image\//i.test(val)) {
+                    if (st) st.textContent = '正在裁出二维码…';
+                    val = await _cropQrImage(val);
                     if (st) st.textContent = '正在压缩图片…';
-                    val = await _compressQrImage(val, 240, 0.8);
+                    val = await _compressQrImage(val, 420, 0.86);
                 }
                 const ts = val ? Date.now() : '';   // 记录保存时间 → 7 天有效期倒计时基准
                 if (val) {
@@ -33295,10 +33387,17 @@ ${maSection}
                 const tip = (cfg && cfg.fabQrcodeTip) || '扫码加群';
                 const box = document.createElement('div');
                 box.id = 'fabQrcodePop';
-                box.style.cssText = 'display:none;position:fixed;right:70px;bottom:150px;z-index:1300;padding:12px;background:rgba(18,20,38,0.98);border:1px solid rgba(79,195,247,0.55);border-radius:12px;box-shadow:0 10px 34px rgba(0,0,0,0.55);text-align:center;';
-                box.innerHTML = '<img src="' + src.replace(/"/g, '&quot;') + '" style="width:150px;height:150px;object-fit:contain;display:block;border-radius:8px;background:#fff;">'
+                box.style.cssText = 'display:none;position:fixed;right:70px;bottom:150px;z-index:1300;padding:10px;background:rgba(18,20,38,0.98);border:1px solid rgba(79,195,247,0.55);border-radius:12px;box-shadow:0 10px 34px rgba(0,0,0,0.55);text-align:center;';
+                // 尺寸 150 → 216：微信群二维码原图 360×540，整图 contain 到 150 方框后二维码只剩 ~75px，扫不动
+                box.innerHTML = '<img id="fabQrcodeImg" src="' + src.replace(/"/g, '&quot;') + '" style="width:216px;max-width:58vw;aspect-ratio:1/1;height:auto;object-fit:contain;display:block;border-radius:8px;background:#fff;">'
                     + '<div style="margin-top:8px;color:#fff;font-size:0.75rem;">' + String(tip).replace(/</g, '&lt;') + '</div>';
                 document.body.appendChild(box);
+                // 自动裁出二维码白块后再替换（老数据是整图 → 这里裁；已是方图/跨域链接则原样）
+                _cropQrImage(src).then(function (out) {
+                    if (!out || out === src) return;
+                    const im = document.getElementById('fabQrcodeImg');
+                    if (im) im.src = out;
+                });
                 let timer = null;
                 const show = function () { if (timer) { clearTimeout(timer); timer = null; } box.style.display = 'block'; };
                 const hide = function () { if (timer) clearTimeout(timer); timer = setTimeout(function () { box.style.display = 'none'; }, 200); };
