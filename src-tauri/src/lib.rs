@@ -57,7 +57,7 @@ fn register_heartbeat(
 }
 
 // 只更新 counter Gist 中「本设备」的 online_users 条目，保留其它字段/其它设备，避免覆盖丢数据。
-async fn do_gist_heartbeat(ctx: &HeartbeatCtx) -> Result<(), String> {
+async fn do_gist_heartbeat(ctx: &HeartbeatCtx, hidden: bool) -> Result<(), String> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
         .build()
@@ -117,10 +117,12 @@ async fn do_gist_heartbeat(ctx: &HeartbeatCtx) -> Result<(), String> {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0);
-    online.insert(
-        ctx.device_id.clone(),
-        serde_json::json!({ "t": now_ms, "nick": nick, "src": "app", "bg": 1 }),
-    );
+    // bg=1 只在「窗口不可见（收托盘/最小化）」时写；前台可见时不写，避免数据分析里出现假「托盘」
+    let mut ol_rec = serde_json::json!({ "t": now_ms, "nick": nick, "src": "app" });
+    if hidden {
+        ol_rec["bg"] = serde_json::json!(1);
+    }
+    online.insert(ctx.device_id.clone(), ol_rec);
 
     let new_content = serde_json::to_string(&counter).map_err(|e| format!("serialize: {}", e))?;
     let patch_body = serde_json::json!({ "files": { "counter.json": { "content": new_content } } });
@@ -3541,7 +3543,14 @@ pub fn run() {
                         let ctx_opt = st.heartbeat.lock().unwrap().clone();
                         if let Some(ctx) = ctx_opt {
                             if !ctx.token.is_empty() && !ctx.counter_gist_id.is_empty() {
-                                if let Err(e) = tauri::async_runtime::block_on(do_gist_heartbeat(&ctx)) {
+                                // 🟢 2026-11-11 托盘标记按真实可见性写：窗口隐藏/最小化才 bg=1，
+                                //    否则前台挂着的桌面端也会被算成「托盘」（数据分析里出现假托盘）。
+                                let hidden = hb_app
+                                    .get_webview_window("main")
+                                    .and_then(|w| w.is_visible().ok())
+                                    .map(|v| !v)
+                                    .unwrap_or(false);
+                                if let Err(e) = tauri::async_runtime::block_on(do_gist_heartbeat(&ctx, hidden)) {
                                     eprintln!("[heartbeat] tick failed: {}", e);
                                 }
                                 // 管理员指令检查：拉取 admin_ctl Gist，命中本设备则唤起窗口 + emit 前端处理

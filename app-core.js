@@ -10837,28 +10837,80 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
         //    卡牌悬停优先展示这里的信息（职业/被动/当前等级档位强化），官方没有的英雄回落旧 heroAttrsData。
         let __officialLoading = false;
         let __officialLoadingPromise = null;
+        // 🟢 2026-11-11 「面板打开慢」修复（APP 端）：
+        //    桌面版窗口 URL 是 https://gyq-svip.github.io/tfjl-web/，所以 data/heroes.json、
+        //    data/hero-spine/index.json 这类相对路径请求**全走网络**（骨骼/皮肤图才在本地包里）。
+        //    原来首开面板必须等这两个请求回来才起播 → 国内几秒级白等。
+        //    现在：本机 localStorage 缓存先顶上（毫秒级），网络在后台静默刷新；首开无缓存才等，且有超时兜底。
+        const HEROES_CACHE_KEY = 'TFJL_Heroes_Cache_V1';
+        const SPINE_IDX_CACHE_KEY = 'TFJL_SpineIndex_Cache_V1';
+        function _heroesMapFrom(arr) {
+            const m = {};
+            (arr || []).forEach(function (h) { if (h && h.name && !m[h.name]) m[h.name] = h; });
+            return m;
+        }
+        function _cacheRead(key, needArray) {
+            try {
+                const o = JSON.parse(localStorage.getItem(key) || 'null');
+                if (!o || !o.data) return null;
+                if (needArray && !Array.isArray(o.data)) return null;
+                return o;
+            } catch (e) { return null; }
+        }
+        function _cacheWrite(key, data) {
+            try { localStorage.setItem(key, JSON.stringify({ t: Date.now(), data: data })); }
+            catch (e) { try { localStorage.removeItem(key); } catch (e2) {} } // 配额不足就放弃缓存，不影响功能
+        }
+        function _siteBase() {
+            const p = location.pathname;
+            return p.endsWith('/') ? p : (p.lastIndexOf('/') >= 0 ? p.slice(0, p.lastIndexOf('/') + 1) : '/');
+        }
+        function _fetchJsonTimeout(url, timeoutMs) {
+            return new Promise(function (resolve) {
+                let done = false;
+                const finish = function (v) { if (done) return; done = true; resolve(v || null); };
+                const timer = setTimeout(function () { finish(null); }, timeoutMs || 2500);
+                try {
+                    fetch(url, { cache: 'no-store' })
+                        .then(function (r) { return r.ok ? r.json() : null; })
+                        .then(function (j) { clearTimeout(timer); finish(j); })
+                        .catch(function () { clearTimeout(timer); finish(null); });
+                } catch (e) { clearTimeout(timer); finish(null); }
+            });
+        }
         function ensureOfficialHeroes() {
             if (window.heroesOfficialMap) return Promise.resolve();
             // 若图鉴已加载过，直接复用其缓存
             if (window.__heroCodexCache) {
-                const m = {};
-                window.__heroCodexCache.forEach(function (h) { if (h.name && !m[h.name]) m[h.name] = h; });
-                window.heroesOfficialMap = m;
+                window.heroesOfficialMap = _heroesMapFrom(window.__heroCodexCache);
                 return Promise.resolve();
             }
+            // ① 本机缓存：立即返回，后台静默刷新
+            const cached = _cacheRead(HEROES_CACHE_KEY, true);
+            if (cached) {
+                window.heroesOfficialMap = _heroesMapFrom(cached.data);
+                __officialLoading = true;
+                __officialLoadingPromise = Promise.resolve();
+                _fetchJsonTimeout(_siteBase() + 'data/heroes.json?t=' + Date.now(), 15000).then(function (arr) {
+                    if (arr && arr.length) {
+                        _cacheWrite(HEROES_CACHE_KEY, arr);
+                        window.heroesOfficialMap = _heroesMapFrom(arr);
+                    }
+                    __officialLoading = false;
+                });
+                return Promise.resolve();
+            }
+            // ② 首开无缓存：等网络，但 6 秒兜底（超时就先出面板，后台拉到后写缓存，下次秒开）
             if (__officialLoading && __officialLoadingPromise) return __officialLoadingPromise;
             __officialLoading = true;
-            __officialLoadingPromise = new Promise(function (resolve) {
-                try {
-                    const p = location.pathname;
-                    const base = p.endsWith('/') ? p : (p.lastIndexOf('/') >= 0 ? p.slice(0, p.lastIndexOf('/') + 1) : '/');
-                    fetch(base + 'data/heroes.json').then(function (r) { return r.json(); }).then(function (arr) {
-                        const m = {};
-                        (arr || []).forEach(function (h) { if (h.name && !m[h.name]) m[h.name] = h; });
-                        window.heroesOfficialMap = m;
-                        resolve();
-                    }).catch(function () { resolve(); });
-                } catch (e) { resolve(); }
+            __officialLoadingPromise = _fetchJsonTimeout(_siteBase() + 'data/heroes.json?t=' + Date.now(), 6000).then(function (arr) {
+                if (arr && arr.length) {
+                    _cacheWrite(HEROES_CACHE_KEY, arr);
+                    window.heroesOfficialMap = _heroesMapFrom(arr);
+                } else {
+                    window.heroesOfficialMap = window.heroesOfficialMap || {};
+                }
+                __officialLoading = false;
             });
             return __officialLoadingPromise;
         }
@@ -12533,9 +12585,18 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 return ''
             }
             // 按当前皮肤起播/重播动画（换皮肤后调用即切换模型）
-            function hdPlaySpine() {
+            async function hdPlaySpine() {
                 try {
                     if (!window.spineHero || !meta || !meta.spine || !cv.isConnected) return
+                    // 🟢 2026-11-11 APP 刚启动时本地资源包还没探测完，直接播会从 github.io 拉骨骼/贴图
+                    //    （慢到好几秒才出动画）。这里最多等 1.2s 让本地源就绪；等不到就按原逻辑走网络。
+                    if (!window.__HERO_SPINE_ASSET_BASE && window.__tfjlSpineBasePromise) {
+                        await Promise.race([
+                            window.__tfjlSpineBasePromise,
+                            new Promise(function (r) { setTimeout(r, 1200) })
+                        ])
+                        if (!cv.isConnected) return
+                    }
                     // 🟢 2026-11-04 皮肤可指定独立目录（幻精灵的紫金铃铛/孔明灯模型在 jingling，英雄默认在 jingling1）
                     const _skinRow = (meta.skins || []).find(function (s) { return s.note === curSkin })
                     const _folder = (_skinRow && _skinRow.folder) || meta.spine
@@ -12608,20 +12669,47 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     //   死神 shen01/shen02 不隐藏（飞起）、光精灵 玉玺/令牌/金饭碗 本体被 dedupe 删（带灰刀/空白）。
                     //   故用 __heroSpineIdxOnline 标记「这份是线上/已合并线上」，没标记就重新拉。
                     if (window.__heroSpineIndex && window.__heroSpineIdxOnline) return window.__heroSpineIndex
-                    const p = location.pathname
-                    const b = p.endsWith('/') ? p : (p.lastIndexOf('/') >= 0 ? p.slice(0, p.lastIndexOf('/') + 1) : '/')
+                    const b = _siteBase()
+                    // 🟢 2026-11-11 缓存优先（和 heroes.json 同一套思路）：
+                    //    桌面端 URL 是 github.io，原来这里每次都回源 index.json?t=...，网络慢就白等好几秒
+                    //    才起播骨骼（骨骼文件明明都在本地包）。现在先拿本机缓存清单**立即起播**，
+                    //    线上清单在后台拉回来、合并本地独有条目后写缓存，下次用新配置。
+                    const _cachedIdx = _cacheRead(SPINE_IDX_CACHE_KEY, false)
+                    if (_cachedIdx && _cachedIdx.data && typeof _cachedIdx.data === 'object') {
+                        const _j0 = Object.assign({}, _cachedIdx.data)
+                        const _old0 = window.__heroSpineIndex
+                        if (_old0 && typeof _old0 === 'object') {
+                            for (const k of Object.keys(_old0)) if (!_j0[k]) _j0[k] = _old0[k]
+                        }
+                        window.__heroSpineIndex = _j0
+                        window.__heroSpineIdxOnline = true   // 缓存本身就是「线上清单」的快照
+                        _fetchJsonTimeout(b + 'data/hero-spine/index.json?t=' + Date.now(), 20000).then(function (_jn) {
+                            if (!_jn || typeof _jn !== 'object') return
+                            _cacheWrite(SPINE_IDX_CACHE_KEY, _jn)
+                            if (!window.__heroSpineIdxOnline) return
+                            const _cur = window.__heroSpineIndex || {}
+                            for (const k of Object.keys(_cur)) if (!_jn[k]) _jn[k] = _cur[k]
+                            window.__heroSpineIndex = _jn
+                        })
+                        return window.__heroSpineIndex
+                    }
                     // 🔴 2026-11-04 索引清单必须回源（带时间戳绕开 SW 缓存键）：
                     //   https 下 sw.js 曾把 data/hero-spine/index.json 走 cacheFirst，且 cacheFirst 会无视
                     //   cache:'no-store' → 桌面端永远读到旧清单（缺 modelHideSlots/modelNoDedupe）→
                     //   死神飞起、光精灵玉玺/令牌/金饭碗面板不显示。加时间戳后缓存键必 miss，强制回源。
                     //   本地包独有条目（线上没有的英雄目录）继续保留，避免本地包独有的模型失联。
-                    const _j = await (await fetch(b + 'data/hero-spine/index.json?t=' + Date.now())).json()
-                    const _old = window.__heroSpineIndex
-                    if (_old && typeof _old === 'object') {
-                        for (const k of Object.keys(_old)) if (!_j[k]) _j[k] = _old[k]
+                    const _j = await _fetchJsonTimeout(b + 'data/hero-spine/index.json?t=' + Date.now(), 2500)
+                    if (_j) {
+                        const _old = window.__heroSpineIndex
+                        if (_old && typeof _old === 'object') {
+                            for (const k of Object.keys(_old)) if (!_j[k]) _j[k] = _old[k]
+                        }
+                        window.__heroSpineIndex = _j
+                        window.__heroSpineIdxOnline = true
+                        _cacheWrite(SPINE_IDX_CACHE_KEY, _j)
+                    } else if (!window.__heroSpineIndex) {
+                        window.__heroSpineIndex = {}
                     }
-                    window.__heroSpineIndex = _j
-                    window.__heroSpineIdxOnline = true
                 } catch (e) { window.__heroSpineIndex = window.__heroSpineIndex || {} }
                 return window.__heroSpineIndex
             })()
@@ -12681,8 +12769,16 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                 const isTauri = !!(window.__TAURI_INTERNALS__ || window.__TAURI__ || location.protocol === 'tauri:' || location.protocol === 'asset:')
                 if (!isTauri) return
                 let tries = 0
-                const timer = setInterval(async function () {
+                // 🟢 2026-11-11 立即探测（原来第一次要等 5 秒）：用户开机就点英雄，这时还没切到本地源
+                //    → 骨骼/图集/贴图全从 github.io 拉，慢到要等好几秒才出动画。
+                //    现在启动即探测一次，之后 1.5s 一轮；探测成功通过 __tfjlSpineBasePromise 放行等待方。
+                try {
+                    window.__tfjlSpineBasePromise = new Promise(function (res) { window.__tfjlSpineBaseResolve = res })
+                } catch (e) {}
+                let timer = null
+                const runProbe = async function () {
                     tries++
+                    if (window.__HERO_SPINE_ASSET_BASE) { if (timer) clearInterval(timer); return }
                     try {
                         const reg = window.skinRegistry || {}
                         let sample = ''
@@ -12701,6 +12797,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             const j = await r.json()
                             if (j && typeof j === 'object' && Object.keys(j).length) {
                                 window.__HERO_SPINE_ASSET_BASE = probe.replace(/index\.json$/, '')
+                                try { if (window.__tfjlSpineBaseResolve) window.__tfjlSpineBaseResolve(true) } catch (e) {}
                                 // 🔴 2026-10-22 本地索引补配置：桌面端解压的动画整包可能是旧版
                                 //   （缺 scale/offsetX 逐英雄配置 → 大小修正不生效）。用线上索引的
                                 //   同名配置覆盖本地副本（资源 URL 仍走本地 base，只同步数值）。
@@ -12752,8 +12849,10 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                             }
                         }
                     } catch (e) {}
-                    if (tries >= 8) clearInterval(timer)
-                }, 5000)
+                    if (tries >= 8 && timer) clearInterval(timer)
+                }
+                runProbe()                             // 启动立即探测一次
+                timer = setInterval(runProbe, 1500)    // 之后 1.5s 一轮，最多 8 轮
             } catch (e) {}
         })()
 
@@ -20860,14 +20959,64 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
             target.offline_history = arr;
         }
         // 桌面端：窗口隐藏（最小化到托盘）不再视为下线——托盘挂机仍在后台跑心跳，仍计入在线（s1.0.107）
+        // 🔴 2026-11-11 修复「数据分析里几乎看不到·托盘」：
+        //    原来只监听 DOM 的 visibilitychange，但 Tauri 点 X 是 Rust 侧 prevent_close() + window.hide()，
+        //    WebView2 不保证把 document.visibilityState 变成 hidden → _windowHidden 长期为 false
+        //    → 心跳写进 Gist 的记录没有 bg 字段 → 后台不显示「·托盘」。
+        //    （背景视频那边早就踩过同一个坑，最终用的是「visibility + 焦点/最小化/可见性 + Rust 事件」多路判定，
+        //      这里直接对齐那套，另外补 30 秒兜底轮询和关闭事件，任何一路命中就更新。）
         function setupWindowHiddenDetection() {
             if (!window.__TAURI__) return;
-            document.addEventListener('visibilitychange', function () {
-                _windowHidden = (document.visibilityState === 'hidden');
+            const applyHidden = function (hidden, why) {
+                const next = !!hidden;
+                if (next === _windowHidden) return;
+                _windowHidden = next;
+                try { window.__tfjlHiddenState = { hidden: next, why: why || '', at: Date.now() }; } catch (e) {}
                 // 隐藏/恢复瞬间都补一次心跳并同步：托盘期间定时器会被 WebView 节流，先把最新时间戳写上去
                 keepSelfOnlineLocal();
                 if (isOnline()) syncCounterToGist();
+            };
+            document.addEventListener('visibilitychange', function () {
+                applyHidden(document.visibilityState === 'hidden', 'visibility');
             });
+            try {
+                const T = window.__TAURI__;
+                const W = T && T.window;
+                const win = (W && typeof W.getCurrentWindow === 'function') ? W.getCurrentWindow() : null;
+                // 精确查询：真最小化 或 窗口不可见（收托盘）才算后台；单纯被别的窗口盖住不算
+                const probe = function (why) {
+                    if (!win) return;
+                    const pm = (typeof win.isMinimized === 'function') ? win.isMinimized().catch(function () { return false; }) : Promise.resolve(false);
+                    const pv = (typeof win.isVisible === 'function') ? win.isVisible().catch(function () { return true; }) : Promise.resolve(true);
+                    Promise.all([pm, pv]).then(function (r) {
+                        applyHidden(!!r[0] || r[1] === false || document.visibilityState === 'hidden', why);
+                    }).catch(function () {});
+                };
+                if (win && typeof win.onFocusChanged === 'function') {
+                    const p = win.onFocusChanged(function (e) {
+                        if (e && e.payload) { applyHidden(false, 'focus'); return; }  // 重新聚焦
+                        probe('blur');                                                // 失焦后再精确判定
+                    });
+                    if (p && p.catch) p.catch(function () {});
+                }
+                // 点 X 收托盘：Rust 会 prevent_close + hide()，这里先记一笔（不必 preventDefault）
+                if (win && typeof win.onCloseRequested === 'function') {
+                    try {
+                        const pc = win.onCloseRequested(function () { applyHidden(true, 'close-to-tray'); });
+                        if (pc && pc.catch) pc.catch(function () {});
+                    } catch (e) {}
+                }
+                if (win && typeof win.isVisible === 'function') {
+                    probe('init');
+                    setInterval(function () { probe('poll'); }, 30000); // 兜底：所有事件都漏掉时也能纠正
+                }
+                const E = T && T.event;
+                if (E && typeof E.listen === 'function') {
+                    // Rust 端精确事件（lib.rs：Focused(false)+is_minimized → tfjl-minimized；Focused(true) → tfjl-restored）
+                    try { const p3 = E.listen('tfjl-minimized', function () { applyHidden(true, 'minimized'); }); if (p3 && p3.catch) p3.catch(function () {}); } catch (e) {}
+                    try { const p4 = E.listen('tfjl-restored', function () { applyHidden(false, 'restored'); }); if (p4 && p4.catch) p4.catch(function () {}); } catch (e) {}
+                }
+            } catch (e) {}
         }
 
         function saveCounterToCache(data) {
