@@ -268,6 +268,36 @@ if ($gitExit -ne 0) {
     exit 1
 }
 
+# ---------------- 6. 只保留最近 2 版资源包（Gitee 发行版附件总配额 1GB，不清理会越堆越满） ----------------
+#   说明：skins-*.zip / spine-*.zip 同时间戳成对出现；这里按时间戳分组，保留最新 2 组，
+#   更早的附件直接删掉（release 与 tag 保留，历史版本页仍在，只是不再占配额）。
+try {
+    Write-Step "清理旧版本资源包（保留最近 2 版）..."
+    $relId = $rel.id
+    $listUrl = "https://gitee.com/api/v5/repos/$Owner/$Repo/releases/$relId/attach_files?access_token=$tok"
+    $attached = Invoke-RestMethod -Uri $listUrl -Method Get -TimeoutSec 60
+    $packaged = @($attached | Where-Object { $_.name -match '^(skins|spine)-\d{8}-\d{6}\.zip$' })
+    $stamps = @($packaged | ForEach-Object { ($_.name -replace '^(skins|spine)-', '' -replace '\.zip$', '') } | Sort-Object -Unique -Descending)
+    $keepStamps = @($stamps | Select-Object -First 2)
+    $removed = 0; $freed = 0
+    foreach ($f in $packaged) {
+        $st = ($f.name -replace '^(skins|spine)-', '' -replace '\.zip$', '')
+        if ($keepStamps -contains $st) { continue }
+        try {
+            $delUrl = "https://gitee.com/api/v5/repos/$Owner/$Repo/releases/$relId/attach_files/$($f.id)?access_token=$tok"
+            Invoke-RestMethod -Uri $delUrl -Method Delete -TimeoutSec 60 | Out-Null
+            $removed++; $freed += [double]$f.size
+        } catch { }
+    }
+    if ($removed -gt 0) {
+        Write-Host "[SKIN-PUB]    已清理 $removed 个旧附件，释放 $([math]::Round($freed / 1MB, 1)) MB（保留版本：$($keepStamps -join ' / ')）" -ForegroundColor DarkGray
+    } else {
+        Write-Host "[SKIN-PUB]    无需清理（当前仅 $($stamps.Count) 版）" -ForegroundColor DarkGray
+    }
+} catch {
+    Write-Host "[SKIN-PUB]    旧包清理跳过：$($_.Exception.Message)" -ForegroundColor Yellow
+}
+
 Write-Host "[SKIN-PUB] ✅ 发布完成：$pkgName（$skinCount 个皮肤，$( [math]::Round($zipSize/1MB,2) ) MB）" -ForegroundColor Green
 if ($spinePkgName) {
     Write-Host "[SKIN-PUB]    动画包：$spinePkgName（$($spineFiles.Count) 个文件，$( [math]::Round($spineZipSize/1MB,2) ) MB）" -ForegroundColor Green
