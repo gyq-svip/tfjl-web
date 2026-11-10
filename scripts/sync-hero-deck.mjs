@@ -95,8 +95,13 @@ function tableRows(csv) {
 }
 function loadOfficialTables(cacheDir) {
   const std = path.join(cacheDir, 'staticTableData')
+  // 🔴 2026-11-10 按修改时间取最新表包（原来按文件大小排序：新版表包可能更小 → 误用旧包）
   const files = fs.readdirSync(std).filter((f) => f.endsWith('.json'))
-    .sort((a, b) => fs.statSync(path.join(std, b)).size - fs.statSync(path.join(std, a)).size)
+    .sort((a, b) => {
+      const ma = fs.statSync(path.join(std, a)).mtimeMs
+      const mb = fs.statSync(path.join(std, b)).mtimeMs
+      return mb - ma || fs.statSync(path.join(std, b)).size - fs.statSync(path.join(std, a)).size
+    })
   if (!files.length) throw new Error('staticTableData 里没有表包 JSON')
   const bundle = files[0]
   const data = JSON.parse(fs.readFileSync(path.join(std, bundle), 'utf8'))

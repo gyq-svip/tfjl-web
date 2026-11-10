@@ -5342,6 +5342,11 @@
           "quality": 3,
           "extraPassive": "额外被动：上阵5法师时，全体PVE战斗中无视冰盾效果",
           "hp": "+2400"
+        },
+        "冰雪·电法": {
+          "quality": 3,
+          "extraPassive": "额外被动：上阵3法师时，全体免疫控制效果",
+          "hp": "+2400"
         }
       },
       "skillVersions": {
@@ -25075,6 +25080,202 @@
             "desc": "对单个目标造成100%攻击伤害，且附带撕裂效果，持续6秒(可叠加180层)。"
           }
         ],
+        "skin": []
+      }
+    },
+    "蜜蜂": {
+      "id": 80103,
+      "profession": "猎人",
+      "cardType": "英雄卡",
+      "attackRange": "不显示",
+      "maxStar": 4,
+      "starParam": [
+        100,
+        300,
+        800,
+        1600,
+        2400
+      ],
+      "base": {
+        "activeSkill": {
+          "name": "蜜蜂",
+          "desc": "技能：对最多5个目标造成100%攻击伤害，且附带腐蚀效果，持续6秒。",
+          "cd": 1500,
+          "dmg": 100
+        },
+        "initialPassive": {
+          "name": "被动：蜂刺",
+          "desc": "初始被动 腐蚀效果每秒造成0.5%生命上限物理伤害"
+        },
+        "fullStarPassive": {
+          "name": "满星被动：蜂刺",
+          "desc": "满星被动 腐蚀效果可以叠加30层"
+        },
+        "mohuaPassive": {
+          "name": "魔化被动",
+          "desc": "攻击附带目标2%生命上限伤害"
+        }
+      },
+      "talents": {
+        "3": {
+          "changeDesc": {
+            "name": "初始被动强化",
+            "desc": "腐蚀效果每秒造成1%生命上限物理伤害"
+          },
+          "initialPassive": {
+            "name": "初始被动",
+            "desc": "腐蚀效果每秒造成1%生命上限物理伤害"
+          },
+          "fullStarPassive": {
+            "name": "满星被动",
+            "desc": "腐蚀效果可以叠加30层"
+          },
+          "mohuaPassive": {
+            "name": "魔化被动",
+            "desc": "攻击附带目标2%生命上限伤害"
+          }
+        },
+        "6": {
+          "changeDesc": {
+            "name": "满星被动强化",
+            "desc": "腐蚀可以叠加60层"
+          },
+          "initialPassive": {
+            "name": "初始被动",
+            "desc": "腐蚀效果每秒造成1%生命上限物理伤害"
+          },
+          "fullStarPassive": {
+            "name": "满星被动",
+            "desc": "腐蚀效果可以叠加60层"
+          },
+          "mohuaPassive": {
+            "name": "魔化被动",
+            "desc": "攻击附带目标2%生命上限伤害"
+          }
+        },
+        "9": {
+          "changeDesc": {
+            "name": "额外被动",
+            "desc": "每上阵1个猎人，自身基础攻速-0.1秒"
+          },
+          "initialPassive": {
+            "name": "初始被动",
+            "desc": "腐蚀效果每秒造成1%生命上限物理伤害"
+          },
+          "fullStarPassive": {
+            "name": "满星被动",
+            "desc": "腐蚀效果可以叠加60层"
+          },
+          "mohuaPassive": {
+            "name": "魔化被动",
+            "desc": "攻击附带目标2%生命上限伤害"
+          }
+        },
+        "12": {
+          "changeDesc": {
+            "name": "初始被动强化",
+            "desc": "腐蚀效果每秒造成1.5%生命上限物理伤害"
+          },
+          "initialPassive": {
+            "name": "初始被动",
+            "desc": "腐蚀效果每秒造成1.5%生命上限物理伤害"
+          },
+          "fullStarPassive": {
+            "name": "满星被动",
+            "desc": "腐蚀效果可以叠加60层"
+          },
+          "mohuaPassive": {
+            "name": "魔化被动",
+            "desc": "攻击附带目标2%生命上限伤害"
+          }
+        },
+        "15": {
+          "changeDesc": {
+            "name": "满星被动强化",
+            "desc": "腐蚀可以叠加120层"
+          },
+          "initialPassive": {
+            "name": "初始被动",
+            "desc": "腐蚀效果每秒造成1.5%生命上限物理伤害"
+          },
+          "fullStarPassive": {
+            "name": "满星被动",
+            "desc": "腐蚀效果可以叠加120层"
+          },
+          "mohuaPassive": {
+            "name": "魔化被动",
+            "desc": "攻击附带目标2%生命上限伤害"
+          }
+        },
+        "18": {
+          "changeDesc": {
+            "name": "额外被动",
+            "desc": "每上阵1个猎人，自身基础攻速-0.2秒"
+          },
+          "initialPassive": {
+            "name": "初始被动",
+            "desc": "腐蚀效果每秒造成1.5%生命上限物理伤害"
+          },
+          "fullStarPassive": {
+            "name": "满星被动",
+            "desc": "腐蚀效果可以叠加120层"
+          },
+          "mohuaPassive": {
+            "name": "魔化被动",
+            "desc": "攻击附带目标2%生命上限伤害"
+          }
+        },
+        "21": {
+          "changeDesc": {
+            "name": "初始被动强化",
+            "desc": "腐蚀效果每秒造成2%生命上限物理伤害"
+          },
+          "initialPassive": {
+            "name": "初始被动",
+            "desc": "腐蚀效果每秒造成2%生命上限物理伤害"
+          },
+          "fullStarPassive": {
+            "name": "满星被动",
+            "desc": "腐蚀效果可以叠加120层"
+          },
+          "mohuaPassive": {
+            "name": "魔化被动",
+            "desc": "攻击附带目标2%生命上限伤害"
+          }
+        },
+        "24": {
+          "changeDesc": {
+            "name": "满星被动强化",
+            "desc": "腐蚀可以叠加180层"
+          },
+          "initialPassive": {
+            "name": "初始被动",
+            "desc": "腐蚀效果每秒造成2%生命上限物理伤害"
+          },
+          "fullStarPassive": {
+            "name": "满星被动",
+            "desc": "腐蚀效果可以叠加180层"
+          },
+          "mohuaPassive": {
+            "name": "魔化被动",
+            "desc": "攻击附带目标2%生命上限伤害"
+          }
+        }
+      },
+      "skins": {},
+      "skillVersions": {
+        "normal": [
+          {
+            "level": 1,
+            "skillId": "80103",
+            "version": "基础",
+            "name": "蜜蜂",
+            "cd": 1500,
+            "desc": "对最多5个目标造成100%攻击伤害，且附带腐蚀效果，持续6秒。"
+          }
+        ],
+        "mohua": [],
+        "gold": [],
         "skin": []
       }
     }

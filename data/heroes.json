@@ -8865,6 +8865,24 @@
     "note": "华山掌门·电法",
     "model": "huashanzhangmen",
     "folder": "dianhun"
+   },
+   {
+    "id": "382",
+    "itemId": "338226",
+    "heroItemId": "26",
+    "level": "1",
+    "describe": "额外被动：上阵3法师时，全体免疫控制效果",
+    "skillIdList": "338226",
+    "EffectType": "",
+    "extraParam": "冰雪礼包获得",
+    "extraParam2": "",
+    "extraParam3": "",
+    "extraInfoType": "",
+    "extraInfo": "",
+    "heroSkinHp": "2400",
+    "note": "冰雪·电法",
+    "model": "bingxuedianfa",
+    "folder": "dianhun"
    }
   ]
  },
@@ -21197,7 +21215,8 @@
     "extraInfo": "3",
     "heroSkinHp": "3600",
     "note": "打狗棒·邪能火炮",
-    "model": "dagoubang"
+    "model": "dagoubang",
+    "folder": "jianongpao"
    }
   ]
  },
@@ -24533,7 +24552,7 @@
     "itemId": "325968",
     "heroItemId": "68",
     "level": "1",
-    "describe": "额外被动：满星后，自身召唤的雷云基础攻速+100%",
+    "describe": "额外被动：满星后，从远端召唤静止的雷云，且基础攻速+100%、技能范围+50%",
     "skillIdList": "",
     "EffectType": "",
     "extraParam": "黄巾起义礼包获得",
@@ -31329,7 +31348,8 @@
     "extraInfo": "",
     "heroSkinHp": "3600",
     "note": "赵无极·邪",
-    "model": "zhaowuji"
+    "model": "zhaowuji",
+    "folder": "xie"
    }
   ]
  },
@@ -36817,7 +36837,7 @@
   "positioning": "",
   "heroColor": 4,
   "heroDesc": "定位：特定输出",
-  "skillName": "技能90",
+  "skillName": "技能102",
   "skillDesc": "",
   "passiveName": "被动：旋涡流",
   "passiveDesc": "初始被动 撕裂效果每秒造成0.2%生命上限纯粹伤害",
@@ -37126,6 +37146,327 @@
     "attack": 990,
     "hp": 180000,
     "cd": 900,
+    "damageType": 1
+   }
+  ],
+  "skins": []
+ },
+ {
+  "id": "80103",
+  "name": "蜜蜂",
+  "occupation": "2",
+  "positioning": "",
+  "heroColor": 4,
+  "heroDesc": "定位：特定输出",
+  "skillName": "技能103",
+  "skillDesc": "",
+  "passiveName": "被动：蜂刺",
+  "passiveDesc": "初始被动 腐蚀效果每秒造成0.5%生命上限物理伤害",
+  "passiveDesc2": "满星被动 腐蚀效果可以叠加30层",
+  "image": "103",
+  "attrs": {
+   "attack": "990",
+   "hp": "10000000",
+   "attackSpeed": "0",
+   "damageType": "1",
+   "pureDamageDesc": "",
+   "trueDamageDesc": "",
+   "critical": "0"
+  },
+  "tiers": [
+   {
+    "level": 1,
+    "skillName": "蜜蜂1",
+    "skillDesc": "对最多5个目标造成100%攻击伤害，且附带腐蚀效果，持续6秒。",
+    "passiveInitial": "腐蚀效果每秒造成0.5%生命上限物理伤害",
+    "passiveFull": "腐蚀效果可以叠加30层",
+    "talentName": "",
+    "talentDesc": ""
+   },
+   {
+    "level": 3,
+    "skillName": "蜜蜂3",
+    "skillDesc": "对最多5个目标造成100%攻击伤害，且附带腐蚀效果，持续6秒。",
+    "passiveInitial": "腐蚀效果每秒造成1%生命上限物理伤害",
+    "passiveFull": "腐蚀效果可以叠加30层",
+    "talentName": "初始被动强化",
+    "talentDesc": "腐蚀效果每秒造成1%生命上限物理伤害"
+   },
+   {
+    "level": 6,
+    "skillName": "蜜蜂3",
+    "skillDesc": "对最多5个目标造成100%攻击伤害，且附带腐蚀效果，持续6秒。",
+    "passiveInitial": "腐蚀效果每秒造成1%生命上限物理伤害",
+    "passiveFull": "腐蚀效果可以叠加60层",
+    "talentName": "满星被动强化",
+    "talentDesc": "腐蚀可以叠加60层"
+   },
+   {
+    "level": 9,
+    "skillName": "蜜蜂3",
+    "skillDesc": "对最多5个目标造成100%攻击伤害，且附带腐蚀效果，持续6秒。",
+    "passiveInitial": "腐蚀效果每秒造成1%生命上限物理伤害",
+    "passiveFull": "腐蚀效果可以叠加60层",
+    "talentName": "额外被动",
+    "talentDesc": "每上阵1个猎人，自身基础攻速-0.1秒"
+   },
+   {
+    "level": 12,
+    "skillName": "蜜蜂12",
+    "skillDesc": "对最多5个目标造成100%攻击伤害，且附带腐蚀效果，持续6秒。",
+    "passiveInitial": "腐蚀效果每秒造成1.5%生命上限物理伤害",
+    "passiveFull": "腐蚀效果可以叠加60层",
+    "talentName": "初始被动强化",
+    "talentDesc": "腐蚀效果每秒造成1.5%生命上限物理伤害"
+   },
+   {
+    "level": 15,
+    "skillName": "蜜蜂12",
+    "skillDesc": "对最多5个目标造成100%攻击伤害，且附带腐蚀效果，持续6秒。",
+    "passiveInitial": "腐蚀效果每秒造成1.5%生命上限物理伤害",
+    "passiveFull": "腐蚀效果可以叠加120层",
+    "talentName": "满星被动强化",
+    "talentDesc": "腐蚀可以叠加120层"
+   },
+   {
+    "level": 18,
+    "skillName": "蜜蜂12",
+    "skillDesc": "对最多5个目标造成100%攻击伤害，且附带腐蚀效果，持续6秒。",
+    "passiveInitial": "腐蚀效果每秒造成1.5%生命上限物理伤害",
+    "passiveFull": "腐蚀效果可以叠加120层",
+    "talentName": "额外被动",
+    "talentDesc": "每上阵1个猎人，自身基础攻速-0.2秒"
+   },
+   {
+    "level": 21,
+    "skillName": "蜜蜂21",
+    "skillDesc": "对最多5个目标造成100%攻击伤害，且附带腐蚀效果，持续6秒。",
+    "passiveInitial": "腐蚀效果每秒造成2%生命上限物理伤害",
+    "passiveFull": "腐蚀效果可以叠加120层",
+    "talentName": "初始被动强化",
+    "talentDesc": "腐蚀效果每秒造成2%生命上限物理伤害"
+   },
+   {
+    "level": 24,
+    "skillName": "蜜蜂21",
+    "skillDesc": "对最多5个目标造成100%攻击伤害，且附带腐蚀效果，持续6秒。",
+    "passiveInitial": "腐蚀效果每秒造成2%生命上限物理伤害",
+    "passiveFull": "腐蚀效果可以叠加180层",
+    "talentName": "满星被动强化",
+    "talentDesc": "腐蚀可以叠加180层"
+   }
+  ],
+  "spine": "mifeng",
+  "spineModel": "mifeng",
+  "stats": [
+   {
+    "level": 1,
+    "attack": 180,
+    "hp": 18000,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 2,
+    "attack": 198,
+    "hp": 21600,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 3,
+    "attack": 216,
+    "hp": 25200,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 4,
+    "attack": 234,
+    "hp": 28800,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 5,
+    "attack": 252,
+    "hp": 32400,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 6,
+    "attack": 270,
+    "hp": 36000,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 7,
+    "attack": 288,
+    "hp": 39600,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 8,
+    "attack": 306,
+    "hp": 43200,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 9,
+    "attack": 324,
+    "hp": 46800,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 10,
+    "attack": 342,
+    "hp": 50400,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 11,
+    "attack": 360,
+    "hp": 54000,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 12,
+    "attack": 378,
+    "hp": 57600,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 13,
+    "attack": 396,
+    "hp": 61200,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 14,
+    "attack": 414,
+    "hp": 64800,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 15,
+    "attack": 432,
+    "hp": 68400,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 16,
+    "attack": 450,
+    "hp": 72000,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 17,
+    "attack": 468,
+    "hp": 75600,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 18,
+    "attack": 486,
+    "hp": 79200,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 19,
+    "attack": 504,
+    "hp": 82800,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 20,
+    "attack": 540,
+    "hp": 90000,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 21,
+    "attack": 576,
+    "hp": 97200,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 22,
+    "attack": 612,
+    "hp": 104400,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 23,
+    "attack": 648,
+    "hp": 111600,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 24,
+    "attack": 684,
+    "hp": 118800,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 25,
+    "attack": 720,
+    "hp": 126000,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 26,
+    "attack": 774,
+    "hp": 136800,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 27,
+    "attack": 828,
+    "hp": 147600,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 28,
+    "attack": 882,
+    "hp": 158400,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 29,
+    "attack": 936,
+    "hp": 169200,
+    "cd": 1500,
+    "damageType": 1
+   },
+   {
+    "level": 30,
+    "attack": 990,
+    "hp": 180000,
+    "cd": 1500,
     "damageType": 1
    }
   ],

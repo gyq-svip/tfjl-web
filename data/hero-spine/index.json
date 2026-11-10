@@ -572,16 +572,18 @@
    "水娃·电法": "shuiwa",
    "戴宗·电法": "daizong",
    "春香·电法": "chunxiang",
-   "华山掌门·电法": "huashanzhangmen"
+   "华山掌门·电法": "huashanzhangmen",
+   "冰雪·电法": "bingxuedianfa"
   },
   "modelPngs": {
    "shuiwa": 1,
    "daizong": 1,
    "chunxiang": 1,
    "huashanzhangmen": 1,
-   "dianhun": 1
+   "dianhun": 1,
+   "bingxuedianfa": 1
   },
-  "updated": "2026-10-19"
+  "updated": "2026-11-10"
  },
  "huoqiang": {
   "hero": "火枪",
@@ -2238,5 +2240,19 @@
    "xuemo": 1
   },
   "updated": "2026-10-19"
+ },
+ "mifeng": {
+  "hero": "蜜蜂",
+  "model": "mifeng",
+  "anims": [
+   "attack",
+   "idle"
+  ],
+  "pngs": 1,
+  "models": {},
+  "modelPngs": {
+   "mifeng": 1
+  },
+  "updated": "2026-11-10"
  }
 }
