@@ -2959,6 +2959,32 @@ if (true) {
         }
     }
 
+    // 🔴 2026-11-17：历史「每周总局数」聚合（按自然周 周一~周日）。
+    // 数据源是永久累积的每日历史 dailyMap（mergeScreenshotPersist 之后），
+    // 因此每周总局数跨周一不清零、一直统计。返回按周一倒叙（最近周在最前）。
+    function aggregateWeeklyTotals(stats) {
+        const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const map = {};
+        (stats || []).forEach(s => {
+            const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s.date || ''));
+            if (!m) return;
+            const d = new Date(+m[1], +m[2] - 1, +m[3]);
+            d.setHours(0, 0, 0, 0);
+            const dow = d.getDay(); // 0=周日
+            d.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1)); // 归到本周一
+            const key = fmt(d);
+            if (!map[key]) map[key] = { weekStart: key, count: 0, days: 0 };
+            map[key].count += (s.count || 0);
+            map[key].days++;
+        });
+        return Object.keys(map).sort((a, b) => b.localeCompare(a)).map(key => {
+            const w = map[key];
+            const sun = new Date(key + 'T00:00:00');
+            sun.setDate(sun.getDate() + 6);
+            return { weekStart: key, weekEnd: fmt(sun), count: w.count, days: w.days };
+        });
+    }
+
     // 渲染截图统计（纯 UI，由 calcScreenshotStats 或缓存加载后调用）
     function renderScreenshotStats(stats) {
         const statsEl = document.getElementById('screenshotStats');
@@ -2979,6 +3005,10 @@ if (true) {
         const formatLocalDate = (d) => {
             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         };
+        // 🔴 2026-11-17：日期轴间隔加大——原来天数多时每格只有 14px，完整日期(YYYY-MM-DD)糊成一团看不清是哪天。
+        //   改成固定 56px 槽位 + 只显示 MM-DD（完整日期进 title），横向滚动查看。所有统计表统一口径。
+        const DAY_SLOT = 56;
+        const BAR_W = 30;
         // 建立日期→计数映射（同时兼容 MM-DD 旧格式，避免周X图表查不到）
         const dateMap = {};
         stats.forEach(s => {
@@ -3018,16 +3048,17 @@ if (true) {
         html += `<div style="background:rgba(0,230,118,0.2);padding:8px 12px;border-radius:6px;text-align:center;"><div style="color:#00e676;font-size:1.4rem;font-weight:bold;" title="仅统计本周一~今天，每周一 0 点自动重置">${weekTotal}</div><div style="color:rgba(255,255,255,0.5);font-size:0.7rem;" title="每周一 0 点自动重置">本周局数·周一重置</div></div>`;
         html += `</div>`;
 
-        const barWidth = Math.min(28, Math.max(14, Math.floor(420 / stats.length)));
+        // 每格固定宽度，日期不再挤在一起（2026-11-17）
         const chartHeight = 120;
-        html += `<div style="display:flex;align-items:flex-end;gap:6px;height:${chartHeight}px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);overflow-x:auto;">`;
+        html += `<div style="display:flex;justify-content:space-between;align-items:center;margin:2px 0 4px;"><span style="color:rgba(255,255,255,0.45);font-size:0.7rem;">每天局数（每格一天，可左右滑动看历史）</span><span style="color:rgba(255,255,255,0.35);font-size:0.65rem;">← 新 · 旧 →</span></div>`;
+        html += `<div style="display:flex;align-items:flex-end;gap:8px;height:${chartHeight}px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);overflow-x:auto;">`;
         for (const s of stats) {
             const h = Math.max(4, Math.round((s.count / maxCount) * (chartHeight - 20)));
             const color = s.count >= avgCount ? '#e040fb' : '#7c4dff';
-            html += `<div style="display:flex;flex-direction:column;align-items:center;min-width:${barWidth}px;">
-                <div style="color:#fff;font-size:0.65rem;margin-bottom:2px;">${s.count}</div>
-                <div style="width:${Math.max(8, barWidth - 6)}px;height:${h}px;background:linear-gradient(180deg,${color},rgba(156,39,176,0.3));border-radius:3px 3px 0 0;" title="${s.date}: ${s.count}局"></div>
-                <div style="color:rgba(255,255,255,0.5);font-size:0.6rem;margin-top:2px;">${s.date}</div>
+            html += `<div style="display:flex;flex-direction:column;align-items:center;flex:0 0 ${DAY_SLOT}px;">
+                <div style="color:#fff;font-size:0.68rem;margin-bottom:2px;">${s.count}</div>
+                <div style="width:${BAR_W}px;height:${h}px;background:linear-gradient(180deg,${color},rgba(156,39,176,0.3));border-radius:3px 3px 0 0;" title="${s.date}: ${s.count}局"></div>
+                <div style="color:rgba(255,255,255,0.55);font-size:0.66rem;margin-top:3px;white-space:nowrap;" title="${s.date}">${s.date.slice(5)}</div>
             </div>`;
         }
         html += `</div>`;
@@ -3048,16 +3079,67 @@ if (true) {
         }
         html += `</div>`;
 
+        // 🔴 2026-11-17：新增「历史每周总局数」——按自然周(周一~周日)聚合，倒叙(最近周在最上/最左)，
+        //   永久累积不清零。列表为主(信息不重叠)，横滑柱状图为辅(最左=最近周)。
+        const weeklyTotals = aggregateWeeklyTotals(stats);
+        if (weeklyTotals.length) {
+            const weekMax = Math.max(1, ...weeklyTotals.map(w => w.count));
+            html += `<div style="margin-top:14px;padding-top:10px;border-top:1px dashed rgba(255,255,255,0.12);">`;
+            html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span style="color:#69f0ae;font-size:0.8rem;font-weight:bold;">📅 历史每周总局数</span>
+                <span style="color:rgba(255,255,255,0.4);font-size:0.65rem;">共 ${weeklyTotals.length} 周 · 永久累计不清零 · 最近周在前</span>
+            </div>`;
+            // 列表：每行 = 日期范围(周一~周日) + 横条 + 局数（含该周有数据的天数）
+            weeklyTotals.forEach((w, i) => {
+                const bar = '█'.repeat(Math.min(30, Math.round(w.count / weekMax * 30)));
+                const isThisWeek = (w.weekStart === mondayDate);
+                const tag = isThisWeek ? '<span style="color:#00e676;font-size:0.62rem;margin-left:4px;">本周</span>' : '';
+                html += `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:0.76rem;${i === 0 ? 'background:rgba(105,240,174,0.06);border-radius:4px;' : ''}">
+                    <span style="color:rgba(255,255,255,0.72);width:96px;flex:0 0 96px;font-family:monospace;font-size:0.68rem;" title="${w.weekStart} ~ ${w.weekEnd}">${w.weekStart.slice(5)}~${w.weekEnd.slice(5)}</span>
+                    <span title="${w.count}局" style="color:#69f0ae;font-family:monospace;letter-spacing:-1px;">${bar}</span>
+                    <span style="color:#fff;font-weight:bold;min-width:38px;">${w.count}局</span>
+                    <span style="color:rgba(255,255,255,0.35);font-size:0.62rem;">${w.days}天${tag}</span>
+                </div>`;
+            });
+            // 横向柱状图（最左=最近周），日期区间两行显示，避免挤压
+            const WEEK_SLOT = 78;
+            const wChartW = Math.max(380, weeklyTotals.length * WEEK_SLOT + 40);
+            const wPadL = 30, wPadR = 10, wPadT = 16, wPadB = 26, wPlotH = 90;
+            const wChartH = wPadT + wPlotH + wPadB;
+            let wBars = '';
+            weeklyTotals.forEach((w, i) => {
+                const bh = Math.max(4, (w.count / weekMax) * wPlotH);
+                const bw = 30;
+                const bx = wPadL + i * WEEK_SLOT + (WEEK_SLOT - bw) / 2;
+                const by = wPadT + wPlotH - bh;
+                const cx = bx + bw / 2;
+                wBars += `<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="3" fill="url(#wgrad)"/>`;
+                wBars += `<text x="${cx}" y="${by - 4}" fill="rgba(255,255,255,0.8)" font-size="9" font-weight="bold" text-anchor="middle">${w.count}</text>`;
+                wBars += `<text x="${cx}" y="${wPadT + wPlotH + 12}" fill="rgba(255,255,255,0.5)" font-size="9" text-anchor="middle">${w.weekStart.slice(5)}</text>`;
+                wBars += `<text x="${cx}" y="${wPadT + wPlotH + 23}" fill="rgba(255,255,255,0.3)" font-size="8" text-anchor="middle">~${w.weekEnd.slice(5)}</text>`;
+            });
+            let wGrid = [0.5, 1.0].map(r => {
+                const gy = wPadT + wPlotH * (1 - r);
+                return `<line x1="${wPadL}" y1="${gy}" x2="${wPadL + weeklyTotals.length * WEEK_SLOT}" y2="${gy}" stroke="rgba(255,255,255,0.06)"/><text x="${wPadL - 4}" y="${gy + 3}" fill="rgba(255,255,255,0.25)" font-size="8" text-anchor="end">${Math.round(weekMax * r)}</text>`;
+            }).join('');
+            html += `<div style="margin-top:10px;"><div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-bottom:4px;">📊 每周趋势（每格一周，最左=最近，可左右滑动）</div>`;
+            html += `<div style="overflow-x:auto;"><svg width="${wChartW}" height="${wChartH}" style="display:block;">
+                <defs><linearGradient id="wgrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#b9f6ca" stop-opacity="0.95"/><stop offset="100%" stop-color="#00b09b" stop-opacity="0.8"/></linearGradient></defs>
+                ${wGrid}${wBars}</svg></div></div>`;
+            html += `</div>`;
+        }
+
         // 最近30天趋势图（SVG柱状图 + 折线，近→远）
         if (recent.length > 0) {
-            const chartW = Math.max(380, recent.length * 20 + 40);
+            const STEP = DAY_SLOT;   // 每格槽位（与上方柱状图一致，2026-11-17 加大间隔）
+            const BAR_GAP = STEP - BAR_W;
+            const chartW = Math.max(380, recent.length * STEP + 40);
             const padL = 30, padR = 10, padT = 16, padB = 16;
             const hMax = Math.max(1, Math.max(...recent.map(s => s.count)));
             const chartH = padT + 100 + padB;
             const plotW = chartW - padL - padR;
             const plotH = 100;
-            const barGap = 6;
-            const barW = Math.min(16, Math.max(14, Math.floor((plotW - (recent.length - 1) * barGap) / recent.length)));
+            const barW = BAR_W;
 
             const gridLines = [0.25, 0.5, 0.75, 1.0];
             let gridHtml = gridLines.map(r => {
@@ -3069,7 +3151,7 @@ if (true) {
             let barsHtml = '';
             recent.forEach((s, i) => {
                 const bh = Math.max(4, (s.count / hMax) * plotH);
-                const bx = padL + i * (barW + barGap);
+                const bx = padL + i * (barW + BAR_GAP);
                 const by = padT + plotH - bh;
                 const cx = bx + barW / 2;
                 const cy = padT + plotH - (s.count / hMax) * plotH;
@@ -3078,19 +3160,19 @@ if (true) {
                 barsHtml += `<defs><linearGradient id="grad${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${light}" stop-opacity="0.95"/><stop offset="100%" stop-color="${c}" stop-opacity="0.85"/></linearGradient></defs>`;
                 barsHtml += `<rect x="${bx}" y="${by}" width="${barW}" height="${bh}" rx="3" fill="url(#grad${i})"/>`;
                 barsHtml += `<text x="${cx}" y="${by - 4}" fill="rgba(255,255,255,0.7)" font-size="9" font-weight="bold" text-anchor="middle">${s.count}</text>`;
-                barsHtml += `<text x="${cx}" y="${padT + plotH + 13}" fill="rgba(255,255,255,0.45)" font-size="9" text-anchor="middle">${s.date.slice(5)}</text>`;
+                barsHtml += `<text x="${cx}" y="${padT + plotH + 13}" fill="rgba(255,255,255,0.55)" font-size="10" text-anchor="middle">${s.date.slice(5)}</text>`;
                 points += `${cx},${cy} `;
             });
 
             const polyline = recent.length > 1 ? `<polyline points="${points.trim()}" fill="none" stroke="#ff9800" stroke-width="1.5" stroke-dasharray="4,2" opacity="0.7"/>` : '';
             const dots = recent.map((s, i) => {
-                const cx = padL + i * (barW + barGap) + barW / 2;
+                const cx = padL + i * (barW + BAR_GAP) + barW / 2;
                 const cy = padT + plotH - (s.count / hMax) * plotH;
                 return `<circle cx="${cx}" cy="${cy}" r="3" fill="#ff9800" opacity="0.9"><title>${s.date}: ${s.count}局</title></circle>`;
             }).join('');
 
-            html += `<div style="margin-top:10px;"><div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:4px;">📈 趋势图</div>`;
-            html += `<svg width="${chartW}" height="${chartH}" style="display:block;">${gridHtml}${barsHtml}${polyline}${dots}</svg></div>`;
+            html += `<div style="margin-top:10px;"><div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-bottom:4px;">📈 趋势图（每格一天，可左右滑动）</div>`;
+            html += `<div style="overflow-x:auto;"><svg width="${chartW}" height="${chartH}" style="display:block;">${gridHtml}${barsHtml}${polyline}${dots}</svg></div></div>`;
         }
 
 
