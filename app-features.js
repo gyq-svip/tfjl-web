@@ -1930,6 +1930,14 @@
                     if (window.refreshWallNickname) window.refreshWallNickname(); // 同步刷新需求墙昵称框
                     used.push(v);
                     await saveUsedNicks(used);
+                    // 🔴 2026-11-19 邀请码追溯：新用户设完昵称后，把「使用人」回填到本次用的邀请码
+                    try {
+                        const pendingCode = sessionStorage.getItem('TFJL_PendingInvite');
+                        if (pendingCode && window.__invite && typeof window.__invite.bindNick === 'function') {
+                            window.__invite.bindNick(pendingCode, v).catch(() => {});
+                            sessionStorage.removeItem('TFJL_PendingInvite');
+                        }
+                    } catch (e) {}
                     cleanup();
                     resolve(v);
                 };

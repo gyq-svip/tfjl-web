@@ -145,19 +145,20 @@
     </script>
     <script defer src="app-boot.js?v=CI_AUTO"></script>
 
-    <!-- 密码验证层（默认隐藏；启动逻辑确认"未登录"后才显示，避免已登录用户闪一下登录界面） -->
+    <!-- 邀请码门（原密码验证层；默认隐藏；启动逻辑确认"未登录"后才显示，避免已登录用户闪一下登录界面） -->
+    <!-- 🔴 2026-11-19 邀请码改用：4 位共享密码删除，进门只认 6 位邀请码。已落盘老用户走启动优先级链直接进，看不到本层。 -->
     <div id="passwordOverlay" class="password-overlay" style="display:none;">
-        <div class="password-box">
+        <div class="password-box" style="max-width:380px;">
             <h2>🔐 塔防小助手</h2>
-            <p id="passwordHint" style="color: rgba(255,255,255,0.7); margin-bottom: 20px;">请输入访问密码</p>
+            <p id="passwordHint" style="color: rgba(255,255,255,0.7); margin-bottom: 12px; line-height:1.7;">
+                请输入 6 位邀请码进入<br>
+                <span style="color:rgba(255,255,255,0.45);font-size:0.8rem;">老用户本机已登录，无需输入，直接进</span>
+            </p>
             <div id="passwordError" class="password-error" style="display: none;"></div>
-            <input type="password" id="passwordInput" placeholder="请输入密码..." onkeypress="if(event.key==='Enter')checkPasswordAndEnter()">
-            <br>
-            <label id="rememberMeLabel" style="display:flex;align-items:center;justify-content:center;gap:8px;margin:10px 0 16px;color:rgba(255,255,255,0.7);font-size:0.85rem;cursor:pointer;">
-                <input type="checkbox" id="rememberPassword" checked style="width:16px;height:16px;cursor:pointer;accent-color:#4ecdc4;">
-                记住密码，下次自动登录
-            </label>
-            <button onclick="checkPasswordAndEnter()" style="width:260px;max-width:90%;padding:12px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-size:0.95rem;font-weight:600;">进入塔防助手</button>
+            <input type="text" id="passwordInput" maxlength="6" autocomplete="off" placeholder="6 位邀请码（字母数字）" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')" onkeypress="if(event.key==='Enter')checkPasswordAndEnter()" style="letter-spacing:4px;text-align:center;font-size:1.15rem;text-transform:uppercase;">
+            <button onclick="checkPasswordAndEnter()" style="width:260px;max-width:90%;padding:12px;margin-top:14px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-size:0.95rem;font-weight:600;">使用邀请码进入</button>
+            <div id="inviteGateQr" style="margin-top:18px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.12);"></div>
+            <div style="margin-top:10px;color:rgba(255,255,255,0.4);font-size:0.72rem;">没有邀请码？向好友索要，或扫码进群获取</div>
         </div>
     </div>
 
@@ -292,6 +293,11 @@
             <span id="profileCenter" title="个人中心（点击查看 / 编辑你的资料）" onclick="openMyProfile()" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;background:rgba(255,255,255,0.07);border:1px solid rgba(255,215,0,0.35);border-radius:16px;padding:4px 12px;color:#ffd700;font-size:0.9rem;" onmouseover="this.style.background='rgba(255,215,0,0.15)'" onmouseout="this.style.background='rgba(255,255,255,0.07)'">
                 <span style="font-size:1rem;">👤</span>
                 <span>欢迎 <strong id="profileNickLabel" style="color:#ffd700;">游客</strong></span>
+            </span>
+            <!-- 🔴 2026-11-19 邀请码：老用户生成给新朋友进门用（30分钟有效、一次性） -->
+            <span id="inviteCenterBtn" title="生成邀请码（给新朋友进门，30分钟有效）" onclick="openInviteModal()" style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;background:rgba(79,195,247,0.1);border:1px solid rgba(79,195,247,0.4);border-radius:16px;padding:4px 12px;color:#4fc3f7;font-size:0.85rem;" onmouseover="this.style.background='rgba(79,195,247,0.2)'" onmouseout="this.style.background='rgba(79,195,247,0.1)'">
+                <span style="font-size:1rem;">🎟️</span>
+                <span>邀请码</span>
             </span>
         </div>
 
@@ -1713,6 +1719,10 @@
                         <span class="mi-emoji">🔑</span>
                         <div class="mi-text"><div class="mi-title">密码管理</div></div>
                     </div>
+                    <div class="admin-menu-item" data-key="inviteManage" onclick="adminShowPage('inviteManage')">
+                        <span class="mi-emoji">🎟️</span>
+                        <div class="mi-text"><div class="mi-title">邀请码管理</div><div class="mi-sub">生成 / 查看 / 作废</div></div>
+                    </div>
                     <div class="admin-menu-item" data-key="cacheManage" onclick="adminShowPage('cacheManage')">
                         <span class="mi-emoji">🧹</span>
                         <div class="mi-text"><div class="mi-title">清除缓存</div></div>
@@ -2678,10 +2688,9 @@
                 <div class="admin-section">
                     <div style="background:rgba(76,175,80,0.1);border-left:3px solid #4caf50;border-radius:6px;padding:12px;margin-bottom:15px;">
                         <div style="color:#4caf50;font-size:0.85rem;font-weight:500;">💡 说明</div>
-                        <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;">
-                            在此管理网站的访问密码。<br>
-                            添加密码后，用户可以使用新密码登录。<br>
-                            <strong style="color:#ffd700;">⚠️ 修改密码后，其他用户需要使用新密码才能登录</strong>
+                        <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;line-height:1.7;">
+                            <strong style="color:#ffd700;">2026-11-19 起进门改用邀请码</strong>，原 4 个共享访问密码已删除，此页仅保留兼容（一般无需使用）。<br>
+                            新用户进门请到「🎟️ 邀请码管理」生成；管理员身份验证用的是「验证码」（在管理面板入口），不受此处影响。
                         </div>
                     </div>
                     
@@ -2693,6 +2702,42 @@
                     
                     <label style="margin-top:15px;">当前密码列表（${getAdminPasswords().length}个）</label>
                     <div id="passwordListDisplay" style="margin-top:10px;max-height:300px;overflow-y:auto;"></div>
+                </div>
+            </div>
+
+            <!-- 邀请码管理（2026-11-19） -->
+            <div id="adminPageInviteManage" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                    <button class="admin-btn admin-btn-secondary" onclick="adminShowMenu()" style="padding:6px 12px;font-size:0.85rem;">← 返回</button>
+                    <h3 style="color:#4fc3f7;margin:0;font-size:1rem;">🎟️ 邀请码管理</h3>
+                </div>
+                <div class="admin-section">
+                    <div style="background:rgba(79,195,247,0.1);border-left:3px solid #4fc3f7;border-radius:6px;padding:12px;margin-bottom:15px;">
+                        <div style="color:#4fc3f7;font-size:0.85rem;font-weight:500;">💡 说明</div>
+                        <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;line-height:1.7;">
+                            新用户凭 6 位邀请码进门（替代原共享密码）。<strong style="color:#ffd700;">30 分钟有效 · 一次性</strong>。<br>
+                            老用户已在个人中心自行生成；管理员可在此生成、查看全部记录、作废任意码。
+                        </div>
+                    </div>
+                    <label>生成邀请码（管理员）</label>
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+                        <input type="text" id="adminInviteNote" maxlength="40" placeholder="备注：给谁 / 用途（选填）" style="flex:1;min-width:180px;">
+                        <button class="admin-btn" style="background:linear-gradient(135deg,#4fc3f7,#2f80ed);" onclick="adminGenerateInvite()">🎲 生成</button>
+                        <button class="admin-btn admin-btn-secondary" onclick="adminLoadInvites()">🔄 刷新列表</button>
+                    </div>
+                    <div id="adminInviteGenMsg" style="color:#ffd700;font-size:0.78rem;min-height:16px;margin-bottom:6px;"></div>
+                    <div id="adminInviteGenResult" style="display:none;background:rgba(79,195,247,0.08);border:1px solid rgba(79,195,247,0.3);border-radius:10px;padding:14px;text-align:center;margin-bottom:12px;">
+                        <div style="color:rgba(255,255,255,0.6);font-size:0.72rem;margin-bottom:6px;">新生成的邀请码</div>
+                        <div id="adminInviteCodeText" style="font-size:2rem;font-weight:700;letter-spacing:8px;color:#4fc3f7;font-family:monospace;cursor:pointer;" onclick="adminCopyInvite()">------</div>
+                        <div style="color:rgba(255,255,255,0.45);font-size:0.7rem;margin-top:6px;">点击码可复制</div>
+                    </div>
+                </div>
+                <div class="admin-section" style="margin-top:15px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                        <h4 style="color:#4ecdc4;margin:0;font-size:0.9rem;">📋 全部邀请码记录</h4>
+                        <input type="text" id="adminInviteSearch" placeholder="🔍 码 / 生成人 / 使用人 / 备注" oninput="adminRenderInvites()" style="padding:7px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.4);color:#fff;font-size:0.78rem;min-width:200px;outline:none;">
+                    </div>
+                    <div id="adminInviteList" style="max-height:420px;overflow-y:auto;"></div>
                 </div>
             </div>
 
@@ -2899,6 +2944,37 @@
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
                 <button id="nickSetupCancel" style="padding:10px 18px;border-radius:8px;border:none;background:rgba(255,255,255,0.1);color:white;cursor:pointer;font-size:0.85rem;">取消</button>
                 <button id="nickSetupSave" style="padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#ffd700,#ff6b6b);color:#1a1a2e;cursor:pointer;font-weight:bold;font-size:0.9rem;">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 邀请码弹窗（老用户生成给新朋友进门用；2026-11-19） -->
+    <div id="inviteModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:99998;align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none'">
+        <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border:2px solid rgba(79,195,247,0.45);border-radius:16px;padding:24px;width:90%;max-width:440px;box-shadow:0 10px 50px rgba(0,0,0,0.6);">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                <h3 style="color:#4fc3f7;margin:0;font-size:1.05rem;">🎟️ 生成邀请码</h3>
+                <span onclick="document.getElementById('inviteModal').style.display='none'" style="cursor:pointer;color:rgba(255,255,255,0.6);font-size:1.3rem;line-height:1;">×</span>
+            </div>
+            <p style="color:rgba(255,255,255,0.6);font-size:0.76rem;line-height:1.7;margin:0 0 14px;">
+                生成一个 <strong style="color:#4fc3f7;">6 位邀请码</strong> 发给新朋友，对方在进门页输入即可进入。<br>
+                <strong style="color:#ffd700;">30 分钟内有效 · 仅可用一次</strong>，过期或用过即失效。
+            </p>
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+                <input type="text" id="inviteNoteInput" maxlength="20" placeholder="备注：给谁（选填，如 给张三）" style="flex:1;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.4);color:#fff;font-size:0.85rem;outline:none;">
+                <button onclick="doGenerateInvite()" id="inviteGenBtn" style="padding:10px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#4fc3f7,#2f80ed);color:#fff;cursor:pointer;font-weight:700;font-size:0.85rem;white-space:nowrap;">🎲 生成</button>
+            </div>
+            <div id="inviteResult" style="display:none;background:rgba(79,195,247,0.08);border:1px solid rgba(79,195,247,0.3);border-radius:10px;padding:16px;text-align:center;margin-bottom:10px;">
+                <div style="color:rgba(255,255,255,0.6);font-size:0.72rem;margin-bottom:6px;">你的邀请码（点击复制）</div>
+                <div id="inviteCodeText" onclick="copyInviteCode()" style="font-size:2rem;font-weight:700;letter-spacing:8px;color:#4fc3f7;cursor:pointer;font-family:monospace;">------</div>
+                <div id="inviteExpireText" style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin-top:8px;"></div>
+            </div>
+            <div id="inviteMsg" style="color:#ffd700;font-size:0.76rem;min-height:16px;text-align:center;"></div>
+            <div style="border-top:1px solid rgba(255,255,255,0.12);margin-top:12px;padding-top:12px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                    <span style="color:rgba(255,255,255,0.7);font-size:0.8rem;">我生成的邀请码</span>
+                    <button onclick="loadMyInvites()" style="padding:4px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.06);color:#fff;cursor:pointer;font-size:0.72rem;">🔄 刷新</button>
+                </div>
+                <div id="myInviteList" style="max-height:180px;overflow-y:auto;"></div>
             </div>
         </div>
     </div>

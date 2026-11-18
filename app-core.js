@@ -18429,7 +18429,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
 
         document.addEventListener('DOMContentLoaded', () => {
             // 登录检查（异步：需读磁盘 auth_state.json 判断是否已登录过）。
-            // 优先级：localStorage 已登录 → 磁盘已登录 → 记住密码且校验通过 → 否则显示密码门。
+            // 优先级：localStorage 已登录 → 磁盘已登录 → 否则显示邀请码门（2026-11-19 起；老用户走前两条直接进）。
             // 注：网页版（无 Tauri）isLoggedInFromDisk 永远 false，仅依赖 localStorage，与原行为一致。
             (async () => {
                 const overlay = document.getElementById('passwordOverlay');
@@ -18446,8 +18446,14 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                         if (typeof recordLoginEvent === 'function') recordLoginEvent();
                     }
                 };
-                const showLogin = () => { overlay.style.display = 'flex'; };
-                // 已登录（localStorage 或磁盘 auth_state.json）→ 直接进入，完全不显示密码门
+                const showLogin = () => {
+                    overlay.style.display = 'flex';
+                    // 🔴 2026-11-19 邀请码门：显示时异步加载群二维码（复用管理员设置的那张，全网同一张）
+                    try { if (typeof window._loadInviteGateQr === 'function') window._loadInviteGateQr(); } catch (e) {}
+                    // 清理旧版"记住密码"残留（密码已删除，不再使用）
+                    try { localStorage.removeItem('TFJL_SavedPwd'); } catch (e) {}
+                };
+                // 已登录（localStorage 或磁盘 auth_state.json）→ 直接进入，完全不显示邀请码门（老用户不受影响）
                 const diskLoggedIn = await isLoggedInFromDisk();
                 if (isLoggedIn() || diskLoggedIn) {
                     localStorage.setItem('TFJL_LoggedIn', 'true');
@@ -18455,30 +18461,7 @@ function applyFusionSkinToSlot(slot, mainUrl, fusedUrl, fusedIsBadge) {
                     enter();
                     return;
                 }
-                // 未登录但记住过密码 → 尝试自动登录（修复旧 bug：原用 getAdminPasswords().includes(明文) 永远不成立）
-                const savedPwd = localStorage.getItem('TFJL_SavedPwd');
-                if (savedPwd) {
-                    try {
-                        const pwd = atob(savedPwd);
-                        let ok = false;
-                        for (const h of getAdminPasswords()) { if (await verifyPassword(pwd, h)) { ok = true; break; } }
-                        if (ok) {
-                            recordLogin();
-                            localStorage.setItem('TFJL_LoggedIn', 'true');
-                            saveAuthToDisk(true);
-                            enter();
-                            return;
-                        } else {
-                            // 保存的密码已失效（密码表变了），清除并预填方便重输
-                            localStorage.removeItem('TFJL_SavedPwd');
-                            const input = document.getElementById('passwordInput');
-                            if (input) input.value = pwd;
-                        }
-                    } catch (e) {
-                        localStorage.removeItem('TFJL_SavedPwd');
-                    }
-                }
-                // 确认未登录 → 显示密码门（此刻才出现，已登录用户全程看不到）
+                // 确认未登录 → 显示邀请码门（此刻才出现，已登录用户全程看不到）
                 showLogin();
             })();
             
@@ -26447,6 +26430,100 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
         }
         window.openMyProfile = openMyProfile;
 
+        // ============ 邀请码弹窗（老用户生成给新朋友进门用；2026-11-19）============
+        let _myInviteCache = null;
+        async function _inviteEnsureReady() {
+            if (window.__invite) return true;
+            alert('邀请码功能未就绪，请稍后重试（或检查网络后刷新）');
+            return false;
+        }
+        function openInviteModal() {
+            const m = document.getElementById('inviteModal');
+            if (!m) return;
+            m.style.display = 'flex';
+            document.getElementById('inviteResult').style.display = 'none';
+            document.getElementById('inviteMsg').textContent = '';
+            loadMyInvites();
+        }
+        window.openInviteModal = openInviteModal;
+
+        async function doGenerateInvite() {
+            if (!(await _inviteEnsureReady())) return;
+            const btn = document.getElementById('inviteGenBtn');
+            const msg = document.getElementById('inviteMsg');
+            const note = (document.getElementById('inviteNoteInput') || {}).value || '';
+            if (btn) { btn.disabled = true; btn.textContent = '生成中…'; }
+            if (msg) msg.textContent = '';
+            try {
+                const nick = localStorage.getItem('TFJL_UserName') || '匿名用户';
+                const dev = (typeof getDeviceId === 'function') ? getDeviceId() : '';
+                const rec = await window.__invite.generate(nick, dev, note.trim());
+                const box = document.getElementById('inviteResult');
+                document.getElementById('inviteCodeText').textContent = rec.code;
+                const exp = new Date(rec.expireAt);
+                document.getElementById('inviteExpireText').textContent =
+                    '有效期至 ' + exp.toLocaleTimeString('zh-CN', { hour12:false }) + '（30分钟）· 生成人：' + (rec.by || nick);
+                box.style.display = 'block';
+                _myInviteCache = null;
+                loadMyInvites();
+                try { window.__recordFeatureUse && window.__recordFeatureUse('生成邀请码'); } catch (e) {}
+            } catch (e) {
+                if (msg) msg.textContent = '❌ 生成失败：' + (e && e.message ? e.message : e);
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = '🎲 生成'; }
+            }
+        }
+        window.doGenerateInvite = doGenerateInvite;
+
+        function copyInviteCode() {
+            const code = document.getElementById('inviteCodeText').textContent.trim();
+            if (!code || code === '------') return;
+            const done = () => { const m = document.getElementById('inviteMsg'); if (m) m.textContent = '✅ 已复制 ' + code + '，发给新朋友吧'; };
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(done).catch(() => { _fallbackCopy(code, done); });
+                else _fallbackCopy(code, done);
+            } catch (e) { _fallbackCopy(code, done); }
+        }
+        function _fallbackCopy(text, done) {
+            try {
+                const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+                document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); done();
+            } catch (e) {}
+        }
+        window.copyInviteCode = copyInviteCode;
+
+        async function loadMyInvites() {
+            const box = document.getElementById('myInviteList');
+            if (!box || !window.__invite) return;
+            box.innerHTML = '<div style="color:rgba(255,255,255,0.4);font-size:0.75rem;text-align:center;padding:8px;">加载中…</div>';
+            const all = await window.__invite.list();
+            const myNick = localStorage.getItem('TFJL_UserName') || '';
+            const mine = all.filter(c => (c.by && c.by === myNick));
+            if (!mine.length) { box.innerHTML = '<div style="color:rgba(255,255,255,0.4);font-size:0.75rem;text-align:center;padding:10px;">还没有生成过邀请码</div>'; return; }
+            const esc = window.escapeHtml || function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); };
+            let html = '';
+            mine.forEach(c => {
+                const st = window.__invite.status(c);
+                const stLabel = { active:'✅ 有效', used:'已使用', expired:'已过期', revoked:'已作废' }[st] || st;
+                const stColor = st === 'active' ? '#7CFC9B' : 'rgba(255,255,255,0.45)';
+                html += '<div style="display:flex;align-items:center;gap:8px;padding:7px 9px;background:rgba(255,255,255,0.05);border-radius:7px;margin-bottom:5px;">'
+                    + '<span style="font-family:monospace;font-size:0.95rem;letter-spacing:2px;color:#4fc3f7;">' + esc(c.code) + '</span>'
+                    + '<span style="flex:1;color:' + stColor + ';font-size:0.74rem;">' + stLabel + (c.note ? ' · ' + esc(c.note) : '') + '</span>'
+                    + '<button onclick="revokeInviteFromModal(\'' + esc(c.code) + '\')" style="padding:3px 8px;border-radius:5px;border:1px solid rgba(255,107,107,0.4);background:rgba(255,107,107,0.08);color:#ff8a80;cursor:pointer;font-size:0.7rem;">作废</button>'
+                    + '</div>';
+            });
+            box.innerHTML = html;
+        }
+        window.loadMyInvites = loadMyInvites;
+
+        async function revokeInviteFromModal(code) {
+            if (!confirm('确定作废邀请码 ' + code + '？作废后立即失效。')) return;
+            const r = await window.__invite.revoke(code);
+            if (r && r.ok) { loadMyInvites(); }
+            else alert('作废失败：' + (r && r.msg ? r.msg : '未知错误'));
+        }
+        window.revokeInviteFromModal = revokeInviteFromModal;
+
         // 同步右上角个人中心昵称标签
         function refreshProfileLabel() {
             const el = document.getElementById('profileNickLabel');
@@ -31261,6 +31338,9 @@ ${maSection}
             } else if (page === 'passwordManage') {
                 document.getElementById('adminPagePasswordManage').style.display = 'block';
                 loadPasswordList();
+            } else if (page === 'inviteManage') {
+                document.getElementById('adminPageInviteManage').style.display = 'block';
+                if (typeof adminLoadInvites === 'function') adminLoadInvites();
             } else if (page === 'cacheManage') {
                 const el = document.getElementById('adminPageCacheManage');
                 if (el) el.style.display = 'block';
@@ -33043,6 +33123,167 @@ ${maSection}
             window.setRoomIndexConfigField = setRoomIndexConfigField;
         } catch (e) {}
 
+        // ============== 邀请码系统（6位字母数字，30分钟有效，一次性；2026-11-19）==============
+        // 存储：独立私有 Gist（invitecodes.json），room_index.json 仅存 inviteGistId（与群二维码同款模式，避免撑爆索引）
+        // 生成人：已落盘老用户（个人中心）/管理员；使用人：新用户登录门输入。全程记录 生成人·生成时间·使用人·使用时间·状态
+        // 🔴 不影响老用户：启动登录优先级链（本地/磁盘已登录→直接进）完全不动；邀请码只在登录门（未落盘）触发
+        (function initInviteSystem() {
+            const INV_FILE = 'invitecodes.json';
+            // 去掉易混淆的 O / 0 / I / 1，剩 32 字符，6 位 ≈ 10.7 亿组合
+            const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            const TTL_MS = 30 * 60 * 1000;   // 30 分钟有效
+            const KEEP_DAYS = 7;             // 保留 7 天记录，防 Gist 无限膨胀
+            let _queue = Promise.resolve();
+            let _storeCache = null, _storeCacheAt = 0;
+
+            function _rand6() {
+                const buf = new Uint32Array(6);
+                try { crypto.getRandomValues(buf); } catch (e) { for (let i=0;i<6;i++) buf[i] = Math.floor(Math.random()*0xffffffff); }
+                let s = '';
+                for (let i=0;i<6;i++) s += CHARS[buf[i] % CHARS.length];
+                return s;
+            }
+            function _status(rec) {
+                if (!rec) return 'unknown';
+                if (rec.status === 'used' || rec.status === 'revoked') return rec.status;
+                if (Date.now() > (Number(rec.expireAt) || 0)) return 'expired';
+                return 'active';
+            }
+            async function _getGid() {
+                const cfg = await getRoomIndexConfig();
+                return (cfg && cfg.inviteGistId) || '';
+            }
+            async function _ensureGid() {
+                let gid = await _getGid();
+                if (gid) return gid;
+                const token = getGistToken();
+                if (!token) throw new Error('未配置 Gist Token，无法创建邀请码存储');
+                gid = await _getGid();  // 二次确认，防并发重复创建
+                if (gid) return gid;
+                const r = await fetch('https://api.github.com/gists', {
+                    method: 'POST',
+                    headers: { 'Accept':'application/vnd.github.v3+json', 'Content-Type':'application/json', 'Authorization':'token '+token },
+                    body: JSON.stringify({ description:'tfjl-web 邀请码（独立Gist）', public:false, files:{ [INV_FILE]: { content: JSON.stringify({ codes: [] }) } } })
+                });
+                if (!r.ok) throw new Error('创建邀请码 Gist 失败 HTTP ' + r.status);
+                const d = await r.json();
+                gid = d.id || '';
+                if (gid) await setRoomIndexConfigFields({ inviteGistId: gid });
+                return gid;
+            }
+            async function _read(gid, force) {
+                if (!force && _storeCache && (Date.now() - _storeCacheAt) < 3000) return _storeCache;
+                const token = getGistToken();
+                const r = await fetch('https://api.github.com/gists/' + gid, {
+                    headers: { 'Accept':'application/vnd.github.v3+json', ...(token ? {'Authorization':'token '+token} : {}) }
+                });
+                if (!r.ok) throw new Error('读取邀请码失败 HTTP ' + r.status);
+                const d = await r.json();
+                const f = d.files && d.files[INV_FILE];
+                let store = { codes: [] };
+                if (f && typeof f.content === 'string') { try { const o = JSON.parse(f.content); if (o && Array.isArray(o.codes)) store = o; } catch (e) {} }
+                _storeCache = store; _storeCacheAt = Date.now();
+                return store;
+            }
+            async function _write(gid, store) {
+                const token = getGistToken();
+                if (!token) throw new Error('未配置 Gist Token');
+                const r = await fetch('https://api.github.com/gists/' + gid, {
+                    method: 'PATCH',
+                    headers: { 'Accept':'application/vnd.github.v3+json', 'Content-Type':'application/json', 'Authorization':'token '+token },
+                    body: JSON.stringify({ files: { [INV_FILE]: { content: JSON.stringify(store) } } })
+                });
+                if (!r.ok) throw new Error('写邀请码失败 HTTP ' + r.status);
+                _storeCache = store; _storeCacheAt = Date.now();
+            }
+            // 串行「读最新→改→写」，避免多客户端并发互相覆盖
+            function _mutate(fn) {
+                _queue = _queue.catch(()=>{}).then(async () => {
+                    const gid = await _ensureGid();
+                    for (let i=0;i<3;i++) {
+                        try {
+                            const store = await _read(gid, true);
+                            const ret = await fn(store);
+                            await _write(gid, store);
+                            return ret;
+                        } catch (e) {
+                            if (i >= 2) throw e;
+                            await new Promise(r => setTimeout(r, 400*(i+1)));
+                        }
+                    }
+                });
+                return _queue;
+            }
+            function _clean(store) {
+                const cutoff = Date.now() - KEEP_DAYS * 86400000;
+                store.codes = store.codes.filter(c => Number(c.createdAt) > cutoff).slice(-500);
+            }
+            const api = {
+                // 生成：by=生成人昵称，dev=生成人设备，note=备注（给谁）
+                generate: function (by, dev, note) {
+                    return _mutate(async (store) => {
+                        const activeCodes = new Set(store.codes.filter(c => _status(c) === 'active').map(c => c.code));
+                        let code = '', tries = 0;
+                        do { code = _rand6(); tries++; } while (activeCodes.has(code) && tries < 50);
+                        if (activeCodes.has(code)) throw new Error('生成失败，请重试');
+                        const now = Date.now();
+                        const rec = { code, by: by||'匿名', byDev: dev||'', note: String(note||'').slice(0,40),
+                            createdAt: now, expireAt: now + TTL_MS, usedBy:'', usedDev:'', usedAt:0, status:'active' };
+                        store.codes.push(rec);
+                        _clean(store);
+                        return rec;
+                    });
+                },
+                // 登录门校验并使用：code=输入码，dev=设备；nick 此时通常为空（先输码进门，设昵称后再回填）
+                redeem: function (code, dev) {
+                    code = String(code||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+                    if (code.length !== 6) return Promise.resolve({ ok:false, msg:'邀请码为 6 位字母数字' });
+                    return _mutate(async (store) => {
+                        const rec = store.codes.find(c => c.code === code);
+                        if (!rec) return { ok:false, msg:'邀请码不存在' };
+                        const st = _status(rec);
+                        if (st === 'used') return { ok:false, msg:'邀请码已被使用' };
+                        if (st === 'revoked') return { ok:false, msg:'邀请码已作废' };
+                        if (st === 'expired') return { ok:false, msg:'邀请码已过期（30分钟有效）' };
+                        rec.status = 'used'; rec.usedBy = ''; rec.usedDev = dev||''; rec.usedAt = Date.now();
+                        return { ok:true, code: code };
+                    });
+                },
+                // 回填使用人昵称（新用户设完昵称后调用），同时把 code 记入本机供打卡关联
+                bindNick: function (code, nick) {
+                    code = String(code||'').trim().toUpperCase();
+                    if (!code || !nick) return Promise.resolve(false);
+                    return _mutate(async (store) => {
+                        const rec = store.codes.find(c => c.code === code && c.status === 'used');
+                        if (!rec || rec.usedBy) return false;
+                        rec.usedBy = nick;
+                        return true;
+                    });
+                },
+                list: async function () {
+                    try {
+                        const gid = await _getGid();
+                        if (!gid) return [];
+                        const store = await _read(gid, true);
+                        return store.codes.slice().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+                    } catch (e) { return []; }
+                },
+                revoke: function (code) {
+                    code = String(code||'').trim().toUpperCase();
+                    return _mutate(async (store) => {
+                        const rec = store.codes.find(c => c.code === code);
+                        if (!rec) return { ok:false, msg:'邀请码不存在' };
+                        if (_status(rec) !== 'active') return { ok:false, msg:'该码已不可用' };
+                        rec.status = 'revoked';
+                        return { ok:true };
+                    });
+                },
+                status: _status,
+                ttlText: '30分钟'
+            };
+            window.__invite = api;
+        })();
+
         // 把 desc 里的 HTML 标签剥离为纯文本，供 title 悬浮说明使用（避免 <br> 等被当字面量显示）
         function _stripHtml(s) { return String(s || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/\n+/g, '\n').trim(); }
 
@@ -33328,6 +33569,7 @@ ${maSection}
             }
         }
         window.fabQrExpiryInfo = fabQrExpiryInfo;   // 供管理员菜单显示同一份倒计时
+        window.getFabQrConfig = getFabQrConfig;     // 🔴 2026-11-19 供登录门加载群二维码（邀请码门复用同一张）
         // 60s 刷新一次（跨自然日自动 -1）；两个位置（功能开关卡片 / 管理员菜单）共用同一个计时器
         function _fabQrEnsureTimer() {
             if (window.__fabQrExpiryTimer) return;
@@ -35614,41 +35856,26 @@ ${maSection}
                 try { window.syncAllNow().catch(() => {}); } catch (e) {}
             }
 
-            // 清除所有登录相关状态（但保留记住的密码用于下次自动登录）
+            // 清除所有登录相关状态
             localStorage.removeItem('TFJL_LoggedIn');
             localStorage.removeItem('TFJL_Mode');
             localStorage.removeItem('TFJL_AuctionOnlyMode');
-            clearAuthOnDisk();   // 同步清磁盘登录标记，下次需重新输入密码
+            try { localStorage.removeItem('TFJL_SavedPwd'); } catch (e) {}  // 旧版记住密码残留清理
+            clearAuthOnDisk();   // 同步清磁盘登录标记，下次需用邀请码重新进门
             
             // 隐藏主内容
             document.getElementById('mainContent').classList.remove('visible');
             
-            // 显示登录界面
+            // 显示邀请码门（2026-11-19：原密码门改为邀请码门）
             document.getElementById('passwordOverlay').style.display = 'flex';
+            try { if (typeof window._loadInviteGateQr === 'function') window._loadInviteGateQr(); } catch (e) {}
             
             // 完全重置登录界面
             document.getElementById('loginActions').style.display = 'none';
             document.getElementById('passwordInput').style.display = 'block';
+            document.getElementById('passwordInput').value = '';
             document.getElementById('passwordError').style.display = 'none';
-            document.getElementById('passwordHint').textContent = '请输入访问密码';
-            
-            // 如果有记住的密码，自动填充
-            const savedPwd = localStorage.getItem('TFJL_SavedPwd');
-            if (savedPwd) {
-                try {
-                    const pwd = atob(savedPwd);
-                    document.getElementById('passwordInput').value = pwd;
-                    document.getElementById('passwordHint').textContent = '已记住密码，直接点击进入';
-                } catch (e) {
-                    localStorage.removeItem('TFJL_SavedPwd');
-                }
-            } else {
-                document.getElementById('passwordInput').value = '';
-            }
-            
-            // 确保记住密码复选框为勾选状态
-            const rememberCb = document.getElementById('rememberPassword');
-            if (rememberCb && savedPwd) rememberCb.checked = true;
+            document.getElementById('passwordHint').innerHTML = '请输入 6 位邀请码进入<br><span style="color:rgba(255,255,255,0.45);font-size:0.8rem;">老用户本机已登录，无需输入，直接进</span>';
             
             // 关闭所有其他面板
             closeAdminPanel();
@@ -35738,6 +35965,89 @@ ${maSection}
             showAdminStatus(`昵称已修改为"${newNick}"！`, 'success');
             loadCurrentNick();
         }
+
+        // ============== 邀请码管理（管理员面板；2026-11-19）==============
+        let _adminInviteAll = [];
+        async function adminLoadInvites() {
+            if (!window.__invite) return;
+            _adminInviteAll = await window.__invite.list();
+            adminRenderInvites();
+        }
+        window.adminLoadInvites = adminLoadInvites;
+
+        function adminRenderInvites() {
+            const box = document.getElementById('adminInviteList');
+            if (!box) return;
+            const q = (document.getElementById('adminInviteSearch') || {}).value || '';
+            const qLower = q.trim().toLowerCase();
+            const list = _adminInviteAll.filter(c => {
+                if (!qLower) return true;
+                return [c.code, c.by, c.usedBy, c.note].some(v => String(v || '').toLowerCase().indexOf(qLower) >= 0);
+            });
+            if (!list.length) { box.innerHTML = '<div style="color:rgba(255,255,255,0.4);font-size:0.8rem;text-align:center;padding:14px;">' + (_adminInviteAll.length ? '无匹配记录' : '暂无邀请码记录') + '</div>'; return; }
+            const esc = window.escapeHtml || function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); };
+            const fmt = ts => ts ? new Date(ts).toLocaleString('zh-CN', { hour12:false }) : '—';
+            let html = '<div style="color:rgba(255,255,255,0.4);font-size:0.72rem;margin-bottom:8px;">共 ' + _adminInviteAll.length + ' 条' + (qLower ? '，匹配 ' + list.length + ' 条' : '') + '</div>';
+            list.forEach(c => {
+                const st = window.__invite.status(c);
+                const stLabel = { active:'✅ 有效', used:'已使用', expired:'已过期', revoked:'已作废' }[st] || st;
+                const stColor = st === 'active' ? '#7CFC9B' : 'rgba(255,255,255,0.5)';
+                html += '<div style="padding:9px 11px;background:rgba(255,255,255,0.05);border-radius:8px;margin-bottom:7px;border-left:3px solid ' + (st==='active'?'#4fc3f7':'rgba(255,255,255,0.15)') + ';">'
+                    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:5px;">'
+                    + '<span style="font-family:monospace;font-size:1.05rem;letter-spacing:2px;color:#4fc3f7;">' + esc(c.code) + '</span>'
+                    + '<span style="color:' + stColor + ';font-size:0.76rem;">' + stLabel + '</span>'
+                    + (c.note ? '<span style="color:#ffd700;font-size:0.72rem;">· ' + esc(c.note) + '</span>' : '')
+                    + '<span style="flex:1;"></span>'
+                    + (st === 'active' ? '<button onclick="adminRevokeInvite(\'' + esc(c.code) + '\')" style="padding:3px 9px;border-radius:5px;border:1px solid rgba(255,107,107,0.4);background:rgba(255,107,107,0.08);color:#ff8a80;cursor:pointer;font-size:0.7rem;">作废</button>' : '')
+                    + '</div>'
+                    + '<div style="color:rgba(255,255,255,0.6);font-size:0.71rem;line-height:1.7;">'
+                    + '生成人：<b style="color:#fff;">' + esc(c.by || '匿名') + '</b> · ' + fmt(c.createdAt) + '<br>'
+                    + '使用人：<b style="color:' + (c.usedBy ? '#7CFC9B' : 'rgba(255,255,255,0.45)') + ';">' + (c.usedBy ? esc(c.usedBy) : '—') + '</b>'
+                    + (c.usedAt ? ' · ' + fmt(c.usedAt) : '')
+                    + '</div>'
+                    + '</div>';
+            });
+            box.innerHTML = html;
+        }
+        window.adminRenderInvites = adminRenderInvites;
+
+        async function adminGenerateInvite() {
+            if (!window.__invite) { const m = document.getElementById('adminInviteGenMsg'); if (m) m.textContent = '❌ 邀请码功能未就绪'; return; }
+            const note = (document.getElementById('adminInviteNote') || {}).value || '';
+            const msg = document.getElementById('adminInviteGenMsg');
+            if (msg) msg.textContent = '生成中…';
+            try {
+                const nick = localStorage.getItem('TFJL_UserName') || '管理员';
+                const dev = (typeof getDeviceId === 'function') ? getDeviceId() : '';
+                const rec = await window.__invite.generate(nick, dev, note.trim());
+                document.getElementById('adminInviteCodeText').textContent = rec.code;
+                document.getElementById('adminInviteGenResult').style.display = 'block';
+                if (msg) msg.textContent = '✅ 生成成功，有效期至 ' + new Date(rec.expireAt).toLocaleTimeString('zh-CN', { hour12:false });
+                adminLoadInvites();
+            } catch (e) {
+                if (msg) msg.textContent = '❌ 生成失败：' + (e && e.message ? e.message : e);
+            }
+        }
+        window.adminGenerateInvite = adminGenerateInvite;
+
+        function adminCopyInvite() {
+            const code = document.getElementById('adminInviteCodeText').textContent.trim();
+            if (!code || code === '------') return;
+            try {
+                const ta = document.createElement('textarea'); ta.value = code; ta.style.position = 'fixed'; ta.style.opacity = '0';
+                document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+                const msg = document.getElementById('adminInviteGenMsg'); if (msg) msg.textContent = '✅ 已复制 ' + code;
+            } catch (e) {}
+        }
+        window.adminCopyInvite = adminCopyInvite;
+
+        async function adminRevokeInvite(code) {
+            if (!confirm('确定作废邀请码 ' + code + '？作废后立即失效。')) return;
+            const r = await window.__invite.revoke(code);
+            if (r && r.ok) adminLoadInvites();
+            else alert('作废失败：' + (r && r.msg ? r.msg : '未知错误'));
+        }
+        window.adminRevokeInvite = adminRevokeInvite;
 
         // ============== 全局用户注册表（增删改查） ==============
         // 缓存全量列表：搜索/改名/删除直接复用，避免每次按键都请求 gist

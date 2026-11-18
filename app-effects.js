@@ -2153,14 +2153,13 @@
             });
         }
 
-        // ==================== 密码验证 ====================
-        // 密码存储在localStorage中，支持管理员动态管理
+        // ==================== 邀请码验证（2026-11-19：4 位共享密码删除，进门只认 6 位邀请码）====================
+        // 🔴 保留 getAdminPasswords / PASSWORDS_STORAGE_KEY：管理员「密码管理」页仍调用（loadPasswordList 等），
+        //    但默认 4 个访问密码哈希已删除 → 页面显示空列表；管理员验证码 ADMIN_VERIFY_HASH 独立，完全不受影响。
         const PASSWORDS_STORAGE_KEY = 'TFJL_AdminPasswords';
-        // 访问密码以 PBKDF2 哈希(v2$)存储，源码不含明文。原始明文仅开发者本地改密用：tfjl / TFJL / ymkfqtbl / gyq
-        const DEFAULT_PASSWORD_HASHES = ['v2$V8Crw2nuBjPl7sZVBfjnmKV13TjXkwXEsFJoLwZxaeg=', 'v2$YLaCsuaTJM9dxJZULdL+Di3jD7SDx+8QnGY3uyZrKJo=', 'v2$KDYq+zl4oiPcvk8gW6BKbypOW7mmUatgKg5pQIRCIxM=', 'v2$RVaqgAE/QYaCaHytPLaM/ADr411QeDBbo8VOBH1OSoQ='];
+        const DEFAULT_PASSWORD_HASHES = [];  // 4 个共享访问密码已删除（原明文一并从源码移除，不在此留存）
 
         function getAdminPasswords() {
-            // 返回哈希数组：初始哈希 + 本地存储中已哈希(v2$)的项；忽略旧明文项(避免比对失败，用户重加即可)
             const saved = localStorage.getItem(PASSWORDS_STORAGE_KEY);
             let extra = [];
             if (saved) {
@@ -2180,7 +2179,7 @@
         // 确保关键函数需要登录
         function requireLogin() {
             if (!isLoggedIn()) {
-                alert('🔒 请先输入密码登录后再操作！');
+                alert('🔒 请先使用邀请码登录后再操作！');
                 return false;
             }
             return true;
@@ -2189,74 +2188,92 @@
         async function checkPasswordAndEnter(targetSystem) {
             const input = document.getElementById('passwordInput');
             const errorDiv = document.getElementById('passwordError');
-            const password = input.value.trim();
-            
+            const code = (input.value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+
             const MAX_ERRORS = 5;
             const LOCK_DURATION = 30;
             let errorCount = parseInt(localStorage.getItem('TFJL_PasswordErrorCount') || '0');
             let lockStartTime = parseInt(localStorage.getItem('TFJL_PasswordLockStart') || '0');
-            let currentTime = Date.now();
-            
+            const currentTime = Date.now();
+
             if (lockStartTime > 0) {
-                const elapsedSeconds = Math.floor((currentTime - lockStartTime) / 1000);
-                const remainingSeconds = LOCK_DURATION - elapsedSeconds;
-                
+                const remainingSeconds = LOCK_DURATION - Math.floor((currentTime - lockStartTime) / 1000);
                 if (remainingSeconds > 0) {
-                    errorDiv.textContent = `⏰ 密码错误次数过多，请 ${remainingSeconds} 秒后再试`;
+                    errorDiv.textContent = `⏰ 错误次数过多，请 ${remainingSeconds} 秒后再试`;
                     errorDiv.style.display = 'block';
                     input.value = '';
                     return;
                 } else {
                     localStorage.setItem('TFJL_PasswordErrorCount', '0');
                     localStorage.setItem('TFJL_PasswordLockStart', '0');
-                    errorCount = 0;
-                    lockStartTime = 0;
+                    errorCount = 0; lockStartTime = 0;
                 }
             }
 
-            const _hashes = getAdminPasswords();
-            let _ok = false;
-            for (const _h of _hashes) { if (await verifyPassword(password, _h)) { _ok = true; break; } }
-            if (_ok) {
-                // 密码正确，清除错误计数
+            if (code.length !== 6) {
+                errorDiv.textContent = '❌ 请输入 6 位邀请码（字母数字）';
+                errorDiv.style.display = 'block';
+                input.focus();
+                return;
+            }
+
+            let res;
+            try {
+                if (!window.__invite || typeof window.__invite.redeem !== 'function') {
+                    errorDiv.textContent = '❌ 邀请码功能未就绪，请稍后重试（或检查网络）';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+                const devId = (typeof getDeviceId === 'function') ? getDeviceId() : '';
+                res = await window.__invite.redeem(code, devId);
+            } catch (e) {
+                errorDiv.textContent = '❌ 验证失败：' + (e && e.message ? e.message : e);
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            if (res && res.ok) {
                 localStorage.setItem('TFJL_PasswordErrorCount', '0');
                 localStorage.setItem('TFJL_PasswordLockStart', '0');
-                
-                // 记录登录
                 recordLogin();
                 localStorage.setItem('TFJL_LoggedIn', 'true');
-                saveAuthToDisk(true);   // 落地到磁盘：重启/更新/清缓存后都不弹密码门
-                
-                // 记住密码：如果勾选了"记住密码"，保存密码（简单编码混淆）
-                const rememberCb = document.getElementById('rememberPassword');
-                if (rememberCb && rememberCb.checked) {
-                    try {
-                        localStorage.setItem('TFJL_SavedPwd', btoa(password));
-                    } catch (e) {}
-                } else {
-                    localStorage.removeItem('TFJL_SavedPwd');
-                }
-                
+                saveAuthToDisk(true);   // 落地到磁盘：重启/更新/清缓存后都不再弹门（延续原有落盘机制）
+                // 记下本次用的码，设昵称时回填「使用人」，便于管理员追溯
+                try { sessionStorage.setItem('TFJL_PendingInvite', res.code); } catch (e) {}
                 errorDiv.style.display = 'none';
-                
-                // 进入归档系统（当前唯一入口）
+                input.value = '';
                 enterArchiveFromLogin();
             } else {
-                // 密码错误
                 errorCount++;
                 localStorage.setItem('TFJL_PasswordErrorCount', errorCount.toString());
-                
                 if (errorCount >= MAX_ERRORS) {
                     localStorage.setItem('TFJL_PasswordLockStart', currentTime.toString());
-                    errorDiv.textContent = `❌ 密码错误已达 ${errorCount} 次，请 ${LOCK_DURATION} 秒后再试`;
+                    errorDiv.textContent = `❌ ${res && res.msg ? res.msg : '邀请码错误'}，错误已达 ${errorCount} 次，请 ${LOCK_DURATION} 秒后再试`;
                 } else {
-                    errorDiv.textContent = `❌ 密码错误，还可以尝试 ${MAX_ERRORS - errorCount} 次`;
+                    errorDiv.textContent = `❌ ${res && res.msg ? res.msg : '邀请码错误'}（还可尝试 ${MAX_ERRORS - errorCount} 次）`;
                 }
                 errorDiv.style.display = 'block';
                 input.value = '';
                 input.focus();
             }
         }
+
+        // 登录门加载群二维码（复用管理员设置的悬浮群二维码，全网同一张，7 天换一次）
+        async function _loadInviteGateQr() {
+            const box = document.getElementById('inviteGateQr');
+            if (!box) return;
+            try {
+                const cfg = (typeof window.getFabQrConfig === 'function') ? await window.getFabQrConfig() : null;
+                const src = cfg && cfg.fabQrcode;
+                if (!src) { box.innerHTML = '<div style="color:rgba(255,255,255,0.35);font-size:0.72rem;text-align:center;">（群二维码待管理员配置）</div>'; return; }
+                const tip = (cfg && cfg.fabQrcodeTip) || '扫码进群';
+                box.innerHTML = '<img src="' + String(src).replace(/"/g,'&quot;') + '" style="width:150px;max-width:60vw;height:150px;object-fit:contain;background:#fff;border-radius:8px;display:block;margin:0 auto;">'
+                    + '<div style="color:#4fc3f7;font-size:0.75rem;text-align:center;margin-top:8px;">' + String(tip).replace(/</g,'&lt;') + '</div>';
+            } catch (e) {
+                box.innerHTML = '<div style="color:rgba(255,255,255,0.35);font-size:0.72rem;text-align:center;">（群二维码加载失败）</div>';
+            }
+        }
+        window._loadInviteGateQr = _loadInviteGateQr;
 
         function enterArchiveFromLogin() {
             // 进入归档系统（完整功能）
