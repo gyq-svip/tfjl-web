@@ -36170,10 +36170,32 @@ ${maSection}
             } catch (e) { console.warn('[昵称管理] 应用服务器昵称失败(降级):', e); }
         }
 
+        // 缓存「昵称 → 最后活跃时间戳」：来自登录打卡公共 Gist（fetchLoginLog 返回 [{nick,ts}]）
+        // 取每个昵称的最大 ts；无记录的昵称视为「从未活跃」。加载一次缓存，点筛选不重复请求。
+        let _nickLastActiveCache = null;
+        async function _loadNickLastActive() {
+            if (_nickLastActiveCache) return _nickLastActiveCache;
+            const map = {};
+            try {
+                const log = (typeof fetchLoginLog === 'function') ? await fetchLoginLog() : [];
+                if (Array.isArray(log)) {
+                    for (const e of log) {
+                        const n = e && e.nick, t = Number(e && e.ts) || 0;
+                        if (!n || !t) continue;
+                        if (!map[n] || t > map[n]) map[n] = t;
+                    }
+                }
+            } catch (e) {}
+            _nickLastActiveCache = map;
+            return map;
+        }
+        window._nickIdleClearCache = function () { _nickLastActiveCache = null; window._nickAllUsed = null; };
+
         async function renderNickRegistry() {
             const list = document.getElementById('nickRegistryList');
             if (!list) return;
             const q = (document.getElementById('nickSearchInput') ? document.getElementById('nickSearchInput').value.trim().toLowerCase() : '');
+            const idleFilter = (document.getElementById('nickIdleFilter') ? document.getElementById('nickIdleFilter').value : '0');
             if (!window._nickAllUsed) {
                 list.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;text-align:center;padding:10px;">加载中...</div>';
                 let _used = await getUsedNicks();
@@ -36194,16 +36216,42 @@ ${maSection}
                 list.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;text-align:center;padding:10px;">暂无注册用户</div>';
                 return;
             }
-            const used = allUsed.filter(function(n){ return !q || n.toLowerCase().indexOf(q) >= 0; });
+            // 并行加载最后活跃映射（失败降级为空 → 全部归入「从未活跃」，不阻塞列表）
+            const lastMap = await _loadNickLastActive();
+            const now = Date.now();
+            const DAY = 86400000;
+            const idleDaysOf = function (n) {
+                const t = lastMap[n] || 0;
+                return t ? Math.floor((now - t) / DAY) : -1;   // -1 = 从未活跃
+            };
+            const daysThreshold = (idleFilter && idleFilter !== '0' && idleFilter !== 'never') ? parseInt(idleFilter, 10) : 0;
+            const passesIdle = function (d) {
+                if (idleFilter === '0') return true;
+                if (idleFilter === 'never') return d < 0;
+                return d < 0 ? true : d >= daysThreshold;    // 无打卡记录也算久未活跃
+            };
+            const used = allUsed.filter(function(n){ return (!q || n.toLowerCase().indexOf(q) >= 0) && passesIdle(idleDaysOf(n)); });
             const cur = localStorage.getItem('TFJL_UserName');
-            let html = '<div style="color:rgba(255,255,255,0.4);font-size:0.72rem;margin-bottom:6px;">共 ' + allUsed.length + ' 个用户' + (q ? '，匹配 ' + used.length + ' 个' : '') + '</div>';
+            let filterLabel = '';
+            if (idleFilter !== '0') {
+                const sel = document.getElementById('nickIdleFilter');
+                filterLabel = '，闲置筛选：' + (sel && sel.selectedOptions[0] ? sel.selectedOptions[0].text : idleFilter);
+            }
+            let html = '<div style="color:rgba(255,255,255,0.4);font-size:0.72rem;margin-bottom:6px;">共 ' + allUsed.length + ' 个用户' + (q ? '，匹配 ' + used.length + ' 个' : '') + filterLabel + '</div>';
+            if (!used.length) {
+                html += '<div style="color:rgba(255,255,255,0.5);font-size:0.8rem;text-align:center;padding:14px;">该筛选条件下没有用户</div>';
+            }
             for (let i = 0; i < used.length; i++) {
                 const n = used[i];
                 const isCur = (n === cur);
+                const d = idleDaysOf(n);
+                const idleLabel = d < 0 ? '从未活跃' : (d === 0 ? '今天活跃' : '最后活跃 ' + d + ' 天前');
+                const idleColor = d < 0 ? '#ff9800' : (d >= 180 ? '#f44336' : (d >= 90 ? '#ffa500' : 'rgba(255,255,255,0.45)'));
                 html += '<div style="display:flex;gap:8px;align-items:center;padding:8px;background:rgba(255,255,255,0.05);border-radius:6px;margin-bottom:6px;">'
                     + '<span style="flex:1;color:' + (isCur ? '#ffd700' : '#fff') + ';font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(n) + (isCur ? '（本机）' : '') + '</span>'
+                    + '<span style="color:' + idleColor + ';font-size:0.7rem;white-space:nowrap;" title="' + (lastMap[n] ? new Date(lastMap[n]).toLocaleString('zh-CN') : '无打卡记录') + '">' + idleLabel + '</span>'
                     + '<button class="admin-btn admin-btn-secondary" style="padding:4px 10px;font-size:0.75rem;" onclick="adminRenameUser(' + i + ')">改</button>'
-                    + '<button class="admin-btn" style="padding:4px 10px;font-size:0.75rem;background:linear-gradient(135deg,#f44336,#d32f2f);" onclick="adminDeleteUser(' + i + ')">删</button>'
+                    + '<button class="admin-btn" style="padding:4px 10px;font-size:0.75rem;background:linear-gradient(135deg,#f44336,#d32f2f);" onclick="adminDeleteUser(' + i + ')">释放</button>'
                     + '</div>';
             }
             window._nickRegistryCache = used;
@@ -36258,7 +36306,7 @@ ${maSection}
             const used = window._nickRegistryCache || [];
             const name = used[filteredIdx];
             if (!name) return;
-            if (!confirm('确定删除用户 "' + name + '"？\n删除后该昵称可被他人重新注册。')) return;
+            if (!confirm('确定释放昵称 "' + name + '"？\n释放后该昵称可被他人重新注册；若确定是僵尸号，此操作不可撤销。')) return;
             const full = await getUsedNicks();
             const idx = full.indexOf(name);
             if (idx < 0) return;

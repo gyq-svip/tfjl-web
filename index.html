@@ -2780,9 +2780,17 @@
                     </div>
                     <div style="display:flex;gap:8px;margin-bottom:10px;">
                         <input type="text" id="nickSearchInput" placeholder="🔍 搜索昵称..." oninput="renderNickRegistry()" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.4);color:white;font-size:0.8rem;outline:none;">
+                        <select id="nickIdleFilter" onchange="renderNickRegistry()" style="padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.4);color:white;font-size:0.8rem;outline:none;max-width:150px;">
+                            <option value="0">全部用户</option>
+                            <option value="30">≥30天未活跃</option>
+                            <option value="60">≥60天未活跃</option>
+                            <option value="90">≥90天未活跃</option>
+                            <option value="180">≥180天未活跃</option>
+                            <option value="never">从未活跃</option>
+                        </select>
                         <button class="admin-btn" style="background:linear-gradient(135deg,#4caf50,#2e7d32);padding:8px 14px;font-size:0.8rem;white-space:nowrap;" onclick="adminAddUser()">➕ 新增</button>
                     </div>
-                    <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin-bottom:10px;">可在此 <strong style="color:#4ecdc4;">增 / 删 / 改 / 查</strong> 用户：搜索框按昵称过滤；「改」会同步更新需求墙发言与分享署名；「删」释放昵称可被他人重注册。本机昵称重置见上方「重置设置」。</div>
+                    <div style="color:rgba(255,255,255,0.5);font-size:0.72rem;margin-bottom:10px;">可在此 <strong style="color:#4ecdc4;">增 / 删 / 改 / 查</strong> 用户：搜索昵称过滤，「闲置筛选」按最后打卡时间找出久未上线的号（数据来自登录打卡，手动点「释放」才删，不会自动清理）。「改」同步需求墙署名；「删/释放」释放昵称可被他人重注册。</div>
                     <div id="nickRegistryList" style="max-height:300px;overflow-y:auto;"></div>
                 </div>
             </div>
