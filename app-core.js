@@ -26457,7 +26457,7 @@ const WALL_BACKUP_GIST_KEY = 'wall_backup_gist_id';
             try {
                 const nick = localStorage.getItem('TFJL_UserName') || '匿名用户';
                 const dev = (typeof getDeviceId === 'function') ? getDeviceId() : '';
-                const rec = await window.__invite.generate(nick, dev, note.trim());
+                const rec = await window.__invite.generate(nick, dev, note.trim(), { personal: true });
                 const box = document.getElementById('inviteResult');
                 document.getElementById('inviteCodeText').textContent = rec.code;
                 const exp = new Date(rec.expireAt);
@@ -33133,6 +33133,8 @@ ${maSection}
             const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
             const TTL_MS = 30 * 60 * 1000;   // 30 分钟有效
             const KEEP_DAYS = 7;             // 保留 7 天记录，防 Gist 无限膨胀
+            const GEN_LIMIT_PER_DAY = 5;     // 个人每天最多生成 5 个邀请码
+            const GEN_MIN_INTERVAL = 30 * 1000;  // 两次生成最少间隔 30 秒（防连点刷码）
             let _queue = Promise.resolve();
             let _storeCache = null, _storeCacheAt = 0;
 
@@ -33220,15 +33222,32 @@ ${maSection}
             }
             const api = {
                 // 生成：by=生成人昵称，dev=生成人设备，note=备注（给谁）
-                generate: function (by, dev, note) {
+                // opts.bypassLimit=true 时跳过个人限额（管理员面板专用）；opts.personal=true 计入个人额度
+                generate: function (by, dev, note, opts) {
+                    const o = opts || {};
                     return _mutate(async (store) => {
+                        const now = Date.now();
+                        const dayStart = new Date(now); dayStart.setHours(0,0,0,0);
+                        const dayMs = dayStart.getTime();
+                        if (!o.bypassLimit && dev) {
+                            // 只统计本机当天生成的「个人码」（personal:true），管理员批量生成不挤占个人额度
+                            const mineToday = store.codes.filter(c => c.personal && c.byDev === dev && Number(c.createdAt) >= dayMs);
+                            if (mineToday.length >= GEN_LIMIT_PER_DAY) {
+                                throw new Error('今天最多生成 ' + GEN_LIMIT_PER_DAY + ' 个邀请码，请明天再试');
+                            }
+                            const lastAt = mineToday.reduce((mx, c) => Math.max(mx, Number(c.createdAt) || 0), 0);
+                            if (lastAt && now - lastAt < GEN_MIN_INTERVAL) {
+                                const wait = Math.ceil((GEN_MIN_INTERVAL - (now - lastAt)) / 1000);
+                                throw new Error('生成太频繁，请 ' + wait + ' 秒后再试');
+                            }
+                        }
                         const activeCodes = new Set(store.codes.filter(c => _status(c) === 'active').map(c => c.code));
                         let code = '', tries = 0;
                         do { code = _rand6(); tries++; } while (activeCodes.has(code) && tries < 50);
                         if (activeCodes.has(code)) throw new Error('生成失败，请重试');
-                        const now = Date.now();
                         const rec = { code, by: by||'匿名', byDev: dev||'', note: String(note||'').slice(0,40),
                             createdAt: now, expireAt: now + TTL_MS, usedBy:'', usedDev:'', usedAt:0, status:'active' };
+                        if (o.personal) rec.personal = true;   // 标记个人生成，用于限额统计
                         store.codes.push(rec);
                         _clean(store);
                         return rec;
@@ -36019,7 +36038,7 @@ ${maSection}
             try {
                 const nick = localStorage.getItem('TFJL_UserName') || '管理员';
                 const dev = (typeof getDeviceId === 'function') ? getDeviceId() : '';
-                const rec = await window.__invite.generate(nick, dev, note.trim());
+                const rec = await window.__invite.generate(nick, dev, note.trim(), { bypassLimit: true });
                 document.getElementById('adminInviteCodeText').textContent = rec.code;
                 document.getElementById('adminInviteGenResult').style.display = 'block';
                 if (msg) msg.textContent = '✅ 生成成功，有效期至 ' + new Date(rec.expireAt).toLocaleTimeString('zh-CN', { hour12:false });

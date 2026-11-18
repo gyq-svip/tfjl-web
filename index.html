@@ -154,6 +154,10 @@
                 请输入 6 位邀请码进入<br>
                 <span style="color:rgba(255,255,255,0.45);font-size:0.8rem;">老用户本机已登录，无需输入，直接进</span>
             </p>
+            <div style="background:rgba(76,175,80,0.12);border:1px solid rgba(76,175,80,0.3);border-radius:8px;padding:8px 10px;margin-bottom:12px;color:#a5d6a7;font-size:0.74rem;line-height:1.6;text-align:center;">
+                ✅ 邀请码 <b style="color:#c8e6c9;">完全免费</b>，首次进入输入一次，之后自动登录<br>
+                <span style="color:rgba(255,255,255,0.55);">请勿向任何人购买 · 谨防倒卖诈骗</span>
+            </div>
             <div id="passwordError" class="password-error" style="display: none;"></div>
             <input type="text" id="passwordInput" maxlength="6" autocomplete="off" placeholder="6 位邀请码（字母数字）" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')" onkeypress="if(event.key==='Enter')checkPasswordAndEnter()" style="letter-spacing:4px;text-align:center;font-size:1.15rem;text-transform:uppercase;">
             <button onclick="checkPasswordAndEnter()" style="width:260px;max-width:90%;padding:12px;margin-top:14px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ecdc4,#44a08d);color:white;cursor:pointer;font-size:0.95rem;font-weight:600;">使用邀请码进入</button>
@@ -2957,7 +2961,8 @@
             </div>
             <p style="color:rgba(255,255,255,0.6);font-size:0.76rem;line-height:1.7;margin:0 0 14px;">
                 生成一个 <strong style="color:#4fc3f7;">6 位邀请码</strong> 发给新朋友，对方在进门页输入即可进入。<br>
-                <strong style="color:#ffd700;">30 分钟内有效 · 仅可用一次</strong>，过期或用过即失效。
+                <strong style="color:#ffd700;">30 分钟内有效 · 仅可用一次</strong>，过期或用过即失效。<br>
+                <span style="color:rgba(255,255,255,0.45);">每人每天最多 5 个 · 两次生成间隔 30 秒</span>
             </p>
             <div style="display:flex;gap:8px;margin-bottom:12px;">
                 <input type="text" id="inviteNoteInput" maxlength="20" placeholder="备注：给谁（选填，如 给张三）" style="flex:1;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.4);color:#fff;font-size:0.85rem;outline:none;">

@@ -2259,18 +2259,41 @@
         }
 
         // 登录门加载群二维码（复用管理员设置的悬浮群二维码，全网同一张，7 天换一次）
+        // 兜底：二维码未配置/加载失败/已过期（管理员没来得及换）→ 引导加微信号索取邀请码
         async function _loadInviteGateQr() {
             const box = document.getElementById('inviteGateQr');
             if (!box) return;
+            const WX = 'gyqsvip';
+            const wxFallback = (lead) => '<div style="text-align:center;line-height:1.9;margin-top:4px;">'
+                + (lead ? '<div style="color:rgba(255,255,255,0.6);font-size:0.74rem;">' + lead + '</div>' : '')
+                + '<span style="color:rgba(255,255,255,0.75);font-size:0.78rem;">请加微信 </span>'
+                + '<b style="color:#ffd700;letter-spacing:0.5px;font-size:0.85rem;">' + WX + '</b>'
+                + '<span style="color:rgba(255,255,255,0.75);font-size:0.78rem;"> 索取邀请码</span></div>';
             try {
                 const cfg = (typeof window.getFabQrConfig === 'function') ? await window.getFabQrConfig() : null;
                 const src = cfg && cfg.fabQrcode;
-                if (!src) { box.innerHTML = '<div style="color:rgba(255,255,255,0.35);font-size:0.72rem;text-align:center;">（群二维码待管理员配置）</div>'; return; }
+                if (!src) { box.innerHTML = wxFallback('群二维码暂未配置'); return; }
+                // 是否已过 7 天有效期（管理员没来得及换 → 群可能已失效，醒目显示微信号）
+                let expired = false;
+                try {
+                    if (typeof window.fabQrExpiryInfo === 'function') {
+                        const info = window.fabQrExpiryInfo(cfg);
+                        if (info && !info.unknown && typeof info.left === 'number' && info.left <= 0) expired = true;
+                    }
+                } catch (e) {}
                 const tip = (cfg && cfg.fabQrcodeTip) || '扫码进群';
-                box.innerHTML = '<img src="' + String(src).replace(/"/g,'&quot;') + '" style="width:150px;max-width:60vw;height:150px;object-fit:contain;background:#fff;border-radius:8px;display:block;margin:0 auto;">'
+                const qrHtml = '<img src="' + String(src).replace(/"/g,'&quot;') + '" style="width:150px;max-width:60vw;height:150px;object-fit:contain;background:#fff;border-radius:8px;display:block;margin:0 auto;">'
                     + '<div style="color:#4fc3f7;font-size:0.75rem;text-align:center;margin-top:8px;">' + String(tip).replace(/</g,'&lt;') + '</div>';
+                if (expired) {
+                    box.innerHTML = qrHtml
+                        + '<div style="color:#ffb84d;font-size:0.72rem;text-align:center;margin-top:8px;">⚠️ 二维码可能已失效，若扫码无效</div>'
+                        + wxFallback('');
+                } else {
+                    box.innerHTML = qrHtml
+                        + '<div style="color:rgba(255,255,255,0.45);font-size:0.7rem;text-align:center;margin-top:7px;">扫码无效？可加微信 <b style="color:rgba(255,215,0,0.9);">' + WX + '</b> 索取</div>';
+                }
             } catch (e) {
-                box.innerHTML = '<div style="color:rgba(255,255,255,0.35);font-size:0.72rem;text-align:center;">（群二维码加载失败）</div>';
+                box.innerHTML = wxFallback('群二维码加载失败');
             }
         }
         window._loadInviteGateQr = _loadInviteGateQr;
