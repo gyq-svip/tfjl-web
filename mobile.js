@@ -153,9 +153,25 @@
     });
   }
 
+  /* 免责声明块：桌面跟在主内容后面，手机上一屏装不下，会直接把下方卡池顶出屏幕。
+     部分旧 WebView 不支持 CSS :has()，所以这里用 JS 兜底（CSS 里也留了一份）。 */
+  function hideDisclaimer() {
+    var sc = document.getElementById('scrollableContent');
+    if (!sc) return;
+    Array.prototype.forEach.call(sc.children, function (el) {
+      if (el.dataset.mHideChecked === '1') return;
+      var h4 = el.querySelector && el.querySelector('h4');
+      if (h4 && /免责声明|免责/.test(h4.textContent || '')) {
+        el.style.setProperty('display', 'none', 'important');
+        el.dataset.mHideChecked = '1';
+      }
+    });
+  }
+
   function apply() {
     buildDrawer();
     splitCardGroupTitle();
+    hideDisclaimer();
     collect();
     addTrigger();
     document.body.classList.add('m-mobile');
