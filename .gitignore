@@ -175,3 +175,7 @@ tools/
 /.release-server.json
 
 docs/panel-audit/shots/
+
+# Capacitor 原生工程与打包产物（本地生成，不入库）
+/android/
+/www/

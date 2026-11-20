@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
     <title>塔防精灵助手 - 阵容卡搭配｜本站网址：https://gyq-svip.github.io/tfjl-web</title>
     <link rel="stylesheet" href="styles.css?v=CI_AUTO">
+    <!-- 手机端适配：<=700px 生效，桌面样式零影响（详见 mobile.css 头部说明） -->
+    <link rel="stylesheet" href="mobile.css?v=CI_AUTO">
     <style>html,body,#mainContent,.container{height:100%;margin:0;padding:0;overflow:hidden}</style>
     <style id="hapStatSprite">
 /* 属性图标：取自官方游戏 UI 图集 skill-aim-atlas.png（5 帧横向：剑/闪电/瞄准/扳手/爱心，取除瞄准外 4 帧）。CSS 雪碧图裁切 */
@@ -144,6 +146,8 @@
     })();
     </script>
     <script defer src="app-boot.js?v=CI_AUTO"></script>
+    <!-- 手机版交互：工具按钮收进底部抽屉（仅 <=700px 生效，桌面零影响） -->
+    <script defer src="mobile.js?v=CI_AUTO"></script>
 
     <!-- 邀请码门（原密码验证层；默认隐藏；启动逻辑确认"未登录"后才显示，避免已登录用户闪一下登录界面） -->
     <!-- 🔴 2026-11-19 邀请码改用：4 位共享密码删除，进门只认 6 位邀请码。已落盘老用户走启动优先级链直接进，看不到本层。 -->

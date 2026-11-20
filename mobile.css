@@ -1,0 +1,1143 @@
+/* ==========================================================================
+   mobile.css —— 手机端适配（竖屏优先，触摸优化）
+   --------------------------------------------------------------------------
+   设计目标（用户诉求）：
+     主页四块内容同屏可读：① 我的卡组 ② 我的卡池 ③ 队友卡组 ④ 队友卡池
+     桌面是「左右并排双栏」，手机上改为「上下分组」：我的组在上、队友组在下，
+     每组内卡组网格 4 列 2 行（7 格正好 4+3 居中），卡池 5 列 2 行。
+
+   实现要点：
+     - 原样式大量硬编码 94px / 433px / 196px，这里统一改成按屏宽的 CSS 变量
+     - #fixedHeader / .sticky-buttons / #scrollableContent 有内联样式和 JS 写入，
+       必须 !important 才能覆盖（_syncScrollableSpacer 在 app-effects.js）
+     - .battle-field / .hands-area 用 display:contents 打平，靠 order 重排，
+       不移动任何 DOM 节点，桌面逻辑零影响
+   生效范围：<= 700px 或 触摸设备竖屏
+   ========================================================================== */
+
+@media (max-width: 700px) {
+
+  /* ---------- 全局尺寸变量 ---------- */
+  :root {
+    --m-pad: 6px;
+    --m-gap: 6px;
+    /* 7 格卡组固定 4 列：屏宽 - 左右内边距 - 3 个间隙 */
+    --m-slot-w: calc((100vw - (var(--m-pad) * 2) - (var(--m-gap) * 3) - 4px) / 4);
+    --m-slot-h: calc(var(--m-slot-w) * 1.06);
+    --m-safe-b: env(safe-area-inset-bottom, 0px);
+    --m-safe-t: env(safe-area-inset-top, 0px);
+    --m-status-h: 24px;
+  }
+
+  html, body {
+    height: 100%;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+
+  body {
+    touch-action: manipulation;
+  }
+
+  #mainContent,
+  #mainContent .container {
+    height: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* ---------- ① 顶栏：从 187px 压到约 68px ---------- */
+  #fixedHeader {
+    position: relative !important;
+    top: 0 !important;
+    left: 0 !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 2px var(--m-pad) 3px !important;
+    box-sizing: border-box !important;
+    z-index: 100 !important;
+    background: linear-gradient(135deg, rgba(15,15,35,.92) 0%, rgba(26,26,46,.92) 50%, rgba(22,33,62,.92) 100%) !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgba(255,215,0,.18);
+  }
+
+  #fixedHeader h1 {
+    font-size: 0.92rem !important;
+    line-height: 1.35 !important;
+    margin: 0 !important;
+    /* 右侧 6 个图标约占 200px，标题让位 */
+    padding-right: 196px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left !important;
+    justify-content: flex-start !important;
+  }
+
+  #fixedHeader h1 #mainHeader {
+    font-size: 0.95rem !important;
+  }
+
+  /* 那串功能说明文字：桌面占 96px(4 行)，手机压成单行省略号 */
+  p#mainTitle.instructions {
+    font-size: 0.6rem !important;
+    line-height: 1.25 !important;
+    height: 14px !important;
+    margin: 1px 0 0 !important;
+    padding: 0 196px 0 0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    text-align: left !important;
+    opacity: .72;
+  }
+
+  /* 公告条 + 时钟：一行 22px */
+  #newsMarqueeContainer {
+    margin: 3px 0 0 !important;
+    padding: 1px 5px !important;
+    border-width: 1px !important;
+    border-radius: 5px !important;
+    min-height: 0 !important;
+  }
+
+  #newsMarqueeContainer > div:first-child {
+    gap: 6px !important;
+    align-items: center !important;
+  }
+
+  #currentTime {
+    font-size: 0.68rem !important;
+    min-width: 0 !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+  }
+
+  #newsMarquee {
+    font-size: 0.68rem !important;
+    line-height: 1.2 !important;
+  }
+
+  /* "点击查看全部公告"角标在手机上纯属噪音 */
+  #newsMarqueeContainer > div:last-child {
+    display: none !important;
+  }
+
+  /* ---------- ② 右上角功能按钮组 ---------- */
+  .sticky-buttons {
+    position: fixed !important;
+    top: calc(2px + var(--m-safe-t)) !important;
+    right: var(--m-pad) !important;
+    left: auto !important;
+    z-index: 9999 !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 3px !important;
+  }
+
+  .sticky-buttons > div {
+    display: flex !important;
+    gap: 3px !important;
+    align-items: center !important;
+  }
+
+  .sticky-buttons button {
+    width: 29px !important;
+    height: 29px !important;
+    min-width: 29px !important;
+    padding: 0 !important;
+    font-size: 0.78rem !important;
+    border-radius: 6px !important;
+    line-height: 1 !important;
+  }
+
+  /* 头像/邀请码两个胶囊收起来（点 ☰ 菜单里还有入口） */
+  #profileCenter,
+  #inviteCenterBtn {
+    display: none !important;
+  }
+
+  /* ---------- ③ 滚动区：由 JS 定位，这里接管高度分配 ---------- */
+  #scrollableContent {
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    bottom: calc(var(--m-status-h) + var(--m-safe-b)) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  /* ---------- ④ 项目/分类选择：一行横滑 ---------- */
+  #scheme1 {
+    flex: 0 0 auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  #scheme1 > div {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 4px !important;
+    padding: 3px var(--m-pad) 4px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  #scheme1 > div::-webkit-scrollbar {
+    display: none;
+  }
+
+  #scheme1 select {
+    height: 30px !important;
+    min-height: 0 !important;
+    font-size: 0.72rem !important;
+    padding: 0 4px !important;
+    flex: 0 0 auto !important;
+    max-width: 108px;
+    border-radius: 6px !important;
+  }
+
+  #scheme1 button {
+    width: 30px !important;
+    height: 30px !important;
+    min-width: 30px !important;
+    padding: 0 !important;
+    font-size: 0.78rem !important;
+    flex: 0 0 auto !important;
+    border-radius: 6px !important;
+  }
+
+  /* ---------- ⑤ 出战选择区：四块重排 ---------- */
+  /* 布局约束（用户明确要求）：卡组内部 7 个卡位必须与游戏一致——
+     顶部 1 个融合位 + 下面 2 列 3 行，位置不能重排。
+     因此这里只做「等比缩放 + 左右并排」，不改任何卡位顺序。 */
+  .selection-area {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    grid-template-rows: auto auto auto auto !important;
+    align-content: start !important;
+    column-gap: 6px !important;
+    row-gap: 0 !important;
+    padding: 0 var(--m-pad) 2px !important;
+    margin: 0 !important;
+    border-radius: 10px !important;
+    border-width: 1px !important;
+    box-sizing: border-box !important;
+  }
+
+  .selection-area > div:first-child {
+    grid-column: 1 / -1 !important;
+    grid-row: 1 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .selection-area h2 {
+    font-size: 0.8rem !important;
+    margin: 1px 0 !important;
+    line-height: 1.4 !important;
+    gap: 6px !important;
+  }
+
+  /* 打平两个容器，让卡组列与卡池列直接参与上面的网格定位 */
+  .battle-field,
+  .hands-area {
+    display: contents !important;
+  }
+
+  /* 皮肤加载进度条：手机上不占地方（加载完本就隐藏） */
+  .hands-area > .skin-load-bar,
+  .battle-slots-container > .skin-load-bar {
+    display: none !important;
+  }
+
+  /* 第 2 行：我的卡组 | 队友卡组 并排
+     第 3、4 行：我的卡池、队友卡池 各占整行（5 列才看得清） */
+  .battle-column.user-column        { grid-column: 1 !important; grid-row: 2 !important; }
+  .battle-column.teammate-column    { grid-column: 2 !important; grid-row: 2 !important; }
+  .hand-cards-column.user-hand      { grid-column: 1 / -1 !important; grid-row: 3 !important; }
+  .hand-cards-column.teammate-hand  { grid-column: 1 / -1 !important; grid-row: 4 !important; }
+
+  .battle-column {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    /* 关键：默认 align-items:center 会让子容器按内容宽度收缩，导致只排得下 2 列 */
+    align-items: stretch !important;
+  }
+
+  /* 卡组标题行：总减伤 + 下拉，压成一条 */
+  .battle-column h4 {
+    width: 100% !important;
+    margin: 1px 0 2px !important;
+    padding: 0 2px !important;
+    font-size: 0.64rem !important;
+    line-height: 1.5 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    text-align: left !important;
+    align-self: stretch !important;
+    white-space: nowrap;
+  }
+
+  .battle-column h4 #myDamageReduction,
+  .battle-column h4 #teammateDamageReduction {
+    font-size: 0.64rem !important;
+    flex: 1 1 auto !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .battle-column h4 select {
+    height: 20px !important;
+    min-height: 0 !important;
+    font-size: 0.6rem !important;
+    padding: 0 2px !important;
+    width: auto !important;
+    max-width: 74px;
+    flex: 0 0 auto !important;
+    border-radius: 4px !important;
+  }
+
+  /* 融合编辑锁定行 */
+  #myFusionLockRow,
+  #teammateFusionLockRow {
+    height: 15px !important;
+    margin: 0 !important;
+    font-size: 0.56rem !important;
+    gap: 3px !important;
+    opacity: .85;
+  }
+
+  #myFusionLockRow span,
+  #teammateFusionLockRow span {
+    font-size: 0.56rem !important;
+  }
+
+  #myFusionLockRow span:first-child,
+  #teammateFusionLockRow span:first-child {
+    font-size: 0.66rem !important;
+  }
+
+  /* ---------- ⑥ 卡组网格：严格 2 列 3 行，位置与游戏一致 ---------- */
+  .battle-slots-container {
+    width: 100% !important;
+    max-width: none !important;
+    gap: 0 !important;
+    margin: 0 !important;
+    align-items: stretch !important;
+  }
+
+  /* 融合位：顶部单独一格，居中，宽度约等于两列的一半 */
+  .battle-slots-container .engineering-slot {
+    width: 54% !important;
+    min-width: 0 !important;
+    max-width: 54% !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    margin: 0 auto 4px !important;
+    padding: 1px 2px !important;
+    font-size: 0.55rem !important;
+  }
+
+  .battle-slots {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 5px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    align-content: start !important;
+  }
+
+  .battle-slot {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    aspect-ratio: 1 / 1.06;
+    padding: 1px !important;
+    font-size: 0.55rem !important;
+    border-radius: 6px !important;
+    border-width: 1.5px !important;
+  }
+
+  .battle-slot.filled .card-item {
+    height: 16px !important;
+    line-height: 16px !important;
+    font-size: 0.55rem !important;
+  }
+
+  .battle-slot .card-item {
+    font-size: 0.55rem !important;
+    line-height: 1.15 !important;
+  }
+
+  /* 卡面小字（等级/名字）等比缩小，避免被卡片裁掉 */
+  .battle-slot .card-level,
+  .battle-slot .card-name,
+  .battle-slot .slot-level,
+  .battle-slot .slot-name {
+    font-size: 0.52rem !important;
+    line-height: 1.1 !important;
+  }
+
+  /* ---------- ⑦ 卡池：5 列 2 行，全宽自适应 ---------- */
+  .hand-cards-column {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 3px 0 0 !important;
+    padding: 3px 0 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .hand-cards-column h3 {
+    font-size: 0.62rem !important;
+    line-height: 1.5 !important;
+    margin: 0 0 2px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 4px !important;
+    padding: 0 2px !important;
+    text-align: left !important;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .hand-cards-column h3 button {
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 20px !important;
+    padding: 0 !important;
+    font-size: 0.6rem !important;
+    flex: 0 0 auto !important;
+  }
+
+  .selected-cards-container {
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr) !important;
+    grid-template-rows: none !important;
+    gap: 4px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    padding: 3px !important;
+    box-sizing: border-box !important;
+    border-radius: 8px !important;
+  }
+
+  .selected-card {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    font-size: 0.5rem !important;
+    padding: 1px !important;
+    border-radius: 5px !important;
+    overflow: hidden;
+  }
+
+  .selected-card .card-name,
+  .selected-card .card-level {
+    font-size: 0.48rem !important;
+    line-height: 1.1 !important;
+  }
+
+  /* ---------- ⑧ 底部状态栏：一行细条 ---------- */
+  #statsBar {
+    height: var(--m-status-h) !important;
+    min-height: 0 !important;
+    padding: 0 var(--m-pad) !important;
+    padding-bottom: var(--m-safe-b) !important;
+    box-sizing: content-box !important;
+    border-top-width: 1px !important;
+    font-size: 0.56rem !important;
+    z-index: 9989 !important;
+  }
+
+  #statsBar > div {
+    gap: 8px !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    height: var(--m-status-h) !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    scrollbar-width: none;
+  }
+
+  #statsBar > div::-webkit-scrollbar {
+    display: none;
+  }
+
+  #statsBar span,
+  #statsBar strong {
+    font-size: 0.56rem !important;
+    white-space: nowrap;
+  }
+
+  /* ---------- ⑨ 左侧卡池抽屉：挪到右侧中段，缩小 ---------- */
+  #poolTabBar {
+    top: auto !important;
+    bottom: 96px !important;
+    left: auto !important;
+    right: 0 !important;
+    padding: 2px !important;
+    border-radius: 8px 0 0 8px !important;
+    opacity: .78;
+  }
+
+  #poolTabBar.collapsed {
+    width: 20px !important;
+    height: 58px !important;
+  }
+
+  #poolTabBar .pool-dock-toggle {
+    width: 16px !important;
+    font-size: 0.5rem !important;
+    padding: 0 !important;
+  }
+
+  #poolTabBar .pool-dock-grip {
+    font-size: 0.55rem !important;
+  }
+
+  /* ---------- ⑩ 触摸交互：把 hover 语义换成 active ---------- */
+  .battle-slot,
+  .selected-card,
+  .hand-cards-column h3 button,
+  #scheme1 button,
+  .sticky-buttons button {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease !important;
+  }
+
+  .battle-slot.filled:active,
+  .selected-card:active {
+    transform: scale(.94) !important;
+    box-shadow: 0 0 0 2px rgba(255,215,0,.55) !important;
+  }
+
+  .battle-slot.drag-over {
+    transform: scale(1.04) !important;
+  }
+
+  /* 移动端没有精确悬停，禁用依赖 hover 的放大效果，避免"点完不消失" */
+  @media (hover: none) {
+    .battle-slot.filled:hover,
+    .selected-card:hover,
+    .collapsible-section .cards-grid:hover .card-item {
+      transform: none !important;
+      box-shadow: none !important;
+    }
+  }
+
+  /* 输入框才允许选中文字，其余禁止长按弹菜单（更像原生 App） */
+  body {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  input,
+  textarea,
+  [contenteditable="true"],
+  #introReaderBody,
+  #newsListContent {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+  }
+
+  /* 免责声明等尾部附属块：手机上不占主界面高度（否则会挤掉下方卡池） */
+  #scrollableContent > div:has(> div > h4) {
+    display: none !important;
+  }
+
+  /* 主界面允许极轻微滚动兜底，正常情况下四块一屏完整显示 */
+  #scrollableContent {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ---------- ⑪ 弹窗统一：宽度贴合、内容可滚 ---------- */
+  #newsListModal > div,
+  #introReaderModal > div,
+  #nickSetupModal > div {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: 78vh !important;
+    padding: 14px !important;
+  }
+
+  /* ---------- ⑫ 横屏兜底：高度太小时改回左右双栏 ---------- */
+  @media (orientation: landscape) and (max-height: 480px) {
+    :root {
+      --m-slot-w: calc((100vw - 24px) / 9);
+      --m-slot-h: calc(var(--m-slot-w) * 1.02);
+    }
+
+    .selection-area {
+      flex-direction: row !important;
+      flex-wrap: wrap !important;
+    }
+
+    .battle-column {
+      width: calc(50% - 4px) !important;
+      order: 1 !important;
+    }
+
+    .battle-column.teammate-column { order: 2 !important; }
+
+    .hand-cards-column {
+      width: calc(50% - 4px) !important;
+      order: 3 !important;
+    }
+
+    .hand-cards-column.teammate-hand { order: 4 !important; }
+
+    .battle-slots { justify-content: center !important; }
+
+    #fixedHeader h1 { padding-right: 190px !important; }
+  }
+}
+
+/* ==========================================================================
+   工具抽屉（mobile.js 构建）
+   桌面版有 12 个工具按钮铺成 3 行，手机上收进底部抽屉，顶栏只留一个「工具」入口。
+   ========================================================================== */
+@media (max-width: 700px) {
+
+  /* 顶栏的抽屉入口 */
+  #mToolTrigger {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    height: 30px !important;
+    min-width: 54px !important;
+    padding: 0 8px !important;
+    border: none !important;
+    border-radius: 8px !important;
+    background: linear-gradient(135deg, #4ecdc4, #2a9d8f) !important;
+    color: #0e2230 !important;
+    font-size: 0.68rem !important;
+    font-weight: 700 !important;
+    flex: 0 0 auto !important;
+    order: 99;
+    box-shadow: 0 1px 6px rgba(78,205,196,.35);
+  }
+
+  #mToolTrigger .m-trigger-ico { font-size: 0.8rem; line-height: 1; }
+
+  .m-drawer {
+    position: fixed;
+    inset: 0;
+    z-index: 9999999;
+    pointer-events: none;
+    visibility: hidden;
+  }
+
+  .m-drawer.open {
+    pointer-events: auto;
+    visibility: visible;
+  }
+
+  .m-drawer-mask {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, .58);
+    opacity: 0;
+    transition: opacity .2s ease;
+  }
+
+  .m-drawer.open .m-drawer-mask { opacity: 1; }
+
+  .m-drawer-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 74vh;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, #1e1e38 0%, #16162b 100%);
+    border-top: 1px solid rgba(255,215,0,.28);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -8px 30px rgba(0,0,0,.55);
+    transform: translateY(102%);
+    transition: transform .26s cubic-bezier(.22,.8,.28,1);
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .m-drawer.open .m-drawer-panel { transform: translateY(0); }
+
+  .m-drawer-handle {
+    width: 38px;
+    height: 4px;
+    border-radius: 3px;
+    background: rgba(255,255,255,.22);
+    margin: 8px auto 2px;
+    flex: 0 0 auto;
+  }
+
+  .m-drawer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 14px 6px;
+    flex: 0 0 auto;
+  }
+
+  .m-drawer-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #ffd700;
+    letter-spacing: .5px;
+  }
+
+  .m-drawer-close {
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(255,255,255,.08);
+    color: rgba(255,255,255,.8);
+    font-size: 0.9rem;
+    line-height: 1;
+    padding: 0;
+  }
+
+  .m-drawer-body {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 12px 8px;
+  }
+
+  .m-drawer-glabel {
+    font-size: 0.66rem;
+    color: rgba(255,255,255,.45);
+    margin: 6px 2px 8px;
+    letter-spacing: .5px;
+  }
+
+  .m-drawer-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px 8px;
+    margin-bottom: 6px;
+  }
+
+  .m-tool {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+  }
+
+  /* 搬进抽屉的原始按钮：统一成 46px 圆角方块 */
+  .m-tool > button,
+  .m-tool > button.m-tool-btn {
+    width: 46px !important;
+    height: 46px !important;
+    min-width: 46px !important;
+    max-width: 46px !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 12px !important;
+    font-size: 1.12rem !important;
+    line-height: 1 !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    position: static !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,.28);
+  }
+
+  .m-tool-label {
+    font-size: 0.6rem;
+    line-height: 1.2;
+    color: rgba(255,255,255,.68);
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  .m-drawer-open {
+    overflow: hidden !important;
+  }
+}
+
+/* 抽屉里两类按钮：纯图标（大 emoji + 下方标签）/ 文字按钮（直接显示文字） */
+@media (max-width: 700px) {
+  .m-tool--text > button,
+  .m-tool--text > button.m-tool-btn {
+    font-size: 0.62rem !important;
+    font-weight: 600 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    padding: 0 3px !important;
+    letter-spacing: -0.2px;
+  }
+}
+
+/* ==========================================================================
+   修订 A —— 标题行不再重叠（卡组标题 / 手牌标题 / 融合锁定行）
+   原样式把「标题 + 总减伤 + 下拉」三样东西塞进 185px，必然重叠。
+   这里改成 block 流式排版 + 省略号兜底，字号压到 0.5rem 级别。
+   ========================================================================== */
+@media (max-width: 700px) {
+
+  .battle-column h4 {
+    width: 100% !important;
+    margin: 1px 0 2px !important;
+    padding: 0 1px !important;
+    font-size: 0.54rem !important;
+    line-height: 1.45 !important;
+    display: block !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    text-align: left !important;
+  }
+
+  .battle-column h4 #myDamageReduction,
+  .battle-column h4 #teammateDamageReduction {
+    font-size: 0.5rem !important;
+    margin-left: 3px !important;
+    color: #4ecdc4 !important;
+  }
+
+  .battle-column h4 select {
+    height: 16px !important;
+    min-height: 0 !important;
+    font-size: 0.48rem !important;
+    margin-left: 3px !important;
+    padding: 0 1px !important;
+    max-width: 48px !important;
+    width: auto !important;
+    vertical-align: middle;
+  }
+
+  /* 融合锁定行：固定 14px，文字省略，避免压住下方融合卡 */
+  #myFusionLockRow,
+  #teammateFusionLockRow {
+    height: 14px !important;
+    min-height: 14px !important;
+    margin: 0 0 2px !important;
+    padding: 0 !important;
+    line-height: 14px !important;
+    overflow: hidden !important;
+    gap: 3px !important;
+    opacity: .8;
+  }
+
+  #myFusionLockRow span,
+  #teammateFusionLockRow span {
+    font-size: 0.52rem !important;
+    line-height: 14px !important;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  #myFusionLockRow span:first-child,
+  #teammateFusionLockRow span:first-child {
+    font-size: 0.62rem !important;
+  }
+
+  #myFusionLockText,
+  #teammateFusionLockText {
+    text-overflow: ellipsis;
+    max-width: 76%;
+  }
+
+  /* 手牌标题：一字排开，不再叠在一起 */
+  .hand-cards-column h3 {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 4px !important;
+    font-size: 0.6rem !important;
+    line-height: 1.4 !important;
+    margin: 0 0 2px !important;
+    padding: 0 1px !important;
+    overflow: hidden !important;
+    white-space: nowrap;
+  }
+
+  .hand-cards-column h3 > * {
+    flex: 0 0 auto !important;
+  }
+
+  .hand-cards-column h3 #myChariotBox,
+  .hand-cards-column h3 #teammateChariotBox {
+    font-size: 0.54rem !important;
+    margin: 0 !important;
+    padding: 1px 5px !important;
+    max-width: 92px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .hand-cards-column h3 button {
+    width: 19px !important;
+    height: 19px !important;
+    min-width: 19px !important;
+    font-size: 0.56rem !important;
+  }
+
+  /* 融合位上方留 2px，避免与锁定行贴边 */
+  .battle-slots-container .engineering-slot {
+    margin: 2px auto 4px !important;
+  }
+}
+
+/* ==========================================================================
+   修订 B —— 顶栏三个下拉平分宽度，不再横向溢出
+   ========================================================================== */
+@media (max-width: 700px) {
+  #scheme1 > div {
+    overflow-x: hidden !important;
+  }
+
+  #scheme1 select {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    width: auto !important;
+    height: 32px !important;
+    font-size: 0.7rem !important;
+    padding: 0 2px 0 4px !important;
+  }
+
+  /* 项目名给多一点空间 */
+  #scheme1 #projectSelector1 {
+    flex: 1.45 1 0 !important;
+  }
+
+  #scheme1 #categorySelector1 {
+    flex: 1.1 1 0 !important;
+  }
+
+  #scheme1 button {
+    flex: 0 0 auto !important;
+  }
+}
+
+/* ==========================================================================
+   修订 C —— 顶栏改 grid 精确分配（工具按钮不再被挤出屏幕）
+   ========================================================================== */
+@media (max-width: 700px) {
+  #scheme1 > div {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1.5fr) 26px 56px !important;
+    gap: 4px !important;
+    align-items: center !important;
+    padding: 3px var(--m-pad) 4px !important;
+    overflow: hidden !important;
+  }
+
+  #scheme1 select {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    flex: none !important;
+    height: 32px !important;
+    font-size: 0.68rem !important;
+    padding: 0 2px 0 4px !important;
+    box-sizing: border-box !important;
+  }
+
+  #scheme1 button {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 32px !important;
+    flex: none !important;
+  }
+
+  #mToolTrigger {
+    width: 56px !important;
+    min-width: 56px !important;
+    height: 32px !important;
+    justify-self: stretch;
+  }
+}
+
+/* 卡组标题分行显示 */
+@media (max-width: 700px) {
+  .battle-column h4 {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 1px 4px !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    line-height: 1.3 !important;
+  }
+
+  .battle-column h4 .m-h4-title {
+    flex: 0 0 100%;
+    font-size: 0.6rem !important;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .battle-column h4 #myDamageReduction,
+  .battle-column h4 #teammateDamageReduction {
+    flex: 0 1 auto !important;
+    font-size: 0.5rem !important;
+    margin: 0 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .battle-column h4 select {
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+    max-width: 52px !important;
+  }
+}
+
+/* ==========================================================================
+   修订 D —— 顶栏隐藏装饰图标（那个 📁 会多占一格，导致 grid 换行、顶栏变两倍高）
+   并收紧卡组纵向尺寸，让四块在 390x844 一屏内完整显示
+   ========================================================================== */
+@media (max-width: 700px) {
+  #scheme1 > div > span {
+    display: none !important;
+  }
+
+  /* 桌面卡槽本身就是正方形（94x94），这里保持一致 */
+  .battle-slot {
+    aspect-ratio: 1 / 1 !important;
+  }
+
+  .battle-slots-container .engineering-slot {
+    height: 26px !important;
+    min-height: 26px !important;
+    margin: 1px auto 3px !important;
+  }
+
+  .battle-slots {
+    gap: 4px !important;
+  }
+
+  .selection-area h2 {
+    font-size: 0.76rem !important;
+    margin: 0 !important;
+  }
+
+  /* 卡池再收一点 */
+  .selected-card {
+    height: 38px !important;
+    min-height: 38px !important;
+  }
+
+  .hand-cards-column {
+    margin-top: 2px !important;
+    padding-top: 2px !important;
+  }
+}
+
+/* ==========================================================================
+   修订 E —— 右侧悬浮「卡组工具」与手牌标题排布
+   ========================================================================== */
+@media (max-width: 700px) {
+  /* 右侧固定浮窗（全队合计 + 卡组工具）在手机上横挡卡组，收成贴边窄条 */
+  #selSideCtrls {
+    top: 50% !important;
+    bottom: auto !important;
+    transform: translateY(-50%);
+    right: 0 !important;
+    width: 40px !important;
+    gap: 3px !important;
+    opacity: .82;
+    z-index: 900 !important;
+  }
+
+  /* 全队合计已可在抽屉/标题看到，这里让位给内容 */
+  #selSideCtrls #teamTotalDr {
+    display: none !important;
+  }
+
+  #selSideCtrls #selSideToggle {
+    width: 40px !important;
+    min-width: 40px !important;
+    height: 36px !important;
+    padding: 0 1px !important;
+    font-size: 0.52rem !important;
+    line-height: 1.15 !important;
+    border-radius: 8px 0 0 8px !important;
+    white-space: normal !important;
+  }
+
+  /* 展开后的面板向左弹出，不遮挡右侧边缘 */
+  #selSideCtrls #selSidePanel {
+    position: absolute !important;
+    right: 44px !important;
+    top: 0 !important;
+    width: 128px !important;
+    z-index: 901 !important;
+  }
+
+  #selSideCtrls #selSidePanel button {
+    font-size: 0.6rem !important;
+    padding: 5px 4px !important;
+    height: auto !important;
+    min-height: 30px !important;
+  }
+
+  /* 手牌标题：卡池名靠右，中间留白 */
+  .hand-cards-column h3 {
+    font-size: 0.64rem !important;
+    gap: 5px !important;
+  }
+
+  .hand-cards-column h3 #myChariotBox,
+  .hand-cards-column h3 #teammateChariotBox {
+    margin-left: auto !important;
+    font-size: 0.56rem !important;
+    padding: 1px 6px !important;
+    flex: 0 0 auto !important;
+  }
+
+  /* 左下关闭按钮 / 右下阵容识别：缩小，别压住卡池 */
+  body > .close-btn,
+  #closeBtn {
+    width: 34px !important;
+    height: 34px !important;
+    opacity: .65;
+  }
+}
