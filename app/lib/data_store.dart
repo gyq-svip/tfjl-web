@@ -165,12 +165,21 @@ class SkinPack {
         ..clear()
         ..addAll(builtin);
     } catch (_) {}
-    // ② 皮肤包内的增量表覆盖（管理员后加的魔化数据）
+    // ② 皮肤包内的增量表按皮肤名合并（不能整体覆盖英雄！
+    //    举例：皮肤包「天使」只有 {风清扬·天使}，整体覆盖会冲掉内置表的「魔化」）
     try {
       final sa = File('${d.path}/skin-attributes.json');
       if (sa.existsSync()) {
         final o = jsonDecode(sa.readAsStringSync()) as Map<String, dynamic>;
-        o.forEach((k, v) => skinAttrs[k] = v);
+        o.forEach((k, v) {
+          if (v is! Map) return;
+          final base = skinAttrs[k];
+          if (base is Map) {
+            v.forEach((sk, attr) => base[sk] = attr);
+          } else {
+            skinAttrs[k] = Map<String, dynamic>.from(v);
+          }
+        });
       }
     } catch (_) {}
   }
