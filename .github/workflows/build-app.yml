@@ -36,18 +36,6 @@ jobs:
         working-directory: app
         run: flutter pub get
 
-      - name: Bake Gist token (extract from live app-core.js)
-        run: |
-          python3 -c "
-          import re, urllib.request
-          req = urllib.request.Request('https://gyq-svip.github.io/tfjl-web/app-core.js', headers={'User-Agent':'TFJL-CI'})
-          js = urllib.request.urlopen(req, timeout=60).read().decode('utf-8')
-          m = re.search(r\"HARDCODED_TOKEN\s*=\s*'([^']{20,})'\", js)
-          assert m and (m.group(1).startswith('ghp_') or m.group(1).startswith('github_pat_')), 'token not found'
-          open('app/assets/data/token.txt','w').write(m.group(1))
-          print('token baked:', m.group(1)[:10]+'...')
-          "
-
       - name: Build Android APK
         working-directory: app
         run: flutter build apk --release
