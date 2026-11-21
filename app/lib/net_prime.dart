@@ -12,10 +12,13 @@ class NetPrime {
   static final List<NetProbeResult> lastResults = [];
   static bool primed = false;
 
+  /// 探测目标：必须和 APP 实际用的域名/路径/请求头一致，否则会误报。
+  /// - Gitee 用仓库首页（皮肤下载走 releases/download，raw 路径 iOS 证书链有问题）
+  /// - GitHub API 必须带 User-Agent，否则 GitHub 固定返回 403（本机实测）
   static const targets = [
-    ('Gitee 皮肤源', 'https://gitee.com/dragon-soars-across-the-world_0/tfjl-web/raw/main/skins-index.json'),
-    ('GitHub Pages', 'https://gyq-svip.github.io/tfjl-web/gist-enc.txt'),
-    ('GitHub API', 'https://api.github.com/gists/a32a0628bd9275f3a4922cd12cf298c9'),
+    ('Gitee 皮肤源', 'https://gitee.com/', false),
+    ('GitHub Pages', 'https://gyq-svip.github.io/tfjl-web/gist-enc.txt', false),
+    ('GitHub API', 'https://api.github.com/gists/a32a0628bd9275f3a4922cd12cf298c9', true),
   ];
 
   /// App 启动后调用一次（首帧后）。只探公网，不阻塞 UI。
@@ -32,8 +35,8 @@ class NetPrime {
   /// 完整探测（网络自检页面用）
   static Future<List<NetProbeResult>> probeAll({bool quick = false}) async {
     final out = <NetProbeResult>[];
-    for (final (label, url) in targets) {
-      out.add(await _probe(label, url, quick ? 8 : 12));
+    for (final (label, url, needsUA) in targets) {
+      out.add(await _probe(label, url, needsUA, quick ? 8 : 12));
     }
     lastResults
       ..clear()
@@ -41,7 +44,7 @@ class NetPrime {
     return out;
   }
 
-  static Future<NetProbeResult> _probe(String label, String url, int timeoutSec) async {
+  static Future<NetProbeResult> _probe(String label, String url, bool needsUA, int timeoutSec) async {
     final sw = Stopwatch()..start();
     final timeout = Duration(seconds: timeoutSec);
     HttpClient? client;
@@ -50,6 +53,10 @@ class NetPrime {
         ..connectionTimeout = timeout
         ..idleTimeout = timeout;
       final req = await client.getUrl(Uri.parse(url)).timeout(timeout);
+      if (needsUA) {
+        req.headers.set('User-Agent', 'TFJL-App');
+        req.headers.set('Accept', 'application/vnd.github+json');
+      }
       final resp = await req.close().timeout(timeout);
       await resp.drain<void>().timeout(timeout);
       sw.stop();

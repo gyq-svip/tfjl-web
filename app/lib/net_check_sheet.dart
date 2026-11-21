@@ -79,7 +79,12 @@ class _NetCheckSheetState extends State<NetCheckSheet> {
 
   String _conclusion(bool allOk, bool cacheOk) {
     if (allOk) return '✅ 三个域名都通，网络正常。共享打不开请检查项目栏是否选了「共享」。';
-    if (!cacheOk) return '❌ 连 Gitee 都不通 —— 手机网络本身没给这个 App 联网权限。\n去 设置 → 蜂窝网络（或无线局域网）→ 找到本 App，开关数据一次；再杀掉后台重开。';
-    return '⚠️ Gitee 通、GitHub 不通 —— 国内网络对 GitHub 不稳定。\n可试试切换 WiFi/蜂窝，或开飞行模式再关掉重测。皮肤走 Gitee 缓存所以能显示。';
+    final giteeOk = results.isNotEmpty && results[0].ok;
+    final pagesOk = results.length > 1 && results[1].ok;
+    final anyOk = results.any((e) => e.ok);
+    if (!anyOk) return '❌ 三个域名都不通 —— 手机确实没给这个 App 联网权限。\n去 设置 → 蜂窝网络（或无线局域网）→ 找到本 App，开关数据一次；再杀掉后台重开。';
+    if (pagesOk) return '✅ GitHub Pages 通（共享 token 走这里），网络本身没问题。\n若共享仍打不开，退出重进一次即可。';
+    if (giteeOk) return '⚠️ 只有 Gitee 通，GitHub 线路不通 —— 国内网络对 GitHub 不稳定。\n可切换 WiFi/蜂窝，或开飞行模式再关掉重测。';
+    return '⚠️ 部分域名不通，可切换 WiFi/蜂窝后重测。';
   }
 }
