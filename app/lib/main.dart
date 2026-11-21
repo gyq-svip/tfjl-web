@@ -427,7 +427,7 @@ class _HomePageState extends State<HomePage> {
   void _showToolsMenu() {
     showModalBottomSheet(context: context, backgroundColor: const Color(0xFF1A1A2E), builder: (_) => SafeArea(
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Padding(padding: EdgeInsets.all(12), child: Align(alignment: Alignment.centerLeft, child: Text('🧰 工具', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))))),
+        const Padding(padding: EdgeInsets.all(12), child: Align(alignment: Alignment.centerLeft, child: Text('🧰 工具 v${AppData.appVersion}', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))))),
         ListTile(leading: const Text('📚', style: TextStyle(fontSize: 20)), title: const Text('阵容图库', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
           subtitle: const Text('精选 · 活动 7 天 A/B · 大航海 223 套', style: TextStyle(fontSize: 10, color: Colors.white54)),
           onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryPage())); }),
