@@ -44,7 +44,7 @@ window.TFJL_DEEPSEA_PLAYER_GIST_ID = '';
 if (typeof window.getGistToken !== 'function') {
     window.getGistToken = function () {
         // 🔴 部署注入分支：deploy.yml 的 Inject Token 步骤会把下方占位符替换为 secrets.GIST_TOKEN
-        const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
+        const HARDCODED_TOKEN = '';
         if (HARDCODED_TOKEN && HARDCODED_TOKEN.length > 20 && HARDCODED_TOKEN.startsWith('ghp_')) {
             return HARDCODED_TOKEN;
         }

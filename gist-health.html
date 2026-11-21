@@ -37,7 +37,7 @@
 <script>
 // 🔴 与 app-core.js 同款 token 解析（部署注入 / localStorage / iframe 父窗口兜底）
 function getGistToken() {
-    const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
+    const HARDCODED_TOKEN = '';
     if (HARDCODED_TOKEN && HARDCODED_TOKEN.length > 20 && HARDCODED_TOKEN.startsWith('ghp_')) return HARDCODED_TOKEN;
     try { const ls = localStorage.getItem('TFJL_Gist_Token'); if (ls) return ls; } catch (e) {}
     try {
