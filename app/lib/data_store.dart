@@ -247,77 +247,33 @@ class ProjectLibrary {
   }
 }
 
-/// 云端共享（Gist）—— token 从线上 app-core.js 的 HARDCODED_TOKEN 提取（与安卓原生版一致）
+/// 云端共享（Gist）——读走匿名（主索引实测匿名可读），写才需要 token
 class GistClient {
   static const masterGist = 'a32a0628bd9275f3a4922cd12cf298c9';
   static String? _token;
 
-  static Future<String> fetchToken() async {
-    if (_token != null && _token!.length > 10) return _token!;
-    final prefs = await SharedPreferences.getInstance();
-    final cached = prefs.getString('gist_token') ?? '';
-    if (cached.length > 10) { _token = cached; return cached; }
-    // ① 本地烘焙 token（编译机注入，不进 git）
-    try {
-      final baked = await rootBundle.loadString('assets/data/token.txt');
-      if (baked.trim().length > 10) {
-        _token = baked.trim();
-        await prefs.setString('gist_token', _token!);
-        debugPrint('[Gist] 使用烘焙 token');
-        return _token!;
-      }
-    } catch (_) {}
-    try {
-      debugPrint('[Gist] 下载 app-core.js 提取 token…');
-      final r = await http.get(
-        Uri.parse('https://gyq-svip.github.io/tfjl-web/app-core.js'),
-        headers: {'User-Agent': 'TFJL-App'},
-      ).timeout(const Duration(seconds: 60));
-      debugPrint('[Gist] app-core.js status=${r.statusCode} len=${r.body.length}');
-      if (r.statusCode == 200) {
-        final m = RegExp(r"HARDCODED_TOKEN\s*=\s*'([^']{20,})'").firstMatch(r.body);
-        debugPrint('[Gist] HARDCODED_TOKEN 匹配: ${m != null}');
-        if (m != null) {
-          final t = m.group(1)!;
-          if (t.startsWith('ghp_') || t.startsWith('github_pat_')) {
-            _token = t;
-            await prefs.setString('gist_token', t);
-            debugPrint('[Gist] token 提取成功');
-            return t;
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('[Gist] fetchToken 异常: $e');
-    }
-    debugPrint('[Gist] token 提取失败');
-    return '';
-  }
-
-  static Map<String, String> _headers(String token) => {
+  static Map<String, String> _headers() => {
         'User-Agent': 'TFJL-App',
         'Accept': 'application/vnd.github+json',
-        if (token.isNotEmpty) 'Authorization': 'token $token',
+        // 注意：不发送可能失效的 token——失效 token 会让 GitHub 直接 401，
+        // 而匿名请求对 public/已知 id 的 gist 是放行的（实测）。
       };
 
-  /// 读主 Gist 的单个文件内容（带 token，重试 2 次）
+  /// 读一个 gist 的单个文件内容（匿名，重试 2 次）
   static Future<String?> readFile(String gistId, String fileName) async {
-    final token = await fetchToken();
-    if (token.isEmpty) return null;
     for (var attempt = 0; attempt < 2; attempt++) {
       try {
         final r = await http.get(Uri.parse('https://api.github.com/gists/$gistId'),
-            headers: _headers(token)).timeout(const Duration(seconds: 20));
-        debugPrint('[Gist] readFile \$fileName status=\${r.statusCode}');
+            headers: _headers()).timeout(const Duration(seconds: 20));
         if (r.statusCode == 200) {
           final g = jsonDecode(r.body) as Map<String, dynamic>;
           final files = g['files'] as Map<String, dynamic>?;
           final f = files?[fileName] as Map<String, dynamic>?;
-          if (f == null) { debugPrint('[Gist] 文件不存在: \$fileName'); return null; }
+          if (f == null) return null;
           var txt = f['content']?.toString() ?? '';
           if (f['truncated'] == true && f['raw_url'] != null) {
             final r2 = await http.get(Uri.parse(f['raw_url'].toString()),
-                headers: _headers(token)).timeout(const Duration(seconds: 30));
+                headers: _headers()).timeout(const Duration(seconds: 30));
             txt = r2.body;
           }
           return txt;
