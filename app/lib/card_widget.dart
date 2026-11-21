@@ -236,7 +236,9 @@ CardData parseCard(dynamic cardRaw, bool isMine, Map<String, dynamic> proj, {Ski
       });
     }
     d.subFile = subSkin.isEmpty ? pack.skinFile(f[1], '') : (pack.skinFile(f[1], subSkin) ?? pack.skinFileByAny(subSkin) ?? pack.skinFile(f[1], ''));
-    if (d.subFile != null) d.subKey = '\${d.subFile!.lastModifiedSync().millisecondsSinceEpoch}';
+    if (d.subFile != null) {
+      try { d.subKey = d.subFile!.lastModifiedSync().millisecondsSinceEpoch.toString(); } catch (_) {}
+    }
     final fLv = proj['fusionLevels'] as Map<String, dynamic>? ?? {};
     d.subLevel = fLv[f[1]]?.toString() ?? '1';
     final fMh = proj['fusionMoHua'] as Map<String, dynamic>? ?? {};

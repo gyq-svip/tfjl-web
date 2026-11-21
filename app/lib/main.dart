@@ -6,9 +6,18 @@ import 'data_store.dart';
 import 'card_widget.dart';
 import 'sheets.dart';
 import 'library_page.dart';
+import 'net_prime.dart';
+import 'net_check_sheet.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const TfjlApp());
+  // iOS 关键：首帧渲染完、App 进入 active 后再主动发一次公网请求，
+  // 把「无线局域网与蜂窝数据」授权拉起来（MQTT 项目已验证：太早发会被系统吞掉）。
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    await Future.delayed(const Duration(milliseconds: 500));
+    await NetPrime.prime();
+  });
 }
 
 class TfjlApp extends StatelessWidget {
@@ -30,6 +39,14 @@ class TfjlApp extends StatelessWidget {
   }
 }
 
+/// 拖动卡牌载荷：手牌下标 + 来源卡槽（从手牌直接拖来时为 null）
+class CardDragData {
+  final bool isMine;
+  final int handIndex;
+  final String? fromSlot;
+  const CardDragData({required this.isMine, required this.handIndex, this.fromSlot});
+}
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
   @override
@@ -46,6 +63,8 @@ class _HomePageState extends State<HomePage> {
   bool loading = true;
   double packPct = -1;              // 皮肤包下载进度
   String loadStage = '';
+  String? dragOverSlot;
+  int? dragOverHandIdx;
 
   @override
   void initState() {
@@ -137,6 +156,63 @@ class _HomePageState extends State<HomePage> {
       (hand[handIdx] as Map<String, dynamic>)['placed'] = null;
       refresh();
     }
+  }
+
+  // ------------------------------------------------------- 自由拖动布局
+  /// 卡槽合法性：工程卡只能进 0 号位，精灵球不能上阵，普通卡只能进 1-6 号位
+  bool _canDropToSlot(Map<String, dynamic> card, String slot) {
+    if (card['profession'] == 'pokeball') return false;
+    final eng = card['isEngineering'] == true;
+    return eng == slot.endsWith('0');
+  }
+
+  void _clearDragHighlights() {
+    if (!mounted) return;
+    setState(() { dragOverSlot = null; dragOverHandIdx = null; });
+  }
+
+  /// 把卡拖到指定卡槽：占位则互换（从手牌拖来时原占位卡退回手牌）
+  void applySlotDrop(CardDragData d, bool targetMine, String targetSlot) {
+    if (d.isMine != targetMine) return;
+    final hand = handCards(targetMine);
+    if (d.handIndex >= hand.length) return;
+    final card = hand[d.handIndex] as Map<String, dynamic>;
+    final prefix = targetMine ? 'u' : 't';
+    if (!targetSlot.startsWith(prefix) || !_canDropToSlot(card, targetSlot)) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(card['profession'] == 'pokeball'
+            ? '精灵球不能上阵'
+            : (card['isEngineering'] == true ? '工程卡只能拖到 0 号位' : '普通卡不能拖到 0 号位')),
+        duration: const Duration(milliseconds: 900)));
+      _clearDragHighlights();
+      return;
+    }
+    final old = card['placed']?.toString() ?? '';
+    final oldSlot = (old.isEmpty || old == 'null') ? null : old;
+    final occIdx = handIndexBySlot(targetMine, targetSlot);
+    if (occIdx >= 0 && occIdx != d.handIndex) {
+      final occ = hand[occIdx] as Map<String, dynamic>;
+      occ['placed'] = oldSlot;
+    }
+    card['placed'] = targetSlot;
+    _clearDragHighlights();
+    persistProject();
+  }
+
+  /// 拖回手牌格：取下卡牌，并按落点重新排列手牌顺序
+  void applyHandDrop(CardDragData d, bool targetMine, int targetIdx) {
+    if (d.isMine != targetMine) return;
+    // 必须直接操作项目里的真实列表，handCards() 返回的是临时副本
+    final key = targetMine ? 'myHandCards' : 'teammateHandCards';
+    final hand = proj?[key] as List?;
+    if (hand == null || d.handIndex >= hand.length) return;
+    var dst = targetIdx.clamp(0, hand.length);
+    final item = hand.removeAt(d.handIndex);
+    if (dst > hand.length) dst = hand.length;
+    hand.insert(dst, item);
+    (item as Map<String, dynamic>)['placed'] = null;
+    _clearDragHighlights();
+    persistProject();
   }
 
   // ------------------------------------------------------- 顶栏与项目栏
@@ -434,8 +510,21 @@ class _HomePageState extends State<HomePage> {
         ListTile(leading: const Text('📖', style: TextStyle(fontSize: 20)), title: const Text('使用说明', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
           subtitle: const Text('上下卡 / 设置 / 卡池的用法', style: TextStyle(fontSize: 10, color: Colors.white54)),
           onTap: () { Navigator.pop(context); _showHelp(); }),
+        ListTile(leading: const Text('🌐', style: TextStyle(fontSize: 20)), title: const Text('网络自检', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+          subtitle: const Text('共享打不开？测一下是哪个环节不通', style: TextStyle(fontSize: 10, color: Colors.white54)),
+          onTap: () { Navigator.pop(context); _showNetCheck(); }),
       ]),
     ));
+  }
+
+  void _showNetCheck() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF16162C),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => const NetCheckSheet(),
+    );
   }
 
   void _showHelp() {
@@ -451,6 +540,11 @@ class _HomePageState extends State<HomePage> {
         '· 点已上阵（变灰）的卡也能打开\n\n'
         '【卡池】\n'
         '· 点手牌标题旁「🎴 卡池」→ 点卡直接加手牌并上阵（长按只加手牌）\n\n'
+        '【自由拖动布局】\n'
+        '· 按住卡牌拖动：手牌→任意卡槽（指定位置上阵）\n'
+        '· 卡槽→卡槽：移动/交换位置\n'
+        '· 卡槽/手牌→手牌格：取下并按落点重排\n'
+        '· 工程卡只能进 0 号位，精灵球不能上阵\n\n'
         '【项目】\n'
         '· 顶栏下拉：本地/共享 → 分类 → 项目\n'
         '· 本地可新建分类和项目',
@@ -519,10 +613,43 @@ class _HomePageState extends State<HomePage> {
     Widget slot(String id) {
       final hi = handIndexBySlot(isMine, id);
       final cd = hi >= 0 ? parseCard(hand[hi], isMine, proj!, pack: SkinPack.I) : CardData();
-      return GestureDetector(
+      final card = GestureDetector(
         onTap: () { if (hi >= 0) takeOff(isMine, hi); },
         onLongPress: () { if (hi >= 0) showCardSettings(cd, isMine, hi); },
         child: CardSlot(data: cd, size: cardW),
+      );
+      final draggable = hi >= 0
+          ? Draggable<CardDragData>(
+              data: CardDragData(isMine: isMine, handIndex: hi, fromSlot: id),
+              feedback: Material(
+                color: Colors.transparent,
+                child: Opacity(opacity: 0.9, child: CardSlot(data: cd, size: cardW * 0.8)),
+              ),
+              childWhenDragging: Opacity(opacity: 0.25, child: CardSlot(data: cd, size: cardW)),
+              onDragEnd: (_) => _clearDragHighlights(),
+              child: card,
+            )
+          : card;
+      return DragTarget<CardDragData>(
+        onWillAcceptWithDetails: (details) {
+          final d = details.data;
+          if (d.isMine != isMine) return false;
+          if (dragOverSlot != id) setState(() => dragOverSlot = id);
+          return true;
+        },
+        onAcceptWithDetails: (details) => applySlotDrop(details.data, isMine, id),
+        onLeave: (d) { if (dragOverSlot == id) setState(() => dragOverSlot = null); },
+        builder: (context, candidate, rejected) {
+          final over = dragOverSlot == id && candidate.isNotEmpty;
+          return Container(
+            width: cardW,
+            height: cardH,
+            decoration: over
+                ? BoxDecoration(border: Border.all(color: const Color(0xFFFFD24A), width: 2), borderRadius: BorderRadius.circular(4))
+                : null,
+            child: draggable,
+          );
+        },
       );
     }
 
@@ -599,16 +726,51 @@ class _HomePageState extends State<HomePage> {
                       padding: EdgeInsets.only(left: c > 0 ? g : 0),
                       child: Builder(builder: (_) {
                         final idx = r * 5 + c;
-                        final cd = idx < hand.length ? parseCard(hand[idx], isMine, proj!, pack: SkinPack.I) : CardData();
-                        final onField = idx < hand.length && ((hand[idx] as Map<String, dynamic>)['placed']?.toString() ?? '').isNotEmpty;
-                        return GestureDetector(
+                        final hasCard = idx < hand.length;
+                        final placed = hasCard ? ((hand[idx] as Map<String, dynamic>)['placed']?.toString() ?? '') : '';
+                        final onField = placed.isNotEmpty && placed != 'null';
+                        final cd = hasCard ? parseCard(hand[idx], isMine, proj!, pack: SkinPack.I) : CardData();
+                        final cell = GestureDetector(
                           onTap: () {
-                            if (idx >= hand.length) { showPoolDialog(isMine); return; }
+                            if (!hasCard) { showPoolDialog(isMine); return; }
                             if (onField) { showCardSettings(cd, isMine, idx); }
                             else { autoPlace(isMine, idx); }
                           },
-                          onLongPress: () { if (idx < hand.length) showCardSettings(cd, isMine, idx); },
+                          onLongPress: () { if (hasCard) showCardSettings(cd, isMine, idx); },
                           child: CardSlot(data: cd, size: cw, dimmed: onField),
+                        );
+                        final draggable = hasCard
+                            ? Draggable<CardDragData>(
+                                data: CardDragData(isMine: isMine, handIndex: idx, fromSlot: onField ? placed : null),
+                                feedback: Material(
+                                  color: Colors.transparent,
+                                  child: Opacity(opacity: 0.9, child: CardSlot(data: cd, size: cw * 0.8, dimmed: onField)),
+                                ),
+                                childWhenDragging: Opacity(opacity: 0.25, child: CardSlot(data: cd, size: cw, dimmed: onField)),
+                                onDragEnd: (_) => _clearDragHighlights(),
+                                child: cell,
+                              )
+                            : cell;
+                        return DragTarget<CardDragData>(
+                          onWillAcceptWithDetails: (details) {
+                            final d = details.data;
+                            if (d.isMine != isMine) return false;
+                            if (dragOverHandIdx != idx) setState(() => dragOverHandIdx = idx);
+                            return true;
+                          },
+                          onAcceptWithDetails: (details) => applyHandDrop(details.data, isMine, idx),
+                          onLeave: (d) { if (dragOverHandIdx == idx) setState(() => dragOverHandIdx = null); },
+                          builder: (context, candidate, rejected) {
+                            final over = dragOverHandIdx == idx && candidate.isNotEmpty;
+                            return Container(
+                              width: cw,
+                              height: ch,
+                              decoration: over
+                                  ? BoxDecoration(border: Border.all(color: const Color(0xFF2BB3A3), width: 2), borderRadius: BorderRadius.circular(4))
+                                  : null,
+                              child: draggable,
+                            );
+                          },
                         );
                       }),
                     ),
