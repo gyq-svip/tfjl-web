@@ -112,13 +112,21 @@ class SkinPack {
   }
 
   /// 官方魔化数据（skin-attributes.json）：{英雄: {皮肤名/魔化: 属性}}
+  /// 来源①：APP 内置完整官方表（100 英雄，61 个有魔化）——打包进 assets/data/
+  /// 来源②：皮肤包内的增量表（17 英雄，管理员后加的）——覆盖内置
   final Map<String, dynamic> skinAttrs = {};
 
-  /// 该英雄官方是否拥有魔化（SKIN_ATTRIBUTES[英雄] 含「魔化」键）
+  /// 该英雄官方是否拥有魔化（与网页 _hasRealMoHua 一致：desc 为「无」视为无魔化）
   bool hasMohuaData(String hero) {
     final official = AppData.officialName(hero);
-    final a = skinAttrs[official];
-    if (a is Map) return a.containsKey('魔化');
+    for (final name in [official, hero]) {
+      final a = skinAttrs[name];
+      if (a is! Map) continue;
+      final m = a['魔化'];
+      if (m == null) continue;
+      final desc = m is String ? m : (m is Map ? (m['desc']?.toString() ?? '') : '');
+      if (desc.isNotEmpty && desc.trim() != '无') return true;
+    }
     return false;
   }
 
@@ -150,12 +158,19 @@ class SkinPack {
       });
     } catch (_) {}
     // 皮肤属性表（官方魔化判定）
+    // ① 先加载 APP 内置完整表（100 英雄 / 61 个有魔化）
+    try {
+      final builtin = jsonDecode(await rootBundle.loadString('assets/data/skin-attributes.json')) as Map<String, dynamic>;
+      skinAttrs
+        ..clear()
+        ..addAll(builtin);
+    } catch (_) {}
+    // ② 皮肤包内的增量表覆盖（管理员后加的魔化数据）
     try {
       final sa = File('${d.path}/skin-attributes.json');
       if (sa.existsSync()) {
         final o = jsonDecode(sa.readAsStringSync()) as Map<String, dynamic>;
-        skinAttrs.clear();
-        skinAttrs.addAll(o);
+        o.forEach((k, v) => skinAttrs[k] = v);
       }
     } catch (_) {}
   }
