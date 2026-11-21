@@ -314,28 +314,42 @@ class GistClient {
     } catch (_) { return ''; }
   }
 
-  /// 读一个 gist 的单个文件内容（匿名，重试 2 次）
+  /// 读一个 gist 的单个文件内容
+  /// ★优先走 gist.githubusercontent.com 直链：无限流、更快、更稳。
+  ///   （api.github.com 匿名只有 60 次/小时，切几个阵容就耗尽 → 403 → "加载失败"）
+  ///   只有 raw 直链失败才退回 GitHub API（兼容非 gyq-svip 名下的 gist）。
   static Future<String?> readFile(String gistId, String fileName) async {
-    for (var attempt = 0; attempt < 2; attempt++) {
+    // ① raw 直链（无速率限制）
+    for (final u in [
+      'https://gist.githubusercontent.com/gyq-svip/$gistId/raw/$fileName',
+      'https://gist.githubusercontent.com/raw/$gistId/$fileName',
+    ]) {
       try {
-        final r = await http.get(Uri.parse('https://api.github.com/gists/$gistId'),
-            headers: _headers()).timeout(const Duration(seconds: 20));
-        if (r.statusCode == 200) {
-          final g = jsonDecode(r.body) as Map<String, dynamic>;
-          final files = g['files'] as Map<String, dynamic>?;
-          final f = files?[fileName] as Map<String, dynamic>?;
-          if (f == null) return null;
-          var txt = f['content']?.toString() ?? '';
-          if (f['truncated'] == true && f['raw_url'] != null) {
-            final r2 = await http.get(Uri.parse(f['raw_url'].toString()),
-                headers: _headers()).timeout(const Duration(seconds: 30));
-            txt = r2.body;
-          }
-          return txt;
+        final r = await http.get(Uri.parse(u), headers: _headers()).timeout(const Duration(seconds: 15));
+        if (r.statusCode == 200 && r.body.isNotEmpty) {
+          debugPrint('[Gist] raw 直链读取成功: $fileName');
+          return r.body;
         }
       } catch (_) {}
-      await Future.delayed(Duration(milliseconds: 400 * (attempt + 1)));
     }
+    // ② 退回 GitHub API（有 60 次/小时限制，仅兜底）
+    try {
+      final r = await http.get(Uri.parse('https://api.github.com/gists/$gistId'),
+          headers: _headers()).timeout(const Duration(seconds: 20));
+      if (r.statusCode == 200) {
+        final g = jsonDecode(r.body) as Map<String, dynamic>;
+        final files = g['files'] as Map<String, dynamic>?;
+        final f = files?[fileName] as Map<String, dynamic>?;
+        if (f == null) return null;
+        var txt = f['content']?.toString() ?? '';
+        if (f['truncated'] == true && f['raw_url'] != null) {
+          final r2 = await http.get(Uri.parse(f['raw_url'].toString()),
+              headers: _headers()).timeout(const Duration(seconds: 30));
+          txt = r2.body;
+        }
+        return txt;
+      }
+    } catch (_) {}
     return null;
   }
 
