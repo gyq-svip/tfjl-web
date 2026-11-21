@@ -1,10 +1,7 @@
 name: Build App (APK + IPA)
 
 on:
-  workflow_dispatch:
-  push:
-    branches: [ main ]
-    paths: [ 'app/**', '.github/workflows/build-app.yml' ]
+  workflow_dispatch:   # 手动触发（Actions 页面点 Run workflow）——macOS 计费 10 倍，按需使用省额度
 
 permissions:
   contents: write
