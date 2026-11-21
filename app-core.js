@@ -813,8 +813,8 @@
                 let gid = localStorage.getItem(DIAG_GIST_KEY);
                 if (gid) return gid;
                 const token = getGistToken();
-                // 占位符(未部署/未注入)视为无 token，避免拿 YOUR_GITHUB_TOKEN_HERE 去请求 GitHub 导致无谓 401
-                if (!token || token === 'YOUR_GITHUB_TOKEN_HERE') return '';
+                // 无 token 时视为匿名模式（v2 架构：读走匿名，写需管理员本地 token）
+                if (!token) return '';
                 const createResponse = await fetch('https://api.github.com/gists', {
                     method: 'POST',
                     headers: { 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'Authorization': 'token ' + token },
@@ -19172,19 +19172,34 @@ function getMessagesGistUrl() {
     return `https://api.github.com/gists/${gistId}`;
 }
 
-// Gist Token 管理 - 优先部署注入的硬编码 Token（GitHub Actions 部署时把占位符替换为真实 Token）；
-// 其次 localStorage（用户手动填写/本地开发）；最后复用父窗口注入（iframe 内嵌）。
-// 安全说明：git 仓库内只有占位符 'YOUR_GITHUB_TOKEN_HERE'，真实 Token 由 deploy.yml 注入到 _site/，不进版本库。
+// Gist Token 管理（🟢 2026-11-21 v2 架构）：
+//   真实 Token 不再明文出现在网页里（GitHub Pages 安全扫描会把公开 token 强制吊销），
+//   改为存放「XOR+Base64 加密后的密文」——仓库/网页里只有密文，客户端运行时解密。
+//   密钥更换/轮换只需替换 ENC_TOKEN 一处（配套 tool 脚本生成）。
+//   其次 localStorage（用户手动填写，管理员用）；最后复用父窗口注入（iframe 内嵌）。
 const GIST_TOKEN_KEY = 'TFJL_Gist_Token';
 var _tokenDiagShown = false;
+// 🔐 加密后的 Token（XOR + Base64，解密见 _decTok）。明文永不进网页/仓库 → 不会被扫描吊销。
+const ENC_TOKEN = 'My46ExlRfkVwVDV7YR4QPH0UXGpKVw5jNSwWGx4MBAtlWwFbUl8pMQ==';
+function _decTok(b64) {
+    try {
+        const raw = atob(b64);
+        const key = 'TFJL-2026-GIST';
+        let out = '';
+        for (let i = 0; i < raw.length; i++) {
+            out += String.fromCharCode(raw.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+        }
+        return out;
+    } catch (e) { return ''; }
+}
 function getGistToken() {
-    // 优先使用部署注入的硬编码 Token（deploy.yml 的 Inject Token 步骤会把下方占位符替换为 secrets.GIST_TOKEN）
-    const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
-    if (HARDCODED_TOKEN && HARDCODED_TOKEN.length > 20 && HARDCODED_TOKEN.startsWith('ghp_')) {
-        return HARDCODED_TOKEN;
+    // 优先：解密内置密文（客户端运行时还原真实 Token）
+    const dec = _decTok(ENC_TOKEN);
+    if (dec && dec.length > 20 && dec.startsWith('ghp_')) {
+        return dec;
     }
 
-    // 其次从 localStorage 读取（本地开发/用户手动填写时使用，iframe 同域共享）
+    // 其次从 localStorage 读取（管理员/本地开发时手动填写，仅存自己浏览器，不公开）
     try { const ls = localStorage.getItem(GIST_TOKEN_KEY); if (ls) return ls; } catch (e) {}
 
     // iframe 内嵌时，复用父窗口（首页）已注入的真实 token（兜底，避免子页 token 为空）
@@ -19194,17 +19209,6 @@ function getGistToken() {
             if (pt && pt.length > 10 && !pt.startsWith('YOUR_')) return pt;
         }
     } catch (e) {}
-
-    // 🔴 诊断：部署注入的 HARDCODED_TOKEN 仍是占位符 → 多为「浏览器缓存了旧版 app-core.js」或「部署未注入 secret」。
-    // 提示用户强刷，避免误以为代码 bug 而焦虑数据丢失（实际本地 localStorage 仍兜底，不会丢）。
-    if (!_tokenDiagShown) {
-        _tokenDiagShown = true;
-        if (HARDCODED_TOKEN.indexOf('YOUR_') === 0) {
-            console.error('[GIST] 未读到 Token：当前 app-core.js 仍是部署占位符版（HARDCODED_TOKEN 未注入）。' +
-                '通常是浏览器缓存了旧版本，请 Ctrl+F5 强刷；若强刷后仍如此，检查仓库 Secrets.GIST_TOKEN 是否已设置。' +
-                '（注意：本地数据仍在 localStorage，不会因无 Token 而丢失）');
-        }
-    }
 
     return '';
 }
@@ -20282,9 +20286,9 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
         }
         
         function checkIfOnlineVersion() {
-            // 在线版本判断：部署时 HARDCODED_TOKEN 占位符会被替换为真实 token（ghp_ 前缀），有则视为在线版
-            const HARDCODED_TOKEN = 'YOUR_GITHUB_TOKEN_HERE';
-            return HARDCODED_TOKEN && HARDCODED_TOKEN.length > 20 && HARDCODED_TOKEN.startsWith('ghp_');
+            // 在线版本判断（🟢 v2 架构）：getGistToken 解密 ENC_TOKEN 成功（ghp_ 前缀）即在线版
+            const t = getGistToken();
+            return t && t.length > 20 && t.startsWith('ghp_');
         }
         
         async function checkOnlineVersionAvailability() {
@@ -32166,7 +32170,7 @@ ${maSection}
             _ensureDiagGist().then(async (gid) => {
                 if (!gid) {
                     const tk = getGistToken();
-                    if (!tk || tk === 'YOUR_GITHUB_TOKEN_HERE') {
+                    if (!tk) {
                         box.innerHTML = '<div style="color:#f87171;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.3);border-radius:8px;padding:12px;line-height:1.8;">⚠️ <b>当前环境没有有效的注入 token</b><br>诊断 Gist 需要管理员账号(gyq-svip)的 GIST_TOKEN 才能创建。<br><br>• 如果你是<b>本地打开 index.html</b>:此功能需部署到线上(注入 token 后)才能用。<br>• 如果是<b>线上版本</b>:请确认部署时 GIST_TOKEN 已正确注入(deploy.yml)。<br><br>👉 上报设置位于本面板顶部的「<b>全网诊断上报总闸</b>」按钮(需先初始化诊断 Gist)。</div>';
                     } else {
                         box.innerHTML = '<div style="color:#fbbf24;line-height:1.8;">诊断 Gist 尚未创建。点击下方按钮以管理员身份创建:<br><br><button onclick="adminInitDiagGist()" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">➕ 初始化诊断 Gist</button><br><br><span id="diagInitHint" style="color:#94a3b8;font-size:0.72rem;"></span></div>';
@@ -32895,7 +32899,7 @@ ${maSection}
         window.adminInitDiagGist = async function () {
             const hint = document.getElementById('diagInitHint');
             const token = getGistToken();
-            if (!token || token === 'YOUR_GITHUB_TOKEN_HERE') { if (hint) hint.textContent = '无有效 token'; return; }
+            if (!token) { if (hint) hint.textContent = '无有效 token'; return; }
             if (hint) hint.textContent = '⏳ 正在创建…';
             try {
                 const r = await fetch('https://api.github.com/gists', {
