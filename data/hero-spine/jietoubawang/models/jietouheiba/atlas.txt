@@ -1,0 +1,209 @@
+
+jietouheiba.png
+size: 843,843
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/a0000
+  rotate: false
+  xy: 2, 607
+  size: 169, 234
+  orig: 512, 512
+  offset: 184, 121
+  index: -1
+images/a0004
+  rotate: false
+  xy: 2, 371
+  size: 168, 234
+  orig: 512, 512
+  offset: 185, 120
+  index: -1
+images/a0008
+  rotate: false
+  xy: 2, 137
+  size: 169, 232
+  orig: 512, 512
+  offset: 184, 121
+  index: -1
+images/a0012
+  rotate: false
+  xy: 173, 139
+  size: 167, 231
+  orig: 512, 512
+  offset: 184, 121
+  index: -1
+images/a0016
+  rotate: false
+  xy: 341, 378
+  size: 166, 230
+  orig: 512, 512
+  offset: 184, 121
+  index: -1
+images/a0020
+  rotate: false
+  xy: 340, 610
+  size: 166, 231
+  orig: 512, 512
+  offset: 184, 121
+  index: -1
+images/a0024
+  rotate: false
+  xy: 173, 608
+  size: 165, 233
+  orig: 512, 512
+  offset: 185, 120
+  index: -1
+images/a0028
+  rotate: false
+  xy: 172, 372
+  size: 167, 233
+  orig: 512, 512
+  offset: 184, 121
+  index: -1
+images/a0039
+  rotate: false
+  xy: 707, 531
+  size: 78, 116
+  orig: 256, 256
+  offset: 83, 60
+  index: -1
+images/a0041
+  rotate: true
+  xy: 678, 752
+  size: 89, 109
+  orig: 256, 256
+  offset: 72, 60
+  index: -1
+images/a0043
+  rotate: false
+  xy: 678, 649
+  size: 93, 101
+  orig: 256, 256
+  offset: 68, 60
+  index: -1
+images/a0047
+  rotate: false
+  xy: 709, 419
+  size: 81, 110
+  orig: 256, 256
+  offset: 80, 60
+  index: -1
+images/a0049
+  rotate: false
+  xy: 615, 502
+  size: 90, 115
+  orig: 256, 256
+  offset: 86, 59
+  index: -1
+images/a0052
+  rotate: false
+  xy: 509, 379
+  size: 100, 119
+  orig: 256, 256
+  offset: 101, 59
+  index: -1
+images/a0057
+  rotate: false
+  xy: 552, 261
+  size: 102, 116
+  orig: 256, 256
+  offset: 97, 60
+  index: -1
+images/a0059
+  rotate: false
+  xy: 616, 24
+  size: 106, 117
+  orig: 256, 256
+  offset: 92, 60
+  index: -1
+images/a0061
+  rotate: false
+  xy: 509, 500
+  size: 104, 117
+  orig: 256, 256
+  offset: 89, 60
+  index: -1
+images/a0063
+  rotate: false
+  xy: 611, 380
+  size: 96, 118
+  orig: 256, 256
+  offset: 89, 60
+  index: -1
+images/fx/huohua/777_000
+  rotate: true
+  xy: 656, 272
+  size: 106, 104
+  orig: 256, 256
+  offset: 79, 76
+  index: -1
+images/fx/huohua/777_001
+  rotate: false
+  xy: 508, 619
+  size: 168, 222
+  orig: 256, 256
+  offset: 75, 23
+  index: -1
+images/fx/huohua/777_002
+  rotate: true
+  xy: 312, 3
+  size: 134, 186
+  orig: 256, 256
+  offset: 80, 40
+  index: -1
+images/fx/huohua/777_003
+  rotate: true
+  xy: 551, 143
+  size: 56, 67
+  orig: 256, 256
+  offset: 97, 82
+  index: -1
+images/fx/huohua2/022_000
+  rotate: true
+  xy: 456, 140
+  size: 59, 93
+  orig: 256, 128
+  offset: 14, 21
+  index: -1
+images/fx/huohua2/022_001
+  rotate: true
+  xy: 500, 2
+  size: 136, 114
+  orig: 256, 128
+  offset: 13, 7
+  index: -1
+images/fx/huohua2/022_002
+  rotate: true
+  xy: 456, 201
+  size: 175, 94
+  orig: 256, 128
+  offset: 16, 15
+  index: -1
+images/fx/huohua2/022_003
+  rotate: false
+  xy: 620, 194
+  size: 174, 65
+  orig: 256, 128
+  offset: 19, 31
+  index: -1
+images/fx/qqq0001
+  rotate: true
+  xy: 2, 29
+  size: 106, 308
+  orig: 546, 606
+  offset: 219, 170
+  index: -1
+images/fx/qqq0002
+  rotate: false
+  xy: 342, 178
+  size: 112, 198
+  orig: 271, 261
+  offset: 79, 32
+  index: -1
+images/fx/qqq0003
+  rotate: false
+  xy: 724, 37
+  size: 65, 155
+  orig: 182, 200
+  offset: 59, 23
+  index: -1

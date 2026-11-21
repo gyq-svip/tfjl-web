@@ -1,0 +1,160 @@
+
+yuelingshan.png
+size: 724,724
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 513, 408
+  size: 89, 119
+  orig: 200, 200
+  offset: 72, 44
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 510, 166
+  size: 90, 119
+  orig: 200, 200
+  offset: 70, 44
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 606, 257
+  size: 93, 119
+  orig: 200, 200
+  offset: 68, 44
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 634, 378
+  size: 88, 119
+  orig: 200, 200
+  offset: 68, 44
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 591, 75
+  size: 88, 119
+  orig: 200, 200
+  offset: 68, 44
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 510, 287
+  size: 94, 119
+  orig: 200, 200
+  offset: 68, 44
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 602, 165
+  size: 90, 119
+  orig: 200, 200
+  offset: 71, 44
+  index: -1
+fx/glow2_00004
+  rotate: false
+  xy: 341, 85
+  size: 162, 165
+  orig: 183, 189
+  offset: 10, 12
+  index: -1
+fx/guang
+  rotate: false
+  xy: 513, 499
+  size: 158, 223
+  orig: 158, 223
+  offset: 0, 0
+  index: -1
+fx/puduzhongsheng_39
+  rotate: false
+  xy: 341, 19
+  size: 84, 64
+  orig: 101, 78
+  offset: 8, 8
+  index: -1
+fx/puduzhongsheng_40
+  rotate: false
+  xy: 427, 24
+  size: 85, 59
+  orig: 115, 82
+  offset: 15, 12
+  index: -1
+fx/puduzhongsheng_41
+  rotate: false
+  xy: 505, 111
+  size: 84, 53
+  orig: 125, 78
+  offset: 20, 13
+  index: -1
+fx/puduzhongsheng_42
+  rotate: true
+  xy: 673, 639
+  size: 83, 39
+  orig: 123, 75
+  offset: 20, 19
+  index: -1
+fx/puduzhongsheng_43
+  rotate: true
+  xy: 673, 557
+  size: 80, 26
+  orig: 80, 26
+  offset: 0, 0
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 173, 252
+  size: 167, 234
+  orig: 400, 400
+  offset: 148, 90
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 174, 488
+  size: 168, 234
+  orig: 400, 400
+  offset: 148, 90
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 252
+  size: 169, 234
+  orig: 400, 400
+  offset: 147, 90
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 2, 488
+  size: 170, 234
+  orig: 400, 400
+  offset: 146, 90
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 16
+  size: 168, 234
+  orig: 400, 400
+  offset: 147, 90
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 344, 488
+  size: 167, 234
+  orig: 400, 400
+  offset: 148, 90
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 172, 16
+  size: 167, 234
+  orig: 400, 400
+  offset: 148, 90
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 342, 252
+  size: 166, 234
+  orig: 400, 400
+  offset: 149, 90
+  index: -1

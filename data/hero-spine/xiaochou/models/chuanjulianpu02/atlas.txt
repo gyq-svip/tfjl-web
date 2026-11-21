@@ -1,0 +1,139 @@
+
+chuanjulianpu02.png
+size: 1038,1038
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 272, 7
+  size: 222, 274
+  orig: 276, 279
+  offset: 35, 1
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 824, 8
+  size: 198, 272
+  orig: 276, 279
+  offset: 39, 0
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 2, 2
+  size: 204, 268
+  orig: 276, 279
+  offset: 41, 0
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 774, 282
+  size: 210, 270
+  orig: 276, 279
+  offset: 25, 0
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 2, 761
+  size: 258, 275
+  orig: 276, 279
+  offset: 13, 0
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 259, 486
+  size: 253, 273
+  orig: 276, 279
+  offset: 2, 2
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 262, 761
+  size: 249, 275
+  orig: 276, 279
+  offset: 11, 2
+  index: -1
+fx/Fire 005 Impact Up_00002
+  rotate: false
+  xy: 899, 827
+  size: 88, 99
+  orig: 140, 140
+  offset: 24, 10
+  index: -1
+fx/Fire 005 Impact Up_00005
+  rotate: false
+  xy: 898, 928
+  size: 99, 108
+  orig: 140, 140
+  offset: 19, 20
+  index: -1
+fx/Fire 005 Impact Up_00008
+  rotate: false
+  xy: 791, 819
+  size: 106, 106
+  orig: 140, 140
+  offset: 15, 28
+  index: -1
+fx/Fire 005 Impact Up_00011
+  rotate: true
+  xy: 791, 927
+  size: 109, 105
+  orig: 140, 140
+  offset: 13, 35
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 535, 239
+  size: 237, 276
+  orig: 263, 278
+  offset: 25, 0
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 548, 4
+  size: 233, 274
+  orig: 263, 278
+  offset: 28, 0
+  index: -1
+idle/idle_2
+  rotate: true
+  xy: 759, 554
+  size: 236, 274
+  orig: 263, 278
+  offset: 23, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 514, 517
+  size: 243, 273
+  orig: 263, 278
+  offset: 17, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 208
+  size: 253, 274
+  orig: 263, 278
+  offset: 9, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 2, 484
+  size: 255, 275
+  orig: 263, 278
+  offset: 8, 0
+  index: -1
+idle/idle_6
+  rotate: true
+  xy: 257, 231
+  size: 251, 276
+  orig: 263, 278
+  offset: 12, 0
+  index: -1
+idle/idle_7
+  rotate: true
+  xy: 513, 792
+  size: 244, 276
+  orig: 263, 278
+  offset: 19, 0
+  index: -1

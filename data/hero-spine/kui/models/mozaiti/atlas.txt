@@ -1,0 +1,195 @@
+
+mozaiti.png
+size: 903,903
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 542, 19
+  size: 108, 159
+  orig: 300, 300
+  offset: 92, 48
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 232, 286
+  size: 85, 159
+  orig: 300, 300
+  offset: 92, 48
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 798, 244
+  size: 84, 159
+  orig: 300, 300
+  offset: 92, 48
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 707, 83
+  size: 94, 159
+  orig: 300, 300
+  offset: 91, 48
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 674, 244
+  size: 122, 159
+  orig: 300, 300
+  offset: 87, 48
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 546, 244
+  size: 126, 159
+  orig: 300, 300
+  offset: 83, 48
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 546, 129
+  size: 113, 159
+  orig: 300, 300
+  offset: 90, 48
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 265
+  size: 228, 317
+  orig: 600, 600
+  offset: 186, 97
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 233, 674
+  size: 227, 318
+  orig: 600, 600
+  offset: 186, 97
+  index: -1
+idle/idle_2
+  rotate: true
+  xy: 233, 447
+  size: 225, 317
+  orig: 600, 600
+  offset: 186, 97
+  index: -1
+idle/idle_3
+  rotate: true
+  xy: 552, 447
+  size: 225, 317
+  orig: 600, 600
+  offset: 185, 97
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 320, 129
+  size: 224, 316
+  orig: 600, 600
+  offset: 185, 97
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 553, 674
+  size: 227, 316
+  orig: 600, 600
+  offset: 184, 97
+  index: -1
+idle/idle_6
+  rotate: true
+  xy: 2, 35
+  size: 228, 316
+  orig: 600, 600
+  offset: 184, 97
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 584
+  size: 229, 317
+  orig: 600, 600
+  offset: 185, 97
+  index: -1
+images/fx/diwangshenbing_07
+  rotate: false
+  xy: 320, 61
+  size: 220, 66
+  orig: 223, 68
+  offset: 2, 0
+  index: -1
+images/fx/diwangshenbing_08
+  rotate: false
+  xy: 546, 405
+  size: 270, 40
+  orig: 273, 42
+  offset: 2, 1
+  index: -1
+images/fx/diwangshenbing_09
+  rotate: false
+  xy: 2, 2
+  size: 210, 31
+  orig: 212, 33
+  offset: 1, 1
+  index: -1
+images/fx/diwangshenbing_10
+  rotate: true
+  xy: 803, 97
+  size: 145, 45
+  orig: 148, 47
+  offset: 0, 0
+  index: -1
+images/fx/huaban/hb_0
+  rotate: false
+  xy: 850, 192
+  size: 51, 50
+  orig: 62, 61
+  offset: 9, 8
+  index: -1
+images/fx/huaban/hb_1
+  rotate: false
+  xy: 850, 92
+  size: 49, 44
+  orig: 62, 61
+  offset: 9, 12
+  index: -1
+images/fx/huaban/hb_2
+  rotate: false
+  xy: 818, 405
+  size: 48, 40
+  orig: 62, 61
+  offset: 5, 11
+  index: -1
+images/fx/huaban/hb_3
+  rotate: false
+  xy: 703, 39
+  size: 53, 42
+  orig: 62, 61
+  offset: 4, 12
+  index: -1
+images/fx/huaban/hb_4
+  rotate: true
+  xy: 850, 138
+  size: 52, 48
+  orig: 62, 61
+  offset: 6, 12
+  index: -1
+images/fx/huaban/hb_5
+  rotate: false
+  xy: 758, 35
+  size: 48, 46
+  orig: 62, 61
+  offset: 9, 12
+  index: -1
+images/fx/huaban/hb_6
+  rotate: false
+  xy: 371, 15
+  size: 43, 44
+  orig: 62, 61
+  offset: 9, 8
+  index: -1
+images/fx/huaban/hb_7
+  rotate: true
+  xy: 320, 14
+  size: 45, 49
+  orig: 62, 61
+  offset: 10, 6
+  index: -1

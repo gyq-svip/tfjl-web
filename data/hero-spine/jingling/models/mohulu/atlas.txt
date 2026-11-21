@@ -1,0 +1,83 @@
+
+mohulu.png
+size: 383,383
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+2
+  rotate: true
+  xy: 2, 84
+  size: 118, 159
+  orig: 118, 160
+  offset: 0, 0
+  index: -1
+22
+  rotate: false
+  xy: 2, 204
+  size: 137, 177
+  orig: 142, 192
+  offset: 2, 6
+  index: -1
+fx/Sparks 084 Charge Radial_00004
+  rotate: false
+  xy: 163, 104
+  size: 105, 102
+  orig: 112, 112
+  offset: 1, 5
+  index: -1
+fx/Sparks 084 Charge Radial_00006
+  rotate: false
+  xy: 163, 4
+  size: 110, 98
+  orig: 112, 112
+  offset: 2, 7
+  index: -1
+fx/Sparks 084 Charge Radial_00008
+  rotate: false
+  xy: 250, 282
+  size: 106, 99
+  orig: 112, 112
+  offset: 6, 5
+  index: -1
+fx/Sparks 084 Charge Radial_00010
+  rotate: true
+  xy: 141, 277
+  size: 104, 107
+  orig: 112, 112
+  offset: 6, 4
+  index: -1
+fx/Sparks 084 Charge Radial_00012
+  rotate: false
+  xy: 270, 179
+  size: 96, 101
+  orig: 112, 112
+  offset: 8, 7
+  index: -1
+fx/Sparks 084 Charge Radial_00014
+  rotate: true
+  xy: 2, 2
+  size: 80, 84
+  orig: 112, 112
+  offset: 21, 17
+  index: -1
+fx/Sparks 084 Charge Radial_00016
+  rotate: true
+  xy: 141, 208
+  size: 67, 69
+  orig: 112, 112
+  offset: 26, 23
+  index: -1
+fx/Sparks 084 Charge Radial_00018
+  rotate: true
+  xy: 88, 42
+  size: 40, 38
+  orig: 112, 112
+  offset: 38, 38
+  index: -1
+fx/xingxing2
+  rotate: true
+  xy: 212, 235
+  size: 40, 43
+  orig: 40, 44
+  offset: 0, 1
+  index: -1

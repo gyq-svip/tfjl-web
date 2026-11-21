@@ -1,0 +1,202 @@
+
+heianyouxia.png
+size: 599,599
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/FX/bao/11_000
+  rotate: false
+  xy: 551, 443
+  size: 36, 33
+  orig: 77, 77
+  offset: 22, 10
+  index: -1
+images/FX/bao/11_001
+  rotate: true
+  xy: 199, 38
+  size: 72, 55
+  orig: 77, 77
+  offset: 5, 10
+  index: -1
+images/FX/bao/11_002
+  rotate: true
+  xy: 142, 35
+  size: 75, 55
+  orig: 77, 77
+  offset: 2, 12
+  index: -1
+images/FX/bao/11_003
+  rotate: true
+  xy: 84, 33
+  size: 77, 56
+  orig: 77, 77
+  offset: 0, 14
+  index: -1
+images/FX/bingyan/bingyan_000
+  rotate: false
+  xy: 32, 10
+  size: 17, 100
+  orig: 61, 154
+  offset: 21, 48
+  index: -1
+images/FX/bingyan/bingyan_001
+  rotate: true
+  xy: 142, 2
+  size: 31, 117
+  orig: 61, 154
+  offset: 14, 36
+  index: -1
+images/FX/bingyan/bingyan_002
+  rotate: false
+  xy: 546, 191
+  size: 50, 114
+  orig: 61, 154
+  offset: 5, 37
+  index: -1
+images/FX/bingyan/bingyan_003
+  rotate: false
+  xy: 551, 478
+  size: 41, 119
+  orig: 61, 154
+  offset: 11, 29
+  index: -1
+images/FX/bingyan/bingyan_004
+  rotate: true
+  xy: 268, 397
+  size: 39, 117
+  orig: 61, 154
+  offset: 13, 27
+  index: -1
+images/FX/bingyan/bingyan_005
+  rotate: true
+  xy: 256, 199
+  size: 35, 127
+  orig: 61, 154
+  offset: 16, 6
+  index: -1
+images/FX/bingyan/bingyan_006
+  rotate: false
+  xy: 551, 307
+  size: 35, 134
+  orig: 61, 154
+  offset: 12, 3
+  index: -1
+images/FX/bingyan/bingyan_007
+  rotate: false
+  xy: 2, 9
+  size: 28, 101
+  orig: 61, 154
+  offset: 17, 0
+  index: -1
+images/FX/bingyan/bingyan_008
+  rotate: false
+  xy: 51, 28
+  size: 31, 82
+  orig: 61, 154
+  offset: 12, 2
+  index: -1
+images/FX/bingyan/bingyan_009
+  rotate: true
+  xy: 84, 5
+  size: 26, 36
+  orig: 61, 154
+  offset: 10, 2
+  index: -1
+images/attack/a0036
+  rotate: false
+  xy: 264, 438
+  size: 124, 159
+  orig: 307, 307
+  offset: 97, 70
+  index: -1
+images/attack/a0039
+  rotate: true
+  xy: 390, 360
+  size: 116, 159
+  orig: 307, 307
+  offset: 101, 70
+  index: -1
+images/attack/a0042
+  rotate: true
+  xy: 390, 478
+  size: 119, 159
+  orig: 307, 307
+  offset: 100, 70
+  index: -1
+images/attack/a0044
+  rotate: false
+  xy: 2, 274
+  size: 148, 160
+  orig: 307, 307
+  offset: 82, 70
+  index: -1
+images/attack/a0048
+  rotate: false
+  xy: 118, 437
+  size: 144, 160
+  orig: 307, 307
+  offset: 74, 70
+  index: -1
+images/attack/a0054
+  rotate: false
+  xy: 2, 112
+  size: 135, 160
+  orig: 307, 307
+  offset: 89, 70
+  index: -1
+images/idle/a0000
+  rotate: true
+  xy: 385, 244
+  size: 114, 159
+  orig: 307, 307
+  offset: 92, 70
+  index: -1
+images/idle/a0004
+  rotate: false
+  xy: 152, 275
+  size: 114, 160
+  orig: 307, 307
+  offset: 91, 70
+  index: -1
+images/idle/a0008
+  rotate: false
+  xy: 2, 436
+  size: 114, 161
+  orig: 307, 307
+  offset: 90, 70
+  index: -1
+images/idle/a0012
+  rotate: false
+  xy: 139, 112
+  size: 115, 160
+  orig: 307, 307
+  offset: 89, 70
+  index: -1
+images/idle/a0016
+  rotate: false
+  xy: 268, 236
+  size: 115, 159
+  orig: 307, 307
+  offset: 89, 70
+  index: -1
+images/idle/a0020
+  rotate: true
+  xy: 385, 127
+  size: 115, 158
+  orig: 307, 307
+  offset: 89, 70
+  index: -1
+images/idle/a0024
+  rotate: true
+  xy: 373, 11
+  size: 114, 158
+  orig: 307, 307
+  offset: 90, 70
+  index: -1
+images/idle/a0028
+  rotate: false
+  xy: 256, 39
+  size: 115, 158
+  orig: 307, 307
+  offset: 91, 70
+  index: -1

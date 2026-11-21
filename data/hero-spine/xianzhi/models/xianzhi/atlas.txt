@@ -1,0 +1,111 @@
+
+xianzhi.png
+size: 906,906
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+a0008
+  rotate: false
+  xy: 278, 331
+  size: 127, 294
+  orig: 512, 512
+  offset: 181, 118
+  index: -1
+a0012
+  rotate: false
+  xy: 407, 339
+  size: 127, 293
+  orig: 512, 512
+  offset: 182, 118
+  index: -1
+a0016
+  rotate: true
+  xy: 536, 473
+  size: 127, 293
+  orig: 512, 512
+  offset: 182, 117
+  index: -1
+a0020
+  rotate: true
+  xy: 536, 346
+  size: 125, 293
+  orig: 512, 512
+  offset: 183, 117
+  index: -1
+a0024
+  rotate: false
+  xy: 289, 35
+  size: 123, 294
+  orig: 512, 512
+  offset: 183, 116
+  index: -1
+a0028
+  rotate: false
+  xy: 665, 51
+  size: 123, 293
+  orig: 512, 512
+  offset: 182, 117
+  index: -1
+a0032
+  rotate: false
+  xy: 414, 43
+  size: 123, 294
+  orig: 512, 512
+  offset: 181, 117
+  index: -1
+a0036
+  rotate: false
+  xy: 539, 51
+  size: 124, 293
+  orig: 512, 512
+  offset: 181, 118
+  index: -1
+a0052
+  rotate: true
+  xy: 2, 43
+  size: 191, 285
+  orig: 512, 512
+  offset: 134, 115
+  index: -1
+a0056
+  rotate: true
+  xy: 549, 709
+  size: 195, 304
+  orig: 512, 512
+  offset: 128, 84
+  index: -1
+a0060
+  rotate: false
+  xy: 292, 634
+  size: 255, 270
+  orig: 512, 512
+  offset: 131, 122
+  index: -1
+a0063
+  rotate: false
+  xy: 2, 627
+  size: 288, 277
+  orig: 512, 512
+  offset: 176, 122
+  index: -1
+a0067
+  rotate: false
+  xy: 2, 243
+  size: 153, 382
+  orig: 512, 512
+  offset: 185, 122
+  index: -1
+a0073
+  rotate: false
+  xy: 157, 236
+  size: 119, 389
+  orig: 512, 512
+  offset: 194, 123
+  index: -1
+a0077
+  rotate: true
+  xy: 549, 602
+  size: 105, 355
+  orig: 512, 512
+  offset: 192, 123
+  index: -1

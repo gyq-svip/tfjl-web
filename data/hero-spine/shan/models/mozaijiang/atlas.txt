@@ -1,0 +1,139 @@
+
+mozaijiang.png
+size: 828,828
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 549, 277
+  size: 100, 137
+  orig: 240, 240
+  offset: 58, 38
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 653, 97
+  size: 92, 134
+  orig: 240, 240
+  offset: 56, 38
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 558, 141
+  size: 93, 134
+  orig: 240, 240
+  offset: 53, 38
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 688, 191
+  size: 113, 135
+  orig: 240, 240
+  offset: 44, 38
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 549, 379
+  size: 170, 135
+  orig: 240, 240
+  offset: 40, 38
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 686, 424
+  size: 131, 136
+  orig: 240, 240
+  offset: 36, 38
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 688, 306
+  size: 116, 138
+  orig: 240, 240
+  offset: 48, 38
+  index: -1
+fx/b7_001
+  rotate: true
+  xy: 550, 562
+  size: 123, 128
+  orig: 176, 176
+  offset: 19, 32
+  index: -1
+fx/b7_002
+  rotate: false
+  xy: 682, 557
+  size: 133, 135
+  orig: 176, 176
+  offset: 11, 29
+  index: -1
+fx/b7_003
+  rotate: true
+  xy: 686, 694
+  size: 132, 139
+  orig: 176, 176
+  offset: 10, 29
+  index: -1
+fx/b7_004
+  rotate: false
+  xy: 550, 687
+  size: 130, 139
+  orig: 176, 176
+  offset: 8, 29
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 549
+  size: 183, 277
+  orig: 480, 480
+  offset: 117, 77
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 270
+  size: 183, 277
+  orig: 480, 480
+  offset: 115, 77
+  index: -1
+idle/idle_2
+  rotate: true
+  xy: 2, 86
+  size: 182, 277
+  orig: 480, 480
+  offset: 114, 77
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 187, 272
+  size: 180, 276
+  orig: 480, 480
+  offset: 116, 77
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 369, 273
+  size: 178, 275
+  orig: 480, 480
+  offset: 119, 77
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 281, 91
+  size: 179, 275
+  orig: 480, 480
+  offset: 121, 77
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 370, 551
+  size: 178, 275
+  orig: 480, 480
+  offset: 123, 77
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 187, 550
+  size: 181, 276
+  orig: 480, 480
+  offset: 120, 77
+  index: -1

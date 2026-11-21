@@ -1,0 +1,279 @@
+
+chushouguai.png
+size: 761,761
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 322, 20
+  size: 91, 125
+  orig: 159, 130
+  offset: 12, 1
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 191, 14
+  size: 99, 129
+  orig: 159, 130
+  offset: 4, 1
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 543, 177
+  size: 110, 113
+  orig: 159, 130
+  offset: 5, 0
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 182, 115
+  size: 147, 60
+  orig: 159, 130
+  offset: 3, 0
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 363, 113
+  size: 154, 64
+  orig: 159, 130
+  offset: 5, 0
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 543, 289
+  size: 138, 90
+  orig: 159, 130
+  offset: 10, 0
+  index: -1
+fx/tx_4_0001
+  rotate: true
+  xy: 2, 2
+  size: 111, 187
+  orig: 119, 196
+  offset: 2, 6
+  index: -1
+fx/tx_4_0002
+  rotate: false
+  xy: 369, 402
+  size: 105, 145
+  orig: 119, 196
+  offset: 8, 7
+  index: -1
+fx/tx_4_0003
+  rotate: false
+  xy: 449, 16
+  size: 106, 95
+  orig: 119, 196
+  offset: 7, 8
+  index: -1
+fx/tx_4_0004
+  rotate: true
+  xy: 557, 73
+  size: 102, 94
+  orig: 119, 196
+  offset: 7, 10
+  index: -1
+fx/zz00
+  rotate: false
+  xy: 686, 208
+  size: 65, 26
+  orig: 106, 106
+  offset: 19, 28
+  index: -1
+fx/zz01
+  rotate: true
+  xy: 716, 236
+  size: 68, 30
+  orig: 106, 106
+  offset: 16, 26
+  index: -1
+fx/zz02
+  rotate: true
+  xy: 726, 618
+  size: 69, 33
+  orig: 106, 106
+  offset: 15, 26
+  index: -1
+fx/zz03
+  rotate: true
+  xy: 476, 476
+  size: 71, 36
+  orig: 106, 106
+  offset: 14, 28
+  index: -1
+fx/zz04
+  rotate: true
+  xy: 476, 403
+  size: 71, 34
+  orig: 106, 106
+  offset: 13, 30
+  index: -1
+fx/zz05
+  rotate: true
+  xy: 730, 465
+  size: 71, 29
+  orig: 106, 106
+  offset: 14, 30
+  index: -1
+fx/zz06
+  rotate: true
+  xy: 557, 2
+  size: 69, 27
+  orig: 106, 106
+  offset: 16, 29
+  index: -1
+fx/zz07
+  rotate: true
+  xy: 730, 398
+  size: 65, 29
+  orig: 106, 106
+  offset: 20, 29
+  index: -1
+fx/zz08
+  rotate: true
+  xy: 726, 689
+  size: 70, 33
+  orig: 106, 106
+  offset: 15, 29
+  index: -1
+fx/zz09
+  rotate: true
+  xy: 683, 309
+  size: 70, 37
+  orig: 106, 106
+  offset: 15, 29
+  index: -1
+fx/zz10
+  rotate: false
+  xy: 586, 36
+  size: 70, 35
+  orig: 106, 106
+  offset: 15, 27
+  index: -1
+fx/zz11
+  rotate: true
+  xy: 686, 236
+  size: 71, 28
+  orig: 106, 106
+  offset: 15, 26
+  index: -1
+fx/zz12
+  rotate: false
+  xy: 586, 4
+  size: 72, 30
+  orig: 106, 106
+  offset: 15, 26
+  index: -1
+fx/zz13
+  rotate: true
+  xy: 722, 306
+  size: 73, 24
+  orig: 106, 106
+  offset: 15, 26
+  index: -1
+fx/zz14
+  rotate: true
+  xy: 658, 213
+  size: 74, 26
+  orig: 106, 106
+  offset: 15, 25
+  index: -1
+fx/zz15
+  rotate: false
+  xy: 449, 369
+  size: 74, 28
+  orig: 106, 106
+  offset: 15, 24
+  index: -1
+fx/zz16
+  rotate: true
+  xy: 512, 399
+  size: 75, 27
+  orig: 106, 106
+  offset: 15, 27
+  index: -1
+fx/zz17
+  rotate: true
+  xy: 730, 538
+  size: 78, 29
+  orig: 106, 106
+  offset: 15, 29
+  index: -1
+fx/zz18
+  rotate: false
+  xy: 369, 369
+  size: 78, 31
+  orig: 106, 106
+  offset: 15, 29
+  index: -1
+idle/idle_00
+  rotate: false
+  xy: 363, 549
+  size: 176, 210
+  orig: 190, 221
+  offset: 7, 0
+  index: -1
+idle/idle_01
+  rotate: false
+  xy: 2, 316
+  size: 175, 220
+  orig: 190, 221
+  offset: 7, 0
+  index: -1
+idle/idle_02
+  rotate: false
+  xy: 2, 538
+  size: 176, 221
+  orig: 190, 221
+  offset: 8, 0
+  index: -1
+idle/idle_03
+  rotate: false
+  xy: 180, 548
+  size: 181, 211
+  orig: 190, 221
+  offset: 8, 1
+  index: -1
+idle/idle_04
+  rotate: false
+  xy: 541, 562
+  size: 183, 197
+  orig: 190, 221
+  offset: 7, 1
+  index: -1
+idle/idle_05
+  rotate: true
+  xy: 541, 381
+  size: 179, 187
+  orig: 190, 221
+  offset: 6, 0
+  index: -1
+idle/idle_06
+  rotate: true
+  xy: 180, 369
+  size: 177, 187
+  orig: 190, 221
+  offset: 5, 0
+  index: -1
+idle/idle_07
+  rotate: false
+  xy: 363, 179
+  size: 178, 188
+  orig: 190, 221
+  offset: 5, 0
+  index: -1
+idle/idle_08
+  rotate: false
+  xy: 182, 177
+  size: 179, 190
+  orig: 190, 221
+  offset: 5, 0
+  index: -1
+idle/idle_09
+  rotate: false
+  xy: 2, 115
+  size: 178, 199
+  orig: 190, 221
+  offset: 6, 0
+  index: -1

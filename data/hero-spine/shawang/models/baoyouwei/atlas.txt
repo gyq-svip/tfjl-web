@@ -1,0 +1,223 @@
+
+baoyouwei.png
+size: 763,763
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 505, 349
+  size: 83, 124
+  orig: 240, 240
+  offset: 61, 38
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 470, 88
+  size: 81, 122
+  orig: 240, 240
+  offset: 63, 38
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 477, 212
+  size: 86, 125
+  orig: 240, 240
+  offset: 56, 38
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 338, 50
+  size: 130, 126
+  orig: 240, 240
+  offset: 47, 38
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 176, 329
+  size: 142, 126
+  orig: 240, 240
+  offset: 39, 38
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 338, 178
+  size: 137, 126
+  orig: 240, 240
+  offset: 44, 38
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 631, 319
+  size: 129, 126
+  orig: 240, 240
+  offset: 49, 38
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 177, 513
+  size: 168, 248
+  orig: 480, 480
+  offset: 120, 77
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 171, 12
+  size: 165, 247
+  orig: 480, 480
+  offset: 122, 77
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 598, 514
+  size: 161, 247
+  orig: 480, 480
+  offset: 126, 77
+  index: -1
+idle/idle_3
+  rotate: true
+  xy: 347, 434
+  size: 161, 248
+  orig: 480, 480
+  offset: 127, 77
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 347, 597
+  size: 164, 249
+  orig: 480, 480
+  offset: 125, 77
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 2, 10
+  size: 167, 249
+  orig: 480, 480
+  offset: 124, 77
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 261
+  size: 172, 249
+  orig: 480, 480
+  offset: 121, 77
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 512
+  size: 173, 249
+  orig: 480, 480
+  offset: 119, 77
+  index: -1
+images/FX/fengjuancanyun_34
+  rotate: true
+  xy: 741, 205
+  size: 72, 20
+  orig: 160, 80
+  offset: 23, 20
+  index: -1
+images/FX/fengjuancanyun_35
+  rotate: false
+  xy: 475, 19
+  size: 45, 45
+  orig: 160, 80
+  offset: 16, 20
+  index: -1
+images/FX/fengjuancanyun_36
+  rotate: false
+  xy: 338, 12
+  size: 135, 36
+  orig: 160, 80
+  offset: 11, 23
+  index: -1
+images/FX/fengjuancanyun_37
+  rotate: false
+  xy: 477, 171
+  size: 134, 39
+  orig: 160, 80
+  offset: 13, 20
+  index: -1
+images/FX/fengjuancanyun_38
+  rotate: false
+  xy: 630, 279
+  size: 128, 38
+  orig: 160, 80
+  offset: 16, 20
+  index: -1
+images/FX/fengjuancanyun_39
+  rotate: false
+  xy: 613, 136
+  size: 126, 41
+  orig: 160, 80
+  offset: 17, 20
+  index: -1
+images/FX/fengjuancanyun_40
+  rotate: false
+  xy: 470, 66
+  size: 73, 20
+  orig: 160, 80
+  offset: 30, 27
+  index: -1
+images/FX/fengjuancanyun_41
+  rotate: false
+  xy: 613, 179
+  size: 120, 48
+  orig: 160, 80
+  offset: 20, 16
+  index: -1
+images/FX/fengjuancanyun_42
+  rotate: false
+  xy: 604, 229
+  size: 132, 48
+  orig: 160, 80
+  offset: 22, 17
+  index: -1
+images/FX/fengjuancanyun_43
+  rotate: false
+  xy: 176, 269
+  size: 133, 58
+  orig: 160, 80
+  offset: 22, 11
+  index: -1
+images/FX/fengjuancanyun_44
+  rotate: false
+  xy: 499, 300
+  size: 129, 47
+  orig: 160, 80
+  offset: 24, 22
+  index: -1
+images/FX/fengjuancanyun_45
+  rotate: false
+  xy: 594, 87
+  size: 119, 47
+  orig: 160, 80
+  offset: 24, 16
+  index: -1
+images/FX/mowanghandi_23
+  rotate: false
+  xy: 177, 457
+  size: 168, 54
+  orig: 214, 97
+  offset: 27, 13
+  index: -1
+images/FX/mowanghandi_24
+  rotate: false
+  xy: 597, 447
+  size: 162, 65
+  orig: 214, 97
+  offset: 11, 13
+  index: -1
+images/FX/mowanghandi_25
+  rotate: false
+  xy: 320, 363
+  size: 183, 69
+  orig: 214, 97
+  offset: 6, 13
+  index: -1
+images/FX/mowanghandi_26
+  rotate: false
+  xy: 320, 306
+  size: 177, 55
+  orig: 214, 97
+  offset: 16, 23
+  index: -1

@@ -1,0 +1,160 @@
+
+tianboguang.png
+size: 887,887
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 643, 7
+  size: 108, 129
+  orig: 300, 300
+  offset: 48, 39
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 780, 757
+  size: 105, 128
+  orig: 300, 300
+  offset: 48, 39
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 774, 31
+  size: 107, 129
+  orig: 300, 300
+  offset: 59, 39
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 496, 379
+  size: 128, 126
+  orig: 300, 300
+  offset: 53, 39
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 626, 379
+  size: 126, 126
+  orig: 300, 300
+  offset: 53, 39
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 754, 377
+  size: 128, 129
+  orig: 300, 300
+  offset: 44, 39
+  index: -1
+fx/caocao_06
+  rotate: false
+  xy: 390, 48
+  size: 124, 43
+  orig: 146, 73
+  offset: 21, 0
+  index: -1
+fx/caocao_07
+  rotate: false
+  xy: 143, 30
+  size: 136, 60
+  orig: 146, 73
+  offset: 6, 0
+  index: -1
+fx/caocao_08
+  rotate: false
+  xy: 2, 24
+  size: 139, 66
+  orig: 146, 73
+  offset: 1, 0
+  index: -1
+fx/caocao_10
+  rotate: false
+  xy: 281, 33
+  size: 107, 58
+  orig: 146, 73
+  offset: 1, 12
+  index: -1
+fx/dadaoguang_00012
+  rotate: true
+  xy: 741, 162
+  size: 213, 140
+  orig: 231, 158
+  offset: 7, 10
+  index: -1
+fx/dadaoguang_00013
+  rotate: false
+  xy: 496, 509
+  size: 196, 129
+  orig: 231, 158
+  offset: 28, 11
+  index: -1
+fx/dadaoguang_00014
+  rotate: false
+  xy: 741, 507
+  size: 144, 131
+  orig: 231, 158
+  offset: 76, 9
+  index: -1
+fx/dadaoguang_00015
+  rotate: true
+  xy: 516, 4
+  size: 111, 125
+  orig: 231, 158
+  offset: 101, 9
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 92
+  size: 244, 263
+  orig: 600, 600
+  offset: 80, 78
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 622
+  size: 246, 263
+  orig: 600, 600
+  offset: 78, 78
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 357
+  size: 246, 263
+  orig: 600, 600
+  offset: 78, 78
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 248, 93
+  size: 245, 262
+  orig: 600, 600
+  offset: 80, 78
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 250, 640
+  size: 245, 260
+  orig: 600, 600
+  offset: 82, 78
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 495, 117
+  size: 244, 259
+  orig: 600, 600
+  offset: 84, 78
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 250, 378
+  size: 244, 260
+  orig: 600, 600
+  offset: 84, 78
+  index: -1
+idle/idle_7
+  rotate: true
+  xy: 516, 640
+  size: 245, 262
+  orig: 600, 600
+  offset: 81, 78
+  index: -1

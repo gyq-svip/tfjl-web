@@ -1,0 +1,188 @@
+
+chunxiang.png
+size: 791,791
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 684, 59
+  size: 80, 127
+  orig: 127, 131
+  offset: 31, 0
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 363, 43
+  size: 78, 124
+  orig: 127, 131
+  offset: 30, 0
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 600, 60
+  size: 82, 126
+  orig: 127, 131
+  offset: 28, 0
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 521, 303
+  size: 90, 128
+  orig: 127, 131
+  offset: 23, 0
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 620, 350
+  size: 112, 130
+  orig: 127, 131
+  offset: 0, 0
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 620, 464
+  size: 116, 130
+  orig: 127, 131
+  offset: 8, 0
+  index: -1
+fx/Electricity 002 Shot Ray Up_00001
+  rotate: false
+  xy: 741, 216
+  size: 42, 132
+  orig: 160, 160
+  offset: 63, 5
+  index: -1
+fx/Electricity 002 Shot Ray Up_00003
+  rotate: false
+  xy: 443, 70
+  size: 62, 140
+  orig: 160, 160
+  offset: 56, 17
+  index: -1
+fx/Electricity 002 Shot Ray Up_00005
+  rotate: true
+  xy: 600, 188
+  size: 75, 138
+  orig: 160, 160
+  offset: 50, 18
+  index: -1
+fx/Electricity 002 Shot Ray Up_00007
+  rotate: false
+  xy: 519, 169
+  size: 79, 132
+  orig: 160, 160
+  offset: 48, 26
+  index: -1
+fx/Electricity 002 Shot Ray Up_00009
+  rotate: true
+  xy: 613, 265
+  size: 83, 126
+  orig: 160, 160
+  offset: 49, 31
+  index: -1
+fx/Electricity 002 Shot Ray Up_00011
+  rotate: false
+  xy: 507, 70
+  size: 79, 97
+  orig: 160, 160
+  offset: 54, 37
+  index: -1
+fx/fxhb_06
+  rotate: true
+  xy: 752, 409
+  size: 171, 36
+  orig: 323, 236
+  offset: 7, 124
+  index: -1
+fx/fxhb_07
+  rotate: false
+  xy: 363, 212
+  size: 151, 62
+  orig: 323, 236
+  offset: 51, 110
+  index: -1
+fx/fxhb_08
+  rotate: false
+  xy: 363, 276
+  size: 154, 71
+  orig: 323, 236
+  offset: 72, 109
+  index: -1
+fx/fxhb_09
+  rotate: false
+  xy: 363, 349
+  size: 156, 82
+  orig: 323, 236
+  offset: 94, 106
+  index: -1
+fx/fxhb_10
+  rotate: false
+  xy: 621, 582
+  size: 162, 100
+  orig: 323, 236
+  offset: 112, 104
+  index: -1
+fx/fxhb_11
+  rotate: false
+  xy: 621, 684
+  size: 168, 105
+  orig: 323, 236
+  offset: 126, 114
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 533
+  size: 180, 256
+  orig: 182, 256
+  offset: 0, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 275
+  size: 180, 256
+  orig: 182, 256
+  offset: 0, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 17
+  size: 179, 256
+  orig: 182, 256
+  offset: 1, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 184, 533
+  size: 177, 256
+  orig: 182, 256
+  offset: 4, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 183, 17
+  size: 178, 256
+  orig: 182, 256
+  offset: 4, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 184, 275
+  size: 177, 256
+  orig: 182, 256
+  offset: 4, 0
+  index: -1
+idle/idle_6
+  rotate: true
+  xy: 363, 612
+  size: 177, 256
+  orig: 182, 256
+  offset: 4, 0
+  index: -1
+idle/idle_7
+  rotate: true
+  xy: 363, 433
+  size: 177, 255
+  orig: 182, 256
+  offset: 4, 0
+  index: -1

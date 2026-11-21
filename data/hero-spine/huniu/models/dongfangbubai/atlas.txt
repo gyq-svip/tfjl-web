@@ -1,0 +1,237 @@
+
+dongfangbubai.png
+size: 905,905
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 407, 38
+  size: 108, 121
+  orig: 225, 225
+  offset: 63, 38
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 652, 26
+  size: 105, 120
+  orig: 225, 225
+  offset: 63, 38
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 696, 500
+  size: 101, 119
+  orig: 225, 225
+  offset: 64, 38
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 530, 31
+  size: 115, 120
+  orig: 225, 225
+  offset: 57, 38
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 260, 54
+  size: 145, 120
+  orig: 225, 225
+  offset: 42, 38
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 432, 148
+  size: 138, 121
+  orig: 225, 225
+  offset: 40, 38
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 572, 148
+  size: 133, 121
+  orig: 225, 225
+  offset: 43, 38
+  index: -1
+fx/a_xian_0027
+  rotate: false
+  xy: 438, 373
+  size: 319, 99
+  orig: 371, 136
+  offset: 36, 11
+  index: -1
+fx/a_xian_0028
+  rotate: false
+  xy: 432, 271
+  size: 320, 100
+  orig: 371, 136
+  offset: 36, 10
+  index: -1
+fx/a_xian_0029
+  rotate: true
+  xy: 800, 600
+  size: 303, 101
+  orig: 371, 136
+  offset: 52, 9
+  index: -1
+fx/a_xian_0030
+  rotate: true
+  xy: 696, 621
+  size: 282, 102
+  orig: 371, 136
+  offset: 56, 8
+  index: -1
+fx/a_xian_0031
+  rotate: false
+  xy: 2, 72
+  size: 256, 102
+  orig: 371, 136
+  offset: 57, 8
+  index: -1
+fx/huaban02_0
+  rotate: false
+  xy: 853, 459
+  size: 50, 32
+  orig: 59, 42
+  offset: 9, 2
+  index: -1
+fx/huaban02_1
+  rotate: true
+  xy: 853, 405
+  size: 52, 34
+  orig: 59, 42
+  offset: 7, 1
+  index: -1
+fx/huaban02_2
+  rotate: false
+  xy: 2, 36
+  size: 53, 34
+  orig: 59, 42
+  offset: 6, 2
+  index: -1
+fx/huaban02_3
+  rotate: false
+  xy: 57, 39
+  size: 53, 31
+  orig: 59, 42
+  offset: 6, 5
+  index: -1
+fx/huaban02_4
+  rotate: false
+  xy: 759, 43
+  size: 46, 27
+  orig: 59, 42
+  offset: 7, 8
+  index: -1
+fx/huaban02_5
+  rotate: false
+  xy: 112, 43
+  size: 48, 27
+  orig: 59, 42
+  offset: 8, 8
+  index: -1
+fx/huaban02_6
+  rotate: false
+  xy: 759, 72
+  size: 49, 27
+  orig: 59, 42
+  offset: 10, 7
+  index: -1
+fx/huaban02_7
+  rotate: false
+  xy: 2, 5
+  size: 49, 29
+  orig: 59, 42
+  offset: 10, 5
+  index: -1
+fx/tx_10001
+  rotate: false
+  xy: 799, 493
+  size: 94, 105
+  orig: 108, 108
+  offset: 13, 1
+  index: -1
+fx/tx_10002
+  rotate: false
+  xy: 707, 176
+  size: 93, 93
+  orig: 108, 108
+  offset: 6, 14
+  index: -1
+fx/tx_10003
+  rotate: false
+  xy: 759, 400
+  size: 92, 91
+  orig: 108, 108
+  offset: 5, 15
+  index: -1
+fx/tx_10004
+  rotate: false
+  xy: 759, 317
+  size: 86, 81
+  orig: 108, 108
+  offset: 3, 22
+  index: -1
+fx/tx_10005
+  rotate: true
+  xy: 759, 101
+  size: 73, 70
+  orig: 108, 108
+  offset: 9, 28
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 662
+  size: 223, 241
+  orig: 450, 450
+  offset: 120, 77
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 227, 663
+  size: 224, 240
+  orig: 450, 450
+  offset: 124, 77
+  index: -1
+idle/idle_2
+  rotate: true
+  xy: 453, 687
+  size: 216, 241
+  orig: 450, 450
+  offset: 134, 77
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 2, 176
+  size: 213, 241
+  orig: 450, 450
+  offset: 137, 77
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 453, 474
+  size: 211, 241
+  orig: 450, 450
+  offset: 135, 77
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 227, 419
+  size: 209, 242
+  orig: 450, 450
+  offset: 132, 77
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 217, 176
+  size: 213, 241
+  orig: 450, 450
+  offset: 125, 77
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 419
+  size: 219, 241
+  orig: 450, 450
+  offset: 120, 77
+  index: -1

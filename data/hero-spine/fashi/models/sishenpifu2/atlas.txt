@@ -1,0 +1,286 @@
+
+sishenpifu2.png
+size: 779,779
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+fx/11_00000
+  rotate: true
+  xy: 607, 2
+  size: 30, 31
+  orig: 400, 400
+  offset: 57, 240
+  index: -1
+fx/11_00001
+  rotate: true
+  xy: 623, 258
+  size: 38, 37
+  orig: 400, 400
+  offset: 59, 241
+  index: -1
+fx/11_00002
+  rotate: false
+  xy: 617, 79
+  size: 48, 43
+  orig: 400, 400
+  offset: 61, 241
+  index: -1
+fx/11_00003
+  rotate: false
+  xy: 538, 17
+  size: 67, 64
+  orig: 400, 400
+  offset: 63, 225
+  index: -1
+fx/11_00004
+  rotate: false
+  xy: 623, 124
+  size: 64, 64
+  orig: 400, 400
+  offset: 72, 226
+  index: -1
+fx/11_00005
+  rotate: false
+  xy: 688, 198
+  size: 63, 65
+  orig: 400, 400
+  offset: 83, 225
+  index: -1
+fx/11_00006
+  rotate: false
+  xy: 623, 190
+  size: 63, 66
+  orig: 400, 400
+  offset: 96, 225
+  index: -1
+fx/11_00007
+  rotate: false
+  xy: 689, 131
+  size: 57, 65
+  orig: 400, 400
+  offset: 115, 226
+  index: -1
+fx/11_00008
+  rotate: false
+  xy: 241, 11
+  size: 57, 43
+  orig: 400, 400
+  offset: 129, 248
+  index: -1
+fx/11_00009
+  rotate: false
+  xy: 180, 11
+  size: 59, 43
+  orig: 400, 400
+  offset: 142, 247
+  index: -1
+fx/11_00010
+  rotate: false
+  xy: 120, 9
+  size: 58, 45
+  orig: 400, 400
+  offset: 158, 242
+  index: -1
+fx/11_00011
+  rotate: false
+  xy: 62, 5
+  size: 56, 49
+  orig: 400, 400
+  offset: 174, 234
+  index: -1
+fx/11_00012
+  rotate: false
+  xy: 607, 34
+  size: 43, 43
+  orig: 400, 400
+  offset: 189, 233
+  index: -1
+fx/11_00013
+  rotate: false
+  xy: 748, 414
+  size: 28, 33
+  orig: 400, 400
+  offset: 204, 233
+  index: -1
+fx/11_00014
+  rotate: true
+  xy: 759, 764
+  size: 13, 18
+  orig: 400, 400
+  offset: 217, 234
+  index: -1
+fx/Fire 001 Ray Up_00003
+  rotate: true
+  xy: 748, 487
+  size: 43, 24
+  orig: 75, 75
+  offset: 15, 0
+  index: -1
+fx/Fire 001 Ray Up_00006
+  rotate: true
+  xy: 667, 71
+  size: 51, 31
+  orig: 75, 75
+  offset: 13, 0
+  index: -1
+fx/Fire 001 Ray Up_00009
+  rotate: false
+  xy: 358, 15
+  size: 57, 39
+  orig: 75, 75
+  offset: 11, 1
+  index: -1
+fx/Fire 001 Ray Up_00012
+  rotate: false
+  xy: 2, 6
+  size: 58, 48
+  orig: 75, 75
+  offset: 11, 3
+  index: -1
+fx/Fire 001 Ray Up_00015
+  rotate: false
+  xy: 300, 10
+  size: 56, 44
+  orig: 75, 75
+  offset: 12, 9
+  index: -1
+fx/Fire 001 Ray Up_00018
+  rotate: false
+  xy: 700, 89
+  size: 43, 40
+  orig: 75, 75
+  offset: 17, 20
+  index: -1
+fx/Fire 001 Ray Up_00021
+  rotate: true
+  xy: 417, 22
+  size: 32, 21
+  orig: 75, 75
+  offset: 21, 38
+  index: -1
+fx/di
+  rotate: true
+  xy: 748, 449
+  size: 36, 27
+  orig: 36, 27
+  offset: 0, 0
+  index: -1
+fx/glow2_00004
+  rotate: false
+  xy: 752, 386
+  size: 25, 26
+  orig: 29, 30
+  offset: 2, 2
+  index: -1
+idle/a0000
+  rotate: false
+  xy: 446, 298
+  size: 214, 238
+  orig: 400, 400
+  offset: 57, 60
+  index: -1
+idle/a0004
+  rotate: false
+  xy: 450, 538
+  size: 216, 239
+  orig: 400, 400
+  offset: 59, 60
+  index: -1
+idle/a0008
+  rotate: false
+  xy: 227, 538
+  size: 221, 239
+  orig: 400, 400
+  offset: 61, 60
+  index: -1
+idle/a0012
+  rotate: false
+  xy: 2, 538
+  size: 223, 239
+  orig: 400, 400
+  offset: 63, 60
+  index: -1
+idle/a0016
+  rotate: false
+  xy: 2, 297
+  size: 223, 239
+  orig: 400, 400
+  offset: 63, 60
+  index: -1
+idle/a0020
+  rotate: false
+  xy: 2, 56
+  size: 220, 239
+  orig: 400, 400
+  offset: 63, 60
+  index: -1
+idle/a0024
+  rotate: false
+  xy: 227, 297
+  size: 217, 239
+  orig: 400, 400
+  offset: 61, 60
+  index: -1
+idle/a0028
+  rotate: false
+  xy: 224, 56
+  size: 215, 239
+  orig: 400, 400
+  offset: 59, 60
+  index: -1
+idle/a0038
+  rotate: false
+  xy: 662, 265
+  size: 88, 124
+  orig: 200, 200
+  offset: 55, 32
+  index: -1
+idle/a0042
+  rotate: false
+  xy: 668, 532
+  size: 104, 104
+  orig: 200, 200
+  offset: 42, 28
+  index: -1
+idle/a0046
+  rotate: false
+  xy: 538, 83
+  size: 77, 91
+  orig: 200, 200
+  offset: 57, 32
+  index: -1
+idle/a0049
+  rotate: false
+  xy: 668, 638
+  size: 89, 139
+  orig: 200, 200
+  offset: 76, 32
+  index: -1
+idle/a0051
+  rotate: false
+  xy: 441, 156
+  size: 76, 139
+  orig: 200, 200
+  offset: 76, 32
+  index: -1
+idle/a0054
+  rotate: false
+  xy: 662, 391
+  size: 84, 139
+  orig: 200, 200
+  offset: 77, 32
+  index: -1
+idle/a0060
+  rotate: false
+  xy: 441, 40
+  size: 95, 114
+  orig: 200, 200
+  offset: 67, 32
+  index: -1
+idle/a0064
+  rotate: false
+  xy: 519, 176
+  size: 102, 120
+  orig: 200, 200
+  offset: 33, 30
+  index: -1

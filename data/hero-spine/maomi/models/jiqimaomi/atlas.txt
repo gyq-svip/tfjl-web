@@ -1,0 +1,279 @@
+
+jiqimaomi.png
+size: 875,875
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 581, 99
+  size: 128, 136
+  orig: 144, 145
+  offset: 13, 0
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 711, 152
+  size: 117, 136
+  orig: 144, 145
+  offset: 25, 0
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 711, 14
+  size: 114, 136
+  orig: 144, 145
+  offset: 28, 0
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 626, 271
+  size: 112, 140
+  orig: 144, 145
+  offset: 28, 0
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 626, 385
+  size: 111, 142
+  orig: 144, 145
+  offset: 28, 1
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 626, 498
+  size: 111, 144
+  orig: 144, 145
+  offset: 28, 1
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 441, 94
+  size: 138, 139
+  orig: 144, 145
+  offset: 1, 2
+  index: -1
+fx/1/idle_0
+  rotate: true
+  xy: 542, 42
+  size: 24, 20
+  orig: 240, 271
+  offset: 27, 170
+  index: -1
+fx/1/idle_1
+  rotate: true
+  xy: 466, 67
+  size: 25, 21
+  orig: 240, 271
+  offset: 46, 171
+  index: -1
+fx/1/idle_2
+  rotate: false
+  xy: 558, 69
+  size: 23, 23
+  orig: 240, 271
+  offset: 66, 162
+  index: -1
+fx/1/idle_3
+  rotate: false
+  xy: 512, 68
+  size: 21, 24
+  orig: 240, 271
+  offset: 70, 147
+  index: -1
+fx/1/idle_4
+  rotate: false
+  xy: 489, 67
+  size: 21, 25
+  orig: 240, 271
+  offset: 56, 138
+  index: -1
+fx/1/idle_5
+  rotate: false
+  xy: 535, 68
+  size: 21, 24
+  orig: 240, 271
+  offset: 39, 145
+  index: -1
+fx/1/idle_6
+  rotate: true
+  xy: 441, 67
+  size: 25, 23
+  orig: 240, 271
+  offset: 19, 157
+  index: -1
+fx/1/idle_7
+  rotate: true
+  xy: 567, 237
+  size: 26, 21
+  orig: 240, 271
+  offset: 14, 165
+  index: -1
+fx/2/atk_3
+  rotate: false
+  xy: 269, 6
+  size: 53, 48
+  orig: 288, 289
+  offset: 72, 53
+  index: -1
+fx/2/atk_4
+  rotate: false
+  xy: 211, 6
+  size: 56, 48
+  orig: 288, 289
+  offset: 72, 54
+  index: -1
+fx/2/atk_5
+  rotate: false
+  xy: 85, 5
+  size: 63, 49
+  orig: 288, 289
+  offset: 72, 53
+  index: -1
+fx/2/atk_6
+  rotate: false
+  xy: 2, 5
+  size: 81, 49
+  orig: 288, 289
+  offset: 72, 53
+  index: -1
+fx/2/atk_6a
+  rotate: false
+  xy: 150, 5
+  size: 59, 49
+  orig: 288, 289
+  offset: 72, 53
+  index: -1
+fx/Ele_00000
+  rotate: false
+  xy: 770, 353
+  size: 95, 63
+  orig: 180, 180
+  offset: 43, 28
+  index: -1
+fx/Ele_00002
+  rotate: false
+  xy: 772, 418
+  size: 96, 89
+  orig: 180, 180
+  offset: 46, 31
+  index: -1
+fx/Ele_00004
+  rotate: true
+  xy: 772, 509
+  size: 100, 101
+  orig: 180, 180
+  offset: 46, 38
+  index: -1
+fx/Ele_00006
+  rotate: false
+  xy: 441, 235
+  size: 93, 92
+  orig: 180, 180
+  offset: 48, 55
+  index: -1
+fx/Ele_00008
+  rotate: false
+  xy: 324, 9
+  size: 93, 45
+  orig: 180, 180
+  offset: 47, 81
+  index: -1
+fx/Ele_00010
+  rotate: false
+  xy: 542, 265
+  size: 72, 62
+  orig: 180, 180
+  offset: 56, 71
+  index: -1
+fx/eye
+  rotate: false
+  xy: 419, 21
+  size: 121, 33
+  orig: 122, 34
+  offset: 0, 1
+  index: -1
+fx/red
+  rotate: true
+  xy: 536, 236
+  size: 27, 29
+  orig: 27, 29
+  offset: 0, 0
+  index: -1
+fx/red3
+  rotate: false
+  xy: 419, 6
+  size: 32, 13
+  orig: 34, 13
+  offset: 1, 0
+  index: -1
+fx/z1
+  rotate: true
+  xy: 747, 611
+  size: 262, 125
+  orig: 262, 125
+  offset: 0, 0
+  index: -1
+fx/z2
+  rotate: true
+  xy: 620, 611
+  size: 262, 125
+  orig: 262, 125
+  offset: 0, 0
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 56
+  size: 224, 271
+  orig: 240, 271
+  offset: 15, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 237, 602
+  size: 200, 271
+  orig: 240, 271
+  offset: 39, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 439, 602
+  size: 179, 271
+  orig: 240, 271
+  offset: 60, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 434, 329
+  size: 190, 271
+  orig: 240, 271
+  offset: 50, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 229, 329
+  size: 203, 271
+  orig: 240, 271
+  offset: 37, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 228, 56
+  size: 211, 271
+  orig: 240, 271
+  offset: 29, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 329
+  size: 225, 271
+  orig: 240, 271
+  offset: 14, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 602
+  size: 233, 271
+  orig: 240, 271
+  offset: 6, 0
+  index: -1

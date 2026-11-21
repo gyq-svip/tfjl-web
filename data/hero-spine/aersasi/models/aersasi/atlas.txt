@@ -1,0 +1,125 @@
+
+aersasi.png
+size: 843,843
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+FX/001
+  rotate: false
+  xy: 379, 282
+  size: 203, 187
+  orig: 256, 256
+  offset: 30, 24
+  index: -1
+a0000
+  rotate: false
+  xy: 215, 570
+  size: 212, 271
+  orig: 700, 700
+  offset: 233, 206
+  index: -1
+a0004
+  rotate: false
+  xy: 2, 567
+  size: 211, 274
+  orig: 700, 700
+  offset: 228, 203
+  index: -1
+a0008
+  rotate: false
+  xy: 2, 291
+  size: 197, 274
+  orig: 700, 700
+  offset: 229, 202
+  index: -1
+a0012
+  rotate: false
+  xy: 2, 16
+  size: 188, 273
+  orig: 700, 700
+  offset: 233, 203
+  index: -1
+a0016
+  rotate: false
+  xy: 192, 13
+  size: 182, 273
+  orig: 700, 700
+  offset: 238, 203
+  index: -1
+a0020
+  rotate: true
+  xy: 429, 471
+  size: 178, 275
+  orig: 700, 700
+  offset: 241, 201
+  index: -1
+a0024
+  rotate: false
+  xy: 201, 288
+  size: 176, 277
+  orig: 700, 700
+  offset: 242, 200
+  index: -1
+a0028
+  rotate: true
+  xy: 429, 651
+  size: 190, 274
+  orig: 700, 700
+  offset: 239, 203
+  index: -1
+a0038
+  rotate: true
+  xy: 574, 19
+  size: 127, 140
+  orig: 350, 350
+  offset: 95, 99
+  index: -1
+a0041
+  rotate: true
+  xy: 584, 276
+  size: 193, 148
+  orig: 350, 350
+  offset: 41, 96
+  index: -1
+a0045
+  rotate: false
+  xy: 376, 133
+  size: 196, 147
+  orig: 350, 350
+  offset: 24, 90
+  index: -1
+a0048
+  rotate: true
+  xy: 705, 670
+  size: 171, 133
+  orig: 350, 350
+  offset: 135, 101
+  index: -1
+a0052
+  rotate: true
+  xy: 706, 522
+  size: 146, 128
+  orig: 350, 350
+  offset: 134, 99
+  index: -1
+a0056
+  rotate: false
+  xy: 574, 148
+  size: 156, 126
+  orig: 350, 350
+  offset: 118, 104
+  index: -1
+a0061
+  rotate: false
+  xy: 376, 2
+  size: 171, 129
+  orig: 350, 350
+  offset: 112, 108
+  index: -1
+a0065
+  rotate: false
+  xy: 734, 384
+  size: 106, 136
+  orig: 350, 350
+  offset: 117, 103
+  index: -1

@@ -1,0 +1,174 @@
+
+zhizhu.png
+size: 1965,750
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+D1
+  rotate: false
+  xy: 371, 57
+  size: 318, 165
+  orig: 318, 165
+  offset: 0, 0
+  index: -1
+D2
+  rotate: false
+  xy: 1647, 399
+  size: 316, 169
+  orig: 316, 169
+  offset: 0, 0
+  index: -1
+D3
+  rotate: false
+  xy: 1013, 382
+  size: 313, 178
+  orig: 313, 178
+  offset: 0, 0
+  index: -1
+D4
+  rotate: false
+  xy: 1016, 562
+  size: 310, 186
+  orig: 310, 186
+  offset: 0, 0
+  index: -1
+D5
+  rotate: false
+  xy: 1328, 559
+  size: 310, 189
+  orig: 311, 189
+  offset: 0, 0
+  index: -1
+D6
+  rotate: false
+  xy: 702, 562
+  size: 312, 186
+  orig: 312, 186
+  offset: 0, 0
+  index: -1
+D7
+  rotate: false
+  xy: 1640, 570
+  size: 314, 178
+  orig: 314, 178
+  offset: 0, 0
+  index: -1
+D8
+  rotate: false
+  xy: 1328, 387
+  size: 317, 170
+  orig: 317, 170
+  offset: 0, 0
+  index: -1
+G1
+  rotate: false
+  xy: 371, 224
+  size: 318, 166
+  orig: 318, 166
+  offset: 0, 0
+  index: -1
+G2
+  rotate: false
+  xy: 691, 225
+  size: 318, 165
+  orig: 318, 165
+  offset: 0, 0
+  index: -1
+G3
+  rotate: false
+  xy: 691, 58
+  size: 318, 165
+  orig: 318, 165
+  offset: 0, 0
+  index: -1
+G4
+  rotate: true
+  xy: 2, 8
+  size: 297, 201
+  orig: 297, 202
+  offset: 0, 0
+  index: -1
+G5
+  rotate: false
+  xy: 2, 307
+  size: 280, 249
+  orig: 280, 249
+  offset: 0, 0
+  index: -1
+G6
+  rotate: false
+  xy: 2, 558
+  size: 366, 190
+  orig: 367, 190
+  offset: 0, 0
+  index: -1
+G7
+  rotate: false
+  xy: 370, 564
+  size: 330, 184
+  orig: 330, 184
+  offset: 0, 0
+  index: -1
+G8
+  rotate: false
+  xy: 370, 392
+  size: 321, 170
+  orig: 321, 170
+  offset: 0, 0
+  index: -1
+Z1
+  rotate: false
+  xy: 693, 392
+  size: 318, 168
+  orig: 318, 168
+  offset: 0, 0
+  index: -1
+Z2
+  rotate: false
+  xy: 1328, 217
+  size: 309, 168
+  orig: 309, 168
+  offset: 0, 0
+  index: -1
+Z3
+  rotate: true
+  xy: 205, 2
+  size: 303, 164
+  orig: 303, 164
+  offset: 0, 0
+  index: -1
+Z4
+  rotate: false
+  xy: 1639, 68
+  size: 291, 163
+  orig: 291, 163
+  offset: 0, 0
+  index: -1
+Z5
+  rotate: false
+  xy: 1328, 49
+  size: 282, 166
+  orig: 282, 166
+  offset: 0, 0
+  index: -1
+Z6
+  rotate: false
+  xy: 1647, 233
+  size: 293, 164
+  orig: 293, 164
+  offset: 0, 0
+  index: -1
+Z7
+  rotate: false
+  xy: 1011, 49
+  size: 303, 164
+  orig: 303, 164
+  offset: 0, 0
+  index: -1
+Z8
+  rotate: false
+  xy: 1011, 215
+  size: 315, 165
+  orig: 316, 166
+  offset: 0, 0
+  index: -1

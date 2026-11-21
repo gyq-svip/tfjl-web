@@ -1,0 +1,181 @@
+
+sulaodie.png
+size: 914,914
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 493, 143
+  size: 105, 154
+  orig: 225, 225
+  offset: 57, 32
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 627, 38
+  size: 104, 155
+  orig: 225, 225
+  offset: 57, 32
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 733, 40
+  size: 101, 155
+  orig: 225, 225
+  offset: 58, 32
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 129, 140
+  size: 122, 156
+  orig: 225, 225
+  offset: 54, 31
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 2, 139
+  size: 125, 157
+  orig: 225, 225
+  offset: 51, 30
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 253, 142
+  size: 119, 155
+  orig: 225, 225
+  offset: 57, 31
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 374, 143
+  size: 117, 154
+  orig: 225, 225
+  offset: 58, 31
+  index: -1
+fx/TX_bl_00004
+  rotate: false
+  xy: 751, 206
+  size: 70, 91
+  orig: 80, 116
+  offset: 9, 11
+  index: -1
+fx/TX_bl_00006
+  rotate: false
+  xy: 675, 197
+  size: 74, 100
+  orig: 80, 116
+  offset: 2, 3
+  index: -1
+fx/TX_bl_00008
+  rotate: false
+  xy: 550, 35
+  size: 75, 106
+  orig: 80, 116
+  offset: 2, 2
+  index: -1
+fx/TX_bl_00010
+  rotate: false
+  xy: 600, 195
+  size: 73, 102
+  orig: 80, 116
+  offset: 2, 6
+  index: -1
+fx/qiliu1_000
+  rotate: false
+  xy: 357, 77
+  size: 188, 63
+  orig: 193, 68
+  offset: 4, 2
+  index: -1
+fx/qiliu1_001
+  rotate: false
+  xy: 2, 57
+  size: 188, 80
+  orig: 194, 84
+  offset: 4, 1
+  index: -1
+fx/qiliu1_002
+  rotate: false
+  xy: 192, 47
+  size: 163, 91
+  orig: 167, 95
+  offset: 3, 2
+  index: -1
+fx/qiliu1_003
+  rotate: false
+  xy: 459, 5
+  size: 89, 70
+  orig: 95, 86
+  offset: 4, 3
+  index: -1
+fx/qiliu1_004
+  rotate: false
+  xy: 823, 228
+  size: 89, 69
+  orig: 93, 73
+  offset: 3, 3
+  index: -1
+fx/qiliu1_005
+  rotate: false
+  xy: 357, 8
+  size: 100, 67
+  orig: 104, 69
+  offset: 2, 0
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 648, 299
+  size: 209, 305
+  orig: 450, 450
+  offset: 115, 64
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 436, 299
+  size: 210, 305
+  orig: 450, 450
+  offset: 114, 64
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 220, 299
+  size: 214, 305
+  orig: 450, 450
+  offset: 110, 64
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 220, 606
+  size: 215, 306
+  orig: 450, 450
+  offset: 107, 64
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 606
+  size: 216, 306
+  orig: 450, 450
+  offset: 105, 64
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 2, 298
+  size: 216, 306
+  orig: 450, 450
+  offset: 106, 64
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 437, 606
+  size: 213, 306
+  orig: 450, 450
+  offset: 109, 63
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 652, 607
+  size: 209, 305
+  orig: 450, 450
+  offset: 113, 64
+  index: -1

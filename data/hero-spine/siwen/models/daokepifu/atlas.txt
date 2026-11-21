@@ -1,0 +1,244 @@
+
+daokepifu.png
+size: 1367,1367
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/FX/1/a0000
+  rotate: false
+  xy: 1193, 464
+  size: 172, 100
+  orig: 512, 512
+  offset: 180, 108
+  index: -1
+images/FX/1/a0004
+  rotate: false
+  xy: 787, 368
+  size: 167, 109
+  orig: 512, 512
+  offset: 180, 100
+  index: -1
+images/FX/1/a0008
+  rotate: false
+  xy: 915, 44
+  size: 164, 116
+  orig: 512, 512
+  offset: 179, 93
+  index: -1
+images/FX/1/a0012
+  rotate: false
+  xy: 1067, 238
+  size: 162, 117
+  orig: 512, 512
+  offset: 179, 91
+  index: -1
+images/FX/1/a0016
+  rotate: false
+  xy: 1187, 112
+  size: 166, 111
+  orig: 512, 512
+  offset: 178, 96
+  index: -1
+images/FX/1/a0020
+  rotate: false
+  xy: 1193, 357
+  size: 169, 105
+  orig: 512, 512
+  offset: 178, 101
+  index: -1
+images/FX/1/a0024
+  rotate: false
+  xy: 1017, 463
+  size: 174, 101
+  orig: 512, 512
+  offset: 179, 105
+  index: -1
+images/FX/1/a0028
+  rotate: false
+  xy: 1187, 12
+  size: 174, 98
+  orig: 512, 512
+  offset: 181, 109
+  index: -1
+images/FX/guang
+  rotate: false
+  xy: 1231, 225
+  size: 129, 130
+  orig: 145, 146
+  offset: 9, 7
+  index: -1
+images/FX/rr/rr _000
+  rotate: false
+  xy: 910, 798
+  size: 235, 240
+  orig: 256, 256
+  offset: 21, 16
+  index: -1
+images/FX/rr/rr _001
+  rotate: false
+  xy: 1017, 566
+  size: 229, 230
+  orig: 256, 256
+  offset: 27, 14
+  index: -1
+images/FX/rr/rr _002
+  rotate: false
+  xy: 1147, 814
+  size: 155, 220
+  orig: 256, 256
+  offset: 101, 16
+  index: -1
+images/FX/rr/rr _003
+  rotate: false
+  xy: 755, 813
+  size: 153, 226
+  orig: 256, 256
+  offset: 103, 14
+  index: -1
+images/FX/rr/rr _004
+  rotate: false
+  xy: 915, 162
+  size: 150, 204
+  orig: 256, 256
+  offset: 106, 26
+  index: -1
+images/FX/rr/rr _005
+  rotate: false
+  xy: 1248, 636
+  size: 116, 176
+  orig: 256, 256
+  offset: 140, 28
+  index: -1
+images/FX/rr/rr _006
+  rotate: false
+  xy: 1081, 106
+  size: 104, 130
+  orig: 256, 256
+  offset: 152, 30
+  index: -1
+images/FX/rr/rr _007
+  rotate: false
+  xy: 1081, 22
+  size: 80, 82
+  orig: 256, 256
+  offset: 168, 36
+  index: -1
+images/FX/xx
+  rotate: false
+  xy: 1248, 568
+  size: 65, 66
+  orig: 93, 92
+  offset: 15, 13
+  index: -1
+images/a0000
+  rotate: false
+  xy: 231, 3
+  size: 227, 320
+  orig: 512, 512
+  offset: 127, 105
+  index: -1
+images/a0004
+  rotate: false
+  xy: 564, 367
+  size: 221, 325
+  orig: 512, 512
+  offset: 127, 98
+  index: -1
+images/a0008
+  rotate: false
+  xy: 460, 14
+  size: 222, 330
+  orig: 512, 512
+  offset: 122, 92
+  index: -1
+images/a0012
+  rotate: false
+  xy: 529, 694
+  size: 224, 330
+  orig: 512, 512
+  offset: 118, 90
+  index: -1
+images/a0016
+  rotate: false
+  xy: 933, 1040
+  size: 227, 325
+  orig: 512, 512
+  offset: 118, 95
+  index: -1
+images/a0020
+  rotate: false
+  xy: 2, 2
+  size: 227, 321
+  orig: 512, 512
+  offset: 121, 100
+  index: -1
+images/a0024
+  rotate: false
+  xy: 684, 47
+  size: 229, 318
+  orig: 512, 512
+  offset: 124, 105
+  index: -1
+images/a0028
+  rotate: false
+  xy: 787, 479
+  size: 228, 317
+  orig: 512, 512
+  offset: 127, 107
+  index: -1
+images/a0037
+  rotate: false
+  xy: 619, 1041
+  size: 312, 324
+  orig: 512, 512
+  offset: 170, 102
+  index: -1
+images/a0040
+  rotate: false
+  xy: 312, 630
+  size: 215, 386
+  orig: 512, 512
+  offset: 139, 101
+  index: -1
+images/a0044
+  rotate: false
+  xy: 298, 346
+  size: 264, 282
+  orig: 512, 512
+  offset: 68, 100
+  index: -1
+images/a0046
+  rotate: false
+  xy: 1162, 1036
+  size: 200, 329
+  orig: 512, 512
+  offset: 187, 101
+  index: -1
+images/a0048
+  rotate: false
+  xy: 313, 1026
+  size: 304, 339
+  orig: 512, 512
+  offset: 181, 74
+  index: -1
+images/a0050
+  rotate: false
+  xy: 2, 670
+  size: 308, 346
+  orig: 512, 512
+  offset: 177, 76
+  index: -1
+images/a0053
+  rotate: false
+  xy: 2, 1018
+  size: 309, 347
+  orig: 512, 512
+  offset: 176, 81
+  index: -1
+images/a0058
+  rotate: false
+  xy: 2, 325
+  size: 294, 343
+  orig: 512, 512
+  offset: 175, 91
+  index: -1

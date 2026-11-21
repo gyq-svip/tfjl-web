@@ -1,0 +1,132 @@
+
+xiaoqi.png
+size: 849,849
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 486, 4
+  size: 93, 136
+  orig: 116, 168
+  offset: 9, 2
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 728, 23
+  size: 97, 131
+  orig: 116, 168
+  offset: 9, 2
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 374, 2
+  size: 110, 138
+  orig: 116, 168
+  offset: 5, 0
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 587, 187
+  size: 104, 137
+  orig: 116, 168
+  offset: 1, 20
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 728, 156
+  size: 98, 135
+  orig: 116, 168
+  offset: 0, 33
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 374, 142
+  size: 115, 143
+  orig: 116, 168
+  offset: 1, 13
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 491, 155
+  size: 94, 140
+  orig: 116, 168
+  offset: 4, 2
+  index: -1
+attack/atk_8
+  rotate: true
+  xy: 587, 91
+  size: 94, 139
+  orig: 116, 168
+  offset: 7, 2
+  index: -1
+idle/idle_00
+  rotate: false
+  xy: 194, 6
+  size: 178, 279
+  orig: 203, 279
+  offset: 13, 0
+  index: -1
+idle/idle_01
+  rotate: false
+  xy: 2, 6
+  size: 190, 279
+  orig: 203, 279
+  offset: 6, 0
+  index: -1
+idle/idle_02
+  rotate: false
+  xy: 2, 287
+  size: 202, 279
+  orig: 203, 279
+  offset: 1, 0
+  index: -1
+idle/idle_03
+  rotate: false
+  xy: 2, 568
+  size: 203, 279
+  orig: 203, 279
+  offset: 0, 0
+  index: -1
+idle/idle_04
+  rotate: false
+  xy: 206, 287
+  size: 189, 279
+  orig: 203, 279
+  offset: 6, 0
+  index: -1
+idle/idle_05
+  rotate: false
+  xy: 588, 293
+  size: 178, 278
+  orig: 203, 279
+  offset: 13, 0
+  index: -1
+idle/idle_06
+  rotate: false
+  xy: 617, 573
+  size: 191, 274
+  orig: 203, 279
+  offset: 6, 0
+  index: -1
+idle/idle_07
+  rotate: false
+  xy: 207, 575
+  size: 203, 272
+  orig: 203, 279
+  offset: 0, 0
+  index: -1
+idle/idle_08
+  rotate: false
+  xy: 412, 575
+  size: 203, 272
+  orig: 203, 279
+  offset: 0, 0
+  index: -1
+idle/idle_09
+  rotate: false
+  xy: 397, 297
+  size: 189, 276
+  orig: 203, 279
+  offset: 6, 0
+  index: -1

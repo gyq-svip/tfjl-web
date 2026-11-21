@@ -1,0 +1,146 @@
+
+wenzhengming.png
+size: 796,796
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 631, 113
+  size: 90, 133
+  orig: 136, 133
+  offset: 16, 0
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 645, 465
+  size: 102, 133
+  orig: 136, 133
+  offset: 16, 0
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 644, 363
+  size: 100, 133
+  orig: 136, 133
+  offset: 16, 0
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 645, 569
+  size: 108, 133
+  orig: 136, 133
+  offset: 13, 0
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 645, 679
+  size: 115, 133
+  orig: 136, 133
+  offset: 12, 0
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 644, 261
+  size: 100, 133
+  orig: 136, 133
+  offset: 12, 0
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 536, 127
+  size: 93, 133
+  orig: 136, 133
+  offset: 14, 0
+  index: -1
+fx/bingyan_001
+  rotate: true
+  xy: 2, 4
+  size: 40, 155
+  orig: 82, 205
+  offset: 20, 48
+  index: -1
+fx/bingyan_003
+  rotate: true
+  xy: 631, 205
+  size: 54, 158
+  orig: 82, 205
+  offset: 16, 39
+  index: -1
+fx/bingyan_005
+  rotate: true
+  xy: 295, 2
+  size: 46, 169
+  orig: 82, 205
+  offset: 22, 8
+  index: -1
+fx/bingyan_007
+  rotate: true
+  xy: 159, 8
+  size: 36, 134
+  orig: 82, 205
+  offset: 24, 0
+  index: -1
+fx/bingyan_009
+  rotate: true
+  xy: 466, 13
+  size: 35, 47
+  orig: 82, 205
+  offset: 14, 3
+  index: -1
+idle/idle_0
+  rotate: true
+  xy: 269, 50
+  size: 210, 265
+  orig: 218, 265
+  offset: 4, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 218, 262
+  size: 212, 265
+  orig: 218, 265
+  offset: 3, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 529
+  size: 215, 265
+  orig: 218, 265
+  offset: 0, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 2, 262
+  size: 214, 265
+  orig: 218, 265
+  offset: 0, 0
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 2, 46
+  size: 214, 265
+  orig: 218, 265
+  offset: 0, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 219, 529
+  size: 212, 265
+  orig: 218, 265
+  offset: 1, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 432, 262
+  size: 210, 265
+  orig: 218, 265
+  offset: 3, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 433, 529
+  size: 210, 265
+  orig: 218, 265
+  offset: 4, 0
+  index: -1

@@ -1,0 +1,188 @@
+
+duye.png
+size: 723,723
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/a0000
+  rotate: false
+  xy: 2, 533
+  size: 235, 188
+  orig: 410, 410
+  offset: 96, 93
+  index: -1
+images/a0004
+  rotate: false
+  xy: 239, 541
+  size: 235, 180
+  orig: 410, 410
+  offset: 97, 94
+  index: -1
+images/a0008
+  rotate: false
+  xy: 476, 547
+  size: 236, 174
+  orig: 410, 410
+  offset: 97, 93
+  index: -1
+images/a0012
+  rotate: false
+  xy: 239, 366
+  size: 236, 173
+  orig: 410, 410
+  offset: 97, 92
+  index: -1
+images/a0016
+  rotate: false
+  xy: 477, 373
+  size: 237, 172
+  orig: 410, 410
+  offset: 96, 93
+  index: -1
+images/a0020
+  rotate: false
+  xy: 238, 189
+  size: 235, 175
+  orig: 410, 410
+  offset: 97, 93
+  index: -1
+images/a0024
+  rotate: false
+  xy: 2, 164
+  size: 234, 180
+  orig: 410, 410
+  offset: 96, 94
+  index: -1
+images/a0028
+  rotate: false
+  xy: 2, 346
+  size: 234, 185
+  orig: 410, 410
+  offset: 96, 93
+  index: -1
+images/a0039
+  rotate: false
+  xy: 239, 2
+  size: 103, 96
+  orig: 205, 205
+  offset: 48, 45
+  index: -1
+images/a0043
+  rotate: false
+  xy: 370, 80
+  size: 104, 107
+  orig: 205, 205
+  offset: 37, 47
+  index: -1
+images/a0047
+  rotate: false
+  xy: 2, 45
+  size: 108, 117
+  orig: 205, 205
+  offset: 36, 47
+  index: -1
+images/a0051
+  rotate: false
+  xy: 239, 100
+  size: 129, 87
+  orig: 205, 205
+  offset: 48, 39
+  index: -1
+images/a0055
+  rotate: false
+  xy: 112, 66
+  size: 125, 96
+  orig: 205, 205
+  offset: 48, 37
+  index: -1
+images/a0063
+  rotate: false
+  xy: 477, 278
+  size: 122, 93
+  orig: 205, 205
+  offset: 48, 46
+  index: -1
+images/fx/Liquid 054 Impact Explosion Right MIX_00001
+  rotate: false
+  xy: 553, 132
+  size: 51, 59
+  orig: 120, 120
+  offset: 12, 31
+  index: -1
+images/fx/Liquid 054 Impact Explosion Right MIX_00003
+  rotate: true
+  xy: 427, 7
+  size: 71, 77
+  orig: 120, 120
+  offset: 4, 22
+  index: -1
+images/fx/Liquid 054 Impact Explosion Right MIX_00005
+  rotate: true
+  xy: 344, 2
+  size: 76, 81
+  orig: 120, 120
+  offset: 4, 20
+  index: -1
+images/fx/Liquid 054 Impact Explosion Right MIX_00007
+  rotate: false
+  xy: 565, 193
+  size: 78, 83
+  orig: 120, 120
+  offset: 5, 17
+  index: -1
+images/fx/Liquid 054 Impact Explosion Right MIX_00009
+  rotate: false
+  xy: 601, 285
+  size: 80, 86
+  orig: 120, 120
+  offset: 6, 15
+  index: -1
+images/fx/Liquid 054 Impact Explosion Right MIX_00011
+  rotate: true
+  xy: 475, 199
+  size: 77, 88
+  orig: 120, 120
+  offset: 10, 13
+  index: -1
+images/fx/Liquid 054 Impact Explosion Right MIX_00013
+  rotate: false
+  xy: 476, 107
+  size: 75, 90
+  orig: 120, 120
+  offset: 12, 12
+  index: -1
+images/voodoo explosion_10
+  rotate: false
+  xy: 553, 107
+  size: 30, 23
+  orig: 34, 50
+  offset: 3, 26
+  index: -1
+images/voodoo explosion_11
+  rotate: false
+  xy: 476, 82
+  size: 31, 23
+  orig: 34, 50
+  offset: 3, 27
+  index: -1
+images/voodoo explosion_4
+  rotate: false
+  xy: 606, 154
+  size: 30, 37
+  orig: 34, 50
+  offset: 3, 4
+  index: -1
+images/voodoo explosion_6
+  rotate: false
+  xy: 683, 332
+  size: 31, 39
+  orig: 34, 50
+  offset: 3, 4
+  index: -1
+images/voodoo explosion_8
+  rotate: true
+  xy: 2, 10
+  size: 33, 42
+  orig: 34, 50
+  offset: 1, 5
+  index: -1

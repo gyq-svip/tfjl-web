@@ -1,0 +1,111 @@
+
+rushuang.png
+size: 842,842
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 633, 729
+  size: 111, 159
+  orig: 200, 200
+  offset: 45, 13
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 627, 568
+  size: 111, 159
+  orig: 200, 200
+  offset: 44, 13
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 633, 457
+  size: 109, 159
+  orig: 200, 200
+  offset: 43, 13
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 633, 342
+  size: 113, 158
+  orig: 200, 200
+  offset: 46, 13
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 632, 235
+  size: 105, 157
+  orig: 200, 200
+  offset: 44, 13
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 633, 25
+  size: 103, 157
+  orig: 200, 200
+  offset: 46, 13
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 633, 130
+  size: 103, 158
+  orig: 200, 200
+  offset: 47, 13
+  index: -1
+idle/idle_0
+  rotate: true
+  xy: 318, 2
+  size: 207, 313
+  orig: 400, 400
+  offset: 94, 28
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 417, 527
+  size: 208, 313
+  orig: 400, 400
+  offset: 94, 28
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 212, 211
+  size: 210, 313
+  orig: 400, 400
+  offset: 93, 28
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 2, 209
+  size: 208, 314
+  orig: 400, 400
+  offset: 94, 28
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 525
+  size: 207, 315
+  orig: 400, 400
+  offset: 94, 28
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 2, 2
+  size: 205, 314
+  orig: 400, 400
+  offset: 95, 28
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 211, 526
+  size: 204, 314
+  orig: 400, 400
+  offset: 96, 28
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 424, 212
+  size: 206, 313
+  orig: 400, 400
+  offset: 95, 28
+  index: -1

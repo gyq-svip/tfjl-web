@@ -1,0 +1,181 @@
+
+fuwang.png
+size: 954,954
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+a0000
+  rotate: false
+  xy: 2, 707
+  size: 233, 245
+  orig: 512, 512
+  offset: 172, 151
+  index: -1
+a0004
+  rotate: false
+  xy: 2, 461
+  size: 237, 244
+  orig: 512, 512
+  offset: 173, 151
+  index: -1
+a0008
+  rotate: false
+  xy: 235, 217
+  size: 241, 242
+  orig: 512, 512
+  offset: 173, 151
+  index: -1
+a0012
+  rotate: false
+  xy: 468, 711
+  size: 241, 241
+  orig: 512, 512
+  offset: 174, 151
+  index: -1
+a0016
+  rotate: true
+  xy: 711, 713
+  size: 239, 241
+  orig: 512, 512
+  offset: 174, 151
+  index: -1
+a0020
+  rotate: false
+  xy: 241, 464
+  size: 236, 242
+  orig: 512, 512
+  offset: 173, 151
+  index: -1
+a0024
+  rotate: false
+  xy: 2, 216
+  size: 231, 243
+  orig: 512, 512
+  offset: 172, 151
+  index: -1
+a0028
+  rotate: false
+  xy: 237, 708
+  size: 229, 244
+  orig: 512, 512
+  offset: 172, 151
+  index: -1
+a0037
+  rotate: false
+  xy: 513, 3
+  size: 110, 130
+  orig: 256, 256
+  offset: 101, 83
+  index: -1
+a0040
+  rotate: false
+  xy: 355, 63
+  size: 75, 152
+  orig: 256, 256
+  offset: 110, 97
+  index: -1
+a0044
+  rotate: false
+  xy: 432, 71
+  size: 79, 144
+  orig: 256, 256
+  offset: 88, 90
+  index: -1
+a0046
+  rotate: false
+  xy: 272, 60
+  size: 81, 155
+  orig: 256, 256
+  offset: 97, 72
+  index: -1
+a0048
+  rotate: false
+  xy: 825, 209
+  size: 124, 108
+  orig: 256, 256
+  offset: 99, 70
+  index: -1
+a0050
+  rotate: false
+  xy: 478, 217
+  size: 126, 100
+  orig: 256, 256
+  offset: 96, 70
+  index: -1
+a0053
+  rotate: false
+  xy: 825, 100
+  size: 122, 107
+  orig: 256, 256
+  offset: 95, 72
+  index: -1
+a0058
+  rotate: false
+  xy: 606, 206
+  size: 93, 117
+  orig: 256, 256
+  offset: 95, 75
+  index: -1
+a0063
+  rotate: true
+  xy: 701, 207
+  size: 110, 122
+  orig: 256, 256
+  offset: 92, 75
+  index: -1
+rr/rr _000
+  rotate: true
+  xy: 711, 476
+  size: 235, 240
+  orig: 256, 256
+  offset: 21, 16
+  index: -1
+rr/rr _001
+  rotate: true
+  xy: 479, 480
+  size: 229, 230
+  orig: 256, 256
+  offset: 27, 14
+  index: -1
+rr/rr _002
+  rotate: true
+  xy: 707, 319
+  size: 155, 220
+  orig: 256, 256
+  offset: 101, 16
+  index: -1
+rr/rr _003
+  rotate: true
+  xy: 479, 325
+  size: 153, 226
+  orig: 256, 256
+  offset: 103, 14
+  index: -1
+rr/rr _004
+  rotate: false
+  xy: 2, 10
+  size: 150, 204
+  orig: 256, 256
+  offset: 106, 26
+  index: -1
+rr/rr _005
+  rotate: false
+  xy: 154, 38
+  size: 116, 176
+  orig: 256, 256
+  offset: 140, 28
+  index: -1
+rr/rr _006
+  rotate: false
+  xy: 625, 74
+  size: 104, 130
+  orig: 256, 256
+  offset: 152, 30
+  index: -1
+rr/rr _007
+  rotate: true
+  xy: 513, 135
+  size: 80, 82
+  orig: 256, 256
+  offset: 168, 36
+  index: -1

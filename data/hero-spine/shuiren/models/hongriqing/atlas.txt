@@ -1,0 +1,195 @@
+
+hongriqing.png
+size: 749,749
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 151, 23
+  size: 72, 107
+  orig: 200, 200
+  offset: 76, 37
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 621, 261
+  size: 71, 105
+  orig: 200, 200
+  offset: 76, 37
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 629, 29
+  size: 72, 108
+  orig: 200, 200
+  offset: 76, 37
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 225, 13
+  size: 88, 108
+  orig: 200, 200
+  offset: 64, 37
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 529, 29
+  size: 98, 108
+  orig: 200, 200
+  offset: 59, 37
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 657, 143
+  size: 84, 116
+  orig: 200, 200
+  offset: 60, 37
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 2, 2
+  size: 100, 108
+  orig: 200, 200
+  offset: 60, 37
+  index: -1
+fx/bawangding_11
+  rotate: true
+  xy: 112, 7
+  size: 95, 37
+  orig: 200, 120
+  offset: 46, 59
+  index: -1
+fx/bawangding_13
+  rotate: false
+  xy: 442, 261
+  size: 177, 87
+  orig: 200, 120
+  offset: 21, 19
+  index: -1
+fx/bawangding_15
+  rotate: true
+  xy: 601, 368
+  size: 192, 88
+  orig: 200, 120
+  offset: 8, 9
+  index: -1
+fx/bawangding_17
+  rotate: true
+  xy: 691, 382
+  size: 178, 54
+  orig: 200, 120
+  offset: 8, 6
+  index: -1
+fx/honglianbafengpao_11
+  rotate: true
+  xy: 548, 139
+  size: 120, 107
+  orig: 185, 158
+  offset: 16, 14
+  index: -1
+fx/honglianbafengpao_12
+  rotate: true
+  xy: 407, 25
+  size: 114, 120
+  orig: 185, 158
+  offset: 10, 13
+  index: -1
+fx/honglianbafengpao_13
+  rotate: true
+  xy: 409, 141
+  size: 118, 137
+  orig: 185, 158
+  offset: 6, 8
+  index: -1
+fx/honglianbafengpao_14
+  rotate: false
+  xy: 228, 169
+  size: 179, 149
+  orig: 185, 158
+  offset: 3, 3
+  index: -1
+fx/honglianbafengpao_15
+  rotate: true
+  xy: 442, 350
+  size: 182, 157
+  orig: 185, 158
+  offset: 1, 0
+  index: -1
+fx/honglianbafengpao_16
+  rotate: true
+  xy: 585, 562
+  size: 185, 157
+  orig: 185, 158
+  offset: 0, 1
+  index: -1
+fx/honglianbafengpao_17
+  rotate: true
+  xy: 148, 132
+  size: 185, 78
+  orig: 185, 158
+  offset: 0, 5
+  index: -1
+fx/honglianbafengpao_18
+  rotate: false
+  xy: 228, 103
+  size: 177, 64
+  orig: 185, 158
+  offset: 0, 14
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 298, 534
+  size: 142, 213
+  orig: 400, 400
+  offset: 150, 76
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 104
+  size: 144, 213
+  orig: 400, 400
+  offset: 148, 76
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 151, 534
+  size: 145, 213
+  orig: 400, 400
+  offset: 148, 76
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 2, 319
+  size: 146, 213
+  orig: 400, 400
+  offset: 148, 76
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 534
+  size: 147, 213
+  orig: 400, 400
+  offset: 149, 76
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 150, 320
+  size: 145, 212
+  orig: 400, 400
+  offset: 151, 76
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 297, 320
+  size: 143, 212
+  orig: 400, 400
+  offset: 152, 76
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 442, 534
+  size: 141, 213
+  orig: 400, 400
+  offset: 152, 76
+  index: -1

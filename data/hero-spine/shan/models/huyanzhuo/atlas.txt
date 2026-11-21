@@ -1,0 +1,160 @@
+
+huyanzhuo.png
+size: 881,881
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 430, 3
+  size: 98, 126
+  orig: 146, 136
+  offset: 0, 0
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 778, 419
+  size: 101, 132
+  orig: 146, 136
+  offset: 0, 0
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 672, 553
+  size: 99, 135
+  orig: 146, 136
+  offset: 0, 0
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 670, 421
+  size: 106, 130
+  orig: 146, 136
+  offset: 0, 2
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 2, 5
+  size: 146, 124
+  orig: 146, 136
+  offset: 0, 0
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 150, 5
+  size: 142, 124
+  orig: 146, 136
+  offset: 0, 0
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 294, 4
+  size: 134, 125
+  orig: 146, 136
+  offset: 0, 0
+  index: -1
+fx/f13_006
+  rotate: false
+  xy: 667, 52
+  size: 69, 97
+  orig: 96, 135
+  offset: 13, 30
+  index: -1
+fx/f13_010
+  rotate: false
+  xy: 530, 29
+  size: 65, 107
+  orig: 96, 135
+  offset: 11, 15
+  index: -1
+fx/f13_014
+  rotate: false
+  xy: 597, 34
+  size: 68, 102
+  orig: 96, 135
+  offset: 11, 11
+  index: -1
+fx/f13_020
+  rotate: false
+  xy: 738, 84
+  size: 45, 65
+  orig: 96, 135
+  offset: 20, 12
+  index: -1
+fx/kuangmozhan_12
+  rotate: false
+  xy: 661, 151
+  size: 213, 228
+  orig: 265, 289
+  offset: 36, 38
+  index: -1
+fx/kuangmozhan_13
+  rotate: false
+  xy: 447, 138
+  size: 212, 241
+  orig: 265, 289
+  offset: 36, 33
+  index: -1
+fx/kuangmozhan_14
+  rotate: false
+  xy: 672, 654
+  size: 167, 225
+  orig: 265, 289
+  offset: 36, 32
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 449, 381
+  size: 219, 248
+  orig: 222, 248
+  offset: 0, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 450, 631
+  size: 220, 248
+  orig: 222, 248
+  offset: 0, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 131
+  size: 221, 248
+  orig: 222, 248
+  offset: 0, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 2, 631
+  size: 222, 248
+  orig: 222, 248
+  offset: 0, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 381
+  size: 222, 248
+  orig: 222, 248
+  offset: 0, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 226, 631
+  size: 222, 248
+  orig: 222, 248
+  offset: 0, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 226, 381
+  size: 221, 248
+  orig: 222, 248
+  offset: 0, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 225, 131
+  size: 220, 248
+  orig: 222, 248
+  offset: 0, 0
+  index: -1

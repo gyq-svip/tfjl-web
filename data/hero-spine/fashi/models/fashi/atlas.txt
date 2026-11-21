@@ -1,0 +1,230 @@
+
+fashi.png
+size: 618,618
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/fx/shen1/shen_001
+  rotate: true
+  xy: 414, 362
+  size: 43, 32
+  orig: 77, 77
+  offset: 16, 0
+  index: -1
+images/fx/shen1/shen_004
+  rotate: false
+  xy: 358, 362
+  size: 52, 77
+  orig: 77, 77
+  offset: 13, 0
+  index: -1
+images/fx/shen1/shen_006
+  rotate: false
+  xy: 547, 252
+  size: 66, 77
+  orig: 77, 77
+  offset: 6, 0
+  index: -1
+images/fx/shen1/shen_008
+  rotate: false
+  xy: 381, 485
+  size: 70, 77
+  orig: 77, 77
+  offset: 3, 0
+  index: -1
+images/fx/shen1/shen_010
+  rotate: true
+  xy: 282, 293
+  size: 67, 77
+  orig: 77, 77
+  offset: 3, 0
+  index: -1
+images/fx/shen1/shen_012
+  rotate: true
+  xy: 381, 564
+  size: 52, 71
+  orig: 77, 77
+  offset: 3, 6
+  index: -1
+images/fx/shen4/shen4_002
+  rotate: false
+  xy: 120, 275
+  size: 11, 13
+  orig: 77, 77
+  offset: 35, 1
+  index: -1
+images/fx/shen4/shen4_004
+  rotate: true
+  xy: 414, 407
+  size: 32, 36
+  orig: 77, 77
+  offset: 33, 1
+  index: -1
+images/fx/shen4/shen4_006
+  rotate: true
+  xy: 455, 4
+  size: 57, 42
+  orig: 77, 77
+  offset: 19, 1
+  index: -1
+images/fx/shen4/shen4_008
+  rotate: false
+  xy: 381, 441
+  size: 69, 42
+  orig: 77, 77
+  offset: 5, 1
+  index: -1
+images/fx/shen4/shen4_010
+  rotate: true
+  xy: 499, 8
+  size: 53, 60
+  orig: 77, 77
+  offset: 2, 1
+  index: -1
+images/fx/shen4/shen4_012
+  rotate: true
+  xy: 547, 128
+  size: 59, 61
+  orig: 77, 77
+  offset: 18, 1
+  index: -1
+images/fx/shen4/shen4_013
+  rotate: true
+  xy: 547, 189
+  size: 61, 63
+  orig: 77, 77
+  offset: 15, 1
+  index: -1
+images/fx/zha01/zha_000
+  rotate: true
+  xy: 258, 133
+  size: 155, 154
+  orig: 180, 180
+  offset: 14, 9
+  index: -1
+images/fx/zha01/zha_001
+  rotate: true
+  xy: 120, 290
+  size: 161, 160
+  orig: 180, 180
+  offset: 11, 5
+  index: -1
+images/fx/zha01/zha_002
+  rotate: false
+  xy: 455, 465
+  size: 154, 151
+  orig: 180, 180
+  offset: 14, 3
+  index: -1
+images/fx/zha01/zha_003
+  rotate: true
+  xy: 314, 9
+  size: 122, 139
+  orig: 180, 180
+  offset: 16, 5
+  index: -1
+images/idle/a0000
+  rotate: false
+  xy: 243, 460
+  size: 136, 156
+  orig: 307, 307
+  offset: 82, 70
+  index: -1
+images/idle/a0004
+  rotate: true
+  xy: 455, 331
+  size: 132, 153
+  orig: 307, 307
+  offset: 79, 69
+  index: -1
+images/idle/a0008
+  rotate: false
+  xy: 414, 140
+  size: 131, 151
+  orig: 307, 307
+  offset: 75, 74
+  index: -1
+images/idle/a0012
+  rotate: false
+  xy: 126, 117
+  size: 130, 156
+  orig: 307, 307
+  offset: 75, 76
+  index: -1
+images/idle/a0016
+  rotate: false
+  xy: 120, 453
+  size: 121, 163
+  orig: 307, 307
+  offset: 83, 77
+  index: -1
+images/idle/a0020
+  rotate: false
+  xy: 2, 271
+  size: 116, 170
+  orig: 307, 307
+  offset: 88, 75
+  index: -1
+images/idle/a0024
+  rotate: false
+  xy: 2, 443
+  size: 116, 173
+  orig: 307, 307
+  offset: 89, 70
+  index: -1
+images/idle/a0028
+  rotate: false
+  xy: 2, 103
+  size: 122, 166
+  orig: 307, 307
+  offset: 89, 69
+  index: -1
+images/skill/c0002
+  rotate: true
+  xy: 282, 362
+  size: 77, 74
+  orig: 154, 154
+  offset: 37, 34
+  index: -1
+images/skill/c0005
+  rotate: false
+  xy: 455, 63
+  size: 82, 75
+  orig: 154, 154
+  offset: 30, 36
+  index: -1
+images/skill/c0008
+  rotate: true
+  xy: 361, 293
+  size: 67, 74
+  orig: 154, 154
+  offset: 44, 41
+  index: -1
+images/skill/c0013
+  rotate: false
+  xy: 2, 2
+  size: 71, 99
+  orig: 154, 154
+  offset: 34, 42
+  index: -1
+images/skill/c0018
+  rotate: false
+  xy: 238, 9
+  size: 74, 106
+  orig: 154, 154
+  offset: 27, 39
+  index: -1
+images/skill/c0023
+  rotate: false
+  xy: 161, 8
+  size: 75, 107
+  orig: 154, 154
+  offset: 26, 35
+  index: -1
+images/skill/c0029
+  rotate: false
+  xy: 75, 9
+  size: 84, 92
+  orig: 154, 154
+  offset: 31, 34
+  index: -1

@@ -1,0 +1,111 @@
+
+ganning.png
+size: 996,996
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 260, 440
+  size: 126, 128
+  orig: 139, 132
+  offset: 11, 0
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 260, 568
+  size: 129, 128
+  orig: 139, 132
+  offset: 8, 0
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 852, 321
+  size: 95, 129
+  orig: 139, 132
+  offset: 38, 0
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 744, 320
+  size: 106, 130
+  orig: 139, 132
+  offset: 32, 0
+  index: -1
+fx/s1_dg_00025
+  rotate: false
+  xy: 457, 452
+  size: 463, 249
+  orig: 488, 338
+  offset: 11, 8
+  index: -1
+fx/s1_dg_00026
+  rotate: false
+  xy: 457, 703
+  size: 447, 291
+  orig: 488, 338
+  offset: 41, 24
+  index: -1
+fx/s1_dg_00027
+  rotate: false
+  xy: 2, 698
+  size: 453, 296
+  orig: 488, 338
+  offset: 31, 19
+  index: -1
+idle/idle_0
+  rotate: true
+  xy: 483, 234
+  size: 216, 259
+  orig: 230, 260
+  offset: 1, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 210
+  size: 222, 258
+  orig: 230, 260
+  offset: 0, 0
+  index: -1
+idle/idle_2
+  rotate: true
+  xy: 2, 470
+  size: 226, 256
+  orig: 230, 260
+  offset: 2, 0
+  index: -1
+idle/idle_3
+  rotate: true
+  xy: 226, 216
+  size: 222, 255
+  orig: 230, 260
+  offset: 8, 0
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 520, 19
+  size: 213, 254
+  orig: 230, 260
+  offset: 13, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 776, 63
+  size: 208, 255
+  orig: 230, 260
+  offset: 13, 0
+  index: -1
+idle/idle_6
+  rotate: true
+  xy: 2, 2
+  size: 206, 256
+  orig: 230, 260
+  offset: 10, 0
+  index: -1
+idle/idle_7
+  rotate: true
+  xy: 260, 4
+  size: 210, 258
+  orig: 230, 260
+  offset: 4, 0
+  index: -1

@@ -1,0 +1,209 @@
+
+xiaolifeidao.png
+size: 953,953
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+fx/1/idle_00
+  rotate: false
+  xy: 2, 688
+  size: 206, 263
+  orig: 206, 263
+  offset: 0, 0
+  index: -1
+fx/1/idle_01
+  rotate: false
+  xy: 2, 423
+  size: 206, 263
+  orig: 206, 263
+  offset: 0, 0
+  index: -1
+fx/1/idle_02
+  rotate: false
+  xy: 2, 158
+  size: 206, 263
+  orig: 206, 263
+  offset: 0, 0
+  index: -1
+fx/1/idle_03
+  rotate: false
+  xy: 925, 443
+  size: 20, 20
+  orig: 20, 20
+  offset: 0, 0
+  index: -1
+fx/caocao_17
+  rotate: true
+  xy: 431, 22
+  size: 134, 119
+  orig: 264, 186
+  offset: 25, 33
+  index: -1
+fx/caocao_18
+  rotate: false
+  xy: 2, 2
+  size: 223, 154
+  orig: 264, 186
+  offset: 8, 16
+  index: -1
+fx/caocao_19
+  rotate: true
+  xy: 757, 465
+  size: 225, 185
+  orig: 264, 186
+  offset: 30, 0
+  index: -1
+fx/caocao_20
+  rotate: false
+  xy: 227, 2
+  size: 202, 154
+  orig: 264, 186
+  offset: 49, 19
+  index: -1
+fx/caocao_21
+  rotate: true
+  xy: 210, 763
+  size: 188, 9
+  orig: 264, 186
+  offset: 73, 89
+  index: -1
+fx/dao
+  rotate: true
+  xy: 640, 4
+  size: 55, 225
+  orig: 70, 246
+  offset: 8, 0
+  index: -1
+fx/guang
+  rotate: true
+  xy: 490, 337
+  size: 74, 35
+  orig: 104, 58
+  offset: 16, 10
+  index: -1
+idle/idle_00
+  rotate: true
+  xy: 492, 581
+  size: 177, 263
+  orig: 206, 263
+  offset: 29, 0
+  index: -1
+idle/idle_01
+  rotate: true
+  xy: 492, 760
+  size: 191, 263
+  orig: 206, 263
+  offset: 15, 0
+  index: -1
+idle/idle_02
+  rotate: true
+  xy: 227, 749
+  size: 202, 263
+  orig: 206, 263
+  offset: 4, 0
+  index: -1
+idle/idle_03
+  rotate: true
+  xy: 227, 541
+  size: 206, 262
+  orig: 206, 263
+  offset: 0, 0
+  index: -1
+idle/idle_04
+  rotate: true
+  xy: 227, 334
+  size: 205, 261
+  orig: 206, 263
+  offset: 1, 0
+  index: -1
+idle/idle_05
+  rotate: false
+  xy: 735, 151
+  size: 200, 260
+  orig: 206, 263
+  offset: 6, 0
+  index: -1
+idle/idle_06
+  rotate: false
+  xy: 757, 692
+  size: 188, 259
+  orig: 206, 263
+  offset: 18, 0
+  index: -1
+idle/idle_07
+  rotate: true
+  xy: 210, 158
+  size: 174, 260
+  orig: 206, 263
+  offset: 32, 0
+  index: -1
+idle/idle_08
+  rotate: true
+  xy: 472, 166
+  size: 166, 261
+  orig: 206, 263
+  offset: 40, 0
+  index: -1
+idle/idle_09
+  rotate: true
+  xy: 491, 413
+  size: 166, 262
+  orig: 206, 263
+  offset: 40, 0
+  index: -1
+images/fx/huaban/hb_0
+  rotate: false
+  xy: 640, 109
+  size: 87, 55
+  orig: 103, 75
+  offset: 16, 14
+  index: -1
+images/fx/huaban/hb_1
+  rotate: false
+  xy: 621, 352
+  size: 90, 59
+  orig: 103, 75
+  offset: 13, 13
+  index: -1
+images/fx/huaban/hb_2
+  rotate: false
+  xy: 527, 351
+  size: 92, 60
+  orig: 103, 75
+  offset: 11, 11
+  index: -1
+images/fx/huaban/hb_3
+  rotate: true
+  xy: 552, 56
+  size: 93, 56
+  orig: 103, 75
+  offset: 10, 10
+  index: -1
+images/fx/huaban/hb_4
+  rotate: false
+  xy: 755, 414
+  size: 80, 49
+  orig: 103, 75
+  offset: 13, 12
+  index: -1
+images/fx/huaban/hb_5
+  rotate: false
+  xy: 610, 61
+  size: 82, 46
+  orig: 103, 75
+  offset: 15, 14
+  index: -1
+images/fx/huaban/hb_6
+  rotate: false
+  xy: 837, 416
+  size: 86, 47
+  orig: 103, 75
+  offset: 17, 15
+  index: -1
+images/fx/huaban/hb_7
+  rotate: false
+  xy: 552, 3
+  size: 86, 51
+  orig: 103, 75
+  offset: 17, 15
+  index: -1

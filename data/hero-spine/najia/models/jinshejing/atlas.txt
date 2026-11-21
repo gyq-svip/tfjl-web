@@ -1,0 +1,188 @@
+
+jinshejing.png
+size: 939,939
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack3/atk_1
+  rotate: false
+  xy: 769, 802
+  size: 113, 135
+  orig: 117, 136
+  offset: 3, 0
+  index: -1
+attack3/atk_2
+  rotate: false
+  xy: 2, 6
+  size: 111, 134
+  orig: 117, 136
+  offset: 3, 0
+  index: -1
+attack3/atk_3
+  rotate: true
+  xy: 769, 697
+  size: 103, 135
+  orig: 117, 136
+  offset: 2, 0
+  index: -1
+attack3/atk_4
+  rotate: false
+  xy: 765, 562
+  size: 110, 133
+  orig: 117, 136
+  offset: 2, 0
+  index: -1
+attack3/atk_5
+  rotate: true
+  xy: 765, 454
+  size: 106, 132
+  orig: 117, 136
+  offset: 1, 0
+  index: -1
+attack3/atk_6
+  rotate: true
+  xy: 763, 213
+  size: 105, 132
+  orig: 117, 136
+  offset: 0, 0
+  index: -1
+attack3/atk_7
+  rotate: false
+  xy: 763, 320
+  size: 111, 132
+  orig: 117, 136
+  offset: 0, 0
+  index: -1
+attack3/atk_8
+  rotate: false
+  xy: 115, 8
+  size: 112, 132
+  orig: 117, 136
+  offset: 1, 0
+  index: -1
+fx/jian
+  rotate: true
+  xy: 497, 59
+  size: 178, 56
+  orig: 205, 102
+  offset: 24, 23
+  index: -1
+fx/qinglongyanyuezhan_22
+  rotate: false
+  xy: 877, 676
+  size: 22, 19
+  orig: 64, 68
+  offset: 31, 48
+  index: -1
+fx/qinglongyanyuezhan_23
+  rotate: true
+  xy: 884, 828
+  size: 44, 43
+  orig: 64, 68
+  offset: 12, 24
+  index: -1
+fx/qinglongyanyuezhan_24
+  rotate: false
+  xy: 614, 185
+  size: 46, 56
+  orig: 64, 68
+  offset: 10, 11
+  index: -1
+fx/qinglongyanyuezhan_25
+  rotate: false
+  xy: 555, 184
+  size: 57, 57
+  orig: 64, 68
+  offset: 7, 7
+  index: -1
+fx/qinglongyanyuezhan_26
+  rotate: true
+  xy: 884, 874
+  size: 63, 43
+  orig: 64, 68
+  offset: 0, 7
+  index: -1
+fx/qinglongyanyuezhan_27
+  rotate: true
+  xy: 555, 124
+  size: 58, 46
+  orig: 64, 68
+  offset: 5, 4
+  index: -1
+fx/qinglongyanyuezhan_28
+  rotate: true
+  xy: 497, 2
+  size: 55, 46
+  orig: 64, 68
+  offset: 8, 2
+  index: -1
+idle2/idle_00
+  rotate: false
+  xy: 2, 408
+  size: 231, 264
+  orig: 241, 264
+  offset: 5, 0
+  index: -1
+idle2/idle_01
+  rotate: true
+  xy: 237, 706
+  size: 231, 264
+  orig: 241, 264
+  offset: 8, 0
+  index: -1
+idle2/idle_02
+  rotate: false
+  xy: 2, 674
+  size: 233, 263
+  orig: 241, 264
+  offset: 8, 0
+  index: -1
+idle2/idle_03
+  rotate: true
+  xy: 235, 239
+  size: 233, 261
+  orig: 241, 264
+  offset: 8, 0
+  index: -1
+idle2/idle_04
+  rotate: true
+  xy: 503, 475
+  size: 231, 260
+  orig: 241, 264
+  offset: 7, 0
+  index: -1
+idle2/idle_05
+  rotate: true
+  xy: 501, 243
+  size: 230, 260
+  orig: 241, 264
+  offset: 4, 0
+  index: -1
+idle2/idle_06
+  rotate: true
+  xy: 234, 8
+  size: 229, 261
+  orig: 241, 264
+  offset: 2, 0
+  index: -1
+idle2/idle_07
+  rotate: true
+  xy: 237, 474
+  size: 230, 262
+  orig: 241, 264
+  offset: 0, 0
+  index: -1
+idle2/idle_08
+  rotate: false
+  xy: 2, 142
+  size: 230, 264
+  orig: 241, 264
+  offset: 0, 0
+  index: -1
+idle2/idle_09
+  rotate: true
+  xy: 503, 708
+  size: 229, 264
+  orig: 241, 264
+  offset: 3, 0
+  index: -1

@@ -1,0 +1,398 @@
+{
+  "type": "tower-defense-project",
+  "version": "1.0",
+  "exportDate": "2026-09-18T14:52:18.991Z",
+  "project": {
+    "name": "王城低配版",
+    "category": "深海",
+    "timestamp": "2026-09-18T14:52:12.603Z",
+    "myHandCards": [
+      {
+        "id": "46",
+        "name": "水灵刀客",
+        "placed": "u6",
+        "isEngineering": false,
+        "profession": "panda",
+        "type": "gold"
+      },
+      {
+        "id": "45",
+        "name": "萌萌",
+        "placed": "u5",
+        "isEngineering": false,
+        "profession": "panda",
+        "type": "gold"
+      },
+      {
+        "id": "34",
+        "name": "咕咕萨满",
+        "placed": "u4",
+        "isEngineering": false,
+        "profession": "priest",
+        "type": "gold"
+      },
+      {
+        "id": "65",
+        "name": "钢鬃",
+        "placed": "u3",
+        "isEngineering": false,
+        "profession": "warrior",
+        "type": "purple"
+      },
+      {
+        "id": "57",
+        "name": "木精灵",
+        "placed": null,
+        "isEngineering": false,
+        "profession": "pokeball",
+        "type": "gold"
+      },
+      {
+        "id": "55",
+        "name": "光精灵",
+        "placed": null,
+        "isEngineering": false,
+        "profession": "pokeball",
+        "type": "gold"
+      },
+      {
+        "id": "56",
+        "name": "幻精灵",
+        "placed": null,
+        "isEngineering": false,
+        "profession": "pokeball",
+        "type": "gold"
+      },
+      {
+        "id": "custom_1780506538530",
+        "name": "火炮射线",
+        "placed": "u0",
+        "isEngineering": true,
+        "profession": "engineering",
+        "type": "gold"
+      },
+      {
+        "id": "custom_1780506403323",
+        "name": "小野酋长",
+        "placed": "u2",
+        "isEngineering": false,
+        "profession": "priest",
+        "type": "gold"
+      },
+      {
+        "id": "custom_1780506452548",
+        "name": "死神海妖",
+        "placed": "u1",
+        "isEngineering": false,
+        "profession": "priest",
+        "type": "purple"
+      }
+    ],
+    "teammateHandCards": [
+      {
+        "id": "49",
+        "name": "火炮宝库",
+        "placed": "t0",
+        "isEngineering": true,
+        "profession": "engineering",
+        "type": "gold"
+      },
+      {
+        "id": "48",
+        "name": "风灵",
+        "placed": "t6",
+        "isEngineering": false,
+        "profession": "panda",
+        "type": "gold"
+      },
+      {
+        "id": "77",
+        "name": "死神",
+        "placed": "t5",
+        "isEngineering": false,
+        "profession": "priest",
+        "type": "purple"
+      },
+      {
+        "id": "71",
+        "name": "骨弓",
+        "placed": "t4",
+        "isEngineering": false,
+        "profession": "archer",
+        "type": "purple"
+      },
+      {
+        "id": "66",
+        "name": "电法",
+        "placed": "t3",
+        "isEngineering": false,
+        "profession": "mage",
+        "type": "purple"
+      },
+      {
+        "id": "61",
+        "name": "铁骑",
+        "placed": "t2",
+        "isEngineering": false,
+        "profession": "warrior",
+        "type": "purple"
+      },
+      {
+        "id": "74",
+        "name": "悟空",
+        "placed": "t1",
+        "isEngineering": false,
+        "profession": "summoner",
+        "type": "purple"
+      },
+      {
+        "id": "54",
+        "name": "魂精灵",
+        "placed": null,
+        "isEngineering": false,
+        "profession": "pokeball",
+        "type": "gold"
+      },
+      {
+        "id": "58",
+        "name": "魔精灵",
+        "placed": null,
+        "isEngineering": false,
+        "profession": "pokeball",
+        "type": "gold"
+      },
+      {
+        "id": "55",
+        "name": "光精灵",
+        "placed": null,
+        "isEngineering": false,
+        "profession": "pokeball",
+        "type": "gold"
+      }
+    ],
+    "myPlacedCards": [
+      {
+        "id": "46",
+        "name": "水灵刀客",
+        "slot": "u6",
+        "isEngineering": false,
+        "profession": "panda"
+      },
+      {
+        "id": "34",
+        "name": "咕咕萨满",
+        "slot": "u4",
+        "isEngineering": false,
+        "profession": "priest"
+      },
+      {
+        "id": "65",
+        "name": "钢鬃",
+        "slot": "u3",
+        "isEngineering": false,
+        "profession": "warrior"
+      },
+      {
+        "id": "45",
+        "name": "萌萌",
+        "slot": "u5",
+        "isEngineering": false,
+        "profession": "panda"
+      },
+      {
+        "id": "custom_1780506538530",
+        "name": "火炮射线",
+        "slot": "u0",
+        "isEngineering": true,
+        "profession": "engineering"
+      },
+      {
+        "id": "custom_1780506403323",
+        "name": "小野酋长",
+        "slot": "u2",
+        "isEngineering": false,
+        "profession": "priest"
+      },
+      {
+        "id": "custom_1780506452548",
+        "name": "死神海妖",
+        "slot": "u1",
+        "isEngineering": false,
+        "profession": "priest"
+      }
+    ],
+    "teammatePlacedCards": [
+      {
+        "id": "49",
+        "name": "火炮宝库",
+        "slot": "t0",
+        "isEngineering": true,
+        "profession": "engineering"
+      },
+      {
+        "id": "48",
+        "name": "风灵",
+        "slot": "t6",
+        "isEngineering": false,
+        "profession": "panda"
+      },
+      {
+        "id": "77",
+        "name": "死神",
+        "slot": "t5",
+        "isEngineering": false,
+        "profession": "priest"
+      },
+      {
+        "id": "71",
+        "name": "骨弓",
+        "slot": "t4",
+        "isEngineering": false,
+        "profession": "archer"
+      },
+      {
+        "id": "74",
+        "name": "悟空",
+        "slot": "t1",
+        "isEngineering": false,
+        "profession": "summoner"
+      },
+      {
+        "id": "66",
+        "name": "电法",
+        "slot": "t3",
+        "isEngineering": false,
+        "profession": "mage"
+      },
+      {
+        "id": "61",
+        "name": "铁骑",
+        "slot": "t2",
+        "isEngineering": false,
+        "profession": "warrior"
+      }
+    ],
+    "cardLevels": {},
+    "cardSkins": {
+      "my_custom_1779492294329": "张顺·鱼人",
+      "my_47": "太平乐·火灵",
+      "my_34": "华夫人·咕咕",
+      "teammate_48": "",
+      "teammate_55": "狮王令牌·光精灵",
+      "teammate_54": "还魂丹·魂精灵",
+      "teammate_58": "月光宝盒·魔精灵",
+      "my_56": "紫金铃铛·幻精灵",
+      "my_55": "狮王令牌·光精灵",
+      "my_57": "仙葫芦·木精灵",
+      "my_custom_1780506403323": "太平乐·小野",
+      "teammate_77": "",
+      "teammate_66": "",
+      "teammate_71": "",
+      "teammate_49": "小李飞刀·邪能火炮",
+      "my_custom_1780506452548": "万圣节·死神",
+      "my_custom_1780506538530": "小李飞刀·邪能火炮",
+      "teammate_74": "二娃·悟空",
+      "teammate_61": "",
+      "my_46": "潮汐·水灵",
+      "my_65": "天蓬元帅·钢鬃",
+      "my_45": "烈火奶奶·萌萌"
+    },
+    "fusionSkins": {
+      "潜艇": "鲨鱼号·微型潜艇",
+      "宝库": "暗月·地精宝库",
+      "射线": "雷峰塔·侏儒射线",
+      "土灵": "武圣·土灵",
+      "酋长": "奶牛·酋长",
+      "刀客": "圣诞怪杰·刀客",
+      "海妖": "巨灵神·海妖",
+      "冰骑": "星陨·冰骑",
+      "钢鬃": "钢鬃",
+      "萨满": "青城掌门·萨满",
+      "水灵": "潮汐·水灵",
+      "火炮": "小李飞刀·邪能火炮",
+      "小野": "十三姨·小野",
+      "咕咕": "太平乐·咕咕",
+      "炎魔": "炎魔",
+      "死神": "万圣节·死神"
+    },
+    "cardMoHua": {
+      "my_custom_1780506452548": true,
+      "my_custom_1780506538530": true,
+      "my_34": true,
+      "my_46": true,
+      "my_45": true
+    },
+    "myDeckInfo": "",
+    "teammateDeckInfo": "",
+    "notepad": "马车暗月车\n寒冰马车\n死神海妖\n猫野牛\n全程强袭\n猫野，副卡死神1级\n合体要7400血\n副卡全程挂机 6风灵即可覆盖小野CD\n\n",
+    "notepadMarks": [
+      {
+        "start": 0,
+        "text": "马车暗月车",
+        "color": "#e0005c",
+        "glow": true
+      },
+      {
+        "start": 6,
+        "text": "寒冰马车",
+        "color": "#e02ccf",
+        "glow": true
+      },
+      {
+        "start": 11,
+        "text": "死神海妖",
+        "color": "#dfe034",
+        "glow": true
+      },
+      {
+        "start": 20,
+        "text": "全程强袭\n",
+        "color": "#7682e0",
+        "glow": true
+      },
+      {
+        "start": 35,
+        "text": "合体要7400血",
+        "color": "#8c8fe0",
+        "glow": true
+      },
+      {
+        "text": "副卡全程挂机 6风灵即可覆盖小野CD",
+        "color": "#c998e0",
+        "glow": true,
+        "start": 44
+      }
+    ],
+    "notebookColor": "#dce02e",
+    "txtFiles": [
+      {
+        "name": "主卡已测试_202674.txt",
+        "content": "上阵：火炮,死神,水灵,萌萌,咕咕,小野,钢鬃,木精灵,光精灵,幻精灵\n皮肤：\n魔化：火炮,死神,水灵,萌萌,咕咕,小野,\n主战车：\n副战车：\n\n1,光葫芦火炮,上火炮满,上死神满,上水灵满,上萌萌满,上咕咕满,上小野满,上钢鬃满,\n16,换强袭\n49,每4秒共100次木精灵,\n50,停球,\n59,每4秒共100次木精灵,\n60,停球,\n69,每4秒共100次木精灵,\n70,停球,\n79,每4秒共100次木精灵,\n80,停球,\n89,每4秒共100次木精灵,\n90,停球,\n99,每4秒共100次木精灵,\n100,停球,\n109,每4秒共100次木精灵,\n110,停球,\n119,每4秒共100次木精灵,\n120,停球,\n129,每4秒共100次木精灵,\n130,停球,\n"
+      },
+      {
+        "name": "副卡已测试脚本_202674.txt",
+        "content": "上阵：火炮，风灵，死神，骨弓，电法，铁骑，悟空，魂精灵，光精灵，魔精灵\n皮肤：\n魔化：\n主战车：\n副战车：\n\n1,上火炮满,上风灵满,上死神满,上骨弓满,上电法满,上铁骑满,上悟空满,\n49,每4秒共100次魔精灵,每2秒共100次魂精灵,\n50,停球,\n59,每4秒共100次魔精灵,每2秒共100次魂精灵,\n60,停球,\n69,每4秒共100次魔精灵,每2秒共100次魂精灵,\n70,停球,\n79,每4秒共100次魔精灵,每2秒共100次魂精灵,\n80,停球,\n89,每4秒共100次魔精灵,每2秒共100次魂精灵,\n90,停球,\n99,每4秒共100次魔精灵,每2秒共100次魂精灵,\n100,停球,\n109,每4秒共100次魔精灵,每2秒共100次魂精灵,\n110,停球,\n119,每4秒共100次魔精灵,每2秒共100次魂精灵,\n120,停球,\n129,每4秒共100次魔精灵,每2秒共100次魂精灵,\n130,停球,\n"
+      },
+      {
+        "name": "000a天使暗月通用.txt",
+        "content": "上阵：冰法,酋长,死神,电法,风灵,潜艇,悟空,鱼人,魔精灵,萌萌,\n皮肤：\n魔化：\n主战车：未设置\n副战车：未设置\n\n1,上死神满,上酋长满,上萌萌2级,上冰法2级,上电法4级,上风灵4级,\n20,验卡补星,\n60,验卡补星,\n\n\n\n",
+        "marks": []
+      }
+    ],
+    "referenceImages": [],
+    "myChariot": {
+      "main": 11,
+      "mainLv": 15,
+      "sub": 18,
+      "subLv": 15,
+      "subFusion": 3
+    },
+    "teammateChariot": {
+      "main": 2,
+      "mainLv": 15,
+      "sub": 11,
+      "subLv": 15,
+      "subFusion": 3
+    }
+  }
+}

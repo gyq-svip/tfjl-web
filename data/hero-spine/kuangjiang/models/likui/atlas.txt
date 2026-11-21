@@ -1,0 +1,216 @@
+
+likui.png
+size: 949,949
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack1/atk1_1
+  rotate: true
+  xy: 508, 229
+  size: 117, 120
+  orig: 158, 136
+  offset: 9, 16
+  index: -1
+attack1/atk1_2
+  rotate: true
+  xy: 514, 478
+  size: 106, 120
+  orig: 158, 136
+  offset: 13, 16
+  index: -1
+attack1/atk1_3
+  rotate: true
+  xy: 252, 2
+  size: 102, 120
+  orig: 158, 136
+  offset: 16, 16
+  index: -1
+attack1/atk1_4
+  rotate: true
+  xy: 374, 2
+  size: 119, 122
+  orig: 158, 136
+  offset: 9, 9
+  index: -1
+attack1/atk1_5
+  rotate: true
+  xy: 514, 586
+  size: 122, 121
+  orig: 158, 136
+  offset: 0, 13
+  index: -1
+attack1/atk1_6
+  rotate: true
+  xy: 252, 106
+  size: 131, 119
+  orig: 158, 136
+  offset: 3, 16
+  index: -1
+attack2/atk2_1
+  rotate: true
+  xy: 637, 473
+  size: 116, 118
+  orig: 154, 177
+  offset: 32, 34
+  index: -1
+attack2/atk2_2
+  rotate: true
+  xy: 770, 707
+  size: 113, 132
+  orig: 154, 177
+  offset: 28, 34
+  index: -1
+attack2/atk2_3
+  rotate: false
+  xy: 770, 822
+  size: 132, 125
+  orig: 154, 177
+  offset: 4, 34
+  index: -1
+attack2/atk2_4
+  rotate: false
+  xy: 630, 119
+  size: 114, 113
+  orig: 154, 177
+  offset: 26, 34
+  index: -1
+attack2/atk2_5
+  rotate: true
+  xy: 630, 234
+  size: 117, 116
+  orig: 154, 177
+  offset: 21, 34
+  index: -1
+attack2/atk2_6
+  rotate: true
+  xy: 508, 348
+  size: 125, 118
+  orig: 154, 177
+  offset: 25, 34
+  index: -1
+attack3/atk3_1
+  rotate: false
+  xy: 637, 591
+  size: 121, 118
+  orig: 179, 154
+  offset: 35, 30
+  index: -1
+attack3/atk3_2
+  rotate: false
+  xy: 628, 353
+  size: 117, 118
+  orig: 179, 154
+  offset: 37, 30
+  index: -1
+attack3/atk3_3
+  rotate: true
+  xy: 760, 593
+  size: 112, 122
+  orig: 179, 154
+  offset: 39, 30
+  index: -1
+attack3/atk3_4
+  rotate: true
+  xy: 747, 354
+  size: 117, 113
+  orig: 179, 154
+  offset: 32, 30
+  index: -1
+attack3/atk3_5
+  rotate: false
+  xy: 498, 2
+  size: 115, 119
+  orig: 179, 154
+  offset: 29, 30
+  index: -1
+attack3/atk3_6
+  rotate: true
+  xy: 748, 235
+  size: 117, 110
+  orig: 179, 154
+  offset: 27, 30
+  index: -1
+attack3/atk3_7
+  rotate: false
+  xy: 373, 123
+  size: 130, 115
+  orig: 179, 154
+  offset: 29, 30
+  index: -1
+fx/11_001
+  rotate: false
+  xy: 716, 44
+  size: 96, 73
+  orig: 102, 102
+  offset: 6, 13
+  index: -1
+fx/11_002
+  rotate: false
+  xy: 615, 44
+  size: 99, 73
+  orig: 102, 102
+  offset: 3, 16
+  index: -1
+fx/11_003
+  rotate: false
+  xy: 505, 154
+  size: 102, 73
+  orig: 102, 102
+  offset: 0, 19
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 262, 475
+  size: 250, 233
+  orig: 261, 248
+  offset: 8, 13
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 239
+  size: 255, 234
+  orig: 261, 248
+  offset: 2, 13
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 712
+  size: 258, 235
+  orig: 261, 248
+  offset: 0, 13
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 2, 475
+  size: 258, 235
+  orig: 261, 248
+  offset: 2, 13
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 262, 710
+  size: 255, 237
+  orig: 261, 248
+  offset: 6, 11
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 519, 711
+  size: 249, 236
+  orig: 261, 248
+  offset: 12, 10
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 259, 240
+  size: 247, 233
+  orig: 261, 248
+  offset: 14, 12
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 4
+  size: 248, 233
+  orig: 261, 248
+  offset: 12, 13
+  index: -1

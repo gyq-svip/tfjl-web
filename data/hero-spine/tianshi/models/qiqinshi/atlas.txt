@@ -1,0 +1,265 @@
+
+qiqinshi.png
+size: 904,904
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 635, 307
+  size: 107, 151
+  orig: 300, 300
+  offset: 80, 48
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 621, 32
+  size: 118, 153
+  orig: 300, 300
+  offset: 75, 47
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 508, 351
+  size: 125, 155
+  orig: 300, 300
+  offset: 72, 46
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 730, 656
+  size: 129, 156
+  orig: 300, 300
+  offset: 70, 46
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 521, 508
+  size: 129, 156
+  orig: 300, 300
+  offset: 70, 46
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 512, 152
+  size: 122, 153
+  orig: 300, 300
+  offset: 73, 47
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 742, 154
+  size: 99, 151
+  orig: 300, 300
+  offset: 87, 48
+  index: -1
+fx/fxpiaoxue2_00
+  rotate: true
+  xy: 512, 866
+  size: 4, 5
+  orig: 129, 276
+  offset: 83, 203
+  index: -1
+fx/fxpiaoxue2_01
+  rotate: false
+  xy: 512, 854
+  size: 4, 4
+  orig: 129, 276
+  offset: 73, 193
+  index: -1
+fx/fxpiaoxue2_02
+  rotate: false
+  xy: 512, 860
+  size: 5, 4
+  orig: 129, 276
+  offset: 62, 183
+  index: -1
+fx/fxpiaoxue2_05
+  rotate: false
+  xy: 508, 872
+  size: 9, 8
+  orig: 129, 276
+  offset: 120, 267
+  index: -1
+fx/fxpiaoxue2_06
+  rotate: false
+  xy: 508, 893
+  size: 9, 9
+  orig: 129, 276
+  offset: 100, 247
+  index: -1
+fx/fxpiaoxue2_07
+  rotate: false
+  xy: 508, 882
+  size: 9, 9
+  orig: 129, 276
+  offset: 80, 227
+  index: -1
+fx/fxpiaoxue2_08
+  rotate: false
+  xy: 508, 307
+  size: 68, 42
+  orig: 129, 276
+  offset: 60, 207
+  index: -1
+fx/fxpiaoxue2_09
+  rotate: true
+  xy: 341, 2
+  size: 78, 51
+  orig: 129, 276
+  offset: 40, 187
+  index: -1
+fx/fxpiaoxue2_10
+  rotate: false
+  xy: 512, 89
+  size: 88, 61
+  orig: 129, 276
+  offset: 20, 167
+  index: -1
+fx/fxpiaoxue2_11
+  rotate: true
+  xy: 788, 316
+  size: 98, 71
+  orig: 129, 276
+  offset: 0, 147
+  index: -1
+fx/fxpiaoxue_00
+  rotate: true
+  xy: 776, 416
+  size: 109, 118
+  orig: 260, 212
+  offset: 138, 93
+  index: -1
+fx/fxpiaoxue_01
+  rotate: true
+  xy: 635, 416
+  size: 90, 100
+  orig: 260, 212
+  offset: 124, 83
+  index: -1
+fx/fxpiaoxue_02
+  rotate: false
+  xy: 679, 555
+  size: 31, 82
+  orig: 260, 212
+  offset: 167, 73
+  index: -1
+fx/fxpiaoxue_03
+  rotate: false
+  xy: 776, 83
+  size: 115, 69
+  orig: 260, 212
+  offset: 133, 113
+  index: -1
+fx/fxpiaoxue_04
+  rotate: false
+  xy: 394, 7
+  size: 125, 73
+  orig: 260, 212
+  offset: 100, 85
+  index: -1
+fx/fxpiaoxue_05
+  rotate: false
+  xy: 521, 639
+  size: 193, 108
+  orig: 260, 212
+  offset: 67, 57
+  index: -1
+fx/fxpiaoxue_06
+  rotate: false
+  xy: 521, 749
+  size: 207, 153
+  orig: 260, 212
+  offset: 33, 28
+  index: -1
+fx/fxpiaoxue_07
+  rotate: true
+  xy: 341, 82
+  size: 220, 169
+  orig: 260, 212
+  offset: 0, 0
+  index: -1
+fx/fxpiaoxue_08
+  rotate: true
+  xy: 636, 154
+  size: 151, 104
+  orig: 260, 212
+  offset: 108, 53
+  index: -1
+fx/fxpiaoxue_09
+  rotate: false
+  xy: 730, 787
+  size: 166, 115
+  orig: 260, 212
+  offset: 83, 30
+  index: -1
+fx/fxpiaoxue_10
+  rotate: false
+  xy: 716, 527
+  size: 182, 127
+  orig: 260, 212
+  offset: 57, 6
+  index: -1
+fx/fxpiaoxue_11
+  rotate: false
+  xy: 521, 4
+  size: 98, 83
+  orig: 260, 212
+  offset: 131, 37
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 337, 604
+  size: 169, 298
+  orig: 600, 600
+  offset: 184, 97
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 172, 2
+  size: 167, 297
+  orig: 600, 600
+  offset: 185, 97
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 2
+  size: 168, 297
+  orig: 600, 600
+  offset: 184, 97
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 339, 304
+  size: 167, 298
+  orig: 600, 600
+  offset: 185, 97
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 170, 603
+  size: 165, 299
+  orig: 600, 600
+  offset: 184, 97
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 173, 302
+  size: 164, 299
+  orig: 600, 600
+  offset: 183, 97
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 602
+  size: 166, 300
+  orig: 600, 600
+  offset: 182, 97
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 301
+  size: 169, 299
+  orig: 600, 600
+  offset: 182, 97
+  index: -1

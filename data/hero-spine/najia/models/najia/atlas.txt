@@ -1,0 +1,223 @@
+
+najia.png
+size: 804,804
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/a0000
+  rotate: true
+  xy: 242, 329
+  size: 234, 212
+  orig: 640, 480
+  offset: 180, 128
+  index: -1
+images/a0004
+  rotate: false
+  xy: 462, 594
+  size: 228, 208
+  orig: 640, 480
+  offset: 181, 128
+  index: -1
+images/a0008
+  rotate: false
+  xy: 456, 126
+  size: 226, 207
+  orig: 640, 480
+  offset: 182, 128
+  index: -1
+images/a0012
+  rotate: true
+  xy: 456, 335
+  size: 228, 209
+  orig: 640, 480
+  offset: 181, 128
+  index: -1
+images/a0016
+  rotate: true
+  xy: 2, 111
+  size: 233, 211
+  orig: 640, 480
+  offset: 180, 128
+  index: -1
+images/a0020
+  rotate: true
+  xy: 2, 346
+  size: 238, 214
+  orig: 640, 480
+  offset: 179, 128
+  index: -1
+images/a0024
+  rotate: false
+  xy: 2, 586
+  size: 241, 216
+  orig: 640, 480
+  offset: 178, 128
+  index: -1
+images/a0028
+  rotate: true
+  xy: 245, 565
+  size: 237, 215
+  orig: 640, 480
+  offset: 179, 128
+  index: -1
+images/a0039
+  rotate: true
+  xy: 215, 210
+  size: 117, 108
+  orig: 320, 240
+  offset: 91, 64
+  index: -1
+images/a0043
+  rotate: true
+  xy: 692, 680
+  size: 122, 110
+  orig: 320, 240
+  offset: 90, 64
+  index: -1
+images/a0045
+  rotate: true
+  xy: 667, 469
+  size: 123, 110
+  orig: 320, 240
+  offset: 89, 64
+  index: -1
+images/a0055
+  rotate: false
+  xy: 667, 358
+  size: 125, 109
+  orig: 320, 240
+  offset: 90, 64
+  index: -1
+images/a0057
+  rotate: true
+  xy: 684, 54
+  size: 122, 108
+  orig: 320, 240
+  offset: 90, 64
+  index: -1
+images/a0061
+  rotate: false
+  xy: 2, 3
+  size: 118, 106
+  orig: 320, 240
+  offset: 90, 64
+  index: -1
+images/a0063
+  rotate: false
+  xy: 325, 221
+  size: 119, 106
+  orig: 320, 240
+  offset: 89, 64
+  index: -1
+images/fx/s1/s01_000
+  rotate: true
+  xy: 692, 602
+  size: 32, 35
+  orig: 102, 102
+  offset: 32, 5
+  index: -1
+images/fx/s1/s01_002
+  rotate: false
+  xy: 732, 179
+  size: 49, 81
+  orig: 102, 102
+  offset: 28, 6
+  index: -1
+images/fx/s1/s01_004
+  rotate: true
+  xy: 282, 15
+  size: 69, 83
+  orig: 102, 102
+  offset: 20, 10
+  index: -1
+images/fx/s1/s01_006
+  rotate: true
+  xy: 533, 73
+  size: 51, 72
+  orig: 102, 102
+  offset: 14, 22
+  index: -1
+images/fx/s1/s01_007
+  rotate: true
+  xy: 607, 69
+  size: 55, 44
+  orig: 102, 102
+  offset: 9, 50
+  index: -1
+images/fx/s2/s02_000
+  rotate: false
+  xy: 218, 451
+  size: 22, 133
+  orig: 82, 205
+  offset: 28, 64
+  index: -1
+images/fx/s2/s02_002
+  rotate: true
+  xy: 215, 86
+  size: 67, 152
+  orig: 82, 205
+  offset: 7, 49
+  index: -1
+images/fx/s2/s02_004
+  rotate: true
+  xy: 215, 155
+  size: 53, 156
+  orig: 82, 205
+  offset: 17, 36
+  index: -1
+images/fx/s2/s02_006
+  rotate: false
+  xy: 684, 178
+  size: 46, 178
+  orig: 82, 205
+  offset: 16, 4
+  index: -1
+images/fx/s2/s02_008
+  rotate: true
+  xy: 692, 636
+  size: 42, 110
+  orig: 82, 205
+  offset: 16, 2
+  index: -1
+images/shui/0
+  rotate: false
+  xy: 198, 9
+  size: 82, 75
+  orig: 102, 91
+  offset: 10, 2
+  index: -1
+images/shui/1
+  rotate: true
+  xy: 373, 129
+  size: 90, 81
+  orig: 102, 91
+  offset: 7, 4
+  index: -1
+images/shui/2
+  rotate: true
+  xy: 369, 35
+  size: 92, 77
+  orig: 102, 91
+  offset: 7, 9
+  index: -1
+images/shui/3
+  rotate: true
+  xy: 122, 15
+  size: 94, 74
+  orig: 102, 91
+  offset: 6, 12
+  index: -1
+images/shui/4
+  rotate: true
+  xy: 732, 262
+  size: 94, 69
+  orig: 102, 91
+  offset: 6, 17
+  index: -1
+images/shui/5
+  rotate: false
+  xy: 448, 60
+  size: 83, 64
+  orig: 102, 91
+  offset: 6, 23
+  index: -1

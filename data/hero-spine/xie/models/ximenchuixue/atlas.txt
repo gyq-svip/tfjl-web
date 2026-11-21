@@ -1,0 +1,153 @@
+
+ximenchuixue.png
+size: 973,973
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 632, 11
+  size: 107, 142
+  orig: 210, 143
+  offset: 30, 0
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 488, 10
+  size: 108, 142
+  orig: 210, 143
+  offset: 31, 0
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 574, 293
+  size: 198, 143
+  orig: 210, 143
+  offset: 7, 0
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 574, 120
+  size: 207, 143
+  orig: 210, 143
+  offset: 2, 0
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 783, 56
+  size: 207, 143
+  orig: 210, 143
+  offset: 0, 0
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 288, 54
+  size: 198, 143
+  orig: 210, 143
+  offset: 4, 0
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 2, 65
+  size: 130, 143
+  orig: 210, 143
+  offset: 10, 0
+  index: -1
+fx/dadaoguang_00012
+  rotate: true
+  xy: 778, 488
+  size: 240, 156
+  orig: 260, 177
+  offset: 8, 12
+  index: -1
+fx/dadaoguang_00013
+  rotate: true
+  xy: 778, 265
+  size: 221, 144
+  orig: 260, 177
+  offset: 31, 13
+  index: -1
+fx/dadaoguang_00014
+  rotate: true
+  xy: 824, 810
+  size: 161, 147
+  orig: 260, 177
+  offset: 86, 10
+  index: -1
+fx/dadaoguang_00015
+  rotate: false
+  xy: 147, 55
+  size: 126, 140
+  orig: 260, 177
+  offset: 113, 10
+  index: -1
+fx/dadaoguang_00017
+  rotate: false
+  xy: 824, 769
+  size: 68, 39
+  orig: 260, 177
+  offset: 112, 17
+  index: -1
+fx/xing1
+  rotate: false
+  xy: 252, 688
+  size: 34, 34
+  orig: 34, 34
+  offset: 0, 0
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 534, 438
+  size: 242, 284
+  orig: 248, 286
+  offset: 3, 0
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 2, 197
+  size: 239, 284
+  orig: 248, 286
+  offset: 3, 0
+  index: -1
+idle/idle_2
+  rotate: true
+  xy: 288, 199
+  size: 237, 284
+  orig: 248, 286
+  offset: 2, 0
+  index: -1
+idle/idle_3
+  rotate: true
+  xy: 538, 730
+  size: 241, 284
+  orig: 248, 286
+  offset: 0, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 288, 438
+  size: 244, 284
+  orig: 248, 286
+  offset: 0, 0
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 2, 438
+  size: 247, 284
+  orig: 248, 286
+  offset: 0, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 687
+  size: 248, 284
+  orig: 248, 286
+  offset: 0, 0
+  index: -1
+idle/idle_7
+  rotate: true
+  xy: 252, 724
+  size: 247, 284
+  orig: 248, 286
+  offset: 1, 0
+  index: -1

@@ -1,0 +1,209 @@
+
+bawangchunjie.png
+size: 690,690
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/a0000
+  rotate: false
+  xy: 138, 491
+  size: 140, 197
+  orig: 640, 480
+  offset: 262, 129
+  index: -1
+images/a0004
+  rotate: false
+  xy: 2, 283
+  size: 141, 196
+  orig: 640, 480
+  offset: 262, 129
+  index: -1
+images/a0008
+  rotate: false
+  xy: 143, 86
+  size: 140, 195
+  orig: 640, 480
+  offset: 262, 129
+  index: -1
+images/a0012
+  rotate: false
+  xy: 145, 294
+  size: 139, 195
+  orig: 640, 480
+  offset: 262, 129
+  index: -1
+images/a0016
+  rotate: false
+  xy: 280, 493
+  size: 139, 195
+  orig: 640, 480
+  offset: 261, 129
+  index: -1
+images/a0020
+  rotate: false
+  xy: 285, 97
+  size: 138, 195
+  orig: 640, 480
+  offset: 262, 129
+  index: -1
+images/a0024
+  rotate: false
+  xy: 286, 296
+  size: 138, 195
+  orig: 640, 480
+  offset: 262, 129
+  index: -1
+images/a0028
+  rotate: false
+  xy: 2, 84
+  size: 139, 197
+  orig: 640, 480
+  offset: 262, 129
+  index: -1
+images/a0039
+  rotate: true
+  xy: 562, 288
+  size: 68, 98
+  orig: 320, 240
+  offset: 120, 64
+  index: -1
+images/a0041
+  rotate: false
+  xy: 513, 358
+  size: 75, 93
+  orig: 320, 240
+  offset: 112, 64
+  index: -1
+images/a0043
+  rotate: false
+  xy: 426, 328
+  size: 78, 87
+  orig: 320, 240
+  offset: 109, 64
+  index: -1
+images/a0045
+  rotate: false
+  xy: 590, 364
+  size: 75, 87
+  orig: 320, 240
+  offset: 112, 64
+  index: -1
+images/a0047
+  rotate: true
+  xy: 562, 217
+  size: 69, 92
+  orig: 320, 240
+  offset: 118, 64
+  index: -1
+images/a0049
+  rotate: false
+  xy: 593, 591
+  size: 75, 97
+  orig: 320, 240
+  offset: 126, 64
+  index: -1
+images/a0052
+  rotate: true
+  xy: 144, 2
+  size: 82, 100
+  orig: 320, 240
+  offset: 138, 64
+  index: -1
+images/a0055
+  rotate: true
+  xy: 246, 2
+  size: 82, 98
+  orig: 320, 240
+  offset: 136, 64
+  index: -1
+images/a0057
+  rotate: false
+  xy: 509, 590
+  size: 82, 98
+  orig: 320, 240
+  offset: 134, 64
+  index: -1
+images/a0059
+  rotate: true
+  xy: 421, 502
+  size: 85, 98
+  orig: 320, 240
+  offset: 131, 64
+  index: -1
+images/a0061
+  rotate: false
+  xy: 421, 589
+  size: 86, 99
+  orig: 320, 240
+  offset: 128, 64
+  index: -1
+images/a0063
+  rotate: true
+  xy: 521, 508
+  size: 80, 99
+  orig: 320, 240
+  offset: 128, 64
+  index: -1
+images/fx/huohua/777_000
+  rotate: false
+  xy: 426, 417
+  size: 85, 83
+  orig: 205, 205
+  offset: 63, 61
+  index: -1
+images/fx/huohua/777_001
+  rotate: false
+  xy: 425, 116
+  size: 135, 178
+  orig: 205, 205
+  offset: 60, 18
+  index: -1
+images/fx/huohua/777_002
+  rotate: true
+  xy: 458, 7
+  size: 107, 149
+  orig: 205, 205
+  offset: 64, 32
+  index: -1
+images/fx/huohua/777_003
+  rotate: false
+  xy: 506, 303
+  size: 46, 53
+  orig: 205, 205
+  offset: 77, 66
+  index: -1
+images/fx/huohua2/022_000
+  rotate: false
+  xy: 622, 515
+  size: 46, 74
+  orig: 205, 102
+  offset: 12, 17
+  index: -1
+images/fx/huohua2/022_001
+  rotate: false
+  xy: 346, 5
+  size: 110, 90
+  orig: 205, 102
+  offset: 10, 6
+  index: -1
+images/fx/huohua2/022_002
+  rotate: false
+  xy: 2, 7
+  size: 140, 75
+  orig: 205, 102
+  offset: 13, 12
+  index: -1
+images/fx/huohua2/022_003
+  rotate: false
+  xy: 521, 453
+  size: 140, 53
+  orig: 205, 102
+  offset: 15, 24
+  index: -1
+images/fx/jinlong
+  rotate: false
+  xy: 2, 481
+  size: 134, 207
+  orig: 140, 266
+  offset: 1, 37
+  index: -1

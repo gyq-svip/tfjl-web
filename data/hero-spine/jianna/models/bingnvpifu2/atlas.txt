@@ -1,0 +1,146 @@
+
+bingnvpifu2.png
+size: 848,848
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 572, 21
+  size: 110, 123
+  orig: 157, 134
+  offset: 13, 0
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 684, 16
+  size: 92, 128
+  orig: 157, 134
+  offset: 16, 0
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 761, 734
+  size: 85, 112
+  orig: 157, 134
+  offset: 12, 0
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 499, 262
+  size: 145, 128
+  orig: 157, 134
+  offset: 0, 0
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 2, 33
+  size: 149, 129
+  orig: 157, 134
+  offset: 0, 0
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 499, 146
+  size: 149, 114
+  orig: 157, 134
+  offset: 1, 0
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 650, 146
+  size: 140, 114
+  orig: 157, 134
+  offset: 4, 0
+  index: -1
+fx/b7_001
+  rotate: false
+  xy: 646, 262
+  size: 123, 128
+  orig: 176, 176
+  offset: 19, 32
+  index: -1
+fx/b7_002
+  rotate: true
+  xy: 435, 11
+  size: 133, 135
+  orig: 176, 176
+  offset: 11, 29
+  index: -1
+fx/b7_003
+  rotate: true
+  xy: 153, 30
+  size: 132, 139
+  orig: 176, 176
+  offset: 10, 29
+  index: -1
+fx/b7_004
+  rotate: true
+  xy: 294, 32
+  size: 130, 139
+  orig: 176, 176
+  offset: 8, 29
+  index: -1
+fx/b7_005
+  rotate: false
+  xy: 761, 609
+  size: 40, 123
+  orig: 176, 176
+  offset: 35, 36
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 164
+  size: 251, 226
+  orig: 266, 226
+  offset: 5, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 517, 620
+  size: 242, 226
+  orig: 266, 226
+  offset: 13, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 510, 392
+  size: 239, 226
+  orig: 266, 226
+  offset: 16, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 255, 164
+  size: 242, 226
+  orig: 266, 226
+  offset: 14, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 261, 392
+  size: 247, 226
+  orig: 266, 226
+  offset: 10, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 262, 620
+  size: 253, 226
+  orig: 266, 226
+  offset: 5, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 620
+  size: 258, 226
+  orig: 266, 226
+  offset: 0, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 392
+  size: 257, 226
+  orig: 266, 226
+  offset: 0, 0
+  index: -1

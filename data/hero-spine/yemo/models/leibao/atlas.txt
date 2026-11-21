@@ -1,0 +1,307 @@
+
+leibao.png
+size: 936,936
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 311, 13
+  size: 105, 135
+  orig: 270, 270
+  offset: 75, 44
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 437, 139
+  size: 97, 133
+  orig: 270, 270
+  offset: 80, 44
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 358, 672
+  size: 88, 131
+  orig: 270, 270
+  offset: 84, 44
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 222, 732
+  size: 102, 134
+  orig: 270, 270
+  offset: 85, 44
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 173, 11
+  size: 107, 136
+  orig: 270, 270
+  offset: 85, 44
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 222, 396
+  size: 104, 136
+  orig: 270, 270
+  offset: 87, 44
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 222, 836
+  size: 98, 136
+  orig: 270, 270
+  offset: 88, 44
+  index: -1
+fx/1/afx_0
+  rotate: true
+  xy: 269, 683
+  size: 47, 44
+  orig: 540, 540
+  offset: 311, 204
+  index: -1
+fx/1/afx_1
+  rotate: false
+  xy: 717, 348
+  size: 47, 44
+  orig: 540, 540
+  offset: 311, 203
+  index: -1
+fx/1/afx_2
+  rotate: true
+  xy: 360, 401
+  size: 48, 44
+  orig: 540, 540
+  offset: 311, 202
+  index: -1
+fx/1/afx_3
+  rotate: false
+  xy: 536, 228
+  size: 47, 44
+  orig: 540, 540
+  offset: 312, 201
+  index: -1
+fx/1/afx_4
+  rotate: false
+  xy: 536, 182
+  size: 47, 44
+  orig: 540, 540
+  offset: 312, 201
+  index: -1
+fx/1/afx_5
+  rotate: false
+  xy: 869, 193
+  size: 47, 44
+  orig: 540, 540
+  offset: 312, 202
+  index: -1
+fx/1/afx_6
+  rotate: true
+  xy: 406, 401
+  size: 48, 44
+  orig: 540, 540
+  offset: 311, 203
+  index: -1
+fx/1/afx_7
+  rotate: true
+  xy: 222, 683
+  size: 47, 45
+  orig: 540, 540
+  offset: 311, 203
+  index: -1
+fx/Energy 028 Slash Radial_00000
+  rotate: true
+  xy: 826, 17
+  size: 60, 41
+  orig: 225, 225
+  offset: 91, 178
+  index: -1
+fx/Energy 028 Slash Radial_00001
+  rotate: false
+  xy: 767, 163
+  size: 64, 74
+  orig: 225, 225
+  offset: 112, 138
+  index: -1
+fx/Energy 028 Slash Radial_00002
+  rotate: false
+  xy: 534, 18
+  size: 65, 119
+  orig: 225, 225
+  offset: 117, 88
+  index: -1
+fx/Energy 028 Slash Radial_00003
+  rotate: false
+  xy: 360, 805
+  size: 84, 129
+  orig: 225, 225
+  offset: 94, 74
+  index: -1
+fx/Energy 028 Slash Radial_00004
+  rotate: true
+  xy: 593, 337
+  size: 84, 122
+  orig: 225, 225
+  offset: 88, 73
+  index: -1
+fx/Energy 028 Slash Radial_00005
+  rotate: false
+  xy: 448, 17
+  size: 84, 120
+  orig: 225, 225
+  offset: 86, 74
+  index: -1
+fx/Energy 028 Slash Radial_00006
+  rotate: false
+  xy: 2, 2
+  size: 84, 116
+  orig: 225, 225
+  offset: 85, 74
+  index: -1
+fx/Energy 028 Slash Radial_00007
+  rotate: false
+  xy: 88, 9
+  size: 83, 109
+  orig: 225, 225
+  offset: 84, 76
+  index: -1
+fx/Energy 028 Slash Radial_00008
+  rotate: true
+  xy: 602, 423
+  size: 77, 98
+  orig: 225, 225
+  offset: 88, 81
+  index: -1
+fx/Energy 028 Slash Radial_00009
+  rotate: false
+  xy: 755, 79
+  size: 72, 81
+  orig: 225, 225
+  offset: 90, 84
+  index: -1
+fx/Energy 028 Slash Radial_00010
+  rotate: false
+  xy: 755, 6
+  size: 69, 71
+  orig: 225, 225
+  offset: 92, 91
+  index: -1
+fx/Energy 028 Slash Radial_00011
+  rotate: false
+  xy: 390, 451
+  size: 54, 61
+  orig: 225, 225
+  offset: 106, 99
+  index: -1
+fx/diwangshenbing_01
+  rotate: false
+  xy: 452, 274
+  size: 139, 177
+  orig: 198, 189
+  offset: 15, 7
+  index: -1
+fx/diwangshenbing_02
+  rotate: true
+  xy: 593, 162
+  size: 173, 172
+  orig: 198, 189
+  offset: 15, 10
+  index: -1
+fx/diwangshenbing_03
+  rotate: false
+  xy: 222, 503
+  size: 166, 167
+  orig: 198, 189
+  offset: 15, 15
+  index: -1
+fx/diwangshenbing_04
+  rotate: true
+  xy: 767, 239
+  size: 153, 166
+  orig: 198, 189
+  offset: 13, 17
+  index: -1
+fx/tx_shdian04
+  rotate: false
+  xy: 390, 514
+  size: 54, 156
+  orig: 90, 180
+  offset: 24, 7
+  index: -1
+fx/tx_shdian06
+  rotate: false
+  xy: 680, 6
+  size: 73, 154
+  orig: 90, 180
+  offset: 9, 1
+  index: -1
+fx/tx_shdian08
+  rotate: false
+  xy: 601, 5
+  size: 77, 155
+  orig: 90, 180
+  offset: 13, 3
+  index: -1
+fx/tx_shdian12
+  rotate: true
+  xy: 446, 453
+  size: 47, 154
+  orig: 90, 180
+  offset: 19, 4
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 719, 665
+  size: 215, 269
+  orig: 540, 540
+  offset: 147, 89
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 448, 502
+  size: 213, 269
+  orig: 540, 540
+  offset: 148, 89
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 719, 394
+  size: 213, 269
+  orig: 540, 540
+  offset: 148, 89
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 220, 120
+  size: 215, 270
+  orig: 540, 540
+  offset: 146, 89
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 120
+  size: 216, 270
+  orig: 540, 540
+  offset: 145, 89
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 2, 664
+  size: 218, 270
+  orig: 540, 540
+  offset: 144, 89
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 392
+  size: 218, 270
+  orig: 540, 540
+  offset: 144, 89
+  index: -1
+idle/idle_7
+  rotate: true
+  xy: 448, 717
+  size: 217, 269
+  orig: 540, 540
+  offset: 145, 89
+  index: -1

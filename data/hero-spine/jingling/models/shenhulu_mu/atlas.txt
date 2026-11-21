@@ -1,0 +1,76 @@
+
+shenhulu_mu.png
+size: 477,477
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+1
+  rotate: true
+  xy: 2, 33
+  size: 114, 175
+  orig: 114, 178
+  offset: 0, 2
+  index: -1
+fx/Sparks 084 Charge Radial_00004
+  rotate: false
+  xy: 288, 45
+  size: 105, 102
+  orig: 112, 112
+  offset: 1, 5
+  index: -1
+fx/Sparks 084 Charge Radial_00006
+  rotate: true
+  xy: 330, 257
+  size: 110, 98
+  orig: 112, 112
+  offset: 2, 7
+  index: -1
+fx/Sparks 084 Charge Radial_00008
+  rotate: true
+  xy: 330, 369
+  size: 106, 99
+  orig: 112, 112
+  offset: 6, 5
+  index: -1
+fx/Sparks 084 Charge Radial_00010
+  rotate: true
+  xy: 179, 43
+  size: 104, 107
+  orig: 112, 112
+  offset: 6, 4
+  index: -1
+fx/Sparks 084 Charge Radial_00012
+  rotate: true
+  xy: 330, 159
+  size: 96, 101
+  orig: 112, 112
+  offset: 8, 7
+  index: -1
+fx/Sparks 084 Charge Radial_00014
+  rotate: false
+  xy: 395, 73
+  size: 80, 84
+  orig: 112, 112
+  offset: 21, 17
+  index: -1
+fx/Sparks 084 Charge Radial_00016
+  rotate: true
+  xy: 395, 4
+  size: 67, 69
+  orig: 112, 112
+  offset: 26, 23
+  index: -1
+fx/Sparks 084 Charge Radial_00018
+  rotate: false
+  xy: 288, 5
+  size: 40, 38
+  orig: 112, 112
+  offset: 38, 38
+  index: -1
+fx/guang2
+  rotate: false
+  xy: 2, 149
+  size: 326, 326
+  orig: 338, 338
+  offset: 6, 6
+  index: -1

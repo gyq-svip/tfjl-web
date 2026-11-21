@@ -1,0 +1,195 @@
+
+suxiaomei.png
+size: 746,746
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 610, 195
+  size: 107, 123
+  orig: 200, 200
+  offset: 69, 37
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 501, 124
+  size: 105, 119
+  orig: 200, 200
+  offset: 74, 37
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 612, 529
+  size: 109, 125
+  orig: 200, 200
+  offset: 63, 38
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 612, 418
+  size: 109, 125
+  orig: 200, 200
+  offset: 62, 50
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 612, 640
+  size: 104, 128
+  orig: 200, 200
+  offset: 61, 55
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 613, 81
+  size: 112, 122
+  orig: 200, 200
+  offset: 64, 48
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 610, 304
+  size: 112, 124
+  orig: 200, 200
+  offset: 65, 37
+  index: -1
+fx/suxiaomei08
+  rotate: true
+  xy: 613, 2
+  size: 77, 78
+  orig: 77, 78
+  offset: 0, 0
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 244
+  size: 200, 249
+  orig: 400, 400
+  offset: 132, 75
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 495
+  size: 203, 249
+  orig: 400, 400
+  offset: 132, 75
+  index: -1
+idle/idle_2
+  rotate: true
+  xy: 2, 36
+  size: 206, 247
+  orig: 400, 400
+  offset: 129, 75
+  index: -1
+idle/idle_3
+  rotate: true
+  xy: 251, 37
+  size: 205, 248
+  orig: 400, 400
+  offset: 128, 75
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 204, 244
+  size: 200, 249
+  orig: 400, 400
+  offset: 132, 75
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 207, 495
+  size: 200, 249
+  orig: 400, 400
+  offset: 131, 75
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 409, 497
+  size: 201, 247
+  orig: 400, 400
+  offset: 128, 75
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 406, 245
+  size: 202, 248
+  orig: 400, 400
+  offset: 128, 75
+  index: -1
+images/fx/Energy01
+  rotate: false
+  xy: 272, 18
+  size: 17, 17
+  orig: 120, 120
+  offset: 27, 61
+  index: -1
+images/fx/Energy02
+  rotate: true
+  xy: 232, 14
+  size: 20, 18
+  orig: 120, 120
+  offset: 21, 59
+  index: -1
+images/fx/Energy03
+  rotate: false
+  xy: 190, 12
+  size: 19, 22
+  orig: 120, 120
+  offset: 19, 54
+  index: -1
+images/fx/Energy04
+  rotate: false
+  xy: 2, 8
+  size: 26, 26
+  orig: 120, 120
+  offset: 19, 46
+  index: -1
+images/fx/Energy05
+  rotate: false
+  xy: 124, 11
+  size: 42, 23
+  orig: 120, 120
+  offset: 25, 42
+  index: -1
+images/fx/Energy06
+  rotate: false
+  xy: 73, 11
+  size: 49, 23
+  orig: 120, 120
+  offset: 40, 40
+  index: -1
+images/fx/Energy07
+  rotate: false
+  xy: 30, 9
+  size: 41, 25
+  orig: 120, 120
+  offset: 58, 41
+  index: -1
+images/fx/Energy08
+  rotate: false
+  xy: 168, 11
+  size: 20, 23
+  orig: 120, 120
+  offset: 82, 49
+  index: -1
+images/fx/Energy09
+  rotate: true
+  xy: 211, 13
+  size: 21, 19
+  orig: 120, 120
+  offset: 80, 54
+  index: -1
+images/fx/Energy10
+  rotate: true
+  xy: 252, 15
+  size: 20, 18
+  orig: 120, 120
+  offset: 77, 57
+  index: -1
+images/fx/glow2_00004
+  rotate: true
+  xy: 501, 4
+  size: 118, 110
+  orig: 122, 114
+  offset: 2, 2
+  index: -1

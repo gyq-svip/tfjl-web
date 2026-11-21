@@ -1,0 +1,146 @@
+
+putilaozu.png
+size: 927,927
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 798, 787
+  size: 127, 138
+  orig: 155, 162
+  offset: 8, 21
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 674, 230
+  size: 126, 137
+  orig: 155, 162
+  offset: 8, 21
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 798, 648
+  size: 127, 137
+  orig: 155, 162
+  offset: 8, 21
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 521, 90
+  size: 149, 137
+  orig: 155, 162
+  offset: 0, 22
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 521, 229
+  size: 151, 141
+  orig: 155, 162
+  offset: 4, 21
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 783, 499
+  size: 147, 138
+  orig: 155, 162
+  offset: 4, 21
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 783, 358
+  size: 142, 139
+  orig: 155, 162
+  offset: 2, 21
+  index: -1
+fx/daoguanga_00005
+  rotate: false
+  xy: 813, 294
+  size: 85, 62
+  orig: 108, 108
+  offset: 12, 11
+  index: -1
+fx/daoguanga_00007
+  rotate: false
+  xy: 2, 27
+  size: 82, 66
+  orig: 108, 108
+  offset: 14, 12
+  index: -1
+fx/daoguanga_00009
+  rotate: false
+  xy: 86, 22
+  size: 76, 71
+  orig: 108, 108
+  offset: 20, 12
+  index: -1
+fx/daoguanga_00011
+  rotate: false
+  xy: 164, 28
+  size: 71, 65
+  orig: 108, 108
+  offset: 25, 21
+  index: -1
+fx/fu
+  rotate: false
+  xy: 813, 249
+  size: 85, 43
+  orig: 85, 43
+  offset: 0, 0
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 266, 95
+  size: 253, 275
+  orig: 267, 324
+  offset: 14, 49
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 529, 372
+  size: 252, 276
+  orig: 267, 324
+  offset: 15, 47
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 270, 372
+  size: 257, 275
+  orig: 267, 324
+  offset: 10, 45
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 2, 95
+  size: 262, 275
+  orig: 267, 324
+  offset: 5, 43
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 372
+  size: 266, 275
+  orig: 267, 324
+  offset: 1, 41
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 2, 649
+  size: 267, 276
+  orig: 267, 324
+  offset: 0, 42
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 271, 650
+  size: 265, 275
+  orig: 267, 324
+  offset: 2, 45
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 538, 650
+  size: 258, 275
+  orig: 267, 324
+  offset: 9, 47
+  index: -1
