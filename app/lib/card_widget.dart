@@ -10,6 +10,7 @@ class CardData {
   String subLevel = '';
   bool subMohua = false;
   String cardType = '';   // gold/purple/blue/green
+  String subCardType = '';  // 副卡品质（融合卡等级盾用）
   String prof = '';
   bool filled = false;
   bool hasMohua = false;
@@ -89,17 +90,28 @@ class CardSlot extends StatelessWidget {
                       if (d.subLevel.isNotEmpty)
                         Positioned(
                           left: 0, bottom: 0,
-                          child: Container(
+                          child: SizedBox(
                             width: w * 0.20,
                             height: w * 0.20,
-                            alignment: Alignment.center,
-                            decoration: const BoxDecoration(
-                              color: Color(0xCC191927),
-                              borderRadius: BorderRadius.only(bottomLeft: Radius.circular(2)),
-                            ),
-                            child: Text(
-                              d.subLevel,
-                              style: TextStyle(color: Colors.white, fontSize: w * 0.115, fontWeight: FontWeight.bold),
+                            child: Stack(
+                              children: [
+                                Image.asset(
+                                  'assets/images/shield-${_badgeType(d.subCardType.isNotEmpty ? d.subCardType : d.cardType)}.png',
+                                  fit: BoxFit.fill,
+                                  errorBuilder: (_, __, ___) => ColoredBox(color: Color(AppData.qualityColor(d.subCardType.isNotEmpty ? d.subCardType : d.cardType))),
+                                ),
+                                Center(
+                                  child: Text(
+                                    d.subLevel,
+                                    style: TextStyle(
+                                      color: const Color(0xFF1A1A2E),
+                                      fontSize: w * 0.115,
+                                      fontWeight: FontWeight.bold,
+                                      shadows: const [Shadow(color: Colors.white54, blurRadius: 1)],
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -137,8 +149,8 @@ class CardSlot extends StatelessWidget {
                   ),
                 ),
               ),
-            // 等级盾（左下）
-            if (d.level.isNotEmpty)
+            // 等级盾（左下）—— 只有真正有卡的格子才画（空卡槽不该显示"1"）
+            if (d.filled && d.level.isNotEmpty)
               Positioned(
                 left: 0, bottom: 0,
                 child: SizedBox(
@@ -201,7 +213,10 @@ CardData parseCard(dynamic cardRaw, bool isMine, Map<String, dynamic> proj, {Ski
   d.isEngineering = cardRaw['isEngineering'] == true;
 
   final official = AppData.officialName(d.name);
-  final pc = AppData.I.poolByName[official];
+  // 融合卡的品质按【主卡】判定（融合名不在卡池里，直接猜 type 会错）
+  final fusionParts = AppData.I.splitFusion(d.name);
+  final typeName = (fusionParts != null && fusionParts.isNotEmpty) ? fusionParts[0] : official;
+  final pc = AppData.I.poolByName[typeName];
   if (pc != null) {
     d.cardType = pc.type;
     if (pc.eng) d.prof = 'engineering';
@@ -239,6 +254,9 @@ CardData parseCard(dynamic cardRaw, bool isMine, Map<String, dynamic> proj, {Ski
     if (d.subFile != null) {
       try { d.subKey = d.subFile!.lastModifiedSync().millisecondsSinceEpoch.toString(); } catch (_) {}
     }
+    // 副卡品质（副卡等级盾用自身品质）
+    final subPc = AppData.I.poolByName[f[1]];
+    d.subCardType = subPc?.type ?? d.cardType;
     final fLv = proj['fusionLevels'] as Map<String, dynamic>? ?? {};
     d.subLevel = fLv[f[1]]?.toString() ?? '1';
     final fMh = proj['fusionMoHua'] as Map<String, dynamic>? ?? {};
