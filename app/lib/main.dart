@@ -9,6 +9,7 @@ import 'library_page.dart';
 import 'net_prime.dart';
 import 'net_check_sheet.dart';
 import 'layout_config.dart';
+import 'floating_panel.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,6 +60,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   bool layoutEditing = false;            // 默认锁定
   bool topBarAutoHide = false;           // 顶栏自动隐藏（可开关）
   bool topBarExpanded = true;            // 下拉行当前是否展开
+  bool poolSideMine = true;              // 悬浮卡池当前服务哪一侧
+  bool poolOverlayOpen = false;          // 悬浮卡池是否显示
   Map<String, dynamic>? proj;
   String gistId = '';
   int sourceMode = 0;               // 0本地 1共享
@@ -629,7 +632,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
+      body: Stack(children: [
+        SafeArea(
         child: loading
             ? const Center(child: CircularProgressIndicator(color: Color(0xFF2BB3A3)))
             : Column(children: [
@@ -679,7 +683,20 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   }),
                 ),
               ]),
-      ),
+        ),  // SafeArea
+        // 悬浮卡池（可拖动/缩放，不挡全屏）
+        if (poolOverlayOpen && proj != null)
+          FloatingPanel(
+            storageKey: 'floating_panel_pool',
+            title: poolSideMine ? '🎴 卡池 · 我的（点卡加手牌）' : '🎴 卡池 · 队友（点卡加手牌）',
+            accent: poolSideMine ? const Color(0xFF67D2F5) : const Color(0xFFC79BF0),
+            onClose: () => setState(() => poolOverlayOpen = false),
+            defaultRect: const Rect.fromLTWH(0.10, 0.14, 0.80, 0.68),
+            child: PoolSheet(isMine: poolSideMine, proj: proj!, embedded: true,
+                onAdded: () { refresh(); persistProject(); },
+                onSwitchSide: () => setState(() => poolSideMine = !poolSideMine)),
+          ),
+      ]),  // Stack
     );
   }
 
@@ -1011,13 +1028,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   // ------------------------------------------------------- 卡池
   void showPoolDialog(bool isMine) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF16162C),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => PoolSheet(isMine: isMine, proj: proj!, onAdded: () { refresh(); persistProject(); }),
-    );
+    setState(() {
+      poolSideMine = isMine;
+      poolOverlayOpen = true;
+    });
   }
 
   // ------------------------------------------------------- 设置面板

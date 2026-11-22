@@ -19,7 +19,7 @@ class PoolCard {
 }
 
 class AppData {
-  static const appVersion = '1.4.0';
+  static const appVersion = '1.5.0';
   static final AppData I = AppData._();
   AppData._();
 
@@ -114,6 +114,17 @@ class AppData {
       }
     }
     return null;
+  }
+
+  /// 卡牌身份（对齐网页 cardIdentity）：融合卡取主卡，基础卡取自身。
+  /// 同一身份的手牌只能带 1 张（水灵 和 水灵刀客 是同一身份，不能同时上）。
+  String cardIdentity(String name) {
+    if (name.isEmpty) return name;
+    final dot = name.indexOf('·');
+    if (dot > 0) return officialName(name.substring(0, dot));
+    final f = splitFusion(name);
+    if (f != null && f.isNotEmpty) return officialName(f[0]);
+    return officialName(name);
   }
 
   final List<String> _heroCache = [];

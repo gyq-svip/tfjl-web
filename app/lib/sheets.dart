@@ -15,7 +15,10 @@ class PoolSheet extends StatefulWidget {
   final bool isMine;
   final Map<String, dynamic> proj;
   final VoidCallback onAdded;
-  const PoolSheet({required this.isMine, required this.proj, required this.onAdded});
+  final bool embedded;                    // 嵌入悬浮面板（无外层 Scaffold/标题）
+  final VoidCallback? onSwitchSide;       // 切换我方/队友
+  const PoolSheet({required this.isMine, required this.proj, required this.onAdded,
+      this.embedded = false, this.onSwitchSide});
 
   @override
   State<PoolSheet> createState() => PoolSheetState();
@@ -191,13 +194,28 @@ class PoolSheetState extends State<PoolSheet> {
   Widget build(BuildContext context) {
     final h = MediaQuery.of(context);
     return SizedBox(
-      height: h.size.height * 0.72,
+      height: widget.embedded ? double.infinity : h.size.height * 0.72,
       child: Column(children: [
         Padding(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           child: Row(children: [
-            Text('🎴 卡池 · 点卡加入${widget.isMine ? "我的" : "队友"}手牌并上阵',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))),
+            if (!widget.embedded)
+              Text('🎴 卡池 · 点卡加入${widget.isMine ? "我的" : "队友"}手牌并上阵',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))),
+            if (widget.embedded)
+              Text('${widget.isMine ? "👤 我的" : "🎭 队友"}手牌',
+                  style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold,
+                      color: widget.isMine ? const Color(0xFF67D2F5) : const Color(0xFFC79BF0))),
+            const Spacer(),
+            if (widget.embedded && widget.onSwitchSide != null)
+              GestureDetector(
+                onTap: widget.onSwitchSide,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(color: const Color(0xFF2BB3A3), borderRadius: BorderRadius.circular(5)),
+                  child: const Text('切换我方/队友', style: TextStyle(fontSize: 9, color: Color(0xFF07231F))),
+                ),
+              ),
           ]),
         ),
         // 品质 tab
@@ -337,18 +355,24 @@ class PoolSheetState extends State<PoolSheet> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('手牌已满 10 张'), duration: Duration(milliseconds: 700)));
       return;
     }
-    for (final c in hand) {
-      if ((c as Map)['name'] == pc.name) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('手牌已有「${pc.name}」，同一张卡只能带 1 张'), duration: const Duration(milliseconds: 900)));
-        return;
-      }
-    }
     final official = AppData.officialName(pc.name);
     final selfFusion = AppData.I.splitFusion(pc.name) != null;
     final def = globalHeroDefaults[official] as Map<String, dynamic>?;
     final cardName = selfFusion
         ? pc.name   // 融合卡：卡名就是融合名
         : ((def != null && def['fusion']?.toString().isNotEmpty == true) ? def['fusion'].toString() : official);
+
+    // 对齐网页 handHasIdentity：同一身份（含基础卡与其融合形态）只能带 1 张
+    final wantIdentity = AppData.I.cardIdentity(cardName);
+    for (final c in hand) {
+      if (AppData.I.cardIdentity((c as Map)['name']?.toString() ?? '') == wantIdentity) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('手牌已有「${pc.name}」（含融合形态），同一张卡只能带 1 张'),
+            duration: const Duration(milliseconds: 900)));
+        return;
+      }
+    }
+
     final card = {
       'id': pc.id.isEmpty ? '${1000 + DateTime.now().millisecondsSinceEpoch % 100000}' : pc.id,
       'name': cardName,
