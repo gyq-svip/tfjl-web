@@ -8,6 +8,7 @@ import 'sheets.dart';
 import 'library_page.dart';
 import 'net_prime.dart';
 import 'net_check_sheet.dart';
+import 'layout_config.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -74,6 +75,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _init() async {
     await AppData.I.load();
+    await LayoutConfig.I.load();
     SkinPack.I.onProgress = (p, s) {
       if (!SkinPack.I.ready && mounted) setState(() { packPct = p; loadStage = s; });
     };
@@ -564,24 +566,95 @@ class _HomePageState extends State<HomePage> {
                 buildTopBar(),
                 if (packPct >= 0) _packProgress(),
                 Expanded(
-                  child: SingleChildScrollView(
+                  child: ReorderableListView.builder(
                     padding: const EdgeInsets.fromLTRB(4, 4, 4, 10),
-                    child: Column(children: [
-                      Align(alignment: Alignment.centerLeft, child: Padding(
-                        padding: const EdgeInsets.only(left: 3, bottom: 4),
-                        child: Text('⚔ ${proj?['name'] ?? '出战选择'}', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))))),
-                      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Expanded(child: buildCardGroup(true)),
-                        const SizedBox(width: 14),
-                        Expanded(child: buildCardGroup(false)),
-                      ]),
-                      buildHandGroup(true),
-                      buildHandGroup(false),
-                    ]),
+                    itemCount: LayoutConfig.I.order.length + 1,
+                    onReorder: (oldIdx, newIdx) => _reorderModule(oldIdx, newIdx),
+                    buildDefaultDragHandles: false,
+                    proxyDecorator: (child, index, animation) => Material(
+                      elevation: 6,
+                      color: const Color(0xFF24243E),
+                      borderRadius: BorderRadius.circular(10),
+                      child: child,
+                    ),
+                    itemBuilder: (context, index) {
+                      // 第 0 项是项目名称头（不可拖动）
+                      if (index == 0) {
+                        return Padding(
+                          key: const ValueKey('title'),
+                          padding: const EdgeInsets.only(left: 3, bottom: 4),
+                          child: Row(children: [
+                            Text('⚔ ${proj?['name'] ?? '出战选择'}',
+                                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))),
+                            const Spacer(),
+                            const Text('⠿ 拖动模块 · ⤢ 改大小', style: TextStyle(fontSize: 9, color: Colors.white38)),
+                          ]),
+                        );
+                      }
+                      final moduleId = LayoutConfig.I.order[index - 1];
+                      return _buildModule(moduleId, index);
+                    },
                   ),
                 ),
               ]),
       ),
+    );
+  }
+
+  /// 模块拖动排序（第 0 项是标题，不可拖，所以索引要 -1）
+  void _reorderModule(int oldIdx, int newIdx) {
+    final o = oldIdx - 1;
+    var n = newIdx - 1;
+    if (o < 0 || o >= LayoutConfig.I.order.length) return;
+    if (n < 0) n = 0;
+    if (n >= LayoutConfig.I.order.length) n = LayoutConfig.I.order.length - 1;
+    if (o == n) return;
+    setState(() {
+      final item = LayoutConfig.I.order.removeAt(o);
+      LayoutConfig.I.order.insert(n, item);
+    });
+    LayoutConfig.I.save();
+  }
+
+  /// 单个模块外壳：⠿ 拖动把手 + ⤢ 大小切换 + 模块内容
+  Widget _buildModule(String moduleId, int listIndex) {
+    final isMine = moduleId == 'myField' || moduleId == 'myHand';
+    final isField = moduleId.endsWith('Field');
+    final sizeIdx = LayoutConfig.I.sizes[moduleId] ?? 1;
+    final accent = isMine ? const Color(0xFF67D2F5) : const Color(0xFFC79BF0);
+    return Container(
+      key: ValueKey(moduleId),
+      margin: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF14142A),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withAlpha(18)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        // 模块头：拖动把手 + 名字 + 大小切换
+        Row(children: [
+          ReorderableDragStartListener(
+            index: listIndex,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              child: Text('⠿', style: TextStyle(fontSize: 15, color: Colors.white.withAlpha(120))),
+            ),
+          ),
+          Expanded(child: Text(LayoutConfig.moduleNames[moduleId] ?? moduleId,
+              style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: accent))),
+          GestureDetector(
+            onTap: () => setState(() => LayoutConfig.I.nextSize(moduleId)),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(color: Colors.white.withAlpha(25), borderRadius: BorderRadius.circular(5)),
+              child: Text(['小', '中', '大'][sizeIdx], style: const TextStyle(fontSize: 9, color: Colors.white70)),
+            ),
+          ),
+          const SizedBox(width: 6),
+        ]),
+        // 模块内容
+        if (isField) buildCardGroup(isMine, moduleId) else buildHandGroup(isMine, moduleId),
+      ]),
     );
   }
 
@@ -598,16 +671,18 @@ class _HomePageState extends State<HomePage> {
   }
 
   // ------------------------------------------------------- 卡组区
-  Widget buildCardGroup(bool isMine) {
+  Widget buildCardGroup(bool isMine, String moduleId) {
     final hand = handCards(isMine);
     var filled = 0;
     for (final c in hand) {
       final pl = (c as Map<String, dynamic>)['placed']?.toString() ?? '';
       if (pl.isNotEmpty && pl != 'null') filled++;
     }
-    final colW = (MediaQuery.of(context).size.width - 24 - 14) / 2;
-    final gap = 3.0;
-    final cardW = (colW - gap) / 2;
+    final scale = LayoutConfig.I.scaleOf(moduleId);
+    // 模块现在独占整行，卡片按档位放大
+    final colW = (MediaQuery.of(context).size.width - 30) / 2;
+    final gap = 4.0;
+    final cardW = (colW - gap) / 2 * scale;
     final cardH = cardW * 0.92;
 
     Widget slot(String id) {
@@ -653,44 +728,46 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
-    return Column(children: [
-      Align(alignment: Alignment.centerLeft, child: Text('${isMine ? "👤 我的卡组" : "🎭 队友卡组"} $filled格',
-          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isMine ? const Color(0xFF67D2F5) : const Color(0xFFC79BF0)))),
-      const SizedBox(height: 3),
-      SizedBox(width: cardW, height: cardH, child: slot(isMine ? 'u0' : 't0')),
-      const SizedBox(height: 4),
-      for (var r = 0; r < 3; r++)
-        Padding(
-          padding: EdgeInsets.only(bottom: r < 2 ? gap : 0),
-          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            for (var c = 0; c < 2; c++)
-              Padding(
-                padding: EdgeInsets.only(left: c > 0 ? gap : 0),
-                child: slot('${isMine ? "u" : "t"}${r * 2 + c + 1}'),
-              ),
-          ]),
-        ),
-    ]);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: Column(children: [
+        SizedBox(width: cardW, height: cardH, child: slot(isMine ? 'u0' : 't0')),
+        const SizedBox(height: 5),
+        for (var r = 0; r < 3; r++)
+          Padding(
+            padding: EdgeInsets.only(bottom: r < 2 ? gap : 0),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              for (var c = 0; c < 2; c++)
+                Padding(
+                  padding: EdgeInsets.only(left: c > 0 ? gap : 0),
+                  child: slot('${isMine ? "u" : "t"}${r * 2 + c + 1}'),
+                ),
+            ]),
+          ),
+      ]),
+    );
   }
 
   // ------------------------------------------------------- 手牌区
-  Widget buildHandGroup(bool isMine) {
+  Widget buildHandGroup(bool isMine, String moduleId) {
     final hand = handCards(isMine);
     final chariot = proj?[isMine ? 'myChariot' : 'teammateChariot'] as Map<String, dynamic>?;
     final dr = AppData.chariotSideDr(chariot);
     final mainN = chariot?['main'] ?? 1;
     final subN = chariot?['sub'] ?? 0;
     final mainLv = chariot?['mainLv'] ?? 1;
-    final boxW = MediaQuery.of(context).size.width - 14;
-    final g = 3.0;
-    final cw = (boxW - 4 - g * 4) / 5;
-    final ch = cw * 0.65;
+    final scale = LayoutConfig.I.scaleOf(moduleId);
+    final boxW = MediaQuery.of(context).size.width - 22;
+    final g = 4.0;
+    final baseCw = (boxW - g * 4) / 5;
+    final cw = baseCw * scale;
+    final ch = cw * 0.82;   // 之前 0.65 太扁，放大后名字看得清
 
     return Padding(
       padding: const EdgeInsets.only(top: 6),
       child: Column(children: [
         Row(children: [
-          Text('${isMine ? "📋 我的手牌" : "📋 队友手牌"} ${hand.length}/10',
+          Text('${hand.length}/10',
               style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: isMine ? const Color(0xFF67D2F5) : const Color(0xFFC79BF0))),
           const Spacer(),
           GestureDetector(
@@ -713,18 +790,20 @@ class _HomePageState extends State<HomePage> {
           ),
         ]),
         const SizedBox(height: 4),
-        Container(
-          padding: const EdgeInsets.all(2),
-          decoration: BoxDecoration(color: Colors.white.withAlpha(20), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white.withAlpha(25))),
-          child: Column(children: [
-            for (var r = 0; r < 2; r++)
-              Padding(
-                padding: EdgeInsets.only(top: r > 0 ? g : 0),
-                child: Row(children: [
-                  for (var c = 0; c < 5; c++)
-                    Padding(
-                      padding: EdgeInsets.only(left: c > 0 ? g : 0),
-                      child: Builder(builder: (_) {
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Container(
+            decoration: BoxDecoration(color: Colors.white.withAlpha(20), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white.withAlpha(25))),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              for (var r = 0; r < 2; r++)
+                Padding(
+                  padding: EdgeInsets.only(top: r > 0 ? g : 0, left: 2, right: 2, bottom: 2),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    for (var c = 0; c < 5; c++)
+                      Padding(
+                        padding: EdgeInsets.only(left: c > 0 ? g : 0),
+                        child: Builder(builder: (_) {
                         final idx = r * 5 + c;
                         final hasCard = idx < hand.length;
                         final placed = hasCard ? ((hand[idx] as Map<String, dynamic>)['placed']?.toString() ?? '') : '';
@@ -778,6 +857,7 @@ class _HomePageState extends State<HomePage> {
               ),
           ]),
         ),
+        ),
       ]),
     );
   }
@@ -806,7 +886,7 @@ class _HomePageState extends State<HomePage> {
       isScrollControlled: true,
       backgroundColor: const Color(0xFF16162C),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => PoolSheet(isMine: isMine, proj: proj!, onAdded: refresh),
+      builder: (_) => PoolSheet(isMine: isMine, proj: proj!, onAdded: () { refresh(); persistProject(); }),
     );
   }
 

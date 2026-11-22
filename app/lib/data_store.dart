@@ -148,8 +148,10 @@ class SkinPack {
           final skinName = sk['name']?.toString() ?? '';
           final file = sk['file']?.toString() ?? '';
           if (skinName.isEmpty || file.isEmpty) continue;
-          // 同名皮肤去重（registry 里有重复条目，界面显示两个一样的）
-          if (names.contains(skinName)) continue;
+          // 与网页一致：过滤掉和英雄同名的"伪皮肤"（它就是默认皮肤，会重复显示）
+          if (_norm(skinName) == _norm(hero)) continue;
+          // 同名皮肤去重（含规范化后同名：全角/半角空格、· 分隔符）
+          if (names.any((n) => _norm(n) == _norm(skinName))) continue;
           if (!seenFiles.add(file)) continue;
           nameIndex[_norm(skinName)] = '$hero/$file';
           names.add(skinName);

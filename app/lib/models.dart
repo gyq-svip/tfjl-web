@@ -19,13 +19,14 @@ class PoolCard {
 }
 
 class AppData {
-  static const appVersion = '1.1.1';
+  static const appVersion = '1.2.0';
   static final AppData I = AppData._();
   AppData._();
 
   List<PoolCard> pool = [];
   final Map<String, PoolCard> poolByName = {};
   final Map<String, List<String>> cloudFusions = {};   // 融合名 -> [主, 副]
+  List<PoolCard> fusionCards = [];   // 官方融合卡（作为独立卡显示在卡池）
   final Map<String, List<String>> builtinFusions = {
     '邪能火炮侏儒射线': ['邪能火炮', '侏儒射线'],
     '侏儒射线微型潜艇': ['侏儒射线', '微型潜艇'],
@@ -65,6 +66,17 @@ class AppData {
       fusions.forEach((k, v) {
         final comps = (v['components'] as List?)?.map((e) => e.toString()).toList() ?? [];
         if (comps.length >= 2) cloudFusions[comps[0] + comps[1]] = comps;
+        final q = (v['quality'] ?? '金').toString();
+        final type = {'金': 'gold', '紫': 'purple', '蓝': 'blue', '绿': 'green'}[q] ?? 'gold';
+        final profCn = (v['profession'] ?? '').toString();
+        final profEn = {
+          '战士': 'warrior', '法师': 'mage', '射手': 'archer', '召唤': 'summoner',
+          '牧师': 'priest', '工程': 'engineering', '熊猫': 'panda', '术士': 'warlock',
+        }[profCn] ?? 'warrior';
+        fusionCards.add(PoolCard(
+          id: 'fusion_$k', name: k, type: type, prof: profEn,
+          cat: type, eng: profEn == 'engineering',
+        ));
       });
     } catch (_) {}
     // 图库

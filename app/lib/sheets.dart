@@ -42,6 +42,12 @@ class PoolSheetState extends State<PoolSheet> {
     if (mounted) setState(() {});
   }
 
+  /// 卡池预设改动后立刻落盘（之前只改内存不保存 → 退出全丢）
+  static Future<void> saveHeroDefaults() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('hero_defaults', jsonEncode(globalHeroDefaults));
+  }
+
   /// 长按卡池卡：该英雄的默认配置面板（官方融合变体 + 官方魔化判定，本地保存）
   void showHeroDefaultsSheet(String heroName) {
     final official = AppData.officialName(heroName);
@@ -79,7 +85,7 @@ class PoolSheetState extends State<PoolSheet> {
                   min: 0, max: (levels.length - 1).toDouble(), divisions: levels.length - 1, value: lvIdx.toDouble(),
                   activeColor: const Color(0xFF4ECDC4),
                   onChanged: (v) => setSheet(() => lvIdx = v.round()),
-                  onChangeEnd: (v) { lvIdx = v.round(); hs['lv'] = '${levels[lvIdx]}'; globalHeroDefaults[official] = hs; setSheet(() {}); },
+                  onChangeEnd: (v) { lvIdx = v.round(); hs['lv'] = '${levels[lvIdx]}'; globalHeroDefaults[official] = hs; saveHeroDefaults(); setSheet(() {}); },
                 ),
                 const Text('🎨 皮肤', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFFF9800))),
                 SizedBox(
@@ -89,7 +95,7 @@ class PoolSheetState extends State<PoolSheet> {
                     children: [
                       for (final sk in SkinPack.I.skinsOfHero(baseHero))
                         GestureDetector(
-                          onTap: () { hs['skin'] = '默认' == sk ? '' : sk; globalHeroDefaults[official] = hs; setSheet(() {}); },
+                          onTap: () { hs['skin'] = '默认' == sk ? '' : sk; globalHeroDefaults[official] = hs; saveHeroDefaults(); setSheet(() {}); },
                           child: Container(
                             width: 50, height: 50, margin: const EdgeInsets.only(right: 5), padding: const EdgeInsets.all(2),
                             decoration: BoxDecoration(
@@ -107,7 +113,7 @@ class PoolSheetState extends State<PoolSheet> {
                 const SizedBox(height: 6),
                 if (hasMh)
                   GestureDetector(
-                    onTap: () { hs['mohua'] = !(hs['mohua'] == true); globalHeroDefaults[official] = hs; setSheet(() {}); },
+                    onTap: () { hs['mohua'] = !(hs['mohua'] == true); globalHeroDefaults[official] = hs; saveHeroDefaults(); setSheet(() {}); },
                     child: Container(
                       width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 7), alignment: Alignment.center,
                       decoration: BoxDecoration(color: hs['mohua'] == true ? const Color(0xFF7C4BC0) : Colors.white.withAlpha(50), borderRadius: BorderRadius.circular(8)),
@@ -125,7 +131,7 @@ class PoolSheetState extends State<PoolSheet> {
                 const Text('🔗 融合变体（官方）', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF9BE9E0))),
                 if (fusion != null)
                   GestureDetector(
-                    onTap: () { hs['fusion'] = ''; globalHeroDefaults[official] = hs; setSheet(() {}); },
+                    onTap: () { hs['fusion'] = ''; globalHeroDefaults[official] = hs; saveHeroDefaults(); setSheet(() {}); },
                     child: Container(
                       width: double.infinity, margin: const EdgeInsets.only(top: 5), padding: const EdgeInsets.symmetric(vertical: 7), alignment: Alignment.center,
                       decoration: BoxDecoration(color: Colors.white.withAlpha(70), borderRadius: BorderRadius.circular(8)),
@@ -138,6 +144,7 @@ class PoolSheetState extends State<PoolSheet> {
                       onTap: () {
                         hs['fusion'] = p[0] + p[1];
                         globalHeroDefaults[official] = hs;
+                        saveHeroDefaults();
                         // 联动刷新：副卡档位/魔化按新副卡重算（面板内完成）
                         final newF = AppData.I.splitFusion(p[0] + p[1]);
                         if (newF != null) {
@@ -166,6 +173,7 @@ class PoolSheetState extends State<PoolSheet> {
                       sub['lv'] = '${subLevels[subIdx]}';
                       hs['sub'] = sub;
                       globalHeroDefaults[official] = hs;
+                      saveHeroDefaults();
                       setSheet(() {});
                     },
                   ),
@@ -227,6 +235,12 @@ class PoolSheetState extends State<PoolSheet> {
       if (!cc) continue;
       byProf.putIfAbsent(c.prof, () => []).add(c);
     }
+    // 官方融合卡并入对应品质/职业（与网页一致，作为独立卡显示）
+    for (final fc in AppData.I.fusionCards) {
+      final cc = fc.cat == cat || fc.type == cat;
+      if (!cc) continue;
+      byProf.putIfAbsent(fc.prof, () => []).add(fc);
+    }
     final profs = profOrder.where(byProf.containsKey).toList();
     for (final p in byProf.keys) {
       if (!profs.contains(p)) profs.add(p);
@@ -268,8 +282,12 @@ class PoolSheetState extends State<PoolSheet> {
   /// 卡池卡：完整渲染（预设的等级/魔化/融合形态直接显示）
   Widget _poolCell(PoolCard c) {
     final official = AppData.officialName(c.name);
+    // 融合卡自身就是融合形态；基础卡用预设里的融合形态
+    final selfFusion = AppData.I.splitFusion(c.name);
     final def = globalHeroDefaults[official] as Map<String, dynamic>?;
-    final displayName = (def != null && def['fusion']?.toString().isNotEmpty == true) ? def['fusion'].toString() : official;
+    final presetFusion = (def != null && def['fusion']?.toString().isNotEmpty == true)
+        ? def['fusion'].toString() : null;
+    final displayName = selfFusion != null ? c.name : (presetFusion ?? official);
     final cd = CardData();
     cd.name = displayName;
     cd.cardType = c.type;
@@ -326,10 +344,14 @@ class PoolSheetState extends State<PoolSheet> {
       }
     }
     final official = AppData.officialName(pc.name);
+    final selfFusion = AppData.I.splitFusion(pc.name) != null;
     final def = globalHeroDefaults[official] as Map<String, dynamic>?;
+    final cardName = selfFusion
+        ? pc.name   // 融合卡：卡名就是融合名
+        : ((def != null && def['fusion']?.toString().isNotEmpty == true) ? def['fusion'].toString() : official);
     final card = {
       'id': pc.id.isEmpty ? '${1000 + DateTime.now().millisecondsSinceEpoch % 100000}' : pc.id,
-      'name': (def != null && def['fusion']?.toString().isNotEmpty == true) ? def['fusion'].toString() : official,
+      'name': cardName,
       'placed': null,
       'isEngineering': pc.eng,
       'profession': pc.eng ? 'engineering' : pc.prof,
