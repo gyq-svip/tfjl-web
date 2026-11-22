@@ -11,6 +11,10 @@ import 'net_check_sheet.dart';
 import 'layout_config.dart';
 import 'floating_panel.dart';
 import 'notepad_sheet.dart';
+import 'script_gen.dart';
+import 'script_sheet.dart';
+import 'activity_calc.dart';
+import 'calc_sheet.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -64,6 +68,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   bool poolSideMine = true;              // 悬浮卡池当前服务哪一侧
   bool poolOverlayOpen = false;          // 悬浮卡池是否显示
   bool notepadOverlayOpen = false;       // 悬浮记事本是否显示
+  bool scriptOverlayOpen = false;        // 悬浮脚本生成是否显示
+  bool calcOverlayOpen = false;          // 悬浮计算器是否显示
+  final ActivityCalc _activityCalc = ActivityCalc();  // 活动配置（云端读+默认兜底）
   Map<String, dynamic>? proj;
   String gistId = '';
   int sourceMode = 0;               // 0本地 1共享
@@ -92,6 +99,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   Future<void> _init() async {
     await AppData.I.load();
     await LayoutConfig.I.load();
+    _activityCalc.load();   // 活动配置后台加载（缓存秒开）
     SkinPack.I.onProgress = (p, s) {
       if (!SkinPack.I.ready && mounted) setState(() { packPct = p; loadStage = s; });
     };
@@ -575,6 +583,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         ListTile(leading: const Text('📝', style: TextStyle(fontSize: 20)), title: const Text('记事本', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
           subtitle: const Text('当前阵容的笔记，随项目走、自动保存', style: TextStyle(fontSize: 10, color: Colors.white54)),
           onTap: () { Navigator.pop(context); setState(() => notepadOverlayOpen = true); }),
+        ListTile(leading: const Text('📜', style: TextStyle(fontSize: 20)), title: const Text('脚本生成', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+          subtitle: const Text('活动/隐藏榜/深海 · 照搬网页规则，自动适配老马', style: TextStyle(fontSize: 10, color: Colors.white54)),
+          onTap: () { Navigator.pop(context); setState(() => scriptOverlayOpen = true); }),
+        ListTile(leading: const Text('🧮', style: TextStyle(fontSize: 20)), title: const Text('活动计算器', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+          subtitle: const Text('商品从后台读取，动态规划算最优购买', style: TextStyle(fontSize: 10, color: Colors.white54)),
+          onTap: () { Navigator.pop(context); setState(() => calcOverlayOpen = true); }),
         ListTile(leading: const Text('🌐', style: TextStyle(fontSize: 20)), title: const Text('网络自检', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
           subtitle: const Text('共享打不开？测一下是哪个环节不通', style: TextStyle(fontSize: 10, color: Colors.white54)),
           onTap: () { Navigator.pop(context); _showNetCheck(); }),
@@ -710,6 +724,26 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             onClose: () => setState(() => notepadOverlayOpen = false),
             defaultRect: const Rect.fromLTWH(0.18, 0.18, 0.66, 0.62),
             child: NotepadSheet(proj: proj!, onChanged: persistProject),
+          ),
+        // 悬浮脚本生成
+        if (scriptOverlayOpen)
+          FloatingPanel(
+            storageKey: 'floating_panel_script',
+            title: '📜 脚本生成（活动/隐藏榜/深海）',
+            accent: const Color(0xFFFF9800),
+            onClose: () => setState(() => scriptOverlayOpen = false),
+            defaultRect: const Rect.fromLTWH(0.06, 0.10, 0.88, 0.80),
+            child: const ScriptSheet(),
+          ),
+        // 悬浮活动计算器
+        if (calcOverlayOpen)
+          FloatingPanel(
+            storageKey: 'floating_panel_calc',
+            title: '🧮 活动计算器（商品后台读取）',
+            accent: const Color(0xFF4CAF50),
+            onClose: () => setState(() => calcOverlayOpen = false),
+            defaultRect: const Rect.fromLTWH(0.08, 0.10, 0.84, 0.80),
+            child: CalcSheet(calc: _activityCalc),
           ),
       ]),  // Stack
     );

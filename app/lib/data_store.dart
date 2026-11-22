@@ -379,6 +379,17 @@ class GistClient {
     return null;
   }
 
+  /// 活动道具配置 activity_tabs.json（管理员后台维护，与网页同源）
+  static Future<List<dynamic>?> readActivityTabs() async {
+    final txt = await readFile(masterGist, 'activity_tabs.json');
+    if (txt == null || txt.isEmpty) return null;
+    try {
+      final d = jsonDecode(txt) as Map<String, dynamic>;
+      final tabs = d['tabs'];
+      return tabs is List ? tabs : null;
+    } catch (_) { return null; }
+  }
+
   /// 共享索引 share_index.json：{key:{id,n,cat,ts}}
   static Future<Map<String, dynamic>?> readShareIndex() async {
     final txt = await readFile(masterGist, 'share_index.json');

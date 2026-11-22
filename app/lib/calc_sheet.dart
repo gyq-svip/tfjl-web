@@ -1,0 +1,137 @@
+import 'package:flutter/material.dart';
+import 'activity_calc.dart';
+
+/// 活动计算器面板（手机端只读：商品从管理后台读取，按规则算最优购买）
+class CalcSheet extends StatefulWidget {
+  final ActivityCalc calc;
+  const CalcSheet({super.key, required this.calc});
+  @override
+  State<CalcSheet> createState() => _CalcSheetState();
+}
+
+class _CalcSheetState extends State<CalcSheet> {
+  int tabIdx = 0;
+  final _targetCtrl = TextEditingController();
+  final _ownedCtrl = TextEditingController(text: '0');
+  final _daysCtrl = TextEditingController(text: '21');
+  bool buyZhanLing = false;
+  Map<String, dynamic>? _result;
+
+  List<Map<String, dynamic>> get tabs => widget.calc.tabs;
+  Map<String, dynamic> get cur => tabs[tabIdx.clamp(0, tabs.length - 1)];
+
+  void _calc() {
+    final target = int.tryParse(_targetCtrl.text) ?? 0;
+    final owned = int.tryParse(_ownedCtrl.text) ?? 0;
+    final days = int.tryParse(_daysCtrl.text) ?? (cur['days'] as int? ?? 21);
+    if (target <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请先输入目标材料数或点选道具')));
+      return;
+    }
+    // 默认每日产出 32（对战杯按固定，简化取 params 或 32）
+    final need = ActivityCalc.calcNeed(target: target, owned: owned, days: days, daily: 32, buyZhanLing: buyZhanLing);
+    final plan = ActivityCalc.optimalPurchase(need['need']!, days);
+    setState(() => _result = {...need, ...plan});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final items = (cur['items'] as List?) ?? [];
+    return Column(children: [
+      // 活动 tab
+      Padding(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
+          for (var i = 0; i < tabs.length; i++)
+            GestureDetector(onTap: () => setState(() { tabIdx = i; _daysCtrl.text = '${tabs[i]['days'] ?? 21}'; _result = null; }),
+              child: Container(margin: EdgeInsets.only(left: i > 0 ? 4 : 0),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(color: tabIdx == i ? const Color(0xFF4CAF50) : Colors.white.withAlpha(35),
+                    borderRadius: BorderRadius.circular(6)),
+                child: Text('${tabs[i]['icon'] ?? ''} ${tabs[i]['name'] ?? ''}',
+                    style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold,
+                        color: tabIdx == i ? Colors.white : Colors.white60)))),
+        ])),
+      ),
+      // 道具价格（只读，从后台）
+      Padding(padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Align(alignment: Alignment.centerLeft,
+          child: Text('🛒 道具价格（后台配置）：', style: TextStyle(fontSize: 10, color: Color(0xFFFFD24A)))),
+      ),
+      SizedBox(height: 120, child: ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        itemCount: items.length,
+        itemBuilder: (_, i) {
+          final it = items[i] as Map;
+          final name = (it['name'] ?? '').toString();
+          final cost = it['cost'] ?? 0;
+          return GestureDetector(
+            onTap: () => setState(() => _targetCtrl.text = '$cost'),
+            child: Padding(padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(children: [
+                Expanded(child: Text(name, style: const TextStyle(fontSize: 10.5, color: Colors.white), overflow: TextOverflow.ellipsis)),
+                Text('$cost', style: const TextStyle(fontSize: 10.5, color: Color(0xFF4ECDC4))),
+              ])),
+          );
+        },
+      )),
+      // 输入行
+      Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: Row(children: [
+        Expanded(child: SizedBox(height: 34, child: TextField(controller: _targetCtrl,
+          keyboardType: TextInputType.number, style: const TextStyle(fontSize: 11, color: Colors.white),
+          decoration: const InputDecoration(labelText: '目标材料', labelStyle: TextStyle(fontSize: 9, color: Colors.white54),
+            isDense: true, border: OutlineInputBorder()), onChanged: (_) => setState(() {})))),
+        const SizedBox(width: 4),
+        Expanded(child: SizedBox(height: 34, child: TextField(controller: _ownedCtrl,
+          keyboardType: TextInputType.number, style: const TextStyle(fontSize: 11, color: Colors.white),
+          decoration: const InputDecoration(labelText: '已有材料', labelStyle: TextStyle(fontSize: 9, color: Colors.white54),
+            isDense: true, border: OutlineInputBorder())))),
+        const SizedBox(width: 4),
+        Expanded(child: SizedBox(height: 34, child: TextField(controller: _daysCtrl,
+          keyboardType: TextInputType.number, style: const TextStyle(fontSize: 11, color: Colors.white),
+          decoration: const InputDecoration(labelText: '剩余天数', labelStyle: TextStyle(fontSize: 9, color: Colors.white54),
+            isDense: true, border: OutlineInputBorder())))),
+      ])),
+      Padding(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), child: Row(children: [
+        Row(children: [
+          Checkbox(value: buyZhanLing, onChanged: (v) => setState(() => buyZhanLing = v ?? false), activeColor: const Color(0xFF4CAF50)),
+          const Text('买战令(98元/200材料)', style: TextStyle(fontSize: 10, color: Colors.white70)),
+        ]),
+        const Spacer(),
+        GestureDetector(onTap: _calc, child: Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(color: const Color(0xFF4CAF50), borderRadius: BorderRadius.circular(8)),
+          child: const Text('🧮 计算', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)))),
+      ])),
+      // 结果
+      Expanded(child: Container(
+        margin: const EdgeInsets.fromLTRB(8, 0, 8, 8), padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(color: Colors.black.withAlpha(50), borderRadius: BorderRadius.circular(8)),
+        child: _result == null
+            ? const Center(child: Text('点道具填目标，或输入材料数后点「计算」', style: TextStyle(fontSize: 10, color: Colors.white38)))
+            : SingleChildScrollView(child: _resultView()),
+      )),
+    ]);
+  }
+
+  Widget _resultView() {
+    final r = _result!;
+    final plan = (r['plan'] as Map?) ?? {};
+    final cost = r['cost'] ?? 0;
+    final need = r['need'] ?? 0;
+    final totalMat = r['totalMat'] ?? 0;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('📊 还需材料：$need（免费产出 ${r['totalFree']}）', style: const TextStyle(fontSize: 11.5, color: Color(0xFF4ECDC4), fontWeight: FontWeight.bold)),
+      const SizedBox(height: 6),
+      Text('💰 最优购买方案（总花费 ¥$cost）：', style: const TextStyle(fontSize: 11, color: Color(0xFFFFD24A), fontWeight: FontWeight.bold)),
+      const SizedBox(height: 4),
+      for (final e in plan.entries)
+        if ((e.value as int) > 0)
+          Padding(padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Text('  · ${e.key} × ${e.value}', style: const TextStyle(fontSize: 11.5, color: Colors.white))),
+      const SizedBox(height: 8),
+      Text('共获得材料 $totalMat（目标已达成${totalMat >= need ? '✓' : '✗'}）',
+          style: TextStyle(fontSize: 10.5, color: totalMat >= need ? Colors.greenAccent : Colors.orangeAccent)),
+      if ((r['zhanLingCost'] ?? 0) > 0)
+        Text('另：战令 ¥${r['zhanLingCost']}', style: const TextStyle(fontSize: 10, color: Colors.white54)),
+    ]);
+  }
+}
