@@ -54,7 +54,9 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
+  late AnimationController _wiggleCtrl;  // 编辑态抖动动画
+  bool layoutEditing = false;            // 默认锁定
   Map<String, dynamic>? proj;
   String gistId = '';
   int sourceMode = 0;               // 0本地 1共享
@@ -70,7 +72,14 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    _wiggleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..repeat();
     _init();
+  }
+
+  @override
+  void dispose() {
+    _wiggleCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _init() async {
@@ -571,14 +580,29 @@ class _HomePageState extends State<HomePage> {
                     Text('⚔ ${proj?['name'] ?? '出战选择'}',
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))),
                     const Spacer(),
-                    const Text('拖标题移动 · 拖右下角缩放', style: TextStyle(fontSize: 9, color: Colors.white38)),
+                    if (layoutEditing)
+                      const Text('编辑中', style: TextStyle(fontSize: 9, color: Color(0xFFFFD24A))),
                     GestureDetector(
-                      onTap: () async { await LayoutConfig.I.reset(); setState(() {}); },
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 5),
-                        child: Text('重置', style: TextStyle(fontSize: 9, color: Color(0xFF2BB3A3))),
+                      onTap: () => setState(() => layoutEditing = !layoutEditing),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: layoutEditing ? const Color(0xFFFFD24A) : const Color(0xFF2BB3A3),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(layoutEditing ? '✓ 完成' : '✎ 编辑布局',
+                            style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold,
+                                color: layoutEditing ? const Color(0xFF1A1A2E) : const Color(0xFF07231F))),
                       ),
                     ),
+                    if (layoutEditing)
+                      GestureDetector(
+                        onTap: () async { await LayoutConfig.I.reset(); setState(() {}); },
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 5),
+                          child: Text('重置', style: TextStyle(fontSize: 9, color: Color(0xFFFF8A80))),
+                        ),
+                      ),
                   ]),
                 ),
                 Expanded(
@@ -607,11 +631,26 @@ class _HomePageState extends State<HomePage> {
 
     return Positioned(
       left: left, top: top, width: width, height: height,
-      child: Container(
+      child: AnimatedBuilder(
+        animation: _wiggleCtrl,
+        builder: (context, child) {
+          // 编辑态：左右轻微摆动（像手机桌面整理图标）
+          final wiggle = layoutEditing
+              ? (Curves.easeInOut.transform((_wiggleCtrl.value * 2) % 1) - 0.5) * 0.022
+              : 0.0;
+          return Transform.rotate(
+            angle: wiggle,
+            child: child,
+          );
+        },
+        child: Container(
           decoration: BoxDecoration(
             color: const Color(0xF014142A),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: accent.withAlpha(90), width: 1),
+            border: Border.all(
+              color: layoutEditing ? const Color(0xFFFFD24A) : accent.withAlpha(60),
+              width: layoutEditing ? 2 : 1,
+            ),
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(10),
@@ -626,7 +665,7 @@ class _HomePageState extends State<HomePage> {
               // 标题栏（拖这里移动模块）
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onPanUpdate: (d) {
+                onPanUpdate: layoutEditing ? (d) {
                   setState(() {
                     final nr = LayoutConfig.I.rects[moduleId]!;
                     LayoutConfig.I.rects[moduleId] = Rect.fromLTWH(
@@ -635,22 +674,23 @@ class _HomePageState extends State<HomePage> {
                       nr.width, nr.height,
                     );
                   });
-                },
-                onPanEnd: (_) => LayoutConfig.I.save(),
+                } : null,
+                onPanEnd: layoutEditing ? (_) => LayoutConfig.I.save() : null,
                 child: Container(
                   height: 24,
-                  color: const Color(0x30FFFFFF),
+                  color: layoutEditing ? const Color(0x40FFD24A) : const Color(0x18FFFFFF),
                   padding: const EdgeInsets.symmetric(horizontal: 6),
                   child: Row(children: [
-                    Icon(Icons.drag_indicator, size: 14, color: accent),
-                    const SizedBox(width: 3),
+                    if (layoutEditing) Icon(Icons.drag_indicator, size: 14, color: const Color(0xFFFFD24A)),
+                    const SizedBox(width: 2),
                     Expanded(child: Text(LayoutConfig.moduleNames[moduleId] ?? moduleId,
                         style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: accent),
                         overflow: TextOverflow.ellipsis)),
                   ]),
                 ),
               ),
-              // 右下角缩放把手（拖这里改宽高）
+              // 右下角缩放把手（仅编辑态显示）
+              if (layoutEditing)
               Positioned(
                 right: 0, bottom: 0,
                 child: GestureDetector(
@@ -679,6 +719,7 @@ class _HomePageState extends State<HomePage> {
             ]),
           ),
         ),
+      ),
     );
   }
 
