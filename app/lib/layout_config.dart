@@ -1,8 +1,8 @@
 import 'dart:ui' show Rect;
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// 主页模块自由布局配置：每个模块有独立的 x/y/宽/高（相对屏幕比例 0~1）
-/// 拖标题换位置、拖右下角缩放，像桌面窗口一样。
+/// 主页模块自由布局：竖屏/横屏各存一套，互不干扰。
+/// 每个模块 x/y/宽/高为相对画布比例 0~1。拖标题换位置、拖右下角缩放。
 class LayoutConfig {
   static const moduleIds = ['myField', 'mateField', 'myHand', 'mateHand'];
   static const moduleNames = {
@@ -12,55 +12,70 @@ class LayoutConfig {
     'mateHand': '📋 队友手牌',
   };
 
-  /// 每个模块：x,y = 左上角相对画布比例；w,h = 宽高相对画布比例
-  /// 默认四块：上排两个卡组、下排两个手牌（并排）
-  final Map<String, Rect> rects = {
+  /// 竖屏默认：上排两卡组、下排两手牌（并排）
+  static Map<String, Rect> get portraitDefault => {
     'myField':   const Rect.fromLTWH(0.00, 0.00, 0.495, 0.42),
     'mateField': const Rect.fromLTWH(0.505, 0.00, 0.495, 0.42),
     'myHand':    const Rect.fromLTWH(0.00, 0.43, 0.495, 0.56),
     'mateHand':  const Rect.fromLTWH(0.505, 0.43, 0.495, 0.56),
   };
 
+  /// 横屏默认：左半屏我方（卡组上+手牌下）、右半屏队友（卡组上+手牌下）
+  static Map<String, Rect> get landscapeDefault => {
+    'myField':   const Rect.fromLTWH(0.00, 0.00, 0.495, 0.48),
+    'myHand':    const Rect.fromLTWH(0.00, 0.49, 0.495, 0.51),
+    'mateField': const Rect.fromLTWH(0.505, 0.00, 0.495, 0.48),
+    'mateHand':  const Rect.fromLTWH(0.505, 0.49, 0.495, 0.51),
+  };
+
+  late Map<String, Rect> portrait;
+  late Map<String, Rect> landscape;
+
   static final LayoutConfig I = LayoutConfig._();
-  LayoutConfig._();
+  LayoutConfig._() {
+    portrait = Map.from(portraitDefault);
+    landscape = Map.from(landscapeDefault);
+  }
+
+  /// 当前方向的配置（由调用方传入 isLandscape）
+  Map<String, Rect> current(bool isLandscape) => isLandscape ? landscape : portrait;
 
   Future<void> load() async {
     final p = await SharedPreferences.getInstance();
+    portrait = await _loadSet(p, 'v');
+    landscape = await _loadSet(p, 'h');
+  }
+
+  Future<Map<String, Rect>> _loadSet(SharedPreferences p, String suffix) async {
+    final result = Map<String, Rect>.from(suffix == 'v' ? portraitDefault : landscapeDefault);
     for (final id in moduleIds) {
-      final s = p.getString('layout_rect_$id');
+      final s = p.getString('layout_rect_${id}_$suffix');
       if (s != null && s.isNotEmpty) {
         try {
           final parts = s.split(',').map(double.parse).toList();
-          if (parts.length == 4) {
-            rects[id] = Rect.fromLTWH(parts[0], parts[1], parts[2], parts[3]);
-          }
+          if (parts.length == 4) result[id] = Rect.fromLTWH(parts[0], parts[1], parts[2], parts[3]);
         } catch (_) {}
       }
     }
+    return result;
   }
 
-  Future<void> save() async {
+  Future<void> save(bool isLandscape) async {
     final p = await SharedPreferences.getInstance();
+    final suffix = isLandscape ? 'h' : 'v';
+    final set = isLandscape ? landscape : portrait;
     for (final id in moduleIds) {
-      final r = rects[id]!;
-      await p.setString('layout_rect_$id',
-          '${r.left},${r.top},${r.width},${r.height}');
+      final r = set[id]!;
+      await p.setString('layout_rect_${id}_$suffix', '${r.left},${r.top},${r.width},${r.height}');
     }
   }
 
-  Future<void> reset() async {
-    rects['myField'] = const Rect.fromLTWH(0.00, 0.00, 0.495, 0.42);
-    rects['mateField'] = const Rect.fromLTWH(0.505, 0.00, 0.495, 0.42);
-    rects['myHand'] = const Rect.fromLTWH(0.00, 0.43, 0.495, 0.56);
-    rects['mateHand'] = const Rect.fromLTWH(0.505, 0.43, 0.495, 0.56);
-    await save();
-  }
-
-  /// 卡片缩放：模块被拉大 → 卡片跟着变大（宽高各占权重）
-  double scaleOf(String id) {
-    final r = rects[id]!;
-    final wScale = r.width / 0.495;
-    final hScale = r.height / (id.endsWith('Field') ? 0.42 : 0.56);
-    return (wScale * 0.6 + hScale * 0.4).clamp(0.55, 2.4);
+  Future<void> reset(bool isLandscape) async {
+    if (isLandscape) {
+      landscape = Map.from(landscapeDefault);
+    } else {
+      portrait = Map.from(portraitDefault);
+    }
+    await save(isLandscape);
   }
 }

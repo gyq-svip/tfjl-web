@@ -19,7 +19,7 @@ class PoolCard {
 }
 
 class AppData {
-  static const appVersion = '1.3.2';
+  static const appVersion = '1.4.0';
   static final AppData I = AppData._();
   AppData._();
 

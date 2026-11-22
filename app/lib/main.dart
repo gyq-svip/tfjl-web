@@ -57,6 +57,8 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
   late AnimationController _wiggleCtrl;  // 编辑态抖动动画
   bool layoutEditing = false;            // 默认锁定
+  bool topBarAutoHide = false;           // 顶栏自动隐藏（可开关）
+  bool topBarExpanded = true;            // 下拉行当前是否展开
   Map<String, dynamic>? proj;
   String gistId = '';
   int sourceMode = 0;               // 0本地 1共享
@@ -90,6 +92,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     };
     final prefs = await SharedPreferences.getInstance();
     lastLocalName = prefs.getString('lastLocal') ?? '';
+    topBarAutoHide = prefs.getBool('topbar_autohide') ?? false;
+    topBarExpanded = !topBarAutoHide;   // 开了自动隐藏则默认收起
     final lib = await ProjectLibrary.load();
     Map<String, dynamic>? local;
     for (final it in lib) {
@@ -229,56 +233,96 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   // ------------------------------------------------------- 顶栏与项目栏
   Widget buildTopBar() {
     final fromShare = sourceMode == 1;
-    return Container(
-      color: const Color(0xFF12122A),
-      padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
-      child: Column(children: [
-        Row(children: [
-          const Text('🛡 塔防助手', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Colors.white)),
-          const Spacer(),
-          GestureDetector(
-            onTap: _showToolsMenu,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-              decoration: BoxDecoration(color: const Color(0xFFFFB300), borderRadius: BorderRadius.circular(7)),
-              child: const Text('☰ 工具', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF07231F))),
-            ),
-          ),
-        ]),
-        const SizedBox(height: 4),
-        SizedBox(
-          height: 30,
-          child: Row(children: [
-            Expanded(
-              flex: 3,
-              child: DropdownButtonFormField<int>(
-                value: sourceMode,
-                dropdownColor: const Color(0xFF1E1E36),
-                decoration: _ddDecor(),
-                style: const TextStyle(fontSize: 11, color: Colors.white),
-                items: const [
-                  DropdownMenuItem(value: 0, child: Text('📱 本地', style: TextStyle(fontSize: 11))),
-                  DropdownMenuItem(value: 1, child: Text('☁ 共享', style: TextStyle(fontSize: 11))),
-                ],
-                onChanged: (v) {
-                  if (v == sourceMode) return;
-                  setState(() {
-                    sourceMode = v!;
-                    if (sourceMode == 0) {
-                      gistId = '';
-                      _loadLocalCurrent();
-                    }
-                    if (sourceMode == 1 && shareIndex == null) _loadShareIndex();
-                  });
-                },
+    final showSelectors = !topBarAutoHide || topBarExpanded;
+    return GestureDetector(
+      // 下滑唤出下拉行（仅自动隐藏开启且当前收起时）
+      onVerticalDragEnd: (d) {
+        if (topBarAutoHide && !topBarExpanded && (d.primaryVelocity ?? 0) > 200) {
+          setState(() => topBarExpanded = true);
+        }
+      },
+      child: Container(
+        color: const Color(0xFF12122A),
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+        child: Column(children: [
+          Row(children: [
+            const Text('🛡 塔防助手', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.white)),
+            const Spacer(),
+            // 当前项目名（收起时也能看到选了哪个）
+            if (topBarAutoHide && !topBarExpanded)
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Text('${proj?['name'] ?? ''}',
+                    style: const TextStyle(fontSize: 10, color: Color(0xFFFFD24A)),
+                    overflow: TextOverflow.ellipsis),
+              ),
+            // 唤出按钮（自动隐藏且收起时显示）
+            if (topBarAutoHide && !topBarExpanded)
+              GestureDetector(
+                onTap: () => setState(() => topBarExpanded = true),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 6),
+                  child: Icon(Icons.expand_more, size: 18, color: Color(0xFF2BB3A3)),
+                ),
+              ),
+            GestureDetector(
+              onTap: _showToolsMenu,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(color: const Color(0xFFFFB300), borderRadius: BorderRadius.circular(7)),
+                child: const Text('☰ 工具', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF07231F))),
               ),
             ),
-            const SizedBox(width: 4),
-            if (!fromShare) ..._localSelectors() else ..._shareSelectors(),
           ]),
-        ),
-      ]),
+          if (showSelectors) ...[
+            const SizedBox(height: 3),
+            SizedBox(
+              height: 30,
+              child: Row(children: [
+                Expanded(
+                  flex: 3,
+                  child: DropdownButtonFormField<int>(
+                    value: sourceMode,
+                    dropdownColor: const Color(0xFF1E1E36),
+                    decoration: _ddDecor(),
+                    style: const TextStyle(fontSize: 11, color: Colors.white),
+                    items: const [
+                      DropdownMenuItem(value: 0, child: Text('📱 本地', style: TextStyle(fontSize: 11))),
+                      DropdownMenuItem(value: 1, child: Text('☁ 共享', style: TextStyle(fontSize: 11))),
+                    ],
+                    onChanged: (v) {
+                      if (v == sourceMode) return;
+                      setState(() {
+                        sourceMode = v!;
+                        if (sourceMode == 0) { gistId = ''; _loadLocalCurrent(); }
+                        if (sourceMode == 1 && shareIndex == null) _loadShareIndex();
+                      });
+                      _maybeCollapseTopBar();
+                    },
+                  ),
+                ),
+                const SizedBox(width: 4),
+                if (!fromShare) ..._localSelectors(onPicked: _maybeCollapseTopBar) else ..._shareSelectors(onPicked: _maybeCollapseTopBar),
+                // 展开态收起按钮
+                if (topBarAutoHide)
+                  GestureDetector(
+                    onTap: () => setState(() => topBarExpanded = false),
+                    child: const Padding(
+                      padding: EdgeInsets.only(left: 4),
+                      child: Icon(Icons.expand_less, size: 18, color: Color(0xFF2BB3A3)),
+                    ),
+                  ),
+              ]),
+            ),
+          ],
+        ]),
+      ),
     );
+  }
+
+  /// 选完项目后自动收起顶栏（仅自动隐藏开启时）
+  void _maybeCollapseTopBar() {
+    if (topBarAutoHide && mounted) setState(() => topBarExpanded = false);
   }
 
   InputDecoration _ddDecor() => InputDecoration(
@@ -289,7 +333,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
       );
 
-  List<Widget> _localSelectors() {
+  List<Widget> _localSelectors({VoidCallback? onPicked}) {
     return [
       FutureBuilder<List<dynamic>>(
         future: ProjectLibrary.load(),
@@ -359,6 +403,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       lastLocalName = v;
                     });
                     SharedPreferences.getInstance().then((p) => p.setString('lastLocal', v));
+                    onPicked?.call();
                     break;
                   }
                 }
@@ -370,7 +415,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     ];
   }
 
-  List<Widget> _shareSelectors() {
+  List<Widget> _shareSelectors({VoidCallback? onPicked}) {
     if (shareIndex == null) {
       return const [
         Expanded(flex: 1, child: _DisabledBox('分类…')),
@@ -421,6 +466,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 final gid = (e['id'] ?? '').toString();
                 if (gid.isNotEmpty && gid != gistId) {
                   setState(() { gistId = gid; loading = true; });
+                  onPicked?.call();   // 选完立即收起顶栏让出空间
                   // 缓存秒开
                   final cproj = await GistClient.readProjectCached(gid);
                   if (mounted && cproj != null) setState(() { proj = cproj; loading = false; });
@@ -524,6 +570,21 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         ListTile(leading: const Text('🌐', style: TextStyle(fontSize: 20)), title: const Text('网络自检', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
           subtitle: const Text('共享打不开？测一下是哪个环节不通', style: TextStyle(fontSize: 10, color: Colors.white54)),
           onTap: () { Navigator.pop(context); _showNetCheck(); }),
+        StatefulBuilder(builder: (ctx, setSheet) => ListTile(
+          leading: const Text('🔽', style: TextStyle(fontSize: 20)),
+          title: const Text('顶栏自动隐藏', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+          subtitle: Text('开：平时收起，点顶部 ▾ 或下滑唤出，选完自动收起', style: TextStyle(fontSize: 10, color: Colors.white54)),
+          trailing: Switch(
+            value: topBarAutoHide,
+            activeColor: const Color(0xFF2BB3A3),
+            onChanged: (v) async {
+              setState(() { topBarAutoHide = v; topBarExpanded = !v; });
+              setSheet(() {});
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('topbar_autohide', v);
+            },
+          ),
+        )),
       ]),
     ));
   }
@@ -597,7 +658,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     ),
                     if (layoutEditing)
                       GestureDetector(
-                        onTap: () async { await LayoutConfig.I.reset(); setState(() {}); },
+                        onTap: () async {
+                          await LayoutConfig.I.reset(MediaQuery.of(context).orientation == Orientation.landscape);
+                          setState(() {});
+                        },
                         child: const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 5),
                           child: Text('重置', style: TextStyle(fontSize: 9, color: Color(0xFFFF8A80))),
@@ -607,9 +671,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 ),
                 Expanded(
                   child: LayoutBuilder(builder: (context, constraints) {
+                    final isLand = MediaQuery.of(context).orientation == Orientation.landscape;
                     return Stack(children: [
                       for (final id in LayoutConfig.moduleIds)
-                        _buildFreeModule(id, constraints.maxWidth, constraints.maxHeight),
+                        _buildFreeModule(id, constraints.maxWidth, constraints.maxHeight, isLand),
                     ]);
                   }),
                 ),
@@ -619,8 +684,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   /// 自由定位模块：拖标题移动位置、拖右下角缩放宽高（像桌面窗口）
-  Widget _buildFreeModule(String moduleId, double canvasW, double canvasH) {
-    final r = LayoutConfig.I.rects[moduleId]!;
+  Widget _buildFreeModule(String moduleId, double canvasW, double canvasH, bool isLandscape) {
+    final rects = LayoutConfig.I.current(isLandscape);
+    final r = rects[moduleId]!;
     final isMine = moduleId == 'myField' || moduleId == 'myHand';
     final isField = moduleId.endsWith('Field');
     final accent = isMine ? const Color(0xFF67D2F5) : const Color(0xFFC79BF0);
@@ -667,15 +733,15 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 behavior: HitTestBehavior.opaque,
                 onPanUpdate: layoutEditing ? (d) {
                   setState(() {
-                    final nr = LayoutConfig.I.rects[moduleId]!;
-                    LayoutConfig.I.rects[moduleId] = Rect.fromLTWH(
+                    final nr = rects[moduleId]!;
+                    rects[moduleId] = Rect.fromLTWH(
                       (nr.left + d.delta.dx / canvasW).clamp(0.0, 1.0 - nr.width),
                       (nr.top + d.delta.dy / canvasH).clamp(0.0, 1.0 - nr.height),
                       nr.width, nr.height,
                     );
                   });
                 } : null,
-                onPanEnd: layoutEditing ? (_) => LayoutConfig.I.save() : null,
+                onPanEnd: layoutEditing ? (_) => LayoutConfig.I.save(isLandscape) : null,
                 child: Container(
                   height: 24,
                   color: layoutEditing ? const Color(0x40FFD24A) : const Color(0x18FFFFFF),
@@ -697,15 +763,15 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   behavior: HitTestBehavior.opaque,
                   onPanUpdate: (d) {
                     setState(() {
-                      final nr = LayoutConfig.I.rects[moduleId]!;
-                      LayoutConfig.I.rects[moduleId] = Rect.fromLTWH(
+                      final nr = rects[moduleId]!;
+                      rects[moduleId] = Rect.fromLTWH(
                         nr.left, nr.top,
                         (nr.width + d.delta.dx / canvasW).clamp(0.22, 1.0 - nr.left),
                         (nr.height + d.delta.dy / canvasH).clamp(0.18, 1.0 - nr.top),
                       );
                     });
                   },
-                  onPanEnd: (_) => LayoutConfig.I.save(),
+                  onPanEnd: (_) => LayoutConfig.I.save(isLandscape),
                   child: Container(
                     width: 26, height: 26,
                     decoration: BoxDecoration(
