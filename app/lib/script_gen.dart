@@ -180,7 +180,12 @@ class ScriptGen {
     return toLaoMa(result);
   }
 
-  /// 隐藏榜专属：无敌链切卡（小野8秒 → 凤凰6秒）
+  /// 隐藏榜专属：无敌链切卡 —— 严格照搬网页 buildHiddenSwitchPart（app-features.js 7740）
+  /// 4 种情况：
+  ///  1 小野没上阵+凤凰没上阵+卡>6 → 小野 02:26/02:31 + 凤凰三段 02:44/02:49/02:50
+  ///  2 只有凤凰没小野 → 凤凰三段 02:44/02:49/02:50
+  ///  3 小野没上阵+凤凰已上阵 → 02:26下凤凰上小野 / 02:31下小野上凤凰 / 02:50下凤凰上小野
+  ///  4 小野已上阵+凤凰没上阵 → 02:44下小野上凤凰3级 / 02:49上凤凰满 / 02:50下凤凰上小野
   static String _hiddenSwitchPart({
     required List<String> arranged, required List<String> heroNames,
     required List<String> gongChengCards,
@@ -194,6 +199,7 @@ class ScriptGen {
     final xiaoDeployed = arranged.any((n) => n.contains('小野'));
     final nonCount = heroNames.where((n) =>
         !_containsAny(n, gongChengNames) && !_containsAny(n, jingLingNames)).length;
+
     final xiaoNot = xiaoCarried && !xiaoDeployed;
     final fengNot = fengCarried && !fengDeployed;
     final jl = <String>[];
@@ -203,15 +209,30 @@ class ScriptGen {
     if (hasHun) jl.add('每3秒共5000次魂精灵');
     final jlStr = jl.isNotEmpty ? ',${jl.join(',')}' : '';
 
-    if (xiaoNot && !fengDeployed && nonCount > 6) {
+    // 情况1的小野上下：小野没上阵 + 凤凰没上阵(或未携带) + 卡>6
+    final needXiao = xiaoNot && !fengDeployed && nonCount > 6;
+    if (needXiao) {
       buf.writeln('02:26,下$first,上小野满$jlStr,');
       buf.writeln('02:31,下小野,上$first满$jlStr,');
     }
-    if (xiaoNot && fengDeployed) buf.writeln('02:36,下凤凰,上小野满$jlStr,');
-    if (xiaoDeployed && fengNot) buf.writeln('02:38,下小野,上凤凰满$jlStr,');
-    if (!xiaoCarried && fengNot) {
-      buf.writeln('02:26,上凤凰满$jlStr,');
-      buf.writeln('02:31,下凤凰,上$first满$jlStr,');
+
+    // 情况3：小野没上阵 + 凤凰携带且已上阵 → 小野优先上扛02:30，02:50再换小野
+    final needFengToXiao = xiaoNot && fengCarried && fengDeployed;
+    if (needFengToXiao) {
+      buf.writeln('02:26,下凤凰,上小野满$jlStr,');
+      buf.writeln('02:31,下小野,上凤凰满$jlStr,');
+      buf.writeln('02:50,下凤凰,上小野满$jlStr,');
+    }
+
+    // 凤凰三段（情况1/2/4）
+    final onlyFeng = fengNot && !xiaoCarried;                       // 情况2
+    final needFeng = fengNot && (needXiao || xiaoDeployed || onlyFeng);
+    if (needFeng) {
+      // 情况4用「小野」做切回卡，情况1/2用「第一张卡」
+      final backCard = (xiaoDeployed && !needXiao) ? '小野' : first;
+      buf.writeln('02:44,下$backCard,上凤凰3级,');
+      buf.writeln('02:49,上凤凰满,');
+      buf.writeln('02:50,下凤凰,上$backCard满$jlStr,');
     }
     return buf.toString();
   }
