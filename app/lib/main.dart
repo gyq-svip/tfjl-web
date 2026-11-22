@@ -587,7 +587,7 @@ class _HomePageState extends State<HomePage> {
                             Text('⚔ ${proj?['name'] ?? '出战选择'}',
                                 style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))),
                             const Spacer(),
-                            const Text('⠿ 拖动模块 · ⤢ 改大小', style: TextStyle(fontSize: 9, color: Colors.white38)),
+                            const Text('按住 ⠿ 拖动排序 · 点「大小」调卡片', style: TextStyle(fontSize: 9, color: Colors.white54)),
                           ]),
                         );
                       }
@@ -636,8 +636,12 @@ class _HomePageState extends State<HomePage> {
           ReorderableDragStartListener(
             index: listIndex,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-              child: Text('⠿', style: TextStyle(fontSize: 15, color: Colors.white.withAlpha(120))),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.drag_indicator, size: 16, color: Color(0xFF9BE9E0)),
+                const SizedBox(width: 2),
+                const Text('拖', style: TextStyle(fontSize: 9, color: Color(0xFF9BE9E0))),
+              ]),
             ),
           ),
           Expanded(child: Text(LayoutConfig.moduleNames[moduleId] ?? moduleId,
@@ -645,12 +649,21 @@ class _HomePageState extends State<HomePage> {
           GestureDetector(
             onTap: () => setState(() => LayoutConfig.I.nextSize(moduleId)),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-              decoration: BoxDecoration(color: Colors.white.withAlpha(25), borderRadius: BorderRadius.circular(5)),
-              child: Text(['小', '中', '大'][sizeIdx], style: const TextStyle(fontSize: 9, color: Colors.white70)),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2BB3A3),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFF5FE0CE), width: 1),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.unfold_more, size: 13, color: Color(0xFF07231F)),
+                const SizedBox(width: 3),
+                Text('大小:${['小', '中', '大'][sizeIdx]}',
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF07231F))),
+              ]),
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 4),
         ]),
         // 模块内容
         if (isField) buildCardGroup(isMine, moduleId) else buildHandGroup(isMine, moduleId),
