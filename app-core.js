@@ -35836,31 +35836,42 @@ ${maSection}
 
         // 🔴 2026-10-21 右侧悬浮工具条只在主页显示：任何全屏弹层（管理面板/管理子页如读写诊断/子页iframe）
         //    打开时自动隐藏，全部关闭后恢复。轮询兜底（400ms，开销极小），不依赖各处手动调用。
+        // 🔴 2026-11-22 升级为「只在主页显示」：通用扫描所有 body 直属浮层（id 以 Modal/Overlay/Panel 结尾），
+        //    任一可见即隐藏工具条 —— 覆盖聊天室/设置/计算/阅读器等此前漏掉的面板，且以后新增浮层自动生效，
+        //    不用再逐个补 ID（用户反馈「全队合计/卡组工具一直显示很怪异」）。
         (function () {
-            const OVERLAY_IDS = ['adminPanelOverlay', 'subpageModal'];
+            // 这些不算遮挡层：工具条自己的折叠子面板（点开「卡组工具」时它本身可见，绝不能隐藏父容器）、登录门（由 mainContent.visible 管辖）
+            const SKIP_IDS = { selSidePanel: 1, passwordOverlay: 1 };
+            const LAYER_SUFFIX = /(Modal|Overlay|Panel)$/;
+            function _isLayerVisible(el) {
+                try {
+                    return window.getComputedStyle(el).display !== 'none';
+                } catch (e) {
+                    return !!(el.style.display && el.style.display !== 'none');
+                }
+            }
             window._syncSelSideCtrls = function () {
                 const ssc = document.getElementById('selSideCtrls');
                 if (!ssc) return;
                 // 🔴 纠正旧缓存 index.html 里遗留的高 z-index（曾置顶，比菜单还高）：强制压回常规层级
                 if (ssc.style.zIndex !== '900') ssc.style.zIndex = '900';
                 let covered = false;
-                // 顶部「☰ 菜单」下拉展开时也隐藏，绝不挡菜单
-                const bm = document.getElementById('backupMenu');
-                if (bm && bm.style.display && bm.style.display !== 'none') covered = true;
-                for (let i = 0; i < OVERLAY_IDS.length; i++) {
-                    const el = document.getElementById(OVERLAY_IDS[i]);
-                    if (el && el.style.display && el.style.display !== 'none') { covered = true; break; }
-                }
+                // ① 未登录 / 主界面未显示 → 隐藏
+                const mc = document.getElementById('mainContent');
+                if (!mc || !mc.classList.contains('visible')) covered = true;
+                // ② 顶部「☰ 菜单」下拉展开时也隐藏，绝不挡菜单
                 if (!covered) {
-                    // 🔴 2026-11-03 只在管理面板本身可见时才看子页：子页都在 overlay 内部，overlay 隐藏时
-                    //   它们即使残留 display:block 也不会遮挡界面，不能因此把右侧工具条永久藏起来（用户反馈"卡组工具消失"）。
-                    const ov = document.getElementById('adminPanelOverlay');
-                    const ovVisible = !!(ov && ov.style.display && ov.style.display !== 'none');
-                    if (ovVisible) {
-                        const pages = document.querySelectorAll('[id^="adminPage"]');
-                        for (let i = 0; i < pages.length; i++) {
-                            if (pages[i].style.display && pages[i].style.display !== 'none') { covered = true; break; }
-                        }
+                    const bm = document.getElementById('backupMenu');
+                    if (bm && bm.style.display && bm.style.display !== 'none') covered = true;
+                }
+                // ③ 任何遮挡浮层可见 → 隐藏（通用扫描，body 直属；管理子页都嵌在 adminPanelOverlay 内会被一并覆盖）
+                if (!covered) {
+                    const kids = document.body.children;
+                    for (let i = 0; i < kids.length; i++) {
+                        const el = kids[i];
+                        const id = el.id || '';
+                        if (SKIP_IDS[id] || !LAYER_SUFFIX.test(id)) continue;
+                        if (_isLayerVisible(el)) { covered = true; break; }
                     }
                 }
                 const want = covered ? 'none' : 'flex';
