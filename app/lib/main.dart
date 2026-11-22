@@ -565,109 +565,120 @@ class _HomePageState extends State<HomePage> {
             : Column(children: [
                 buildTopBar(),
                 if (packPct >= 0) _packProgress(),
-                Expanded(
-                  child: ReorderableListView.builder(
-                    padding: const EdgeInsets.fromLTRB(4, 4, 4, 10),
-                    itemCount: LayoutConfig.I.order.length + 1,
-                    onReorder: (oldIdx, newIdx) => _reorderModule(oldIdx, newIdx),
-                    buildDefaultDragHandles: false,
-                    proxyDecorator: (child, index, animation) => Material(
-                      elevation: 6,
-                      color: const Color(0xFF24243E),
-                      borderRadius: BorderRadius.circular(10),
-                      child: child,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  child: Row(children: [
+                    Text('⚔ ${proj?['name'] ?? '出战选择'}',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))),
+                    const Spacer(),
+                    const Text('拖标题移动 · 拖右下角缩放', style: TextStyle(fontSize: 9, color: Colors.white38)),
+                    GestureDetector(
+                      onTap: () async { await LayoutConfig.I.reset(); setState(() {}); },
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 5),
+                        child: Text('重置', style: TextStyle(fontSize: 9, color: Color(0xFF2BB3A3))),
+                      ),
                     ),
-                    itemBuilder: (context, index) {
-                      // 第 0 项是项目名称头（不可拖动）
-                      if (index == 0) {
-                        return Padding(
-                          key: const ValueKey('title'),
-                          padding: const EdgeInsets.only(left: 3, bottom: 4),
-                          child: Row(children: [
-                            Text('⚔ ${proj?['name'] ?? '出战选择'}',
-                                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))),
-                            const Spacer(),
-                            const Text('按住 ⠿ 拖动排序 · 点「大小」调卡片', style: TextStyle(fontSize: 9, color: Colors.white54)),
-                          ]),
-                        );
-                      }
-                      final moduleId = LayoutConfig.I.order[index - 1];
-                      return _buildModule(moduleId, index);
-                    },
-                  ),
+                  ]),
+                ),
+                Expanded(
+                  child: LayoutBuilder(builder: (context, constraints) {
+                    return Stack(children: [
+                      for (final id in LayoutConfig.moduleIds)
+                        _buildFreeModule(id, constraints.maxWidth, constraints.maxHeight),
+                    ]);
+                  }),
                 ),
               ]),
       ),
     );
   }
 
-  /// 模块拖动排序（第 0 项是标题，不可拖，所以索引要 -1）
-  void _reorderModule(int oldIdx, int newIdx) {
-    final o = oldIdx - 1;
-    var n = newIdx - 1;
-    if (o < 0 || o >= LayoutConfig.I.order.length) return;
-    if (n < 0) n = 0;
-    if (n >= LayoutConfig.I.order.length) n = LayoutConfig.I.order.length - 1;
-    if (o == n) return;
-    setState(() {
-      final item = LayoutConfig.I.order.removeAt(o);
-      LayoutConfig.I.order.insert(n, item);
-    });
-    LayoutConfig.I.save();
-  }
-
-  /// 单个模块外壳：⠿ 拖动把手 + ⤢ 大小切换 + 模块内容
-  Widget _buildModule(String moduleId, int listIndex) {
+  /// 自由定位模块：拖标题移动位置、拖右下角缩放宽高（像桌面窗口）
+  Widget _buildFreeModule(String moduleId, double canvasW, double canvasH) {
+    final r = LayoutConfig.I.rects[moduleId]!;
     final isMine = moduleId == 'myField' || moduleId == 'myHand';
     final isField = moduleId.endsWith('Field');
-    final sizeIdx = LayoutConfig.I.sizes[moduleId] ?? 1;
     final accent = isMine ? const Color(0xFF67D2F5) : const Color(0xFFC79BF0);
-    return Container(
-      key: ValueKey(moduleId),
-      margin: const EdgeInsets.only(bottom: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFF14142A),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withAlpha(18)),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        // 模块头：拖动把手 + 名字 + 大小切换
-        Row(children: [
-          ReorderableDragStartListener(
-            index: listIndex,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.drag_indicator, size: 16, color: Color(0xFF9BE9E0)),
-                const SizedBox(width: 2),
-                const Text('拖', style: TextStyle(fontSize: 9, color: Color(0xFF9BE9E0))),
-              ]),
-            ),
+    final left = r.left * canvasW;
+    final top = r.top * canvasH;
+    final width = r.width * canvasW;
+    final height = r.height * canvasH;
+
+    return Positioned(
+      left: left, top: top, width: width, height: height,
+      child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xF014142A),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: accent.withAlpha(90), width: 1),
           ),
-          Expanded(child: Text(LayoutConfig.moduleNames[moduleId] ?? moduleId,
-              style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: accent))),
-          GestureDetector(
-            onTap: () => setState(() => LayoutConfig.I.nextSize(moduleId)),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2BB3A3),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: const Color(0xFF5FE0CE), width: 1),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Stack(children: [
+              // 内容（留标题栏空间）
+              Positioned.fill(
+                top: 24,
+                child: SingleChildScrollView(
+                  child: isField ? buildCardGroup(isMine, moduleId) : buildHandGroup(isMine, moduleId),
+                ),
               ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.unfold_more, size: 13, color: Color(0xFF07231F)),
-                const SizedBox(width: 3),
-                Text('大小:${['小', '中', '大'][sizeIdx]}',
-                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF07231F))),
-              ]),
-            ),
+              // 标题栏（拖这里移动模块）
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onPanUpdate: (d) {
+                  setState(() {
+                    final nr = LayoutConfig.I.rects[moduleId]!;
+                    LayoutConfig.I.rects[moduleId] = Rect.fromLTWH(
+                      (nr.left + d.delta.dx / canvasW).clamp(0.0, 1.0 - nr.width),
+                      (nr.top + d.delta.dy / canvasH).clamp(0.0, 1.0 - nr.height),
+                      nr.width, nr.height,
+                    );
+                  });
+                },
+                onPanEnd: (_) => LayoutConfig.I.save(),
+                child: Container(
+                  height: 24,
+                  color: const Color(0x30FFFFFF),
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Row(children: [
+                    Icon(Icons.drag_indicator, size: 14, color: accent),
+                    const SizedBox(width: 3),
+                    Expanded(child: Text(LayoutConfig.moduleNames[moduleId] ?? moduleId,
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: accent),
+                        overflow: TextOverflow.ellipsis)),
+                  ]),
+                ),
+              ),
+              // 右下角缩放把手（拖这里改宽高）
+              Positioned(
+                right: 0, bottom: 0,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onPanUpdate: (d) {
+                    setState(() {
+                      final nr = LayoutConfig.I.rects[moduleId]!;
+                      LayoutConfig.I.rects[moduleId] = Rect.fromLTWH(
+                        nr.left, nr.top,
+                        (nr.width + d.delta.dx / canvasW).clamp(0.22, 1.0 - nr.left),
+                        (nr.height + d.delta.dy / canvasH).clamp(0.18, 1.0 - nr.top),
+                      );
+                    });
+                  },
+                  onPanEnd: (_) => LayoutConfig.I.save(),
+                  child: Container(
+                    width: 26, height: 26,
+                    decoration: BoxDecoration(
+                      color: const Color(0x552BB3A3),
+                      borderRadius: const BorderRadius.only(bottomRight: Radius.circular(10)),
+                    ),
+                    child: const Icon(Icons.zoom_out_map, size: 18, color: Color(0xFF9BE9E0)),
+                  ),
+                ),
+              ),
+            ]),
           ),
-          const SizedBox(width: 4),
-        ]),
-        // 模块内容
-        if (isField) buildCardGroup(isMine, moduleId) else buildHandGroup(isMine, moduleId),
-      ]),
+        ),
     );
   }
 
