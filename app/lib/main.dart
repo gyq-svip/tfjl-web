@@ -10,6 +10,7 @@ import 'net_prime.dart';
 import 'net_check_sheet.dart';
 import 'layout_config.dart';
 import 'floating_panel.dart';
+import 'notepad_sheet.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,6 +63,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   bool topBarExpanded = true;            // 下拉行当前是否展开
   bool poolSideMine = true;              // 悬浮卡池当前服务哪一侧
   bool poolOverlayOpen = false;          // 悬浮卡池是否显示
+  bool notepadOverlayOpen = false;       // 悬浮记事本是否显示
   Map<String, dynamic>? proj;
   String gistId = '';
   int sourceMode = 0;               // 0本地 1共享
@@ -570,6 +572,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         ListTile(leading: const Text('📖', style: TextStyle(fontSize: 20)), title: const Text('使用说明', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
           subtitle: const Text('上下卡 / 设置 / 卡池的用法', style: TextStyle(fontSize: 10, color: Colors.white54)),
           onTap: () { Navigator.pop(context); _showHelp(); }),
+        ListTile(leading: const Text('📝', style: TextStyle(fontSize: 20)), title: const Text('记事本', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+          subtitle: const Text('当前阵容的笔记，随项目走、自动保存', style: TextStyle(fontSize: 10, color: Colors.white54)),
+          onTap: () { Navigator.pop(context); setState(() => notepadOverlayOpen = true); }),
         ListTile(leading: const Text('🌐', style: TextStyle(fontSize: 20)), title: const Text('网络自检', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
           subtitle: const Text('共享打不开？测一下是哪个环节不通', style: TextStyle(fontSize: 10, color: Colors.white54)),
           onTap: () { Navigator.pop(context); _showNetCheck(); }),
@@ -695,6 +700,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             child: PoolSheet(isMine: poolSideMine, proj: proj!, embedded: true,
                 onAdded: () { refresh(); persistProject(); },
                 onSwitchSide: () => setState(() => poolSideMine = !poolSideMine)),
+          ),
+        // 悬浮记事本
+        if (notepadOverlayOpen && proj != null)
+          FloatingPanel(
+            storageKey: 'floating_panel_notepad',
+            title: '📝 记事本 · ${proj?['name'] ?? ''}',
+            accent: const Color(0xFF9BE9E0),
+            onClose: () => setState(() => notepadOverlayOpen = false),
+            defaultRect: const Rect.fromLTWH(0.18, 0.18, 0.66, 0.62),
+            child: NotepadSheet(proj: proj!, onChanged: persistProject),
           ),
       ]),  // Stack
     );
