@@ -616,12 +616,12 @@ class _HomePageState extends State<HomePage> {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(10),
             child: Stack(children: [
-              // 内容（留标题栏空间）
+              // 内容（留标题栏空间）—— 传模块可用宽高，卡片按比例塞满、全部可见
               Positioned.fill(
                 top: 24,
-                child: SingleChildScrollView(
-                  child: isField ? buildCardGroup(isMine, moduleId) : buildHandGroup(isMine, moduleId),
-                ),
+                child: isField
+                    ? buildCardGroup(isMine, width, height - 24)
+                    : buildHandGroup(isMine, width, height - 24),
               ),
               // 标题栏（拖这里移动模块）
               GestureDetector(
@@ -695,18 +695,20 @@ class _HomePageState extends State<HomePage> {
   }
 
   // ------------------------------------------------------- 卡组区
-  Widget buildCardGroup(bool isMine, String moduleId) {
+  /// boxW/boxH = 模块内容区可用宽高（已扣标题栏）。卡片按比例缩放，保证 7 张全显示。
+  Widget buildCardGroup(bool isMine, double boxW, double boxH) {
     final hand = handCards(isMine);
     var filled = 0;
     for (final c in hand) {
       final pl = (c as Map<String, dynamic>)['placed']?.toString() ?? '';
       if (pl.isNotEmpty && pl != 'null') filled++;
     }
-    final scale = LayoutConfig.I.scaleOf(moduleId);
-    // 模块现在独占整行，卡片按档位放大
-    final colW = (MediaQuery.of(context).size.width - 30) / 2;
     final gap = 4.0;
-    final cardW = (colW - gap) / 2 * scale;
+    // 布局：1 主卡 + 3 排×2 = 4 行；宽度方向 2 列
+    final cardWByWidth = (boxW - 8 - gap) / 2;
+    final cardHByHeight = (boxH - 8 - gap * 3) / 4;
+    // 卡片保持 0.92 宽高比，取宽高中较小者，确保不溢出
+    final cardW = (cardWByWidth < cardHByHeight / 0.92 ? cardWByWidth : cardHByHeight / 0.92).clamp(18.0, 240.0);
     final cardH = cardW * 0.92;
 
     Widget slot(String id) {
@@ -773,19 +775,20 @@ class _HomePageState extends State<HomePage> {
   }
 
   // ------------------------------------------------------- 手牌区
-  Widget buildHandGroup(bool isMine, String moduleId) {
+  /// boxW/boxH = 模块内容区可用宽高。手牌 2 排×5 + 顶部按钮行，按比例塞满、10 张全显示。
+  Widget buildHandGroup(bool isMine, double boxW, double boxH) {
     final hand = handCards(isMine);
     final chariot = proj?[isMine ? 'myChariot' : 'teammateChariot'] as Map<String, dynamic>?;
     final dr = AppData.chariotSideDr(chariot);
     final mainN = chariot?['main'] ?? 1;
     final subN = chariot?['sub'] ?? 0;
     final mainLv = chariot?['mainLv'] ?? 1;
-    final scale = LayoutConfig.I.scaleOf(moduleId);
-    final boxW = MediaQuery.of(context).size.width - 22;
-    final g = 4.0;
-    final baseCw = (boxW - g * 4) / 5;
-    final cw = baseCw * scale;
-    final ch = cw * 0.82;   // 之前 0.65 太扁，放大后名字看得清
+    final g = 3.0;
+    // 顶部按钮行约 22px；2 排卡片
+    final cardWByWidth = (boxW - 6 - g * 4) / 5;
+    final cardHByHeight = (boxH - 26 - 6 - g) / 2;
+    final cw = (cardWByWidth < cardHByHeight / 0.82 ? cardWByWidth : cardHByHeight / 0.82).clamp(16.0, 200.0);
+    final ch = cw * 0.82;
 
     return Padding(
       padding: const EdgeInsets.only(top: 6),
@@ -814,12 +817,9 @@ class _HomePageState extends State<HomePage> {
           ),
         ]),
         const SizedBox(height: 4),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 2),
-          child: Container(
-            decoration: BoxDecoration(color: Colors.white.withAlpha(20), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white.withAlpha(25))),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          decoration: BoxDecoration(color: Colors.white.withAlpha(20), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white.withAlpha(25))),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
               for (var r = 0; r < 2; r++)
                 Padding(
                   padding: EdgeInsets.only(top: r > 0 ? g : 0, left: 2, right: 2, bottom: 2),
@@ -880,7 +880,6 @@ class _HomePageState extends State<HomePage> {
                 ]),
               ),
           ]),
-        ),
         ),
       ]),
     );
