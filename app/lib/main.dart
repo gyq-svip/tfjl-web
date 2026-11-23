@@ -900,6 +900,45 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         ),  // SafeArea
         // 🔴 悬浮下拉选择行（自动隐藏开启且展开时）：浮在内容之上，不挤占布局
         if (topBarAutoHide && topBarExpanded && proj != null) _buildFloatingSelectors(),
+        // 🔴 编辑布局模式：悬浮「完成/重置」条（完成按钮在这里，不用回设置）
+        if (layoutEditing)
+          Positioned(
+            left: 0, right: 0, bottom: 10,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A2E),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: const Color(0xFFFFD24A), width: 0.8),
+                  boxShadow: [BoxShadow(color: Colors.black.withAlpha(120), blurRadius: 12, offset: const Offset(0, 3))],
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Padding(padding: EdgeInsets.symmetric(horizontal: 6),
+                      child: Text('✎ 编辑中：拖标题移动 · 拖右下角缩放',
+                          style: TextStyle(fontSize: 10, color: Color(0xFFFFD24A)))),
+                  GestureDetector(
+                    onTap: () => setState(() => layoutEditing = false),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                      decoration: BoxDecoration(color: const Color(0xFFFFD24A), borderRadius: BorderRadius.circular(14)),
+                      child: const Text('✓ 完成',
+                          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E))),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () async {
+                      await LayoutConfig.I.reset(MediaQuery.of(context).orientation == Orientation.landscape);
+                      if (mounted) setState(() {});
+                    },
+                    child: const Padding(padding: EdgeInsets.symmetric(horizontal: 6),
+                        child: Text('↺ 重置', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFFF8A80)))),
+                  ),
+                ]),
+              ),
+            ),
+          ),
         // 悬浮卡池（可拖动/缩放，不挡全屏）
         if (poolOverlayOpen && proj != null)
           FloatingPanel(
