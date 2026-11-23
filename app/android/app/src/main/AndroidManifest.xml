@@ -1,5 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- 安卓应用内更新：下载 APK 后拉起系统安装器必须有此权限（否则 InstallStart 直接拒绝） -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <application
         android:label="塔防助手"
         android:name="${applicationName}"
