@@ -19,34 +19,34 @@ class VersionCheck {
   static final _assetRe =
       RegExp(r'^tfjl-(android|ios)-v(\d+\.\d+\.\d+)\.(apk|ipa)$');
 
+  /// 版本清单：GitHub Pages 静态文件（与 PC updater.json / 皮肤 skins-index.json 同一套路）
+  /// 🔴 不用 Gitee API（匿名限流 403）、不用 CDN —— 清单随主站 main 分支自动发布
+  static const _versionUrl = 'https://gyq-svip.github.io/tfjl-web/app-version.json';
+
   /// 拉最新版本信息。失败抛异常（带原因），成功返回版本信息
   static Future<({String ver, String apkUrl, String ipaUrl, String body})> _fetchLatest() async {
     final http.Response r;
     try {
       r = await http
-          .get(Uri.parse(_releaseApi), headers: {'User-Agent': 'TFJL-App'})
+          .get(Uri.parse(_versionUrl), headers: {'User-Agent': 'TFJL-App'})
           .timeout(const Duration(seconds: 12));
     } catch (e) {
       throw Exception('网络异常（$e）');
     }
     if (r.statusCode != 200) {
-      throw Exception('Gitee 返回 HTTP ${r.statusCode}');
+      throw Exception('版本清单 HTTP ${r.statusCode}');
     }
-    final rel = jsonDecode(r.body) as Map<String, dynamic>;
-    final assets = (rel['assets'] as List?) ?? const [];
-    String? ver, apkUrl, ipaUrl;
-    for (final a in assets) {
-      if (a is! Map) continue;
-      final m = _assetRe.firstMatch((a['name'] ?? '').toString());
-      if (m == null) continue;
-      final url = (a['browser_download_url'] ?? '').toString();
-      if (m.group(1) == 'android') { ver = m.group(2); apkUrl = url; }
-      if (m.group(1) == 'ios') ipaUrl = url;
+    final d = jsonDecode(r.body) as Map<String, dynamic>;
+    final ver = d['version']?.toString() ?? '';
+    if (ver.isEmpty) {
+      throw Exception('版本清单内容为空');
     }
-    if (ver == null) {
-      throw Exception('发行版里没有安卓安装包（附件名不匹配）');
-    }
-    return (ver: ver, apkUrl: apkUrl ?? '', ipaUrl: ipaUrl ?? '', body: (rel['body'] ?? '').toString().trim());
+    return (
+      ver: ver,
+      apkUrl: d['apk']?.toString() ?? '',
+      ipaUrl: d['ipa']?.toString() ?? '',
+      body: d['body']?.toString() ?? '',
+    );
   }
 
   /// 启动后静默检查一次；任何失败（无网/超时/仓库不可达）一律不打扰
