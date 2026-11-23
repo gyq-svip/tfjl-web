@@ -298,38 +298,45 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   // ------------------------------------------------------- 顶栏与项目栏
   /// 顶栏第一行（常驻）：标题 + 快捷功能 chips +（收起时）项目名/唤出按钮
+  /// 🔴 自动隐藏关闭时：下拉选择行跟在第一行下面常驻显示（修复：重构后漏加回导致项目菜单调不出来）
   Widget buildTopBar() {
     return Container(
       color: const Color(0xFF12122A),
       padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-      child: SizedBox(
-        height: 30,
-        child: Row(children: [
-          const Text('🛡 塔防助手', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.white)),
-          // 当前项目名（收起时也能看到选了哪个）
-          if (topBarAutoHide && !topBarExpanded)
-            Padding(
-              padding: const EdgeInsets.only(left: 6),
-              child: Text('${proj?['name'] ?? ''}',
-                  style: const TextStyle(fontSize: 10, color: Color(0xFFFFD24A)),
-                  overflow: TextOverflow.ellipsis),
-            ),
-          // 唤出按钮（自动隐藏且收起时显示）
-          if (topBarAutoHide && !topBarExpanded)
-            GestureDetector(
-              onTap: () => setState(() => topBarExpanded = true),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 6),
-                child: Icon(Icons.expand_more, size: 18, color: Color(0xFF2BB3A3)),
+      child: Column(children: [
+        SizedBox(
+          height: 30,
+          child: Row(children: [
+            const Text('🛡 塔防助手', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.white)),
+            // 当前项目名（收起时也能看到选了哪个）
+            if (topBarAutoHide && !topBarExpanded)
+              Padding(
+                padding: const EdgeInsets.only(left: 6),
+                child: Text('${proj?['name'] ?? ''}',
+                    style: const TextStyle(fontSize: 10, color: Color(0xFFFFD24A)),
+                    overflow: TextOverflow.ellipsis),
               ),
+            // 唤出按钮（自动隐藏且收起时显示）
+            if (topBarAutoHide && !topBarExpanded)
+              GestureDetector(
+                onTap: () => setState(() => topBarExpanded = true),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 6),
+                  child: Icon(Icons.expand_more, size: 18, color: Color(0xFF2BB3A3)),
+                ),
+              ),
+            const Spacer(),
+            // 可编辑快捷功能 chips（长按任意 chip 打开显隐编辑）
+            Expanded(
+              child: _quickActionsRow(),
             ),
-          const Spacer(),
-          // 可编辑快捷功能 chips（长按任意 chip 打开显隐编辑）
-          Expanded(
-            child: _quickActionsRow(),
-          ),
-        ]),
-      ),
+          ]),
+        ),
+        if (!topBarAutoHide) ...[
+          const SizedBox(height: 4),
+          SizedBox(height: 30, child: _buildSelectorRow()),
+        ],
+      ]),
     );
   }
 

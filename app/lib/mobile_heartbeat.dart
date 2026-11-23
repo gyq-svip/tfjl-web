@@ -12,7 +12,7 @@ class MobileHeartbeat {
   static const _deviceKey = 'mobile_device_anonid';
   static const _nickKey = 'mobile_heartbeat_nick';
   static const _lastKey = 'mobile_heartbeat_last';
-  static const appVersion = '1.7.5';
+  static const appVersion = '1.7.6';
 
   Timer? _timer;
   static final MobileHeartbeat I = MobileHeartbeat._();
