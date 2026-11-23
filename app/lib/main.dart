@@ -18,6 +18,7 @@ import 'calc_sheet.dart';
 import 'mobile_heartbeat.dart';
 import 'version_check.dart';
 import 'backup_transfer.dart';
+import 'dr_system.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -105,6 +106,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     await LayoutConfig.I.load();
     _activityCalc.load();   // 活动配置后台加载（缓存秒开）
     _loadQuick();           // 顶栏快捷功能配置
+    DrSystem.load();        // 减伤表（洗炼/特殊技能）
     // 用户昵称（注册制，与网页 TFJL_UserName 同键；老用户旧键兼容兜底）
     final prefs0 = await SharedPreferences.getInstance();
     if (mounted) {
@@ -1025,6 +1027,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               tool('🧮', '活动计算器', '商品从后台读取，动态规划算最优购买', () => setState(() { navTab = 0; calcOverlayOpen = true; }),
                   accent: const Color(0xFF4CAF50)),
               tool('🌐', '网络自检', '共享打不开？测一下是哪个环节不通', _showNetCheck, accent: const Color(0xFF67D2F5)),
+              tool('🛡', '减伤表管理', '洗炼减伤 / 小野酋长宝库特殊技能（我的·队友）', () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const DrManagePage()));
+              }, accent: const Color(0xFF4ade80)),
               tool('✎', '编辑布局', '自由拖动/缩放各模块位置和大小', () => setState(() { navTab = 0; layoutEditing = !layoutEditing; }),
                   accent: const Color(0xFFFFD24A)),
               tool('📥', '导入 PC 备份', '选 PC 端导出的 TFJL-backup-*.json，恢复全部阵容', () async {
@@ -1438,7 +1443,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   Widget buildHandGroup(bool isMine, double boxW, double boxH) {
     final hand = handCards(isMine);
     final chariot = proj?[isMine ? 'myChariot' : 'teammateChariot'] as Map<String, dynamic>?;
-    final dr = AppData.chariotSideDr(chariot);
+    final drTable = isMine ? '我的' : '队友';
+    final bd = DrSystem.breakdown(handCards: hand, tableName: drTable, chariot: chariot);
+    final dr = bd['total']!;
     final mainN = chariot?['main'] ?? 1;
     final subN = chariot?['sub'] ?? 0;
     final mainLv = chariot?['mainLv'] ?? 1;
@@ -1457,12 +1464,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: isMine ? const Color(0xFF67D2F5) : const Color(0xFFC79BF0))),
           const Spacer(),
           GestureDetector(
-            onTap: () => showChariotDialog(chariot, isMine),
+            onTap: () => _showDrDetails(isMine, bd),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(color: const Color(0x33FFD24A), borderRadius: BorderRadius.circular(5)),
-              child: Text('🚂 $mainN/$subN Lv$mainLv 🛡${dr.toStringAsFixed(1)}%',
-                  style: const TextStyle(fontSize: 8.5, color: Color(0xFFFFD24A))),
+              decoration: BoxDecoration(
+                color: dr > 0 ? const Color(0x33FFD24A) : Colors.white.withAlpha(20),
+                borderRadius: BorderRadius.circular(5),
+              ),
+              child: Text('🚂 $mainN/$subN Lv$mainLv  🛡${dr.toStringAsFixed(1)}%',
+                  style: TextStyle(fontSize: 8.5,
+                      color: dr > 0 ? const Color(0xFFFFD24A) : Colors.white24)),
             ),
           ),
           const SizedBox(width: 4),
@@ -1542,6 +1553,55 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         ),
       ]),
     );
+  }
+
+  /// 🛡 减伤详情弹窗：拆分明细（洗炼/酋长/小野/宝库/战车）+ 战车配置 + 管理入口
+  void _showDrDetails(bool isMine, Map<String, double> bd) {
+    final drTable = isMine ? '我的' : '队友';
+    final chariot = proj?[isMine ? 'myChariot' : 'teammateChariot'] as Map<String, dynamic>?;
+    final mainN = chariot?['main'] ?? 1;
+    final mainLv = chariot?['mainLv'] ?? 1;
+    final subN = chariot?['sub'] ?? 0;
+    showDialog(context: context, builder: (ctx) => AlertDialog(
+      backgroundColor: const Color(0xFF1e293b),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(children: [
+        Text(isMine ? '🛡 我方减伤' : '🛡 队友减伤', style: const TextStyle(color: Colors.white, fontSize: 15)),
+        const Spacer(),
+        GestureDetector(
+          onTap: () {
+            Navigator.pop(ctx);
+            Navigator.push(context, MaterialPageRoute(builder: (_) => DrManagePage(initialTable: drTable)));
+          },
+          child: const Text('管理表 ›', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF2BB3A3))),
+        ),
+      ]),
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('总减伤：${bd['total'].toString()}%',
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF4ade80))),
+        const SizedBox(height: 8),
+        Text(DrSystem.tooltip(bd), style: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.5)),
+        const Divider(color: Colors.white12, height: 18),
+        Text('🚂 ${isMine ? "我方" : "队友"}战车：主车 $mainN 号（Lv$mainLv）· 副车 ${((subN ?? 0) as int) <= 0 ? "未设置" : "$subN 号"}',
+            style: const TextStyle(fontSize: 11.5, color: Colors.white54)),
+        const Text('只有「走马江湖号」计减伤；主车 3×等级+6，副车再乘融合系数',
+            style: TextStyle(fontSize: 10, color: Colors.white38)),
+        const SizedBox(height: 4),
+        Text('减伤表：$drTable（点击右上角「管理表」编辑洗炼/特殊技能）',
+            style: const TextStyle(fontSize: 10.5, color: Colors.white38)),
+      ]),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.pop(ctx);
+            showChariotDialog(chariot, isMine);
+          },
+          child: const Text('战车详情', style: TextStyle(color: Color(0xFFFFD24A))),
+        ),
+        TextButton(onPressed: () => Navigator.pop(ctx),
+            child: Text('关闭', style: TextStyle(color: Colors.white.withOpacity(0.6)))),
+      ],
+    ));
   }
 
   void showChariotDialog(Map<String, dynamic>? c, bool isMine) {

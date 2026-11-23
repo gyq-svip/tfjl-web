@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'data_store.dart';
+import 'dr_system.dart';
 
 /// 📤📥 阵容备份导入导出 —— 与 PC 端「数据导出/导入」同格式（TFJL-backup-*.json）
 /// PC 格式：{ version:'2.1', exportDate, categories:[], projects:[扁平项目行], localStorage:{} }
@@ -41,6 +42,11 @@ class BackupTransfer {
         added++;
       }
       await ProjectLibrary.save(lib);
+      // 减伤表随 PC 备份恢复（PC localStorage 里的 tdjl_dr_tables_v2）
+      final ls = data['localStorage'];
+      if (ls is Map && ls['tdjl_dr_tables_v2'] != null) {
+        await DrSystem.restoreFromPcLocal(ls['tdjl_dr_tables_v2'].toString());
+      }
       final pcVer = data['version']?.toString() ?? '?';
       return '✅ 导入成功（PC备份 v$pcVer）：新增 $added 个项目${cats.isNotEmpty ? '，分类 ${cats.join('、')}' : ''}${skipped > 0 ? '；跳过 $skipped 个同名' : ''}';
     } catch (e) {
@@ -71,7 +77,8 @@ class BackupTransfer {
       'exportDate': DateTime.now().toIso8601String(),
       'categories': cats,
       'projects': projects,
-      'localStorage': <String, dynamic>{},   // APP 无 localStorage 配置（皮肤/等级已随项目走）
+      // 减伤表一起带走（PC 导入时可恢复洗炼/特殊技能）
+      'localStorage': {'tdjl_dr_tables_v2': DrSystem.exportForPc()},
     };
     final jsonStr = const JsonEncoder.withIndent('  ').convert(exportData);
     final fileName = 'TFJL-backup-${DateTime.now().toIso8601String().slice(0, 10)}.json';

@@ -114,13 +114,36 @@ class VersionCheck {
           ),
           if (isIOS)
             TextButton(
-              onPressed: () {
-                if (info.ipaUrl.isEmpty) return;
-                Clipboard.setData(ClipboardData(text: info.ipaUrl));
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('✅ iOS 安装包链接已复制，去全能签「网址下载」粘贴即可'),
-                    duration: Duration(seconds: 3)));
+              onPressed: () async {
+                // 🔴 iOS 复制修复：等写入完成 + 读回校验；空链接给提示；失败弹可手动选择的兜底框
+                if (info.ipaUrl.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('iOS 安装包还没上传，稍后再试（可先更新安卓看更新说明）'),
+                      duration: Duration(seconds: 2)));
+                  return;
+                }
+                try {
+                  await Clipboard.setData(ClipboardData(text: info.ipaUrl));
+                  final check = await Clipboard.getData('text/plain');
+                  if (check?.text != info.ipaUrl) throw Exception('剪贴板写入校验失败');
+                  if (!ctx.mounted) return;
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('✅ iOS 安装包链接已复制，去全能签「网址下载」粘贴即可'),
+                      duration: Duration(seconds: 3)));
+                } catch (_) {
+                  if (!ctx.mounted) return;
+                  showDialog(
+                    context: ctx,
+                    builder: (c2) => AlertDialog(
+                      backgroundColor: const Color(0xFF1e293b),
+                      title: const Text('请手动长按复制', style: TextStyle(color: Colors.white, fontSize: 15)),
+                      content: SelectableText(info.ipaUrl,
+                          style: const TextStyle(color: Color(0xFF67D2F5), fontSize: 12)),
+                      actions: [TextButton(onPressed: () => Navigator.pop(c2), child: const Text('关闭'))],
+                    ),
+                  );
+                }
               },
               child: const Text('复制 iOS 链接',
                   style: TextStyle(color: Color(0xFF67D2F5), fontWeight: FontWeight.bold)),

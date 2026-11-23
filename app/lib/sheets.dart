@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'models.dart';
 import 'data_store.dart';
 import 'card_widget.dart';
+import 'dr_system.dart';
 
 /// 全局英雄默认配置（官方英雄名 → {lv,skin,mohua,fusion,sub:{lv,skin,mohua}}）
 Map<String, dynamic> globalHeroDefaults = {};
@@ -606,6 +607,8 @@ class SettingsSheetState extends State<SettingsSheet> {
             else
               _pill('👹 该英雄无魔化', Colors.white.withAlpha(24)),
             const SizedBox(height: 8),
+            // 🛡 减伤（洗炼）——与网页新版英雄面板一致：读当前侧对应表的主卡洗炼值
+            _drSection(),
             // 融合变体
             _fusionVariants(),
             // 副卡设置
@@ -621,6 +624,55 @@ class SettingsSheetState extends State<SettingsSheet> {
             const SizedBox(height: 4),
           ]),
         ),
+      ),
+    );
+  }
+
+  /// 🛡 减伤（洗炼）区块：显示/编辑该卡主卡在对应表（我的/队友）的洗炼减伤值
+  Widget _drSection() {
+    final drTable = widget.isMine ? '我的' : '队友';
+    final cur = DrSystem.refineKeyFor(drTable, name);
+    final val = cur != null ? (DrSystem.refineMap(drTable)[cur] ?? 0) : 0.0;
+    final vTxt = val == val.roundToDouble() ? val.toInt().toString() : val.toStringAsFixed(1);
+    return GestureDetector(
+      onTap: () async {
+        final ctl = TextEditingController(text: val > 0 ? vTxt : '');
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF1e293b),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            title: Text('$baseHero 洗炼减伤（$drTable 表）', style: const TextStyle(color: Colors.white, fontSize: 14)),
+            content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              TextField(controller: ctl, autofocus: true, keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                decoration: InputDecoration(hintText: '减伤 %，留空=清除', filled: true,
+                  fillColor: const Color(0xFF0C0C17), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)),
+              ),
+              const SizedBox(height: 6),
+              const Text('计入条件：这张卡上阵（同表内同主卡只算一次）', style: TextStyle(fontSize: 10.5, color: Colors.white38)),
+            ]),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false),
+                  child: Text('取消', style: TextStyle(color: Colors.white.withOpacity(0.6)))),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2BB3A3)),
+                child: const Text('保存', style: TextStyle(color: Color(0xFF07231F), fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+        if (ok == true) {
+          final v = (double.tryParse(ctl.text.trim()) ?? 0).clamp(0, 100).toDouble();
+          DrSystem.setRefine(drTable, cur ?? baseHero, v > 0 ? v : null);
+          setState(() {});
+          widget.onChanged();
+        }
+      },
+      child: _pill(
+        val > 0 ? '🛡 减伤（洗炼）$vTxt%　·　$drTable 表' : '🛡 减伤（洗炼）未设置　·　$drTable 表',
+        val > 0 ? const Color(0x334ade80) : Colors.white.withAlpha(24),
       ),
     );
   }
