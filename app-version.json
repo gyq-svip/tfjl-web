@@ -1,7 +1,7 @@
 {
-  "version": "1.7.6",
-  "apk": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-app-store/releases/download/app-v1/tfjl-android-v1.7.6.apk",
-  "ipa": "https://raw.githubusercontent.com/gyq-svip/tfjl-web/releases/tfjl-ios-v1.7.6.ipa",
-  "body": "战车设置(23辆选车/等级/副车融合)、战车显示车名简写、手牌标题栏紧凑合并、移出手牌修复、减伤系统(洗炼/小野/酋长/宝库)、阵容备份导入导出(PC互通)",
-  "updated": "2026-11-23 20:40"
+  "version": "1.7.7",
+  "apk": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-app-store/releases/download/app-v1/tfjl-android-v1.7.7.apk",
+  "ipa": "https://raw.githubusercontent.com/gyq-svip/tfjl-web/releases/tfjl-ios-v1.7.7.ipa",
+  "body": "版本检测修复(改用Pages静态清单,不再Gitee API 403) + 战车设置/车名简写/紧凑布局/移出手牌修复/减伤系统/阵容备份导入导出",
+  "updated": "2026-11-23 21:00"
 }
