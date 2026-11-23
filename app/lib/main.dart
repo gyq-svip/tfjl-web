@@ -890,7 +890,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   Widget _homeBody() {
     return Stack(children: [
         // 🖼 背景层（图片/视频，IgnorePointer 不影响点击）
-        Positioned.fill(child: BgLayer(type: BgSetting.type, path: BgSetting.path, opacity: BgSetting.opacity)),
+        Positioned.fill(child: BgLayer(type: BgSetting.type, path: BgSetting.path, themeId: BgSetting.themeId, opacity: BgSetting.opacity)),
         SafeArea(
         child: Column(children: [
                 buildTopBar(),   // 第一行常驻（标题+快捷chips；关闭自动隐藏时下拉行也在这里）
@@ -1124,12 +1124,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         _settingsRow('🎁', '生成邀请码', '6位一次性邀请码（每天5个，30分钟有效）', _generateInvite),
         // 界面
         _settingsSection('界面'),
-        _settingsRow('🖼', '主页背景（图片 / 视频）',
-            BgSetting.type == 'none'
-                ? '未设置 · 点选本地图片或视频做背景'
-                : (BgSetting.type == 'image' ? '图片背景 · 透明度 ${(BgSetting.opacity * 100).round()}%' : '视频背景 · 透明度 ${(BgSetting.opacity * 100).round()}%'),
+        _settingsRow('🖼', '主页背景（内置主题 / 图片 / 视频）',
+            BgSetting.summary,
             _showBgPicker,
-            trailing: Text(BgSetting.type == 'none' ? '无' : (BgSetting.type == 'image' ? '图片' : '视频'),
+            trailing: Text(BgSetting.shortLabel,
                 style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2BB3A3)))),
         _settingsRow('✎', '编辑布局', '自由拖动/缩放各模块位置和大小（主页进入编辑态）', () {
           setState(() { navTab = 0; layoutEditing = !layoutEditing; });
@@ -1255,12 +1253,49 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
                 const Text('🖼 主页背景', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))),
                 const SizedBox(height: 4),
-                const Text('选本地图片或视频做主页画布背景（视频静音循环播放）', style: TextStyle(fontSize: 10.5, color: Colors.white38)),
-                const SizedBox(height: 12),
+                const Text('内置主题（与 PC 端同源；首次会边播边缓存，之后秒开）',
+                    style: TextStyle(fontSize: 10.5, color: Colors.white38)),
+                const SizedBox(height: 8),
                 Row(children: [
-                  Expanded(child: _bgBtn('🖼 选图片', () => pick(false))),
+                  for (var i = 0; i < BgSetting.builtinThemes.length; i++)
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final t = BgSetting.builtinThemes[i];
+                          BgSetting.type = 'theme';
+                          BgSetting.themeId = t['id']!;
+                          await BgSetting.save();
+                          BgSetting.ensureThemeCached(t['id']!, t['url']!);   // 后台缓存，下次秒开
+                          if (mounted) setState(() {});
+                          if (ctx.mounted) Navigator.pop(ctx);
+                        },
+                        child: Container(
+                          margin: EdgeInsets.only(right: i < BgSetting.builtinThemes.length - 1 ? 8 : 0),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: (BgSetting.type == 'theme' && BgSetting.themeId == BgSetting.builtinThemes[i]['id'])
+                                ? const Color(0xFF2BB3A3)
+                                : Colors.white.withAlpha(28),
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                          child: Column(children: [
+                            Text(BgSetting.builtinThemes[i]['name']!,
+                                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold,
+                                    color: (BgSetting.type == 'theme' && BgSetting.themeId == BgSetting.builtinThemes[i]['id'])
+                                        ? const Color(0xFF07231F) : Colors.white70)),
+                            if (BgSetting.builtinThemes[i]['id'] == BgSetting.defaultThemeId)
+                              const Text('默认', style: TextStyle(fontSize: 8.5, color: Color(0xFFFFD24A))),
+                          ]),
+                        ),
+                      ),
+                    ),
+                ]),
+                const SizedBox(height: 10),
+                Row(children: [
+                  Expanded(child: _bgBtn('🖼 选本地图片', () => pick(false))),
                   const SizedBox(width: 8),
-                  Expanded(child: _bgBtn('🎬 选视频', () => pick(true))),
+                  Expanded(child: _bgBtn('🎬 选本地视频', () => pick(true))),
                 ]),
                 const SizedBox(height: 10),
                 Row(children: [
