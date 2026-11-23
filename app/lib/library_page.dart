@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'models.dart';
 import 'data_store.dart';
 import 'card_widget.dart';
@@ -16,30 +18,83 @@ class _LibraryPageState extends State<LibraryPage> {
   int tab = 0;
   Map<String, dynamic> featured = {'items': []};
   final Set<int> expandedSailing = {};
+  static const _cacheKey = 'library_featured_cache';
+  static const _cacheAtKey = 'library_featured_cache_at';
+  bool _refreshing = false;
+  String _cacheTime = '';
 
   @override
   void initState() {
     super.initState();
+    _initLoad();
+  }
+
+  /// 缓存秒开 + 后台刷新（图库是死数据，很久才更新一次，没必要每次等网络）
+  Future<void> _initLoad() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getString(_cacheKey);
+    if (cached != null && cached.isNotEmpty) {
+      try {
+        final j = jsonDecode(cached) as Map<String, dynamic>;
+        if ((j['items'] as List?)?.isNotEmpty == true) {
+          final at = prefs.getInt(_cacheAtKey) ?? 0;
+          if (mounted) {
+            setState(() {
+              featured = j;
+              _cacheTime = at > 0 ? _fmtTime(at) : '';
+            });
+          }
+        }
+      } catch (_) {}
+    }
     _loadFeatured();
   }
 
+  static String _fmtTime(int ms) {
+    final d = DateTime.fromMillisecondsSinceEpoch(ms);
+    return '${d.month}/${d.day} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+  }
+
   Future<void> _loadFeatured() async {
-    // 精选阵容在线 Gist（匿名可读）
-    const gid = 'eba2aa1c41025fd2ff5beecff2668c3f';
+    if (_refreshing) return;
+    setState(() => _refreshing = true);
     try {
-      final r = await httpGet('https://api.github.com/gists/$gid');
-      if (r != null) {
-        final d = jsonDecode(r) as Map<String, dynamic>;
-        final files = d['files'] as Map<String, dynamic>;
-        var f = files['featured_lineups.json'] as Map<String, dynamic>?;
-        if (f != null) {
-          var txt = f['content'].toString();
-          if (f['truncated'] == true) txt = (await httpGet(f['raw_url'].toString())) ?? '';
-          final j = jsonDecode(txt) as Map<String, dynamic>;
-          if ((j['items'] as List?)?.isNotEmpty == true && mounted) setState(() => featured = j);
-        }
+      // 精选 gist id（room_index.json 配置 = eba2aa1c…；直接用它，秒开不等索引）
+      const gid = 'eba2aa1c41025fd2ff5beecff2668c3f';
+      // 双通道并行竞速：token API（快）∥ raw 直链（稳），谁先回用谁，20 秒封顶
+      final txt = await _raceRead(gid);
+      if (txt == null || txt.isEmpty) return;
+      final j = jsonDecode(txt) as Map<String, dynamic>;
+      if ((j['items'] as List?)?.isNotEmpty != true) return;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_cacheKey, txt);
+      await prefs.setInt(_cacheAtKey, DateTime.now().millisecondsSinceEpoch);
+      if (mounted) {
+        setState(() {
+          featured = j;
+          _cacheTime = _fmtTime(DateTime.now().millisecondsSinceEpoch);
+        });
       }
-    } catch (_) {}
+    } catch (_) {
+      // 失败保留缓存内容
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
+    }
+  }
+
+  /// 两路并行读取 featured_lineups.json，先成功者胜（20s 封顶，避免单路卡死拖满超时预算）
+  Future<String?> _raceRead(String gid) {
+    final c = Completer<String?>();
+    void win(String? v) {
+      if (!c.isCompleted && v != null && v.isNotEmpty) c.complete(v);
+    }
+    GistClient.readFileApiFirst(gid, 'featured_lineups.json').then(win).catchError((_) {});
+    GistClient.readFile(gid, 'featured_lineups.json').then(win).catchError((_) {});
+    GistClient.readFile(GistClient.masterGist, 'featured_lineups.json').then(win).catchError((_) {});
+    Future.delayed(const Duration(seconds: 20), () {
+      if (!c.isCompleted) c.complete(null);
+    });
+    return c.future;
   }
 
   Future<String?> httpGet(String url) async {
@@ -109,9 +164,35 @@ class _LibraryPageState extends State<LibraryPage> {
   Widget _featured() {
     final items = (featured['items'] as List?) ?? [];
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Padding(padding: EdgeInsets.symmetric(horizontal: 3, vertical: 4),
-          child: Text('⭐ 精选阵容（在线资源）· 点卡调设置 · 「用此阵容」导入项目', style: TextStyle(fontSize: 9.5, color: Color(0xFF9AA4B8)))),
-      if (items.isEmpty) const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('精选阵容加载中…', style: TextStyle(color: Colors.white38)))),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
+        child: Row(children: [
+          Expanded(
+            child: Text(
+              '⭐ 精选阵容${_cacheTime.isNotEmpty ? "（缓存 $_cacheTime）" : ""} · 点卡调设置 · 「用此阵容」导入项目',
+              style: const TextStyle(fontSize: 9.5, color: Color(0xFF9AA4B8)),
+            ),
+          ),
+          GestureDetector(
+            onTap: _refreshing ? null : _loadFeatured,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(color: Colors.white.withAlpha(28), borderRadius: BorderRadius.circular(6)),
+              child: Text(_refreshing ? '刷新中…' : '🔄 刷新',
+                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold,
+                      color: _refreshing ? Colors.white24 : const Color(0xFF4ECDC4))),
+            ),
+          ),
+        ]),
+      ),
+      if (items.isEmpty)
+        Padding(
+          padding: const EdgeInsets.all(20),
+          child: Center(
+            child: Text(_refreshing ? '精选阵容加载中…（首次需联网）' : '精选阵容为空，点右上「🔄 刷新」重试',
+                style: const TextStyle(color: Colors.white38, fontSize: 12)),
+          ),
+        ),
       for (final itRaw in items) _featuredCard(itRaw as Map<String, dynamic>),
     ]);
   }

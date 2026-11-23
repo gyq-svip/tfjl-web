@@ -484,10 +484,15 @@ class GistClient {
         }
       } catch (_) {}
     }
-    // ② 退回 GitHub API（有 60 次/小时限制，仅兜底）
+    // ② 退回 GitHub API —— 带 token（5000次/小时），token 不可用时匿名兜底（60次/小时）
     try {
+      final tok = await fetchToken();
+      final headers = <String, String>{
+        ..._headers(),
+        if (tok.isNotEmpty) 'Authorization': 'token $tok',
+      };
       final r = await http.get(Uri.parse('https://api.github.com/gists/$gistId'),
-          headers: _headers()).timeout(const Duration(seconds: 20));
+          headers: headers).timeout(const Duration(seconds: 20));
       if (r.statusCode == 200) {
         final g = jsonDecode(r.body) as Map<String, dynamic>;
         final files = g['files'] as Map<String, dynamic>?;
@@ -503,6 +508,34 @@ class GistClient {
       }
     } catch (_) {}
     return null;
+  }
+
+  /// 快速读取：**API+token 优先**（token 5000次/小时、响应快），失败再走 raw 直链。
+  /// 适合「用户点开就要看到」的页面（如图库精选），避免 raw 域名不稳时干等。
+  static Future<String?> readFileApiFirst(String gistId, String fileName) async {
+    try {
+      final tok = await fetchToken();
+      if (tok.isNotEmpty) {
+        final r = await http.get(Uri.parse('https://api.github.com/gists/$gistId'),
+            headers: {..._headers(), 'Authorization': 'token $tok'})
+            .timeout(const Duration(seconds: 10));
+        if (r.statusCode == 200) {
+          final g = jsonDecode(r.body) as Map<String, dynamic>;
+          final files = g['files'] as Map<String, dynamic>?;
+          final f = files?[fileName] as Map<String, dynamic>?;
+          if (f != null) {
+            var txt = f['content']?.toString() ?? '';
+            if (f['truncated'] == true && f['raw_url'] != null) {
+              final r2 = await http.get(Uri.parse(f['raw_url'].toString()),
+                  headers: _headers()).timeout(const Duration(seconds: 20));
+              if (r2.statusCode == 200) txt = r2.body;
+            }
+            if (txt.isNotEmpty) return txt;
+          }
+        }
+      }
+    } catch (_) {}
+    return readFile(gistId, fileName);
   }
 
   /// 活动道具配置 activity_tabs.json（管理员后台维护，与网页同源）
