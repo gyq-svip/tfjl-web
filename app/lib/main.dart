@@ -17,6 +17,7 @@ import 'activity_calc.dart';
 import 'calc_sheet.dart';
 import 'mobile_heartbeat.dart';
 import 'version_check.dart';
+import 'backup_transfer.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -1026,6 +1027,18 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               tool('🌐', '网络自检', '共享打不开？测一下是哪个环节不通', _showNetCheck, accent: const Color(0xFF67D2F5)),
               tool('✎', '编辑布局', '自由拖动/缩放各模块位置和大小', () => setState(() { navTab = 0; layoutEditing = !layoutEditing; }),
                   accent: const Color(0xFFFFD24A)),
+              tool('📥', '导入 PC 备份', '选 PC 端导出的 TFJL-backup-*.json，恢复全部阵容', () async {
+                final r = await BackupTransfer.importFromPc(context);
+                if (r.isNotEmpty && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r), duration: const Duration(seconds: 3)));
+                }
+              }, accent: const Color(0xFF67D2F5)),
+              tool('📤', '导出阵容备份', '导出 PC 兼容 TFJL-backup-*.json，PC 端可一键恢复', () async {
+                final r = await BackupTransfer.exportToPc(context);
+                if (r.isNotEmpty && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r), duration: const Duration(seconds: 3)));
+                }
+              }, accent: const Color(0xFF4CAF50)),
               const SizedBox(height: 8),
             ]),
           ),
