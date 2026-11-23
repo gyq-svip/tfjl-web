@@ -1,0 +1,125 @@
+
+nianshougugu.png
+size: 982,982
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_0
+  rotate: false
+  xy: 684, 44
+  size: 148, 159
+  orig: 200, 200
+  offset: 16, 16
+  index: -1
+attack/atk_1
+  rotate: false
+  xy: 834, 44
+  size: 146, 159
+  orig: 200, 200
+  offset: 18, 16
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 536, 43
+  size: 146, 160
+  orig: 200, 200
+  offset: 18, 16
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 802, 205
+  size: 149, 160
+  orig: 200, 200
+  offset: 17, 16
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 802, 827
+  size: 153, 161
+  orig: 200, 200
+  offset: 15, 16
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 802, 669
+  size: 156, 160
+  orig: 200, 200
+  offset: 12, 16
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 802, 511
+  size: 156, 160
+  orig: 200, 200
+  offset: 12, 16
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 802, 356
+  size: 153, 160
+  orig: 200, 200
+  offset: 13, 16
+  index: -1
+fx/glow2_00004
+  rotate: true
+  xy: 684, 265
+  size: 81, 82
+  orig: 92, 94
+  offset: 5, 6
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 536, 348
+  size: 264, 315
+  orig: 400, 400
+  offset: 44, 34
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 534, 665
+  size: 266, 315
+  orig: 400, 400
+  offset: 42, 34
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 267, 22
+  size: 267, 317
+  orig: 400, 400
+  offset: 40, 34
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 2, 341
+  size: 266, 318
+  orig: 400, 400
+  offset: 40, 34
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 661
+  size: 265, 319
+  orig: 400, 400
+  offset: 41, 34
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 269, 662
+  size: 263, 318
+  orig: 400, 400
+  offset: 43, 34
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 21
+  size: 263, 318
+  orig: 400, 400
+  offset: 44, 34
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 270, 344
+  size: 264, 316
+  orig: 400, 400
+  offset: 44, 34
+  index: -1

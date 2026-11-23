@@ -1,0 +1,118 @@
+
+xiaoxiao.png
+size: 733,733
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+D1
+  rotate: true
+  xy: 572, 464
+  size: 133, 146
+  orig: 133, 146
+  offset: 0, 0
+  index: -1
+D2
+  rotate: true
+  xy: 2, 349
+  size: 133, 144
+  orig: 133, 144
+  offset: 0, 0
+  index: -1
+D3
+  rotate: true
+  xy: 581, 599
+  size: 132, 142
+  orig: 132, 142
+  offset: 0, 0
+  index: -1
+D4
+  rotate: true
+  xy: 2, 488
+  size: 132, 140
+  orig: 132, 140
+  offset: 0, 0
+  index: -1
+D5
+  rotate: true
+  xy: 144, 484
+  size: 132, 140
+  orig: 132, 140
+  offset: 0, 0
+  index: -1
+D6
+  rotate: true
+  xy: 286, 482
+  size: 132, 140
+  orig: 132, 140
+  offset: 0, 0
+  index: -1
+D7
+  rotate: true
+  xy: 428, 482
+  size: 132, 142
+  orig: 132, 142
+  offset: 0, 0
+  index: -1
+D8
+  rotate: true
+  xy: 148, 347
+  size: 133, 144
+  orig: 133, 144
+  offset: 0, 0
+  index: -1
+G1
+  rotate: true
+  xy: 294, 347
+  size: 133, 146
+  orig: 133, 146
+  offset: 0, 0
+  index: -1
+G2
+  rotate: true
+  xy: 418, 616
+  size: 115, 161
+  orig: 115, 161
+  offset: 0, 0
+  index: -1
+G3
+  rotate: true
+  xy: 247, 618
+  size: 113, 169
+  orig: 113, 169
+  offset: 0, 0
+  index: -1
+G4
+  rotate: false
+  xy: 590, 288
+  size: 141, 174
+  orig: 141, 174
+  offset: 0, 0
+  index: -1
+G5
+  rotate: true
+  xy: 2, 205
+  size: 140, 184
+  orig: 140, 184
+  offset: 0, 0
+  index: -1
+G6
+  rotate: true
+  xy: 2, 622
+  size: 109, 243
+  orig: 109, 243
+  offset: 0, 0
+  index: -1
+G7
+  rotate: false
+  xy: 188, 191
+  size: 157, 154
+  orig: 157, 154
+  offset: 0, 0
+  index: -1
+G8
+  rotate: true
+  xy: 442, 325
+  size: 137, 146
+  orig: 137, 146
+  offset: 0, 0
+  index: -1

@@ -1,0 +1,258 @@
+
+gugong_pifu.png
+size: 777,777
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/FX/bao/11_000
+  rotate: false
+  xy: 339, 2
+  size: 48, 44
+  orig: 102, 102
+  offset: 29, 13
+  index: -1
+images/FX/bao/11_001
+  rotate: true
+  xy: 696, 525
+  size: 96, 74
+  orig: 102, 102
+  offset: 6, 12
+  index: -1
+images/FX/bao/11_002
+  rotate: true
+  xy: 691, 424
+  size: 99, 74
+  orig: 102, 102
+  offset: 3, 16
+  index: -1
+images/FX/bao/11_003
+  rotate: false
+  xy: 586, 337
+  size: 102, 74
+  orig: 102, 102
+  offset: 0, 19
+  index: -1
+images/FX/bingyan/bingyan_000
+  rotate: false
+  xy: 480, 70
+  size: 22, 133
+  orig: 82, 205
+  offset: 28, 64
+  index: -1
+images/FX/bingyan/bingyan_001
+  rotate: true
+  xy: 182, 13
+  size: 40, 155
+  orig: 82, 205
+  offset: 20, 48
+  index: -1
+images/FX/bingyan/bingyan_002
+  rotate: false
+  xy: 698, 623
+  size: 67, 152
+  orig: 82, 205
+  offset: 7, 49
+  index: -1
+images/FX/bingyan/bingyan_003
+  rotate: false
+  xy: 596, 177
+  size: 54, 158
+  orig: 82, 205
+  offset: 16, 39
+  index: -1
+images/FX/bingyan/bingyan_004
+  rotate: false
+  xy: 652, 179
+  size: 53, 156
+  orig: 82, 205
+  offset: 17, 36
+  index: -1
+images/FX/bingyan/bingyan_005
+  rotate: true
+  xy: 198, 55
+  size: 46, 169
+  orig: 82, 205
+  offset: 22, 8
+  index: -1
+images/FX/bingyan/bingyan_006
+  rotate: true
+  xy: 2, 54
+  size: 46, 178
+  orig: 82, 205
+  offset: 16, 4
+  index: -1
+images/FX/bingyan/bingyan_007
+  rotate: false
+  xy: 504, 78
+  size: 36, 134
+  orig: 82, 205
+  offset: 24, 0
+  index: -1
+images/FX/bingyan/bingyan_008
+  rotate: false
+  xy: 542, 102
+  size: 42, 110
+  orig: 82, 205
+  offset: 16, 2
+  index: -1
+images/FX/bingyan/bingyan_009
+  rotate: true
+  xy: 690, 340
+  size: 35, 47
+  orig: 82, 205
+  offset: 14, 3
+  index: -1
+images/FX/overlay_atkpromote_00
+  rotate: true
+  xy: 635, 93
+  size: 82, 43
+  orig: 96, 55
+  offset: 6, 2
+  index: -1
+images/FX/overlay_atkpromote_01
+  rotate: true
+  xy: 680, 95
+  size: 82, 45
+  orig: 96, 55
+  offset: 6, 2
+  index: -1
+images/FX/overlay_atkpromote_02
+  rotate: true
+  xy: 586, 93
+  size: 82, 47
+  orig: 96, 55
+  offset: 6, 2
+  index: -1
+images/FX/overlay_atkpromote_03
+  rotate: false
+  xy: 86, 4
+  size: 82, 48
+  orig: 96, 55
+  offset: 6, 2
+  index: -1
+images/FX/overlay_atkpromote_04
+  rotate: false
+  xy: 2, 2
+  size: 82, 50
+  orig: 96, 55
+  offset: 6, 2
+  index: -1
+images/FX/overlay_atkpromote_05
+  rotate: false
+  xy: 369, 48
+  size: 82, 41
+  orig: 96, 55
+  offset: 6, 2
+  index: -1
+images/FX/overlay_atkpromote_06
+  rotate: false
+  xy: 389, 3
+  size: 82, 43
+  orig: 96, 55
+  offset: 6, 2
+  index: -1
+images/FX/overlay_atkpromote_07
+  rotate: false
+  xy: 691, 377
+  size: 82, 45
+  orig: 96, 55
+  offset: 6, 2
+  index: -1
+images/attack/a0036
+  rotate: false
+  xy: 493, 214
+  size: 101, 111
+  orig: 205, 205
+  offset: 58, 47
+  index: -1
+images/attack/a0039
+  rotate: false
+  xy: 586, 536
+  size: 108, 116
+  orig: 205, 205
+  offset: 59, 47
+  index: -1
+images/attack/a0042
+  rotate: false
+  xy: 586, 654
+  size: 110, 121
+  orig: 205, 205
+  offset: 63, 47
+  index: -1
+images/attack/a0044
+  rotate: false
+  xy: 586, 413
+  size: 103, 121
+  orig: 205, 205
+  offset: 57, 47
+  index: -1
+images/attack/a0048
+  rotate: false
+  xy: 391, 205
+  size: 100, 120
+  orig: 205, 205
+  offset: 53, 47
+  index: -1
+images/attack/a0054
+  rotate: false
+  xy: 391, 91
+  size: 87, 112
+  orig: 205, 205
+  offset: 58, 47
+  index: -1
+images/idle/a0000
+  rotate: false
+  xy: 394, 327
+  size: 190, 222
+  orig: 410, 410
+  offset: 120, 94
+  index: -1
+images/idle/a0004
+  rotate: false
+  xy: 393, 551
+  size: 191, 224
+  orig: 410, 410
+  offset: 121, 94
+  index: -1
+images/idle/a0008
+  rotate: false
+  xy: 199, 551
+  size: 192, 224
+  orig: 410, 410
+  offset: 121, 94
+  index: -1
+images/idle/a0012
+  rotate: false
+  xy: 2, 551
+  size: 195, 224
+  orig: 410, 410
+  offset: 121, 94
+  index: -1
+images/idle/a0016
+  rotate: false
+  xy: 2, 326
+  size: 195, 223
+  orig: 410, 410
+  offset: 122, 94
+  index: -1
+images/idle/a0020
+  rotate: false
+  xy: 2, 102
+  size: 194, 222
+  orig: 410, 410
+  offset: 121, 94
+  index: -1
+images/idle/a0024
+  rotate: false
+  xy: 199, 328
+  size: 193, 221
+  orig: 410, 410
+  offset: 121, 94
+  index: -1
+images/idle/a0028
+  rotate: false
+  xy: 198, 103
+  size: 191, 221
+  orig: 410, 410
+  offset: 121, 94
+  index: -1

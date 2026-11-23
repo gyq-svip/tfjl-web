@@ -1,0 +1,209 @@
+
+panjinlian.png
+size: 902,902
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 758, 417
+  size: 101, 161
+  orig: 127, 161
+  offset: 11, 0
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 742, 254
+  size: 102, 161
+  orig: 127, 161
+  offset: 14, 0
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 572, 48
+  size: 95, 161
+  orig: 127, 161
+  offset: 17, 0
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 736, 95
+  size: 93, 161
+  orig: 127, 161
+  offset: 18, 0
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 453, 95
+  size: 117, 161
+  orig: 127, 161
+  offset: 7, 0
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 324, 95
+  size: 127, 161
+  orig: 127, 161
+  offset: 0, 0
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 635, 417
+  size: 121, 161
+  orig: 127, 161
+  offset: 3, 0
+  index: -1
+fx/fxhb_06
+  rotate: false
+  xy: 2, 12
+  size: 171, 36
+  orig: 323, 236
+  offset: 7, 124
+  index: -1
+fx/fxhb_07
+  rotate: false
+  xy: 742, 190
+  size: 151, 62
+  orig: 323, 236
+  offset: 51, 110
+  index: -1
+fx/fxhb_08
+  rotate: false
+  xy: 735, 22
+  size: 154, 71
+  orig: 323, 236
+  offset: 72, 109
+  index: -1
+fx/fxhb_09
+  rotate: false
+  xy: 324, 11
+  size: 156, 82
+  orig: 323, 236
+  offset: 94, 106
+  index: -1
+fx/fxhb_10
+  rotate: false
+  xy: 572, 145
+  size: 162, 100
+  orig: 323, 236
+  offset: 112, 104
+  index: -1
+fx/fxhb_11
+  rotate: true
+  xy: 635, 247
+  size: 168, 105
+  orig: 323, 236
+  offset: 126, 114
+  index: -1
+fx/huaban02_0
+  rotate: false
+  xy: 208, 19
+  size: 44, 29
+  orig: 52, 38
+  offset: 8, 2
+  index: -1
+fx/huaban02_1
+  rotate: true
+  xy: 175, 2
+  size: 46, 31
+  orig: 52, 38
+  offset: 6, 1
+  index: -1
+fx/huaban02_2
+  rotate: false
+  xy: 841, 869
+  size: 47, 31
+  orig: 52, 38
+  offset: 5, 2
+  index: -1
+fx/huaban02_3
+  rotate: false
+  xy: 482, 64
+  size: 47, 29
+  orig: 52, 38
+  offset: 5, 4
+  index: -1
+fx/huaban02_4
+  rotate: false
+  xy: 841, 813
+  size: 41, 25
+  orig: 52, 38
+  offset: 6, 7
+  index: -1
+fx/huaban02_5
+  rotate: false
+  xy: 254, 23
+  size: 42, 25
+  orig: 52, 38
+  offset: 7, 7
+  index: -1
+fx/huaban02_6
+  rotate: false
+  xy: 482, 38
+  size: 44, 24
+  orig: 52, 38
+  offset: 8, 6
+  index: -1
+fx/huaban02_7
+  rotate: false
+  xy: 841, 840
+  size: 44, 27
+  orig: 52, 38
+  offset: 8, 4
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 218, 580
+  size: 211, 320
+  orig: 214, 320
+  offset: 3, 0
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 2, 50
+  size: 206, 320
+  orig: 214, 320
+  offset: 8, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 430, 258
+  size: 203, 320
+  orig: 214, 320
+  offset: 11, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 637, 580
+  size: 202, 320
+  orig: 214, 320
+  offset: 12, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 431, 580
+  size: 204, 320
+  orig: 214, 320
+  offset: 9, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 218, 258
+  size: 210, 320
+  orig: 214, 320
+  offset: 4, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 580
+  size: 214, 320
+  orig: 214, 320
+  offset: 0, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 258
+  size: 214, 320
+  orig: 214, 320
+  offset: 0, 0
+  index: -1

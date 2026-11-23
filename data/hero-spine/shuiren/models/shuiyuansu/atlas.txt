@@ -1,0 +1,153 @@
+
+shuiyuansu.png
+size: 992,992
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 557, 28
+  size: 132, 152
+  orig: 240, 240
+  offset: 41, 36
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 840, 693
+  size: 139, 150
+  orig: 240, 240
+  offset: 35, 36
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 715, 173
+  size: 126, 145
+  orig: 240, 240
+  offset: 52, 37
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 836, 546
+  size: 144, 145
+  orig: 240, 240
+  offset: 50, 37
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 840, 834
+  size: 144, 156
+  orig: 240, 240
+  offset: 60, 36
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 557, 162
+  size: 156, 156
+  orig: 240, 240
+  offset: 44, 36
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 836, 390
+  size: 133, 154
+  orig: 240, 240
+  offset: 56, 36
+  index: -1
+fx/Liquid 024 Splash Slash Right_00002
+  rotate: false
+  xy: 864, 330
+  size: 121, 58
+  orig: 200, 200
+  offset: 28, 62
+  index: -1
+fx/Liquid 024 Splash Slash Right_00004
+  rotate: false
+  xy: 720, 320
+  size: 142, 68
+  orig: 200, 200
+  offset: 24, 51
+  index: -1
+fx/Liquid 024 Splash Slash Right_00006
+  rotate: false
+  xy: 165, 4
+  size: 157, 73
+  orig: 200, 200
+  offset: 25, 43
+  index: -1
+fx/Liquid 024 Splash Slash Right_00008
+  rotate: false
+  xy: 2, 2
+  size: 161, 75
+  orig: 200, 200
+  offset: 25, 39
+  index: -1
+fx/Liquid 024 Splash Slash Right_00010
+  rotate: false
+  xy: 324, 13
+  size: 162, 79
+  orig: 200, 200
+  offset: 26, 33
+  index: -1
+fx/Liquid 024 Splash Slash Right_00012
+  rotate: false
+  xy: 558, 320
+  size: 160, 78
+  orig: 200, 200
+  offset: 28, 30
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 281, 691
+  size: 278, 299
+  orig: 480, 480
+  offset: 93, 74
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 684
+  size: 277, 306
+  orig: 480, 480
+  offset: 96, 74
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 380
+  size: 277, 302
+  orig: 480, 480
+  offset: 96, 74
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 561, 698
+  size: 277, 292
+  orig: 480, 480
+  offset: 92, 75
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 558, 400
+  size: 276, 289
+  orig: 480, 480
+  offset: 89, 75
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 281, 94
+  size: 274, 295
+  orig: 480, 480
+  offset: 87, 74
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 281, 391
+  size: 275, 298
+  orig: 480, 480
+  offset: 86, 74
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 79
+  size: 277, 299
+  orig: 480, 480
+  offset: 89, 74
+  index: -1

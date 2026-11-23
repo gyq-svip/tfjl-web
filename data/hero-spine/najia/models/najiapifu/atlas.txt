@@ -1,0 +1,153 @@
+
+najiapifu.png
+size: 997,997
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/attack/b0003
+  rotate: false
+  xy: 783, 745
+  size: 212, 250
+  orig: 386, 386
+  offset: 69, 72
+  index: -1
+images/attack/b0006
+  rotate: false
+  xy: 215, 14
+  size: 207, 249
+  orig: 386, 386
+  offset: 74, 70
+  index: -1
+images/attack/b0011
+  rotate: true
+  xy: 521, 321
+  size: 218, 254
+  orig: 386, 386
+  offset: 60, 64
+  index: -1
+images/attack/b0014
+  rotate: true
+  xy: 265, 755
+  size: 240, 260
+  orig: 386, 386
+  offset: 55, 72
+  index: -1
+images/attack/b0017
+  rotate: true
+  xy: 2, 502
+  size: 240, 251
+  orig: 386, 386
+  offset: 50, 80
+  index: -1
+images/attack/b0020
+  rotate: true
+  xy: 2, 265
+  size: 235, 249
+  orig: 386, 386
+  offset: 51, 78
+  index: -1
+images/attack/b0023
+  rotate: false
+  xy: 2, 744
+  size: 261, 251
+  orig: 386, 386
+  offset: 25, 75
+  index: -1
+images/idle/a0000
+  rotate: true
+  xy: 255, 307
+  size: 220, 250
+  orig: 395, 424
+  offset: 64, 94
+  index: -1
+images/idle/a0004
+  rotate: false
+  xy: 2, 14
+  size: 211, 249
+  orig: 395, 424
+  offset: 72, 92
+  index: -1
+images/idle/a0008
+  rotate: true
+  xy: 507, 114
+  size: 205, 248
+  orig: 395, 424
+  offset: 77, 90
+  index: -1
+images/idle/a0012
+  rotate: false
+  xy: 783, 493
+  size: 211, 250
+  orig: 395, 424
+  offset: 70, 87
+  index: -1
+images/idle/a0016
+  rotate: false
+  xy: 777, 237
+  size: 217, 254
+  orig: 395, 424
+  offset: 61, 85
+  index: -1
+images/idle/a0020
+  rotate: true
+  xy: 265, 529
+  size: 224, 254
+  orig: 395, 424
+  offset: 55, 87
+  index: -1
+images/idle/a0024
+  rotate: true
+  xy: 527, 769
+  size: 226, 254
+  orig: 395, 424
+  offset: 53, 90
+  index: -1
+images/idle/a0028
+  rotate: true
+  xy: 527, 541
+  size: 226, 254
+  orig: 395, 424
+  offset: 55, 92
+  index: -1
+images/shui/0
+  rotate: true
+  xy: 424, 9
+  size: 103, 95
+  orig: 127, 114
+  offset: 12, 2
+  index: -1
+images/shui/1
+  rotate: false
+  xy: 521, 11
+  size: 112, 101
+  orig: 127, 114
+  offset: 9, 5
+  index: -1
+images/shui/2
+  rotate: false
+  xy: 635, 15
+  size: 114, 97
+  orig: 127, 114
+  offset: 9, 11
+  index: -1
+images/shui/3
+  rotate: false
+  xy: 751, 20
+  size: 118, 92
+  orig: 127, 114
+  offset: 7, 15
+  index: -1
+images/shui/4
+  rotate: true
+  xy: 757, 118
+  size: 117, 86
+  orig: 127, 114
+  offset: 7, 22
+  index: -1
+images/shui/5
+  rotate: true
+  xy: 424, 201
+  size: 104, 80
+  orig: 127, 114
+  offset: 7, 29
+  index: -1

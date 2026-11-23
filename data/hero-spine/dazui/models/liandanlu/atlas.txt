@@ -1,0 +1,195 @@
+
+liandanlu.png
+size: 561,561
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+fx/h2_000
+  rotate: true
+  xy: 452, 129
+  size: 50, 62
+  orig: 50, 66
+  offset: 0, 0
+  index: -1
+fx/h2_001
+  rotate: false
+  xy: 401, 31
+  size: 49, 61
+  orig: 50, 66
+  offset: 0, 0
+  index: -1
+fx/h2_002
+  rotate: false
+  xy: 452, 6
+  size: 50, 57
+  orig: 50, 66
+  offset: 0, 0
+  index: -1
+fx/h2_003
+  rotate: false
+  xy: 452, 65
+  size: 49, 62
+  orig: 50, 66
+  offset: 0, 0
+  index: -1
+fx/h2_004
+  rotate: true
+  xy: 335, 94
+  size: 47, 66
+  orig: 50, 66
+  offset: 3, 0
+  index: -1
+fx/h2_005
+  rotate: false
+  xy: 452, 249
+  size: 50, 66
+  orig: 50, 66
+  offset: 0, 0
+  index: -1
+fx/h2_006
+  rotate: false
+  xy: 452, 181
+  size: 50, 66
+  orig: 50, 66
+  offset: 0, 0
+  index: -1
+fx/h2_007
+  rotate: false
+  xy: 231, 42
+  size: 49, 66
+  orig: 50, 66
+  offset: 0, 0
+  index: -1
+fx/h2_008
+  rotate: false
+  xy: 282, 42
+  size: 49, 66
+  orig: 50, 66
+  offset: 1, 0
+  index: -1
+fx/h2_009
+  rotate: false
+  xy: 504, 249
+  size: 50, 66
+  orig: 50, 66
+  offset: 0, 0
+  index: -1
+fx/h2_010
+  rotate: false
+  xy: 504, 181
+  size: 50, 66
+  orig: 50, 66
+  offset: 0, 0
+  index: -1
+fx/h2_011
+  rotate: true
+  xy: 333, 45
+  size: 47, 66
+  orig: 50, 66
+  offset: 0, 0
+  index: -1
+fx/liandanlu01
+  rotate: false
+  xy: 340, 434
+  size: 175, 52
+  orig: 352, 248
+  offset: 88, 90
+  index: -1
+fx/liandanlu02
+  rotate: false
+  xy: 340, 488
+  size: 177, 71
+  orig: 352, 248
+  offset: 88, 93
+  index: -1
+fx/liandanlu03
+  rotate: true
+  xy: 415, 172
+  size: 152, 35
+  orig: 352, 248
+  offset: 99, 195
+  index: -1
+fx/yifangfuren_20
+  rotate: false
+  xy: 335, 143
+  size: 70, 71
+  orig: 120, 120
+  offset: 23, 22
+  index: -1
+fx/yifangfuren_21
+  rotate: false
+  xy: 302, 216
+  size: 111, 108
+  orig: 120, 120
+  offset: 2, 0
+  index: -1
+fx/yifangfuren_22
+  rotate: true
+  xy: 121, 96
+  size: 116, 101
+  orig: 120, 120
+  offset: 1, 5
+  index: -1
+fx/yifangfuren_23
+  rotate: true
+  xy: 456, 317
+  size: 115, 103
+  orig: 120, 120
+  offset: 3, 3
+  index: -1
+fx/yifangfuren_24
+  rotate: false
+  xy: 116, 9
+  size: 113, 85
+  orig: 120, 120
+  offset: 2, 17
+  index: -1
+fx/yifangfuren_25
+  rotate: false
+  xy: 2, 11
+  size: 112, 87
+  orig: 120, 120
+  offset: 4, 15
+  index: -1
+fx/yifangfuren_26
+  rotate: false
+  xy: 224, 110
+  size: 109, 104
+  orig: 120, 120
+  offset: 6, 7
+  index: -1
+fx/yifangfuren_27
+  rotate: true
+  xy: 340, 326
+  size: 106, 114
+  orig: 120, 120
+  offset: 5, 0
+  index: -1
+fx/yifangfuren_28
+  rotate: false
+  xy: 188, 216
+  size: 112, 109
+  orig: 120, 120
+  offset: 8, 5
+  index: -1
+fx/yifangfuren_29
+  rotate: false
+  xy: 2, 100
+  size: 117, 112
+  orig: 120, 120
+  offset: 3, 4
+  index: -1
+liandanlu01
+  rotate: false
+  xy: 2, 214
+  size: 184, 111
+  orig: 184, 111
+  offset: 0, 0
+  index: -1
+liandanlu02
+  rotate: false
+  xy: 2, 327
+  size: 336, 232
+  orig: 352, 248
+  offset: 8, 8
+  index: -1

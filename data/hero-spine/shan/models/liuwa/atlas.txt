@@ -1,0 +1,188 @@
+
+liuwa.png
+size: 758,758
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack1/atk_1
+  rotate: true
+  xy: 204, 40
+  size: 85, 117
+  orig: 114, 127
+  offset: 23, 0
+  index: -1
+attack1/atk_2
+  rotate: true
+  xy: 641, 329
+  size: 84, 115
+  orig: 114, 127
+  offset: 12, 0
+  index: -1
+attack1/atk_3
+  rotate: true
+  xy: 323, 34
+  size: 91, 112
+  orig: 114, 127
+  offset: 5, 0
+  index: -1
+attack1/atk_4
+  rotate: false
+  xy: 445, 159
+  size: 99, 119
+  orig: 114, 127
+  offset: 11, 0
+  index: -1
+attack1/atk_5
+  rotate: false
+  xy: 609, 638
+  size: 103, 118
+  orig: 114, 127
+  offset: 11, 0
+  index: -1
+attack1/atk_6
+  rotate: true
+  xy: 641, 415
+  size: 103, 115
+  orig: 114, 127
+  offset: 11, 0
+  index: -1
+attack1/atk_7
+  rotate: false
+  xy: 609, 520
+  size: 103, 116
+  orig: 114, 127
+  offset: 11, 0
+  index: -1
+attack1/atk_8
+  rotate: false
+  xy: 546, 161
+  size: 100, 117
+  orig: 114, 127
+  offset: 13, 0
+  index: -1
+fx/TX_fsx_00002
+  rotate: false
+  xy: 445, 107
+  size: 109, 50
+  orig: 118, 54
+  offset: 9, 1
+  index: -1
+fx/TX_fsx_00004
+  rotate: true
+  xy: 714, 646
+  size: 110, 40
+  orig: 118, 54
+  offset: 3, 2
+  index: -1
+fx/TX_fsx_00006
+  rotate: true
+  xy: 651, 93
+  size: 97, 48
+  orig: 118, 54
+  offset: 1, 6
+  index: -1
+fx/skill1_huoxing_0001
+  rotate: false
+  xy: 437, 34
+  size: 91, 71
+  orig: 97, 72
+  offset: 0, 0
+  index: -1
+fx/skill1_huoxing_0003
+  rotate: false
+  xy: 648, 255
+  size: 87, 72
+  orig: 97, 72
+  offset: 7, 0
+  index: -1
+fx/skill1_huoxing_0005
+  rotate: false
+  xy: 556, 94
+  size: 93, 65
+  orig: 97, 72
+  offset: 3, 7
+  index: -1
+fx/skill1_huoxing_0007
+  rotate: false
+  xy: 530, 27
+  size: 94, 65
+  orig: 97, 72
+  offset: 3, 6
+  index: -1
+fx/skill1_huoxing_0009
+  rotate: false
+  xy: 648, 192
+  size: 84, 61
+  orig: 97, 72
+  offset: 11, 10
+  index: -1
+fx/skill1_huoxing_0011
+  rotate: false
+  xy: 626, 32
+  size: 84, 59
+  orig: 97, 72
+  offset: 11, 12
+  index: -1
+fx/xing
+  rotate: false
+  xy: 734, 217
+  size: 22, 36
+  orig: 22, 36
+  offset: 0, 0
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 448, 280
+  size: 191, 236
+  orig: 204, 238
+  offset: 9, 0
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 208, 324
+  size: 192, 238
+  orig: 204, 238
+  offset: 8, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 411, 518
+  size: 196, 238
+  orig: 204, 238
+  offset: 4, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 208, 518
+  size: 201, 238
+  orig: 204, 238
+  offset: 0, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 518
+  size: 204, 238
+  orig: 204, 238
+  offset: 0, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 2, 279
+  size: 204, 237
+  orig: 204, 238
+  offset: 0, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 42
+  size: 200, 235
+  orig: 204, 238
+  offset: 4, 0
+  index: -1
+idle/idle_7
+  rotate: true
+  xy: 208, 127
+  size: 195, 235
+  orig: 204, 238
+  offset: 8, 0
+  index: -1

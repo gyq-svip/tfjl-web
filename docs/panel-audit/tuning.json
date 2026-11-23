@@ -1,0 +1,1328 @@
+[
+ {
+  "hero": "冰骑",
+  "folder": "aersasi",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "恶魔",
+  "folder": "yilidan",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.56,
+   0.58,
+   0.58,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "火法",
+  "folder": "huonv",
+  "medH": 0.56,
+  "scale": 1.036,
+  "samples": [
+   0.56,
+   0.56,
+   0.56,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "剑客",
+  "folder": "jiansheng",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.58,
+   0.58,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "刺客",
+  "folder": "huanci",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.58,
+   0.58,
+   0.58,
+   0.58,
+   0.6
+  ]
+ },
+ {
+  "hero": "小鹿",
+  "folder": "xiaolu",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "冰法",
+  "folder": "jianna",
+  "medH": 0.56,
+  "scale": 1.036,
+  "samples": [
+   0.56,
+   0.56,
+   0.56,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "蛇女",
+  "folder": "najia",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.58,
+   0.58,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "绿弓",
+  "folder": "fengxingzhe",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "冰弓",
+  "folder": "heianyouxia",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "暗法",
+  "folder": "guangfa",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "雷神",
+  "folder": "zhousi",
+  "medH": 0.56,
+  "scale": 1.036,
+  "samples": [
+   0.56,
+   0.56,
+   0.56,
+   0.58,
+   0.58
+  ]
+ },
+ {
+  "hero": "战将",
+  "folder": "jumo",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "刀客",
+  "folder": "siwen",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "海妖",
+  "folder": "chaoxi",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.56,
+   0.56,
+   0.58,
+   0.58,
+   0.58
+  ]
+ },
+ {
+  "hero": "大树",
+  "folder": "dashu",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.58,
+   0.58,
+   0.58,
+   0.58,
+   0.6
+  ]
+ },
+ {
+  "hero": "铁骑",
+  "folder": "juntuanshibing",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "飞机",
+  "folder": "feiji",
+  "medH": 0.56,
+  "scale": 1.036,
+  "samples": [
+   0.54,
+   0.56,
+   0.56,
+   0.56,
+   0.6
+  ]
+ },
+ {
+  "hero": "炸弹",
+  "folder": "xiubujiang",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "谜云",
+  "folder": "mituan",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.58,
+   0.58,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "神龛",
+  "folder": "shenling",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.58,
+   0.58,
+   0.58,
+   0.58,
+   0.6
+  ]
+ },
+ {
+  "hero": "骨弓",
+  "folder": "gugong",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "祭司",
+  "folder": "xianzhi",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "斧客",
+  "folder": "fuwang",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "死神",
+  "folder": "fashi",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.56,
+   0.56,
+   0.58,
+   0.58,
+   0.6
+  ]
+ },
+ {
+  "hero": "电法",
+  "folder": "dianhun",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "火枪",
+  "folder": "huoqiang",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.58,
+   0.58,
+   0.58,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "石头",
+  "folder": "xiaoxiao",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.58,
+   0.58,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "蜘蛛",
+  "folder": "zhizhu",
+  "medH": 0.54,
+  "scale": 1.074,
+  "samples": [
+   0.54,
+   0.54,
+   0.54,
+   0.58,
+   0.58
+  ]
+ },
+ {
+  "hero": "骨龙",
+  "folder": "silinglong",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.58,
+   0.58,
+   0.58,
+   0.58,
+   0.58
+  ]
+ },
+ {
+  "hero": "圣骑",
+  "folder": "shengqi",
+  "medH": 0.7,
+  "scale": 0.829,
+  "samples": [
+   0.7,
+   0.7,
+   0.7,
+   0.7,
+   0.7
+  ]
+ },
+ {
+  "hero": "巫医",
+  "folder": "wuyi",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "女王",
+  "folder": "tongkunvwang",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.54,
+   0.54,
+   0.58,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "光精灵",
+  "folder": "jingling",
+  "medH": 0.56,
+  "scale": 1.036,
+  "samples": [
+   0.52,
+   0.54,
+   0.56,
+   0.58,
+   0.6
+  ]
+ },
+ {
+  "hero": "雷精灵",
+  "folder": "jingling",
+  "medH": 0.48,
+  "scale": 1.208,
+  "samples": [
+   0.44,
+   0.46,
+   0.48,
+   0.5,
+   0.54
+  ]
+ },
+ {
+  "hero": "悟空",
+  "folder": "sunwukong",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.58,
+   0.58,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "幽灵",
+  "folder": "yougui",
+  "medH": 0.56,
+  "scale": 1.036,
+  "samples": [
+   0.54,
+   0.54,
+   0.56,
+   0.58,
+   0.58
+  ]
+ },
+ {
+  "hero": "工匠",
+  "folder": "fatiao",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.58,
+   0.58,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "幻精灵",
+  "folder": "jingling1",
+  "medH": 0.56,
+  "scale": 1.036,
+  "samples": [
+   0.52,
+   0.54,
+   0.56,
+   0.58,
+   0.58
+  ]
+ },
+ {
+  "hero": "暗精灵",
+  "folder": "jingling",
+  "medH": 0.54,
+  "scale": 1.074,
+  "samples": [
+   0.5,
+   0.52,
+   0.54,
+   0.54,
+   0.6
+  ]
+ },
+ {
+  "hero": "萌萌",
+  "folder": "xiongmao",
+  "medH": 0.64,
+  "scale": 0.906,
+  "samples": [
+   0.6,
+   0.6,
+   0.64,
+   0.64,
+   0.64
+  ]
+ },
+ {
+  "hero": "恶匪",
+  "folder": "tufu",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.58,
+   0.58,
+   0.58,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "虎弓",
+  "folder": "huniu",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "木精灵",
+  "folder": "jingling",
+  "medH": 0.56,
+  "scale": 1.036,
+  "samples": [
+   0.54,
+   0.54,
+   0.56,
+   0.56,
+   0.58
+  ]
+ },
+ {
+  "hero": "霸王",
+  "folder": "jietoubawang",
+  "medH": 0.56,
+  "scale": 1.036,
+  "samples": [
+   0.56,
+   0.56,
+   0.56,
+   0.58,
+   0.58
+  ]
+ },
+ {
+  "hero": "地精",
+  "folder": "dijing",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.58,
+   0.58,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "毒王",
+  "folder": "duye",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "萨满",
+  "folder": "daize",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.56,
+   0.58,
+   0.58,
+   0.58,
+   0.6
+  ]
+ },
+ {
+  "hero": "神龙",
+  "folder": "panglong",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "魔精灵",
+  "folder": "jingling",
+  "medH": 0.56,
+  "scale": 1.036,
+  "samples": [
+   0.52,
+   0.54,
+   0.56,
+   0.56,
+   0.56
+  ]
+ },
+ {
+  "hero": "狂龙",
+  "folder": "ken",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.58,
+   0.58,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "酋长",
+  "folder": "niutouguai",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.58,
+   0.58,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "后羿",
+  "folder": "houyi",
+  "medH": 0.42,
+  "scale": 1.381,
+  "samples": [
+   0.42,
+   0.42,
+   0.42,
+   0.42,
+   0.42
+  ]
+ },
+ {
+  "hero": "松鼠",
+  "folder": "songshu",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.54,
+   0.54,
+   0.58,
+   0.58,
+   0.6
+  ]
+ },
+ {
+  "hero": "亡将",
+  "folder": "kulouwang",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "炎魔",
+  "folder": "yanmo",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "小丑",
+  "folder": "xiaochou",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.58,
+   0.58,
+   0.58,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "咕咕",
+  "folder": "gugu",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.58,
+   0.58,
+   0.58,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "邪能火炮",
+  "folder": "jianongpao",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.56,
+   0.56,
+   0.58,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "领主",
+  "folder": "mori",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.58,
+   0.58,
+   0.58,
+   0.58,
+   0.6
+  ]
+ },
+ {
+  "hero": "沙皇",
+  "folder": "shawang",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "孤星",
+  "folder": "shangjin",
+  "medH": 0.64,
+  "scale": 0.906,
+  "samples": [
+   0.62,
+   0.62,
+   0.64,
+   0.64,
+   0.64
+  ]
+ },
+ {
+  "hero": "彩精灵",
+  "folder": "caijingling",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.56,
+   0.58,
+   0.58,
+   0.6,
+   0.66
+  ]
+ },
+ {
+  "hero": "鲛女",
+  "folder": "renyu",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.58,
+   0.58,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "船长",
+  "folder": "haidao",
+  "medH": 0.66,
+  "scale": 0.879,
+  "samples": [
+   0.58,
+   0.6,
+   0.66,
+   0.66,
+   0.72
+  ]
+ },
+ {
+  "hero": "土精灵",
+  "folder": "tujingling",
+  "medH": 0.56,
+  "scale": 1.036,
+  "samples": [
+   0.52,
+   0.54,
+   0.56,
+   0.56,
+   0.6
+  ]
+ },
+ {
+  "hero": "龟相",
+  "folder": "guixianren",
+  "medH": 0.64,
+  "scale": 0.906,
+  "samples": [
+   0.62,
+   0.64,
+   0.64,
+   0.64,
+   0.66
+  ]
+ },
+ {
+  "hero": "龙王",
+  "folder": "longwang",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.58,
+   0.58,
+   0.58,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "狂将",
+  "folder": "kuangjiang",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "爱神",
+  "folder": "aishen",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "影",
+  "folder": "ying",
+  "medH": 0.62,
+  "scale": 0.935,
+  "samples": [
+   0.62,
+   0.62,
+   0.62,
+   0.62,
+   0.62
+  ]
+ },
+ {
+  "hero": "小野",
+  "folder": "qiqi",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "阿翼",
+  "folder": "qiuwang",
+  "medH": 0.64,
+  "scale": 0.906,
+  "samples": [
+   0.56,
+   0.62,
+   0.64,
+   0.68,
+   0.7
+  ]
+ },
+ {
+  "hero": "龙拳",
+  "folder": "gangquan",
+  "medH": 0.32,
+  "scale": 1.812,
+  "samples": [
+   0.32,
+   0.32,
+   0.32,
+   0.32,
+   0.32
+  ]
+ },
+ {
+  "hero": "钢鬃",
+  "folder": "gangbei",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.58,
+   0.58,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "女妖",
+  "folder": "nvyao",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.62,
+   0.62
+  ]
+ },
+ {
+  "hero": "猫咪",
+  "folder": "maomi",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "魇",
+  "folder": "yemo",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "闪",
+  "folder": "shan",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.58,
+   0.58,
+   0.58,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "葵",
+  "folder": "kui",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "地精宝库",
+  "folder": "baoxiangui",
+  "medH": 0.72,
+  "scale": 0.806,
+  "samples": [
+   0.72,
+   0.72,
+   0.72,
+   0.72,
+   0.72
+  ]
+ },
+ {
+  "hero": "侏儒射线",
+  "folder": "zhurushexian",
+  "medH": 0.66,
+  "scale": 0.879,
+  "samples": [
+   0.6,
+   0.6,
+   0.66,
+   0.66,
+   0.66
+  ]
+ },
+ {
+  "hero": "魂精灵",
+  "folder": "jingling7",
+  "medH": 0.56,
+  "scale": 1.036,
+  "samples": [
+   0.5,
+   0.52,
+   0.56,
+   0.56,
+   0.56
+  ]
+ },
+ {
+  "hero": "傀",
+  "folder": "daocaoren",
+  "medH": 0.56,
+  "scale": 1.036,
+  "samples": [
+   0.56,
+   0.56,
+   0.56,
+   0.56,
+   0.56
+  ]
+ },
+ {
+  "hero": "火神",
+  "folder": "hongkai",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.58,
+   0.58,
+   0.58,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "邪",
+  "folder": "xie",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.56,
+   0.58,
+   0.58,
+   0.58,
+   0.6
+  ]
+ },
+ {
+  "hero": "大圣",
+  "folder": "dasheng",
+  "medH": 0.52,
+  "scale": 1.115,
+  "samples": [
+   0.52,
+   0.52,
+   0.52,
+   0.52,
+   0.52
+  ]
+ },
+ {
+  "hero": "咬人娃娃",
+  "folder": "dazui",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "凤凰",
+  "folder": "yuhuofenghuang",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.52,
+   0.56,
+   0.6,
+   0.62,
+   0.68
+  ]
+ },
+ {
+  "hero": "鱼人",
+  "folder": "xiaoyuren",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.58,
+   0.58,
+   0.58,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "冰精灵",
+  "folder": "bingjingling",
+  "medH": 0.52,
+  "scale": 1.115,
+  "samples": [
+   0.5,
+   0.52,
+   0.52,
+   0.56,
+   0.58
+  ]
+ },
+ {
+  "hero": "土灵",
+  "folder": "tuling",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "水灵",
+  "folder": "shuimao",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "火灵",
+  "folder": "huoling",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "钟馗",
+  "folder": "zhongkui",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "小炮",
+  "folder": "kuangtu",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "天使",
+  "folder": "tianshi",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.58,
+   0.58,
+   0.58,
+   0.58,
+   0.58
+  ]
+ },
+ {
+  "hero": "微型潜艇",
+  "folder": "qianting",
+  "medH": 0.54,
+  "scale": 1.074,
+  "samples": [
+   0.5,
+   0.52,
+   0.54,
+   0.54,
+   0.54
+  ]
+ },
+ {
+  "hero": "风灵",
+  "folder": "fengling",
+  "medH": 0.6,
+  "scale": 0.967,
+  "samples": [
+   0.6,
+   0.6,
+   0.6,
+   0.6,
+   0.6
+  ]
+ },
+ {
+  "hero": "冰鸟",
+  "folder": "bingniao",
+  "medH": 0.54,
+  "scale": 1.074,
+  "samples": [
+   0.52,
+   0.52,
+   0.54,
+   0.56,
+   0.56
+  ]
+ },
+ {
+  "hero": "水人",
+  "folder": "shuiren",
+  "medH": 0.62,
+  "scale": 0.935,
+  "samples": [
+   0.62,
+   0.62,
+   0.62,
+   0.62,
+   0.62
+  ]
+ },
+ {
+  "hero": "血魔",
+  "folder": "xuemo",
+  "medH": 0.58,
+  "scale": 1,
+  "samples": [
+   0.56,
+   0.58,
+   0.58,
+   0.58,
+   0.58
+  ]
+ }
+]

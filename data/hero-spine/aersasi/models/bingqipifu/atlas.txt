@@ -1,0 +1,111 @@
+
+bingqipifu.png
+size: 995,995
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack2/atk2_1
+  rotate: true
+  xy: 716, 122
+  size: 147, 144
+  orig: 178, 188
+  offset: 4, 0
+  index: -1
+attack2/atk2_2
+  rotate: false
+  xy: 862, 114
+  size: 131, 155
+  orig: 178, 188
+  offset: 7, 0
+  index: -1
+attack2/atk2_3
+  rotate: false
+  xy: 891, 809
+  size: 90, 184
+  orig: 178, 188
+  offset: 10, 0
+  index: -1
+attack2/atk2_4
+  rotate: false
+  xy: 580, 105
+  size: 134, 164
+  orig: 178, 188
+  offset: 5, 0
+  index: -1
+attack2/atk2_5
+  rotate: false
+  xy: 580, 271
+  size: 172, 146
+  orig: 178, 188
+  offset: 4, 0
+  index: -1
+attack2/atk2_6
+  rotate: false
+  xy: 754, 271
+  size: 158, 146
+  orig: 178, 188
+  offset: 4, 0
+  index: -1
+fx/glow2_00004
+  rotate: true
+  xy: 891, 726
+  size: 81, 82
+  orig: 92, 94
+  offset: 5, 6
+  index: -1
+idle/idle_0
+  rotate: true
+  xy: 580, 419
+  size: 282, 291
+  orig: 296, 296
+  offset: 12, 2
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 294, 411
+  size: 284, 290
+  orig: 296, 296
+  offset: 12, 2
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 117
+  size: 287, 290
+  orig: 296, 296
+  offset: 9, 2
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 597, 703
+  size: 292, 290
+  orig: 296, 296
+  offset: 4, 2
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 703
+  size: 296, 290
+  orig: 296, 296
+  offset: 0, 2
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 300, 703
+  size: 295, 290
+  orig: 296, 296
+  offset: 0, 2
+  index: -1
+idle/idle_6
+  rotate: true
+  xy: 2, 409
+  size: 292, 290
+  orig: 296, 296
+  offset: 1, 2
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 291, 117
+  size: 287, 290
+  orig: 296, 296
+  offset: 6, 2
+  index: -1

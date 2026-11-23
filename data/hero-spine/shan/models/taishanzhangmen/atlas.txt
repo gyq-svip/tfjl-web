@@ -1,0 +1,188 @@
+
+taishanzhangmen.png
+size: 846,846
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 407, 501
+  size: 100, 135
+  orig: 300, 300
+  offset: 56, 34
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 655, 179
+  size: 89, 128
+  orig: 300, 300
+  offset: 59, 34
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 565, 177
+  size: 88, 130
+  orig: 300, 300
+  offset: 60, 34
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 722, 309
+  size: 99, 130
+  orig: 300, 300
+  offset: 60, 34
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 540, 309
+  size: 180, 130
+  orig: 300, 300
+  offset: 56, 34
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 407, 332
+  size: 167, 131
+  orig: 300, 300
+  offset: 54, 34
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 407, 603
+  size: 135, 134
+  orig: 300, 300
+  offset: 53, 34
+  index: -1
+attack/atk_8
+  rotate: true
+  xy: 407, 739
+  size: 105, 138
+  orig: 300, 300
+  offset: 53, 34
+  index: -1
+fx/caocao_06
+  rotate: false
+  xy: 407, 287
+  size: 124, 43
+  orig: 146, 73
+  offset: 21, 0
+  index: -1
+fx/caocao_07
+  rotate: false
+  xy: 143, 12
+  size: 136, 60
+  orig: 146, 73
+  offset: 6, 0
+  index: -1
+fx/caocao_08
+  rotate: false
+  xy: 2, 6
+  size: 139, 66
+  orig: 146, 73
+  offset: 1, 0
+  index: -1
+fx/caocao_09
+  rotate: false
+  xy: 281, 14
+  size: 109, 58
+  orig: 146, 73
+  offset: 0, 12
+  index: -1
+fx/caocao_10
+  rotate: false
+  xy: 392, 14
+  size: 107, 58
+  orig: 146, 73
+  offset: 1, 12
+  index: -1
+fx/caocao_11
+  rotate: false
+  xy: 501, 24
+  size: 80, 48
+  orig: 146, 73
+  offset: 0, 24
+  index: -1
+fx/d1_000
+  rotate: false
+  xy: 565, 80
+  size: 89, 95
+  orig: 102, 102
+  offset: 9, 3
+  index: -1
+fx/d1_001
+  rotate: false
+  xy: 656, 82
+  size: 88, 95
+  orig: 102, 102
+  offset: 9, 3
+  index: -1
+fx/d1_002
+  rotate: false
+  xy: 746, 213
+  size: 94, 94
+  orig: 102, 102
+  offset: 4, 2
+  index: -1
+fx/d1_003
+  rotate: false
+  xy: 583, 4
+  size: 94, 74
+  orig: 102, 102
+  offset: 4, 2
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 563
+  size: 203, 281
+  orig: 600, 600
+  offset: 109, 68
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 280
+  size: 202, 281
+  orig: 600, 600
+  offset: 108, 68
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 206, 280
+  size: 199, 281
+  orig: 600, 600
+  offset: 110, 68
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 207, 564
+  size: 198, 280
+  orig: 600, 600
+  offset: 112, 68
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 565, 441
+  size: 199, 279
+  orig: 600, 600
+  offset: 113, 68
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 565, 642
+  size: 202, 279
+  orig: 600, 600
+  offset: 112, 68
+  index: -1
+idle/idle_6
+  rotate: true
+  xy: 284, 74
+  size: 204, 279
+  orig: 600, 600
+  offset: 111, 68
+  index: -1
+idle/idle_7
+  rotate: true
+  xy: 2, 74
+  size: 204, 280
+  orig: 600, 600
+  offset: 110, 68
+  index: -1

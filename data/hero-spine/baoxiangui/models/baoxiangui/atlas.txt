@@ -1,0 +1,139 @@
+
+baoxiangui.png
+size: 825,825
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+bxx06
+  rotate: false
+  xy: 367, 240
+  size: 150, 152
+  orig: 150, 152
+  offset: 0, 0
+  index: -1
+bxx07
+  rotate: false
+  xy: 2, 584
+  size: 230, 239
+  orig: 230, 239
+  offset: 0, 0
+  index: -1
+fx/fx_01
+  rotate: false
+  xy: 625, 632
+  size: 172, 191
+  orig: 230, 239
+  offset: 27, 3
+  index: -1
+fx/fx_02
+  rotate: true
+  xy: 443, 459
+  size: 171, 191
+  orig: 230, 239
+  offset: 27, 3
+  index: -1
+fx/fx_03
+  rotate: false
+  xy: 443, 632
+  size: 180, 191
+  orig: 230, 239
+  offset: 8, 3
+  index: -1
+fx/fx_04
+  rotate: false
+  xy: 2, 358
+  size: 207, 224
+  orig: 230, 239
+  offset: 3, 3
+  index: -1
+fx/fx_05
+  rotate: false
+  xy: 234, 603
+  size: 207, 220
+  orig: 230, 239
+  offset: 3, 9
+  index: -1
+fx/fx_06
+  rotate: false
+  xy: 2, 168
+  size: 198, 188
+  orig: 230, 239
+  offset: 3, 41
+  index: -1
+fx/fx_07
+  rotate: false
+  xy: 636, 442
+  size: 175, 188
+  orig: 230, 239
+  offset: 3, 41
+  index: -1
+fx/fx_08
+  rotate: false
+  xy: 211, 394
+  size: 175, 188
+  orig: 230, 239
+  offset: 3, 41
+  index: -1
+fx/glow2_00004
+  rotate: true
+  xy: 614, 7
+  size: 121, 124
+  orig: 137, 142
+  offset: 8, 9
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 12
+  size: 151, 154
+  orig: 183, 183
+  offset: 8, 19
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 155, 12
+  size: 151, 154
+  orig: 183, 183
+  offset: 8, 19
+  index: -1
+idle/idle_2
+  rotate: true
+  xy: 211, 241
+  size: 151, 154
+  orig: 183, 183
+  offset: 8, 19
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 308, 84
+  size: 151, 154
+  orig: 183, 183
+  offset: 8, 19
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 461, 84
+  size: 151, 154
+  orig: 183, 183
+  offset: 8, 19
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 519, 286
+  size: 151, 154
+  orig: 183, 183
+  offset: 8, 19
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 672, 286
+  size: 151, 154
+  orig: 183, 183
+  offset: 8, 19
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 614, 130
+  size: 151, 154
+  orig: 183, 183
+  offset: 8, 19
+  index: -1

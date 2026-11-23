@@ -1,0 +1,153 @@
+
+jumopifu.png
+size: 882,882
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/FX/bb/11_000
+  rotate: false
+  xy: 727, 253
+  size: 60, 56
+  orig: 128, 128
+  offset: 36, 16
+  index: -1
+images/FX/bb/11_001
+  rotate: true
+  xy: 771, 630
+  size: 120, 92
+  orig: 128, 128
+  offset: 8, 16
+  index: -1
+images/FX/bb/11_002
+  rotate: true
+  xy: 727, 311
+  size: 124, 92
+  orig: 128, 128
+  offset: 4, 20
+  index: -1
+images/FX/bb/11_003
+  rotate: true
+  xy: 771, 752
+  size: 128, 92
+  orig: 128, 128
+  offset: 0, 24
+  index: -1
+images/FX/fuzi2
+  rotate: false
+  xy: 713, 437
+  size: 93, 75
+  orig: 100, 100
+  offset: 1, 13
+  index: -1
+images/FX/j3
+  rotate: false
+  xy: 713, 514
+  size: 115, 114
+  orig: 128, 128
+  offset: 7, 7
+  index: -1
+images/idle/a0000
+  rotate: true
+  xy: 233, 3
+  size: 170, 230
+  orig: 512, 512
+  offset: 181, 119
+  index: -1
+images/idle/a0004
+  rotate: false
+  xy: 176, 175
+  size: 169, 232
+  orig: 512, 512
+  offset: 182, 119
+  index: -1
+images/idle/a0008
+  rotate: false
+  xy: 249, 647
+  size: 171, 233
+  orig: 512, 512
+  offset: 181, 119
+  index: -1
+images/idle/a0012
+  rotate: false
+  xy: 2, 175
+  size: 172, 232
+  orig: 512, 512
+  offset: 181, 119
+  index: -1
+images/idle/a0016
+  rotate: false
+  xy: 422, 649
+  size: 173, 231
+  orig: 512, 512
+  offset: 181, 119
+  index: -1
+images/idle/a0020
+  rotate: false
+  xy: 597, 650
+  size: 172, 230
+  orig: 512, 512
+  offset: 181, 119
+  index: -1
+images/idle/a0024
+  rotate: true
+  xy: 2, 2
+  size: 171, 229
+  orig: 512, 512
+  offset: 182, 119
+  index: -1
+images/idle/a0028
+  rotate: false
+  xy: 362, 415
+  size: 170, 230
+  orig: 512, 512
+  offset: 182, 119
+  index: -1
+images/idle/a0039
+  rotate: false
+  xy: 2, 409
+  size: 203, 227
+  orig: 512, 512
+  offset: 140, 116
+  index: -1
+images/idle/a0043
+  rotate: false
+  xy: 2, 638
+  size: 245, 242
+  orig: 512, 512
+  offset: 94, 117
+  index: -1
+images/idle/a0046
+  rotate: false
+  xy: 207, 413
+  size: 153, 223
+  orig: 512, 512
+  offset: 163, 119
+  index: -1
+images/idle/a0049
+  rotate: true
+  xy: 534, 229
+  size: 201, 191
+  orig: 512, 512
+  offset: 195, 117
+  index: -1
+images/idle/a0053
+  rotate: false
+  xy: 347, 198
+  size: 185, 213
+  orig: 512, 512
+  offset: 193, 117
+  index: -1
+images/idle/a0058
+  rotate: false
+  xy: 465, 3
+  size: 184, 193
+  orig: 512, 512
+  offset: 182, 118
+  index: -1
+images/idle/a0063
+  rotate: false
+  xy: 534, 432
+  size: 177, 215
+  orig: 512, 512
+  offset: 180, 120
+  index: -1

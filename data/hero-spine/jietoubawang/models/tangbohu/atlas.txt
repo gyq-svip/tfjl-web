@@ -1,0 +1,160 @@
+
+tangbohu.png
+size: 818,818
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 460, 564
+  size: 117, 133
+  orig: 137, 135
+  offset: 0, 0
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 597, 685
+  size: 93, 131
+  orig: 137, 135
+  offset: 0, 0
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 729, 683
+  size: 87, 133
+  orig: 137, 135
+  offset: 6, 0
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 460, 724
+  size: 92, 135
+  orig: 137, 135
+  offset: 1, 0
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 595, 583
+  size: 98, 135
+  orig: 137, 135
+  offset: 1, 0
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 677, 168
+  size: 136, 135
+  orig: 137, 135
+  offset: 1, 0
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 677, 37
+  size: 129, 135
+  orig: 137, 135
+  offset: 0, 0
+  index: -1
+fx/liu_02
+  rotate: false
+  xy: 459, 282
+  size: 87, 18
+  orig: 102, 26
+  offset: 5, 5
+  index: -1
+fx/liu_04
+  rotate: false
+  xy: 539, 303
+  size: 81, 23
+  orig: 102, 26
+  offset: 15, 2
+  index: -1
+fx/liu_06
+  rotate: false
+  xy: 459, 302
+  size: 78, 24
+  orig: 102, 26
+  offset: 22, 1
+  index: -1
+fx/liu_08
+  rotate: false
+  xy: 677, 11
+  size: 72, 24
+  orig: 102, 26
+  offset: 28, 1
+  index: -1
+fx/liu_10
+  rotate: false
+  xy: 622, 305
+  size: 66, 21
+  orig: 102, 26
+  offset: 33, 2
+  index: -1
+fx/liu_12
+  rotate: false
+  xy: 548, 283
+  size: 61, 18
+  orig: 102, 26
+  offset: 38, 4
+  index: -1
+fx/liu_14
+  rotate: false
+  xy: 611, 284
+  size: 58, 17
+  orig: 102, 26
+  offset: 40, 5
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 280
+  size: 228, 267
+  orig: 230, 275
+  offset: 2, 8
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 234, 549
+  size: 224, 267
+  orig: 230, 275
+  offset: 4, 8
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 232, 9
+  size: 219, 270
+  orig: 230, 275
+  offset: 4, 5
+  index: -1
+idle/idle_3
+  rotate: true
+  xy: 459, 328
+  size: 219, 268
+  orig: 230, 275
+  offset: 2, 6
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 453, 13
+  size: 222, 266
+  orig: 230, 275
+  offset: 0, 8
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 232, 281
+  size: 225, 266
+  orig: 230, 275
+  offset: 0, 8
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 11
+  size: 228, 267
+  orig: 230, 275
+  offset: 0, 8
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 549
+  size: 230, 267
+  orig: 230, 275
+  offset: 0, 8
+  index: -1

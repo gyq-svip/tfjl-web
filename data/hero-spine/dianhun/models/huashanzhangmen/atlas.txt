@@ -1,0 +1,160 @@
+
+huashanzhangmen.png
+size: 742,742
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 398, 302
+  size: 89, 120
+  orig: 200, 200
+  offset: 64, 48
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 364, 86
+  size: 86, 120
+  orig: 200, 200
+  offset: 66, 48
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 539, 86
+  size: 84, 120
+  orig: 200, 200
+  offset: 64, 48
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 490, 208
+  size: 92, 120
+  orig: 200, 200
+  offset: 62, 48
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 514, 406
+  size: 94, 121
+  orig: 200, 200
+  offset: 60, 48
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 367, 208
+  size: 92, 121
+  orig: 200, 200
+  offset: 60, 48
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 452, 86
+  size: 85, 120
+  orig: 200, 200
+  offset: 61, 48
+  index: -1
+fx/Electricity 034 Charge Radial_00006
+  rotate: false
+  xy: 625, 90
+  size: 97, 99
+  orig: 160, 160
+  offset: 28, 31
+  index: -1
+fx/Electricity 034 Charge Radial_00009
+  rotate: false
+  xy: 625, 191
+  size: 101, 100
+  orig: 160, 160
+  offset: 28, 30
+  index: -1
+fx/Electricity 034 Charge Radial_00012
+  rotate: false
+  xy: 520, 302
+  size: 106, 102
+  orig: 160, 160
+  offset: 24, 29
+  index: -1
+fx/Electricity 034 Charge Radial_00015
+  rotate: true
+  xy: 637, 390
+  size: 110, 103
+  orig: 160, 160
+  offset: 22, 30
+  index: -1
+fx/Electricity 034 Charge Radial_00020
+  rotate: false
+  xy: 398, 393
+  size: 114, 107
+  orig: 160, 160
+  offset: 19, 30
+  index: -1
+fx/Electricity 034 Charge Radial_00024
+  rotate: true
+  xy: 628, 293
+  size: 95, 108
+  orig: 160, 160
+  offset: 42, 31
+  index: -1
+fx/jianhua
+  rotate: true
+  xy: 367, 313
+  size: 186, 29
+  orig: 186, 29
+  offset: 0, 0
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 373, 502
+  size: 181, 238
+  orig: 400, 400
+  offset: 127, 98
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 502
+  size: 184, 238
+  orig: 400, 400
+  offset: 125, 98
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 262
+  size: 184, 238
+  orig: 400, 400
+  offset: 126, 98
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 188, 501
+  size: 183, 239
+  orig: 400, 400
+  offset: 127, 98
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 21
+  size: 182, 239
+  orig: 400, 400
+  offset: 128, 98
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 188, 260
+  size: 177, 239
+  orig: 400, 400
+  offset: 131, 98
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 186, 19
+  size: 176, 239
+  orig: 400, 400
+  offset: 132, 98
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 556, 502
+  size: 178, 238
+  orig: 400, 400
+  offset: 130, 98
+  index: -1

@@ -1,0 +1,90 @@
+
+hanbingzhenqi.png
+size: 441,441
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+fx/glow2_00004
+  rotate: false
+  xy: 2, 272
+  size: 162, 167
+  orig: 183, 189
+  offset: 10, 10
+  index: -1
+fxg01
+  rotate: false
+  xy: 285, 287
+  size: 33, 31
+  orig: 97, 68
+  offset: 0, 0
+  index: -1
+fxg02
+  rotate: false
+  xy: 206, 286
+  size: 34, 32
+  orig: 92, 97
+  offset: 53, 3
+  index: -1
+fxg03
+  rotate: true
+  xy: 166, 286
+  size: 32, 38
+  orig: 66, 88
+  offset: 0, 49
+  index: -1
+fxg04
+  rotate: true
+  xy: 242, 287
+  size: 31, 41
+  orig: 82, 99
+  offset: 3, 2
+  index: -1
+fxg05
+  rotate: false
+  xy: 383, 388
+  size: 51, 51
+  orig: 121, 125
+  offset: 67, 71
+  index: -1
+idle/a_0
+  rotate: false
+  xy: 320, 173
+  size: 119, 145
+  orig: 119, 145
+  offset: 0, 0
+  index: -1
+idle/idle_0
+  rotate: true
+  xy: 2, 151
+  size: 119, 157
+  orig: 119, 157
+  offset: 0, 0
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 161, 151
+  size: 119, 157
+  orig: 119, 157
+  offset: 0, 0
+  index: -1
+idle/idle_3
+  rotate: true
+  xy: 161, 151
+  size: 119, 157
+  orig: 119, 157
+  offset: 0, 0
+  index: -1
+idle/idle_2
+  rotate: true
+  xy: 166, 320
+  size: 119, 157
+  orig: 119, 157
+  offset: 0, 0
+  index: -1
+xing1
+  rotate: false
+  xy: 325, 383
+  size: 56, 56
+  orig: 58, 58
+  offset: 1, 1
+  index: -1

@@ -1,0 +1,177 @@
+# ====================
+# Tauri 桌面应用：只忽略构建产物/生成代码，保留 Rust 源码进仓库
+# ====================
+src-tauri/target/
+src-tauri/gen/
+/src/
+
+# ====================
+# Node.js 依赖和配置（Tauri用，网站不需要）
+# ====================
+node_modules/
+package.json
+package-lock.json
+
+# ====================
+# 构建日志和临时文件
+# ====================
+build-log*.txt
+*.log
+
+# ====================
+# 图标生成脚本和临时图标（已编译进Tauri，不需要在网站仓库里）
+# ====================
+generate-icons.js
+export_cards.js
+icon-app-128.png
+icon-installed-64.png
+icon-installer-128.png
+icon-installer-64.png
+icon-preview.png
+icon-source.png
+
+# ====================
+# Nativefier 打包产物（之前测试用的，已不需要）
+# ====================
+塔防助手-win32-x64/
+
+# ====================
+# 安装包和exe（不提交到仓库）
+# ====================
+*.exe
+塔防精灵助手_*.exe
+
+# ====================
+# 备份文件
+# ====================
+index_backup_*.html
+*_backup_*.html
+# 发布脚本备份（本地保留，不入库）
+publish_update.ps1.bak
+
+# ====================
+# 测试数据文件
+# ====================
+测试.txt
+英雄数据.txt
+
+# ====================
+# 系统文件
+# ====================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ====================
+# 项目本地数据 / AI 助手工作目录
+# ====================
+.codebuddy/
+.vscode/
+
+# ====================
+# 本地工具脚本（网站运行不需要）
+# ====================
+scripts/
+!scripts/
+scripts/*
+!scripts/export-heroes/
+# 官方数据同步/校验脚本（从微信小游戏官方缓存解析，需入库以便复现）
+!scripts/sync-hero-deck.mjs
+# 例外：GitHub Actions 用的 CI 脚本必须入库（定时备份等）
+!.github/scripts/
+
+# ====================
+# 旧版备份
+# ====================
+backup/
+
+# ====================
+# 签名密钥（本地保管，切勿上传到仓库！）
+# ====================
+tauri.key
+taui.key
+*.key
+# 私钥的 base64 副本（等同私钥，严禁入库）
+tfjl-sign-key.b64
+# 公钥/备份副本（虽无密级，但避免误提交造成混淆）
+tauri.key.pub
+taui.key.pub
+tauri.key.bak
+密钥.txt
+
+# ====================
+# OCR 模型（Tesseract 大文件，本地保管，不入库）
+# ====================
+*.traineddata
+
+# ====================
+# 安装包签名文件（发布产物，走 Gitee 发行版附件，仓库不保留）
+# 若想在仓库留存历史签名可删掉这一行
+# ====================
+*.sig
+
+# ====================
+# 用户本地导出的数据 / 文档（非源码）
+# ====================
+手动签名.txt
+英雄数据导出.json
+
+# ====================
+# 皮肤发布包（打包产物，走 Gitee 发行版附件分发，仓库不保留，避免每次重打都 +20MB）
+# ====================
+skins.zip
+skins-*.zip
+# 皮肤格式统一时删除的冗余 png 备份（本地留档核对用，确认无误后可手动删除）
+_skin_png_backup/
+
+# ====================
+# 开发/辅助工具（与网页/桌面软件运行无关，本地保留不入库）
+# ====================
+tools/
+# 第三方参考源码（本地排查用，与网页/桌面运行无关）
+/other/
+# AI 测试工具的工作目录（playwright/cli）——🔴 必须忽略：未跟踪杂文件会让
+# 旧版 APP「一键推送」的全仓库 git status 误判有改动 → nothing-to-commit 误报推送失败
+.playwright-cli/
+.workbuddy/
+
+# ====================
+# 本地分类文件夹（整理散落文件用，均不入库）
+# ====================
+# 临时草稿 / 一次性调试脚本 / 敏感草稿（唯一临时目录，AI 脚本命名 YYYY-MM-DD_描述.ext，每日自动清理）
+/tfjl_temp/
+# 长期归档（不确定是否要留、但暂不能丢的文件；含 README 标注用途；AI 不得擅自删，含 Gist 快照有泄密风险）
+/archive/
+# 历史误建的临时目录（已废弃，统一用 tfjl_temp/）
+/tjl_temp/
+# 构建日志
+/logs/
+# 用户本地导出数据 / 文档（大部分不入库；英雄图鉴官方数据需部署到 Pages，单独例外）
+/data/
+!/data/
+/data/*
+!/data/heroes.json
+# 英雄 Spine 动画资源（官方导出，图鉴面板播放用；目录清单 index.json + 各英雄 skeleton/atlas/png）
+!/data/hero-spine/
+!/data/hero-spine/**
+# 英雄图鉴：数据与立绘图集入库（avatar 17.9MB）；Spine 骨骼由官方 resources bundle 提取（scripts/export-heroes/extract-official-spine.py）
+!/data/hero-deck/
+!/data/hero-deck/**
+/data/hero-deck/_tables/
+/data/hero-deck/_tmp/
+/data/hero-deck/assets/*
+!/data/hero-deck/assets/avatar/
+# 官方配置表快照（scripts/sync-hero-deck.mjs --emit 从微信小游戏缓存解析生成，不含第三方数据）
+!/data/official/
+!/data/official/**
+# 图标等静态资源（Tauri 图标已编译进二进制，网页用 src-tauri/icons）
+/assets/
+# 安装包 + 签名（本地保留，下载源在 Gitee 发行版附件）
+/releases/
+
+# ====================
+# 本地发布工具的运行时文件（端口 + 一次性 token，供 AI/CLI 调用，严禁入库）
+# ====================
+/.release-server.json
+
+docs/panel-audit/shots/

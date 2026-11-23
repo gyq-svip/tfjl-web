@@ -1,0 +1,265 @@
+
+xiaoyepifu.png
+size: 731,731
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/fx/Energy01
+  rotate: false
+  xy: 578, 163
+  size: 19, 19
+  orig: 135, 135
+  offset: 30, 69
+  index: -1
+images/fx/Energy02
+  rotate: false
+  xy: 688, 140
+  size: 22, 21
+  orig: 135, 135
+  offset: 24, 66
+  index: -1
+images/fx/Energy03
+  rotate: false
+  xy: 554, 158
+  size: 22, 24
+  orig: 135, 135
+  offset: 21, 61
+  index: -1
+images/fx/Energy04
+  rotate: false
+  xy: 599, 159
+  size: 30, 29
+  orig: 135, 135
+  offset: 21, 52
+  index: -1
+images/fx/Energy05
+  rotate: false
+  xy: 578, 131
+  size: 47, 26
+  orig: 135, 135
+  offset: 28, 47
+  index: -1
+images/fx/Energy06
+  rotate: false
+  xy: 631, 135
+  size: 55, 26
+  orig: 135, 135
+  offset: 45, 45
+  index: -1
+images/fx/Energy07
+  rotate: false
+  xy: 678, 634
+  size: 46, 28
+  orig: 135, 135
+  offset: 65, 46
+  index: -1
+images/fx/Energy08
+  rotate: false
+  xy: 495, 113
+  size: 23, 26
+  orig: 135, 135
+  offset: 92, 55
+  index: -1
+images/fx/Energy09
+  rotate: false
+  xy: 645, 493
+  size: 22, 22
+  orig: 135, 135
+  offset: 91, 61
+  index: -1
+images/fx/Energy10
+  rotate: false
+  xy: 688, 117
+  size: 22, 21
+  orig: 135, 135
+  offset: 87, 64
+  index: -1
+images/fx/fire/fxf01
+  rotate: false
+  xy: 380, 14
+  size: 38, 54
+  orig: 46, 71
+  offset: 5, 2
+  index: -1
+images/fx/fire/fxf02
+  rotate: false
+  xy: 380, 70
+  size: 38, 58
+  orig: 46, 71
+  offset: 5, 2
+  index: -1
+images/fx/fire/fxf03
+  rotate: false
+  xy: 455, 79
+  size: 38, 60
+  orig: 46, 71
+  offset: 5, 1
+  index: -1
+images/fx/fire/fxf04
+  rotate: false
+  xy: 420, 67
+  size: 31, 61
+  orig: 46, 71
+  offset: 4, 1
+  index: -1
+images/fx/fire/fxf05
+  rotate: false
+  xy: 678, 664
+  size: 46, 65
+  orig: 46, 71
+  offset: 0, 0
+  index: -1
+images/fx/fire/fxf06
+  rotate: false
+  xy: 560, 184
+  size: 37, 63
+  orig: 46, 71
+  offset: 6, 2
+  index: -1
+images/fx/fire/fxf07
+  rotate: false
+  xy: 522, 122
+  size: 30, 64
+  orig: 46, 71
+  offset: 5, 2
+  index: -1
+images/fx/fire/fxf08
+  rotate: false
+  xy: 599, 190
+  size: 31, 57
+  orig: 46, 71
+  offset: 5, 0
+  index: -1
+images/fx/fire/fxf09
+  rotate: false
+  xy: 522, 188
+  size: 36, 65
+  orig: 46, 71
+  offset: 2, 0
+  index: -1
+images/fx/glow2_00003
+  rotate: false
+  xy: 568, 632
+  size: 108, 97
+  orig: 167, 156
+  offset: 30, 32
+  index: -1
+images/idle/a0000
+  rotate: false
+  xy: 191, 16
+  size: 187, 236
+  orig: 461, 461
+  offset: 132, 106
+  index: -1
+images/idle/a0004
+  rotate: false
+  xy: 2, 254
+  size: 188, 236
+  orig: 461, 461
+  offset: 132, 106
+  index: -1
+images/idle/a0008
+  rotate: false
+  xy: 2, 492
+  size: 188, 237
+  orig: 461, 461
+  offset: 133, 106
+  index: -1
+images/idle/a0012
+  rotate: false
+  xy: 2, 15
+  size: 187, 237
+  orig: 461, 461
+  offset: 133, 106
+  index: -1
+images/idle/a0016
+  rotate: false
+  xy: 380, 493
+  size: 186, 236
+  orig: 461, 461
+  offset: 133, 106
+  index: -1
+images/idle/a0020
+  rotate: false
+  xy: 379, 255
+  size: 184, 236
+  orig: 461, 461
+  offset: 133, 106
+  index: -1
+images/idle/a0024
+  rotate: false
+  xy: 192, 255
+  size: 185, 236
+  orig: 461, 461
+  offset: 132, 106
+  index: -1
+images/idle/a0028
+  rotate: false
+  xy: 192, 493
+  size: 186, 236
+  orig: 461, 461
+  offset: 132, 106
+  index: -1
+images/idle/a0037
+  rotate: false
+  xy: 455, 141
+  size: 65, 112
+  orig: 230, 230
+  offset: 77, 53
+  index: -1
+images/idle/a0039
+  rotate: false
+  xy: 669, 406
+  size: 60, 109
+  orig: 230, 230
+  offset: 79, 53
+  index: -1
+images/idle/a0041
+  rotate: false
+  xy: 658, 287
+  size: 69, 117
+  orig: 230, 230
+  offset: 79, 60
+  index: -1
+images/idle/a0043
+  rotate: false
+  xy: 565, 249
+  size: 78, 121
+  orig: 230, 230
+  offset: 65, 67
+  index: -1
+images/idle/a0045
+  rotate: false
+  xy: 645, 163
+  size: 75, 122
+  orig: 230, 230
+  offset: 67, 68
+  index: -1
+images/idle/a0047
+  rotate: false
+  xy: 380, 130
+  size: 73, 123
+  orig: 230, 230
+  offset: 69, 67
+  index: -1
+images/idle/a0051
+  rotate: false
+  xy: 568, 502
+  size: 75, 128
+  orig: 230, 230
+  offset: 71, 59
+  index: -1
+images/idle/a0056
+  rotate: false
+  xy: 565, 372
+  size: 91, 119
+  orig: 230, 230
+  offset: 71, 52
+  index: -1
+images/idle/a0061
+  rotate: false
+  xy: 645, 517
+  size: 84, 113
+  orig: 230, 230
+  offset: 67, 53
+  index: -1

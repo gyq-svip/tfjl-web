@@ -1,0 +1,174 @@
+
+julingshen.png
+size: 896,896
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/a0000
+  rotate: true
+  xy: 254, 361
+  size: 265, 238
+  orig: 560, 420
+  offset: 127, 87
+  index: -1
+images/a0004
+  rotate: true
+  xy: 254, 628
+  size: 266, 242
+  orig: 560, 420
+  offset: 127, 84
+  index: -1
+images/a0008
+  rotate: true
+  xy: 494, 367
+  size: 259, 257
+  orig: 560, 420
+  offset: 133, 78
+  index: -1
+images/a0012
+  rotate: false
+  xy: 2, 76
+  size: 252, 267
+  orig: 560, 420
+  offset: 139, 79
+  index: -1
+images/a0016
+  rotate: false
+  xy: 2, 620
+  size: 250, 274
+  orig: 560, 420
+  offset: 140, 79
+  index: -1
+images/a0020
+  rotate: false
+  xy: 2, 345
+  size: 250, 273
+  orig: 560, 420
+  offset: 140, 79
+  index: -1
+images/a0024
+  rotate: false
+  xy: 256, 97
+  size: 252, 262
+  orig: 560, 420
+  offset: 139, 81
+  index: -1
+images/a0028
+  rotate: true
+  xy: 498, 638
+  size: 256, 248
+  orig: 560, 420
+  offset: 135, 84
+  index: -1
+images/a0039
+  rotate: false
+  xy: 753, 764
+  size: 141, 130
+  orig: 280, 210
+  offset: 53, 42
+  index: -1
+images/a0043
+  rotate: false
+  xy: 664, 247
+  size: 125, 112
+  orig: 280, 210
+  offset: 55, 51
+  index: -1
+images/a0045
+  rotate: true
+  xy: 633, 13
+  size: 120, 118
+  orig: 280, 210
+  offset: 60, 51
+  index: -1
+images/a0047
+  rotate: true
+  xy: 664, 135
+  size: 110, 123
+  orig: 280, 210
+  offset: 69, 51
+  index: -1
+images/a0049
+  rotate: false
+  xy: 510, 11
+  size: 121, 122
+  orig: 280, 210
+  offset: 86, 51
+  index: -1
+images/a0051
+  rotate: true
+  xy: 753, 361
+  size: 135, 137
+  orig: 280, 210
+  offset: 87, 46
+  index: -1
+images/a0055
+  rotate: false
+  xy: 753, 498
+  size: 139, 133
+  orig: 280, 210
+  offset: 81, 52
+  index: -1
+images/a0059
+  rotate: false
+  xy: 753, 633
+  size: 141, 129
+  orig: 280, 210
+  offset: 69, 51
+  index: -1
+images/a0063
+  rotate: false
+  xy: 510, 239
+  size: 152, 126
+  orig: 280, 210
+  offset: 51, 45
+  index: -1
+images/fx/b2_00000
+  rotate: false
+  xy: 366, 64
+  size: 28, 31
+  orig: 90, 90
+  offset: 28, 4
+  index: -1
+images/fx/b2_00002
+  rotate: false
+  xy: 2, 2
+  size: 43, 72
+  orig: 90, 90
+  offset: 25, 5
+  index: -1
+images/fx/b2_00004
+  rotate: true
+  xy: 99, 13
+  size: 61, 73
+  orig: 90, 90
+  offset: 18, 9
+  index: -1
+images/fx/bao01
+  rotate: true
+  xy: 47, 12
+  size: 62, 50
+  orig: 84, 84
+  offset: 10, 17
+  index: -1
+images/fx/bao02
+  rotate: true
+  xy: 311, 18
+  size: 77, 53
+  orig: 84, 84
+  offset: 3, 19
+  index: -1
+images/fx/bao03
+  rotate: false
+  xy: 174, 20
+  size: 80, 54
+  orig: 84, 84
+  offset: 2, 18
+  index: -1
+images/fx/bao04
+  rotate: true
+  xy: 256, 15
+  size: 80, 53
+  orig: 84, 84
+  offset: 2, 18
+  index: -1

@@ -1,0 +1,167 @@
+
+aishenpifu.png
+size: 647,647
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 158, 330
+  size: 158, 154
+  orig: 500, 500
+  offset: 209, 103
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 2, 487
+  size: 162, 158
+  orig: 500, 500
+  offset: 205, 100
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 166, 486
+  size: 154, 159
+  orig: 500, 500
+  offset: 205, 99
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 2, 326
+  size: 154, 159
+  orig: 500, 500
+  offset: 199, 99
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 318, 327
+  size: 151, 157
+  orig: 500, 500
+  offset: 195, 101
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 158, 173
+  size: 146, 155
+  orig: 500, 500
+  offset: 199, 103
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 306, 25
+  size: 141, 154
+  orig: 500, 500
+  offset: 204, 103
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 173
+  size: 145, 151
+  orig: 500, 500
+  offset: 212, 102
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 322, 497
+  size: 148, 151
+  orig: 500, 500
+  offset: 208, 102
+  index: -1
+idle/idle_2
+  rotate: true
+  xy: 306, 181
+  size: 144, 151
+  orig: 500, 500
+  offset: 211, 102
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 459, 173
+  size: 143, 152
+  orig: 500, 500
+  offset: 213, 102
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 475, 504
+  size: 141, 152
+  orig: 500, 500
+  offset: 216, 102
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 2, 34
+  size: 137, 151
+  orig: 500, 500
+  offset: 221, 103
+  index: -1
+idle/idle_6
+  rotate: true
+  xy: 449, 31
+  size: 140, 151
+  orig: 500, 500
+  offset: 218, 103
+  index: -1
+idle/idle_7
+  rotate: true
+  xy: 471, 352
+  size: 143, 152
+  orig: 500, 500
+  offset: 215, 102
+  index: -1
+images/fx/aixin
+  rotate: true
+  xy: 602, 35
+  size: 38, 35
+  orig: 41, 37
+  offset: 2, 1
+  index: -1
+images/fx/huan/a00
+  rotate: true
+  xy: 209, 91
+  size: 80, 31
+  orig: 84, 35
+  offset: 2, 2
+  index: -1
+images/fx/m1
+  rotate: true
+  xy: 155, 67
+  size: 104, 52
+  orig: 136, 55
+  offset: 23, 3
+  index: -1
+images/fx/m3
+  rotate: false
+  xy: 155, 11
+  size: 98, 54
+  orig: 136, 55
+  offset: 36, 1
+  index: -1
+images/fx/m5
+  rotate: false
+  xy: 322, 486
+  size: 82, 9
+  orig: 136, 55
+  offset: 54, 22
+  index: -1
+images/fx/t1
+  rotate: true
+  xy: 602, 75
+  size: 96, 41
+  orig: 121, 46
+  offset: 18, 2
+  index: -1
+images/fx/t2
+  rotate: true
+  xy: 604, 264
+  size: 86, 41
+  orig: 121, 46
+  offset: 32, 2
+  index: -1
+images/fx/t3
+  rotate: true
+  xy: 604, 185
+  size: 77, 40
+  orig: 121, 46
+  offset: 43, 2
+  index: -1

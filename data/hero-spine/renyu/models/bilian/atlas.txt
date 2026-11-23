@@ -1,0 +1,153 @@
+
+bilian.png
+size: 1023,1023
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 445, 551
+  size: 207, 258
+  orig: 240, 293
+  offset: 27, 0
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 705, 506
+  size: 201, 256
+  orig: 240, 293
+  offset: 30, 0
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 794, 57
+  size: 198, 255
+  orig: 240, 293
+  offset: 31, 0
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 718, 314
+  size: 190, 268
+  orig: 240, 293
+  offset: 13, 1
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 657, 831
+  size: 190, 275
+  orig: 240, 293
+  offset: 1, 13
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 2, 751
+  size: 215, 270
+  orig: 240, 293
+  offset: 9, 6
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 223, 501
+  size: 220, 256
+  orig: 240, 293
+  offset: 20, 0
+  index: -1
+fx/guang
+  rotate: true
+  xy: 437, 301
+  size: 198, 279
+  orig: 198, 279
+  offset: 0, 0
+  index: -1
+fx/puduzhongsheng_39
+  rotate: false
+  xy: 908, 751
+  size: 106, 78
+  orig: 126, 97
+  offset: 9, 11
+  index: -1
+fx/puduzhongsheng_40
+  rotate: true
+  xy: 934, 915
+  size: 106, 72
+  orig: 144, 102
+  offset: 19, 16
+  index: -1
+fx/puduzhongsheng_41
+  rotate: false
+  xy: 657, 764
+  size: 105, 65
+  orig: 156, 97
+  offset: 25, 17
+  index: -1
+fx/puduzhongsheng_42
+  rotate: false
+  xy: 437, 252
+  size: 104, 47
+  orig: 154, 94
+  offset: 25, 25
+  index: -1
+fx/puduzhongsheng_43
+  rotate: false
+  xy: 530, 7
+  size: 100, 32
+  orig: 100, 32
+  offset: 0, 0
+  index: -1
+idle/idle_0
+  rotate: true
+  xy: 265, 24
+  size: 211, 263
+  orig: 222, 275
+  offset: 8, 0
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 530, 41
+  size: 209, 262
+  orig: 222, 275
+  offset: 11, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 223, 237
+  size: 212, 262
+  orig: 222, 275
+  offset: 9, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 440, 760
+  size: 215, 261
+  orig: 222, 275
+  offset: 7, 0
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 2, 2
+  size: 218, 261
+  orig: 222, 275
+  offset: 4, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 219, 759
+  size: 219, 262
+  orig: 222, 275
+  offset: 1, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 222
+  size: 219, 262
+  orig: 222, 275
+  offset: 0, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 486
+  size: 219, 263
+  orig: 222, 275
+  offset: 0, 0
+  index: -1

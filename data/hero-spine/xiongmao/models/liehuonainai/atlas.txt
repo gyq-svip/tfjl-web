@@ -1,0 +1,153 @@
+
+liehuonainai.png
+size: 979,979
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 253, 3
+  size: 218, 249
+  orig: 750, 750
+  offset: 187, 94
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 2, 2
+  size: 219, 249
+  orig: 750, 750
+  offset: 184, 94
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 641, 226
+  size: 169, 249
+  orig: 750, 750
+  offset: 185, 94
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 812, 226
+  size: 162, 249
+  orig: 750, 750
+  offset: 186, 94
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 632, 477
+  size: 196, 249
+  orig: 750, 750
+  offset: 165, 94
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 407, 476
+  size: 223, 249
+  orig: 750, 750
+  offset: 159, 94
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 406, 224
+  size: 233, 249
+  orig: 750, 750
+  offset: 164, 94
+  index: -1
+attack/atk_8
+  rotate: false
+  xy: 605, 728
+  size: 221, 249
+  orig: 750, 750
+  offset: 170, 94
+  index: -1
+fx/bingyan/bingyan_000
+  rotate: false
+  xy: 830, 927
+  size: 132, 50
+  orig: 256, 102
+  offset: 74, 23
+  index: -1
+fx/bingyan/bingyan_002
+  rotate: true
+  xy: 892, 770
+  size: 155, 70
+  orig: 256, 102
+  offset: 51, 5
+  index: -1
+fx/bingyan/bingyan_004
+  rotate: true
+  xy: 828, 747
+  size: 178, 62
+  orig: 256, 102
+  offset: 23, 11
+  index: -1
+fx/bingyan/bingyan_006
+  rotate: true
+  xy: 892, 606
+  size: 162, 65
+  orig: 256, 102
+  offset: 32, 13
+  index: -1
+fx/bingyan/bingyan_008
+  rotate: true
+  xy: 830, 508
+  size: 96, 63
+  orig: 256, 102
+  offset: 50, 15
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 207, 727
+  size: 197, 250
+  orig: 750, 750
+  offset: 176, 94
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 504, 26
+  size: 196, 249
+  orig: 750, 750
+  offset: 177, 94
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 406, 727
+  size: 197, 250
+  orig: 750, 750
+  offset: 178, 94
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 205, 223
+  size: 199, 250
+  orig: 750, 750
+  offset: 177, 94
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 223
+  size: 201, 250
+  orig: 750, 750
+  offset: 176, 94
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 2, 727
+  size: 203, 250
+  orig: 750, 750
+  offset: 175, 94
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 475
+  size: 202, 250
+  orig: 750, 750
+  offset: 174, 94
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 206, 475
+  size: 199, 250
+  orig: 750, 750
+  offset: 175, 94
+  index: -1

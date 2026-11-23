@@ -1,0 +1,244 @@
+
+ruyan.png
+size: 926,926
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 796, 579
+  size: 96, 172
+  orig: 270, 270
+  offset: 71, 42
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 796, 753
+  size: 98, 171
+  orig: 270, 270
+  offset: 72, 42
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 796, 407
+  size: 99, 170
+  orig: 270, 270
+  offset: 72, 42
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 108, 66
+  size: 98, 168
+  orig: 270, 270
+  offset: 71, 42
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 796, 238
+  size: 100, 167
+  orig: 270, 270
+  offset: 70, 42
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 2, 66
+  size: 104, 168
+  orig: 270, 270
+  offset: 65, 42
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 208, 67
+  size: 96, 169
+  orig: 270, 270
+  offset: 69, 42
+  index: -1
+fx/Smoke 010 Slash Right_00006
+  rotate: true
+  xy: 764, 82
+  size: 49, 80
+  orig: 162, 162
+  offset: 40, 54
+  index: -1
+fx/Smoke 010 Slash Right_00008
+  rotate: false
+  xy: 846, 59
+  size: 56, 72
+  orig: 162, 162
+  offset: 43, 65
+  index: -1
+fx/Smoke 010 Slash Right_00010
+  rotate: false
+  xy: 621, 6
+  size: 60, 76
+  orig: 162, 162
+  offset: 44, 64
+  index: -1
+fx/Smoke 010 Slash Right_00012
+  rotate: true
+  xy: 123, 2
+  size: 62, 86
+  orig: 162, 162
+  offset: 44, 55
+  index: -1
+fx/Smoke 010 Slash Right_00014
+  rotate: false
+  xy: 683, 8
+  size: 62, 74
+  orig: 162, 162
+  offset: 45, 68
+  index: -1
+fx/Smoke 010 Slash Right_00016
+  rotate: false
+  xy: 747, 13
+  size: 62, 67
+  orig: 162, 162
+  offset: 46, 75
+  index: -1
+fx/Smoke 010 Slash Right_00018
+  rotate: true
+  xy: 306, 35
+  size: 59, 63
+  orig: 162, 162
+  offset: 49, 79
+  index: -1
+fx/Smoke 010 Slash Right_00020
+  rotate: true
+  xy: 811, 3
+  size: 54, 57
+  orig: 162, 162
+  offset: 52, 85
+  index: -1
+fx/Smoke 010 Slash Right_00022
+  rotate: false
+  xy: 870, 12
+  size: 40, 45
+  orig: 162, 162
+  offset: 60, 96
+  index: -1
+fx/Smoke 013 Radial_00001
+  rotate: true
+  xy: 211, 7
+  size: 58, 84
+  orig: 162, 162
+  offset: 87, 10
+  index: -1
+fx/Smoke 013 Radial_00003
+  rotate: true
+  xy: 540, 142
+  size: 93, 87
+  orig: 162, 162
+  offset: 49, 2
+  index: -1
+fx/Smoke 013 Radial_00005
+  rotate: true
+  xy: 772, 133
+  size: 103, 125
+  orig: 162, 162
+  offset: 42, 1
+  index: -1
+fx/Smoke 013 Radial_00007
+  rotate: true
+  xy: 397, 134
+  size: 101, 141
+  orig: 162, 162
+  offset: 39, 2
+  index: -1
+fx/Smoke 013 Radial_00009
+  rotate: true
+  xy: 397, 38
+  size: 94, 143
+  orig: 162, 162
+  offset: 38, 6
+  index: -1
+fx/Smoke 013 Radial_00011
+  rotate: false
+  xy: 306, 96
+  size: 89, 140
+  orig: 162, 162
+  offset: 37, 12
+  index: -1
+fx/Smoke 013 Radial_00013
+  rotate: true
+  xy: 629, 157
+  size: 79, 141
+  orig: 162, 162
+  offset: 36, 13
+  index: -1
+fx/Smoke 013 Radial_00015
+  rotate: false
+  xy: 542, 2
+  size: 77, 138
+  orig: 162, 162
+  offset: 34, 17
+  index: -1
+fx/Smoke 013 Radial_00017
+  rotate: true
+  xy: 629, 84
+  size: 71, 133
+  orig: 162, 162
+  offset: 34, 22
+  index: -1
+fx/Smoke 013 Radial_00019
+  rotate: true
+  xy: 2, 2
+  size: 62, 119
+  orig: 162, 162
+  offset: 39, 34
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 598, 582
+  size: 196, 342
+  orig: 540, 540
+  offset: 139, 84
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 201, 582
+  size: 197, 342
+  orig: 540, 540
+  offset: 140, 84
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 201, 238
+  size: 197, 342
+  orig: 540, 540
+  offset: 140, 84
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 400, 237
+  size: 196, 342
+  orig: 540, 540
+  offset: 139, 84
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 598, 238
+  size: 196, 342
+  orig: 540, 540
+  offset: 137, 84
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 2, 581
+  size: 197, 343
+  orig: 540, 540
+  offset: 135, 84
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 236
+  size: 197, 343
+  orig: 540, 540
+  offset: 135, 84
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 400, 581
+  size: 196, 343
+  orig: 540, 540
+  offset: 137, 84
+  index: -1

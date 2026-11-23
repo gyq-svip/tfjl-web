@@ -1,0 +1,139 @@
+
+shaheshang.png
+size: 887,887
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/attack_1
+  rotate: true
+  xy: 457, 64
+  size: 140, 109
+  orig: 195, 188
+  offset: 43, 9
+  index: -1
+attack/attack_2
+  rotate: false
+  xy: 568, 4
+  size: 140, 107
+  orig: 195, 188
+  offset: 45, 9
+  index: -1
+attack/attack_3
+  rotate: false
+  xy: 314, 87
+  size: 141, 117
+  orig: 195, 188
+  offset: 33, 12
+  index: -1
+attack/attack_4
+  rotate: false
+  xy: 691, 266
+  size: 112, 165
+  orig: 195, 188
+  offset: 12, 12
+  index: -1
+attack/attack_5
+  rotate: true
+  xy: 568, 113
+  size: 140, 108
+  orig: 195, 188
+  offset: 55, 9
+  index: -1
+attack/attack_6
+  rotate: false
+  xy: 710, 7
+  size: 135, 105
+  orig: 195, 188
+  offset: 56, 0
+  index: -1
+attack/attack_7
+  rotate: true
+  xy: 678, 114
+  size: 139, 108
+  orig: 195, 188
+  offset: 39, 9
+  index: -1
+fx/rr _000
+  rotate: false
+  xy: 2, 12
+  size: 188, 192
+  orig: 205, 205
+  offset: 17, 13
+  index: -1
+fx/rr _002
+  rotate: false
+  xy: 565, 255
+  size: 124, 176
+  orig: 205, 205
+  offset: 81, 13
+  index: -1
+fx/rr _004
+  rotate: false
+  xy: 192, 40
+  size: 120, 164
+  orig: 205, 205
+  offset: 85, 21
+  index: -1
+fx/rr _006
+  rotate: true
+  xy: 314, 2
+  size: 83, 104
+  orig: 205, 205
+  offset: 122, 24
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 660
+  size: 280, 225
+  orig: 280, 225
+  offset: 0, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 284, 206
+  size: 279, 225
+  orig: 280, 225
+  offset: 0, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 433
+  size: 280, 225
+  orig: 280, 225
+  offset: 0, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 284, 660
+  size: 280, 225
+  orig: 280, 225
+  offset: 0, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 206
+  size: 280, 225
+  orig: 280, 225
+  offset: 0, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 566, 433
+  size: 279, 225
+  orig: 280, 225
+  offset: 1, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 284, 433
+  size: 280, 225
+  orig: 280, 225
+  offset: 0, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 566, 660
+  size: 280, 225
+  orig: 280, 225
+  offset: 0, 0
+  index: -1

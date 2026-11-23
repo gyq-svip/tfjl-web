@@ -1,0 +1,223 @@
+
+bingxuedianfa.png
+size: 937,937
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 486, 185
+  size: 106, 132
+  orig: 250, 250
+  offset: 87, 47
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 738, 53
+  size: 107, 130
+  orig: 250, 250
+  offset: 88, 47
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 620, 185
+  size: 106, 127
+  orig: 250, 250
+  offset: 86, 47
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 2, 16
+  size: 112, 135
+  orig: 250, 250
+  offset: 101, 47
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 139, 21
+  size: 107, 134
+  orig: 250, 250
+  offset: 101, 47
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 634, 321
+  size: 99, 134
+  orig: 250, 250
+  offset: 101, 47
+  index: -1
+attack/atk_7
+  rotate: false
+  xy: 641, 592
+  size: 99, 133
+  orig: 250, 250
+  offset: 96, 47
+  index: -1
+fx/4
+  rotate: false
+  xy: 607, 5
+  size: 129, 178
+  orig: 130, 178
+  offset: 1, 0
+  index: -1
+fx/5
+  rotate: true
+  xy: 275, 38
+  size: 145, 184
+  orig: 147, 186
+  offset: 1, 1
+  index: -1
+fx/6
+  rotate: false
+  xy: 461, 6
+  size: 144, 177
+  orig: 146, 180
+  offset: 2, 1
+  index: -1
+fx/7
+  rotate: false
+  xy: 486, 293
+  size: 146, 162
+  orig: 148, 166
+  offset: 1, 2
+  index: -1
+fx/Fire 012 Slash Right_00003
+  rotate: true
+  xy: 852, 734
+  size: 106, 78
+  orig: 150, 150
+  offset: 0, 22
+  index: -1
+fx/Fire 012 Slash Right_00004
+  rotate: true
+  xy: 849, 262
+  size: 115, 83
+  orig: 150, 150
+  offset: 0, 21
+  index: -1
+fx/Fire 012 Slash Right_00005
+  rotate: true
+  xy: 847, 89
+  size: 120, 88
+  orig: 150, 150
+  offset: 2, 20
+  index: -1
+fx/Fire 012 Slash Right_00006
+  rotate: false
+  xy: 757, 842
+  size: 124, 93
+  orig: 150, 150
+  offset: 6, 18
+  index: -1
+fx/Fire 012 Slash Right_00007
+  rotate: false
+  xy: 742, 628
+  size: 125, 97
+  orig: 150, 150
+  offset: 13, 16
+  index: -1
+fx/Fire 012 Slash Right_00008
+  rotate: true
+  xy: 735, 337
+  size: 125, 98
+  orig: 150, 150
+  offset: 16, 16
+  index: -1
+fx/Fire 012 Slash Right_00009
+  rotate: true
+  xy: 641, 464
+  size: 126, 99
+  orig: 150, 150
+  offset: 18, 17
+  index: -1
+fx/Fire 012 Slash Right_00010
+  rotate: true
+  xy: 749, 211
+  size: 124, 98
+  orig: 150, 150
+  offset: 24, 19
+  index: -1
+fx/Fire 012 Slash Right_00011
+  rotate: true
+  xy: 835, 502
+  size: 124, 96
+  orig: 150, 150
+  offset: 25, 21
+  index: -1
+fx/Fire 012 Slash Right_00012
+  rotate: true
+  xy: 835, 379
+  size: 121, 96
+  orig: 150, 150
+  offset: 29, 22
+  index: -1
+fx/Fire 012 Slash Right_00013
+  rotate: true
+  xy: 757, 734
+  size: 106, 93
+  orig: 150, 150
+  offset: 40, 25
+  index: -1
+fx/Fire 012 Slash Right_00014
+  rotate: true
+  xy: 742, 526
+  size: 100, 91
+  orig: 150, 150
+  offset: 44, 26
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 399
+  size: 213, 267
+  orig: 500, 500
+  offset: 170, 92
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 668
+  size: 214, 267
+  orig: 500, 500
+  offset: 170, 92
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 130
+  size: 213, 267
+  orig: 500, 500
+  offset: 170, 92
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 217, 398
+  size: 211, 268
+  orig: 500, 500
+  offset: 171, 92
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 218, 726
+  size: 209, 268
+  orig: 500, 500
+  offset: 172, 92
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 488, 727
+  size: 208, 267
+  orig: 500, 500
+  offset: 173, 92
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 430, 457
+  size: 209, 267
+  orig: 500, 500
+  offset: 172, 92
+  index: -1
+idle/idle_7
+  rotate: true
+  xy: 217, 185
+  size: 211, 267
+  orig: 500, 500
+  offset: 171, 92
+  index: -1

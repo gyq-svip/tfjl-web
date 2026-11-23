@@ -1,0 +1,342 @@
+
+guixiangpifu.png
+size: 697,697
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/a0000
+  rotate: false
+  xy: 2, 518
+  size: 185, 177
+  orig: 410, 410
+  offset: 119, 110
+  index: -1
+images/a0004
+  rotate: false
+  xy: 2, 339
+  size: 185, 177
+  orig: 410, 410
+  offset: 119, 110
+  index: -1
+images/a0008
+  rotate: false
+  xy: 189, 518
+  size: 184, 177
+  orig: 410, 410
+  offset: 119, 110
+  index: -1
+images/a0012
+  rotate: false
+  xy: 189, 340
+  size: 184, 176
+  orig: 410, 410
+  offset: 119, 110
+  index: -1
+images/a0016
+  rotate: false
+  xy: 375, 520
+  size: 185, 175
+  orig: 410, 410
+  offset: 119, 110
+  index: -1
+images/a0020
+  rotate: false
+  xy: 375, 343
+  size: 185, 175
+  orig: 410, 410
+  offset: 119, 110
+  index: -1
+images/a0024
+  rotate: false
+  xy: 189, 163
+  size: 185, 175
+  orig: 410, 410
+  offset: 119, 110
+  index: -1
+images/a0028
+  rotate: false
+  xy: 2, 161
+  size: 185, 176
+  orig: 410, 410
+  offset: 119, 110
+  index: -1
+images/a0039
+  rotate: false
+  xy: 562, 369
+  size: 89, 97
+  orig: 205, 205
+  offset: 60, 51
+  index: -1
+images/a0043
+  rotate: false
+  xy: 2, 11
+  size: 91, 148
+  orig: 205, 205
+  offset: 58, 56
+  index: -1
+images/a0047
+  rotate: false
+  xy: 95, 39
+  size: 92, 120
+  orig: 205, 205
+  offset: 49, 55
+  index: -1
+images/a0051
+  rotate: false
+  xy: 562, 571
+  size: 92, 124
+  orig: 205, 205
+  offset: 57, 55
+  index: -1
+images/a0055
+  rotate: false
+  xy: 376, 161
+  size: 94, 87
+  orig: 205, 205
+  offset: 59, 55
+  index: -1
+images/a0059
+  rotate: false
+  xy: 472, 158
+  size: 93, 87
+  orig: 205, 205
+  offset: 59, 55
+  index: -1
+images/a0063
+  rotate: true
+  xy: 472, 247
+  size: 94, 89
+  orig: 205, 205
+  offset: 59, 55
+  index: -1
+images/fx/Liquid 042 Impact Splash Explosion Up_00003
+  rotate: true
+  xy: 567, 158
+  size: 96, 35
+  orig: 160, 160
+  offset: 27, 5
+  index: -1
+images/fx/Liquid 042 Impact Splash Explosion Up_00004
+  rotate: true
+  xy: 570, 47
+  size: 109, 34
+  orig: 160, 160
+  offset: 23, 6
+  index: -1
+images/fx/Liquid 042 Impact Splash Explosion Up_00005
+  rotate: false
+  xy: 95, 2
+  size: 114, 35
+  orig: 160, 160
+  offset: 21, 6
+  index: -1
+images/fx/Liquid 042 Impact Splash Explosion Up_00006
+  rotate: true
+  xy: 340, 44
+  size: 117, 34
+  orig: 160, 160
+  offset: 20, 6
+  index: -1
+images/fx/Liquid 042 Impact Splash Explosion Up_00007
+  rotate: false
+  xy: 211, 2
+  size: 119, 31
+  orig: 160, 160
+  offset: 19, 6
+  index: -1
+images/fx/Liquid 042 Impact Splash Explosion Up_00008
+  rotate: false
+  xy: 340, 13
+  size: 123, 28
+  orig: 160, 160
+  offset: 16, 6
+  index: -1
+images/fx/Liquid 042 Impact Splash Explosion Up_00009
+  rotate: true
+  xy: 663, 282
+  size: 130, 25
+  orig: 160, 160
+  offset: 12, 6
+  index: -1
+images/fx/Liquid 042 Impact Splash Explosion Up_00010
+  rotate: true
+  xy: 656, 571
+  size: 124, 18
+  orig: 160, 160
+  offset: 21, 6
+  index: -1
+images/fx/Liquid 042 Impact Splash Explosion Up_00011
+  rotate: true
+  xy: 653, 403
+  size: 9, 8
+  orig: 160, 160
+  offset: 127, 8
+  index: -1
+images/fx/daoguang0003
+  rotate: false
+  xy: 562, 468
+  size: 89, 101
+  orig: 112, 112
+  offset: 3, 5
+  index: -1
+images/fx/daoguang0005
+  rotate: false
+  xy: 376, 250
+  size: 94, 91
+  orig: 112, 112
+  offset: 6, 18
+  index: -1
+images/fx/daoguang0007
+  rotate: false
+  xy: 189, 70
+  size: 97, 91
+  orig: 112, 112
+  offset: 7, 20
+  index: -1
+images/fx/daoguang0013
+  rotate: false
+  xy: 653, 414
+  size: 42, 45
+  orig: 112, 112
+  offset: 58, 64
+  index: -1
+images/fx/shuibo01
+  rotate: true
+  xy: 376, 43
+  size: 116, 49
+  orig: 166, 101
+  offset: 32, 4
+  index: -1
+images/fx/shuibo02
+  rotate: true
+  xy: 427, 54
+  size: 105, 41
+  orig: 166, 101
+  offset: 29, 4
+  index: -1
+images/fx/shuibo03
+  rotate: true
+  xy: 653, 461
+  size: 108, 42
+  orig: 166, 101
+  offset: 27, 3
+  index: -1
+images/fx/shuibo04
+  rotate: true
+  xy: 613, 257
+  size: 110, 48
+  orig: 166, 101
+  offset: 25, 3
+  index: -1
+images/fx/shuibo05
+  rotate: true
+  xy: 470, 42
+  size: 114, 49
+  orig: 166, 101
+  offset: 23, 2
+  index: -1
+images/fx/shuibo06
+  rotate: true
+  xy: 288, 35
+  size: 126, 50
+  orig: 166, 101
+  offset: 21, 1
+  index: -1
+images/fx/shuibo07
+  rotate: true
+  xy: 613, 146
+  size: 109, 47
+  orig: 166, 101
+  offset: 35, 1
+  index: -1
+images/fx/shuibo08
+  rotate: true
+  xy: 563, 256
+  size: 111, 48
+  orig: 166, 101
+  offset: 33, 0
+  index: -1
+images/fx/shuibo09
+  rotate: true
+  xy: 521, 45
+  size: 111, 47
+  orig: 166, 101
+  offset: 33, 1
+  index: -1
+images/fx/yu1_00
+  rotate: true
+  xy: 676, 613
+  size: 28, 12
+  orig: 28, 82
+  offset: 0, 7
+  index: -1
+images/fx/yu1_01
+  rotate: true
+  xy: 676, 643
+  size: 26, 15
+  orig: 28, 82
+  offset: 1, 45
+  index: -1
+images/fx/yu1_02
+  rotate: false
+  xy: 243, 53
+  size: 25, 15
+  orig: 28, 82
+  offset: 1, 57
+  index: -1
+images/fx/yu1_03
+  rotate: false
+  xy: 465, 27
+  size: 26, 13
+  orig: 28, 82
+  offset: 1, 62
+  index: -1
+images/fx/yu1_04
+  rotate: true
+  xy: 676, 671
+  size: 24, 18
+  orig: 28, 82
+  offset: 3, 60
+  index: -1
+images/fx/yu1_05
+  rotate: false
+  xy: 189, 50
+  size: 24, 18
+  orig: 28, 82
+  offset: 3, 63
+  index: -1
+images/fx/yu1_06
+  rotate: true
+  xy: 676, 583
+  size: 28, 11
+  orig: 28, 82
+  offset: 0, 71
+  index: -1
+images/fx/yu1_07
+  rotate: false
+  xy: 215, 53
+  size: 26, 15
+  orig: 28, 82
+  offset: 1, 62
+  index: -1
+images/fx/yu1_08
+  rotate: false
+  xy: 493, 26
+  size: 25, 14
+  orig: 28, 82
+  offset: 1, 42
+  index: -1
+images/fx/yu1_09
+  rotate: false
+  xy: 465, 12
+  size: 25, 13
+  orig: 28, 82
+  offset: 1, 19
+  index: -1
+images/fx/yu1_10
+  rotate: false
+  xy: 663, 262
+  size: 24, 18
+  orig: 28, 82
+  offset: 3, 1
+  index: -1

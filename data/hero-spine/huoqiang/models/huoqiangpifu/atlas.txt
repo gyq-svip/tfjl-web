@@ -1,0 +1,132 @@
+
+huoqiangpifu.png
+size: 958,958
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: true
+  xy: 823, 542
+  size: 143, 133
+  orig: 163, 140
+  offset: 9, 0
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 823, 393
+  size: 147, 131
+  orig: 163, 140
+  offset: 11, 0
+  index: -1
+attack/atk_3
+  rotate: false
+  xy: 375, 10
+  size: 150, 129
+  orig: 163, 140
+  offset: 13, 0
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 549, 132
+  size: 147, 136
+  orig: 163, 140
+  offset: 0, 0
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 742, 255
+  size: 146, 136
+  orig: 163, 140
+  offset: 0, 0
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 698, 117
+  size: 142, 136
+  orig: 163, 140
+  offset: 6, 0
+  index: -1
+fx/qi3_000
+  rotate: true
+  xy: 833, 817
+  size: 139, 88
+  orig: 205, 205
+  offset: 61, 62
+  index: -1
+fx/qi3_001
+  rotate: false
+  xy: 2, 24
+  size: 178, 115
+  orig: 205, 205
+  offset: 20, 49
+  index: -1
+fx/qi3_002
+  rotate: false
+  xy: 550, 270
+  size: 190, 144
+  orig: 205, 205
+  offset: 5, 37
+  index: -1
+fx/qi3_003
+  rotate: false
+  xy: 182, 61
+  size: 191, 78
+  orig: 205, 205
+  offset: 5, 74
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 413
+  size: 274, 271
+  orig: 278, 273
+  offset: 0, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 2, 686
+  size: 276, 270
+  orig: 278, 273
+  offset: 0, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 280, 687
+  size: 275, 269
+  orig: 278, 273
+  offset: 0, 0
+  index: -1
+idle/idle_3
+  rotate: true
+  xy: 278, 141
+  size: 268, 269
+  orig: 278, 273
+  offset: 6, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 557, 687
+  size: 274, 269
+  orig: 278, 273
+  offset: 0, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 550, 416
+  size: 271, 269
+  orig: 278, 273
+  offset: 2, 0
+  index: -1
+idle/idle_6
+  rotate: true
+  xy: 278, 411
+  size: 273, 270
+  orig: 278, 273
+  offset: 0, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 141
+  size: 274, 270
+  orig: 278, 273
+  offset: 0, 0
+  index: -1

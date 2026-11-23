@@ -1,0 +1,146 @@
+
+shishizi.png
+size: 453,453
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+idle/idle1_0
+  rotate: false
+  xy: 302, 263
+  size: 145, 188
+  orig: 600, 600
+  offset: 199, 83
+  index: -1
+idle/idle1_1
+  rotate: false
+  xy: 154, 263
+  size: 146, 188
+  orig: 600, 600
+  offset: 199, 83
+  index: -1
+idle/idle1_7
+  rotate: false
+  xy: 154, 263
+  size: 146, 188
+  orig: 600, 600
+  offset: 199, 83
+  index: -1
+idle/idle1_2
+  rotate: false
+  xy: 153, 73
+  size: 148, 188
+  orig: 600, 600
+  offset: 199, 83
+  index: -1
+idle/idle1_6
+  rotate: false
+  xy: 153, 73
+  size: 148, 188
+  orig: 600, 600
+  offset: 199, 83
+  index: -1
+idle/idle1_3
+  rotate: false
+  xy: 2, 73
+  size: 149, 188
+  orig: 600, 600
+  offset: 199, 83
+  index: -1
+idle/idle1_5
+  rotate: false
+  xy: 2, 73
+  size: 149, 188
+  orig: 600, 600
+  offset: 199, 83
+  index: -1
+idle/idle1_4
+  rotate: false
+  xy: 2, 263
+  size: 150, 188
+  orig: 600, 600
+  offset: 199, 83
+  index: -1
+idle/idle_00
+  rotate: true
+  xy: 305, 20
+  size: 68, 99
+  orig: 600, 600
+  offset: 299, 85
+  index: -1
+idle/idle_01
+  rotate: false
+  xy: 375, 90
+  size: 68, 99
+  orig: 600, 600
+  offset: 300, 85
+  index: -1
+idle/idle_11
+  rotate: false
+  xy: 375, 90
+  size: 68, 99
+  orig: 600, 600
+  offset: 300, 85
+  index: -1
+idle/idle_02
+  rotate: true
+  xy: 2, 2
+  size: 69, 99
+  orig: 600, 600
+  offset: 300, 85
+  index: -1
+idle/idle_10
+  rotate: true
+  xy: 2, 2
+  size: 69, 99
+  orig: 600, 600
+  offset: 300, 85
+  index: -1
+idle/idle_03
+  rotate: true
+  xy: 103, 2
+  size: 69, 99
+  orig: 600, 600
+  offset: 301, 85
+  index: -1
+idle/idle_09
+  rotate: true
+  xy: 103, 2
+  size: 69, 99
+  orig: 600, 600
+  offset: 301, 85
+  index: -1
+idle/idle_04
+  rotate: true
+  xy: 303, 191
+  size: 70, 99
+  orig: 600, 600
+  offset: 301, 85
+  index: -1
+idle/idle_08
+  rotate: true
+  xy: 303, 191
+  size: 70, 99
+  orig: 600, 600
+  offset: 301, 85
+  index: -1
+idle/idle_05
+  rotate: true
+  xy: 204, 2
+  size: 69, 99
+  orig: 600, 600
+  offset: 302, 85
+  index: -1
+idle/idle_07
+  rotate: true
+  xy: 204, 2
+  size: 69, 99
+  orig: 600, 600
+  offset: 302, 85
+  index: -1
+idle/idle_06
+  rotate: false
+  xy: 303, 90
+  size: 70, 99
+  orig: 600, 600
+  offset: 302, 85
+  index: -1

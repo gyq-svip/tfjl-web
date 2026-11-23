@@ -1,0 +1,181 @@
+
+tulingtaipingle.png
+size: 891,891
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_1
+  rotate: false
+  xy: 598, 6
+  size: 128, 147
+  orig: 200, 200
+  offset: 24, 18
+  index: -1
+attack/atk_2
+  rotate: true
+  xy: 694, 465
+  size: 127, 145
+  orig: 200, 200
+  offset: 25, 18
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 598, 155
+  size: 139, 141
+  orig: 200, 200
+  offset: 11, 18
+  index: -1
+attack/atk_4
+  rotate: false
+  xy: 728, 3
+  size: 123, 150
+  orig: 200, 200
+  offset: 60, 18
+  index: -1
+attack/atk_5
+  rotate: false
+  xy: 694, 311
+  size: 120, 152
+  orig: 200, 200
+  offset: 61, 16
+  index: -1
+attack/atk_6
+  rotate: false
+  xy: 741, 158
+  size: 119, 151
+  orig: 200, 200
+  offset: 53, 17
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 696, 770
+  size: 119, 150
+  orig: 200, 200
+  offset: 47, 18
+  index: -1
+fx/n_jiagong_01
+  rotate: false
+  xy: 240, 9
+  size: 75, 51
+  orig: 120, 120
+  offset: 21, 19
+  index: -1
+fx/n_jiagong_02
+  rotate: false
+  xy: 696, 684
+  size: 78, 84
+  orig: 120, 120
+  offset: 22, 17
+  index: -1
+fx/n_jiagong_03
+  rotate: false
+  xy: 816, 380
+  size: 67, 83
+  orig: 120, 120
+  offset: 33, 19
+  index: -1
+fx/n_jiagong_04
+  rotate: false
+  xy: 696, 600
+  size: 65, 82
+  orig: 120, 120
+  offset: 35, 20
+  index: -1
+fx/n_jiagong_05
+  rotate: false
+  xy: 763, 602
+  size: 64, 80
+  orig: 120, 120
+  offset: 36, 22
+  index: -1
+fx/yan1_001
+  rotate: false
+  xy: 2, 3
+  size: 84, 57
+  orig: 102, 68
+  offset: 6, 1
+  index: -1
+fx/yan1_002
+  rotate: false
+  xy: 88, 5
+  size: 77, 55
+  orig: 102, 68
+  offset: 17, 1
+  index: -1
+fx/yan1_003
+  rotate: false
+  xy: 167, 2
+  size: 71, 58
+  orig: 102, 68
+  offset: 27, 1
+  index: -1
+fx/yan1_004
+  rotate: false
+  xy: 317, 3
+  size: 48, 60
+  orig: 102, 68
+  offset: 51, 0
+  index: -1
+fx/yan1_005
+  rotate: false
+  xy: 367, 3
+  size: 35, 60
+  orig: 102, 68
+  offset: 66, 0
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 2, 592
+  size: 231, 297
+  orig: 400, 400
+  offset: 63, 37
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 2, 62
+  size: 230, 297
+  orig: 400, 400
+  offset: 63, 37
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 235, 295
+  size: 228, 297
+  orig: 400, 400
+  offset: 64, 37
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 465, 296
+  size: 227, 296
+  orig: 400, 400
+  offset: 65, 37
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 467, 594
+  size: 227, 295
+  orig: 400, 400
+  offset: 65, 37
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 301, 65
+  size: 228, 295
+  orig: 400, 400
+  offset: 64, 37
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 235, 594
+  size: 230, 295
+  orig: 400, 400
+  offset: 64, 37
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 294
+  size: 231, 296
+  orig: 400, 400
+  offset: 63, 37
+  index: -1

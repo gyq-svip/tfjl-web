@@ -1,0 +1,153 @@
+
+tianjixing.png
+size: 1008,1008
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk1_1
+  rotate: true
+  xy: 797, 418
+  size: 132, 163
+  orig: 159, 231
+  offset: 14, 0
+  index: -1
+attack/atk1_2
+  rotate: true
+  xy: 797, 287
+  size: 129, 163
+  orig: 159, 231
+  offset: 13, 0
+  index: -1
+attack/atk1_3
+  rotate: true
+  xy: 797, 887
+  size: 119, 202
+  orig: 159, 231
+  offset: 13, 0
+  index: -1
+attack/atk1_4
+  rotate: true
+  xy: 537, 233
+  size: 119, 227
+  orig: 159, 231
+  offset: 14, 0
+  index: -1
+attack/atk1_5
+  rotate: false
+  xy: 796, 683
+  size: 119, 202
+  orig: 159, 231
+  offset: 13, 0
+  index: -1
+attack/atk1_6
+  rotate: true
+  xy: 797, 552
+  size: 129, 167
+  orig: 159, 231
+  offset: 14, 0
+  index: -1
+attack2/atk2_1
+  rotate: false
+  xy: 537, 4
+  size: 119, 227
+  orig: 135, 231
+  offset: 13, 0
+  index: -1
+attack2/atk2_2
+  rotate: true
+  xy: 779, 167
+  size: 118, 227
+  orig: 135, 231
+  offset: 13, 0
+  index: -1
+attack2/atk2_3
+  rotate: false
+  xy: 658, 4
+  size: 119, 227
+  orig: 135, 231
+  offset: 13, 0
+  index: -1
+fx/glow2_00004
+  rotate: false
+  xy: 779, 71
+  size: 92, 94
+  orig: 104, 106
+  offset: 6, 6
+  index: -1
+fx/xing
+  rotate: false
+  xy: 917, 819
+  size: 66, 66
+  orig: 66, 66
+  offset: 0, 0
+  index: -1
+fx/xing1
+  rotate: false
+  xy: 917, 753
+  size: 64, 64
+  orig: 66, 66
+  offset: 1, 1
+  index: -1
+fx/xing2
+  rotate: true
+  xy: 2, 12
+  size: 13, 132
+  orig: 13, 132
+  offset: 0, 0
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 270, 27
+  size: 265, 325
+  orig: 278, 325
+  offset: 3, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 272, 681
+  size: 261, 325
+  orig: 278, 325
+  offset: 7, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 535, 681
+  size: 259, 325
+  orig: 278, 325
+  offset: 8, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 536, 354
+  size: 259, 325
+  orig: 278, 325
+  offset: 6, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 271, 354
+  size: 263, 325
+  orig: 278, 325
+  offset: 2, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 2, 27
+  size: 266, 325
+  orig: 278, 325
+  offset: 0, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 354
+  size: 267, 325
+  orig: 278, 325
+  offset: 0, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 681
+  size: 268, 325
+  orig: 278, 325
+  offset: 0, 0
+  index: -1

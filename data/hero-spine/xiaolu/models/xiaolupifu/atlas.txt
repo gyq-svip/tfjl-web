@@ -1,0 +1,146 @@
+
+xiaolupifu.png
+size: 894,894
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+FX/glow2_00004
+  rotate: false
+  xy: 470, 62
+  size: 162, 165
+  orig: 183, 189
+  offset: 10, 12
+  index: -1
+FX/guangzhu/guangzhu_00026
+  rotate: true
+  xy: 634, 63
+  size: 164, 155
+  orig: 191, 206
+  offset: 12, 13
+  index: -1
+FX/guangzhu/guangzhu_00027
+  rotate: true
+  xy: 139, 245
+  size: 168, 160
+  orig: 191, 206
+  offset: 11, 12
+  index: -1
+FX/guangzhu/guangzhu_00028
+  rotate: true
+  xy: 2, 52
+  size: 175, 162
+  orig: 191, 206
+  offset: 8, 13
+  index: -1
+FX/guangzhu/guangzhu_00029
+  rotate: false
+  xy: 301, 247
+  size: 162, 166
+  orig: 191, 206
+  offset: 18, 13
+  index: -1
+FX/guangzhu/guangzhu_00031
+  rotate: false
+  xy: 2, 244
+  size: 135, 169
+  orig: 191, 206
+  offset: 30, 14
+  index: -1
+FX/guangzhu/guangzhu_00033
+  rotate: false
+  xy: 470, 348
+  size: 114, 65
+  orig: 191, 206
+  offset: 42, 72
+  index: -1
+FX/yunwu
+  rotate: false
+  xy: 614, 837
+  size: 243, 55
+  orig: 246, 59
+  offset: 2, 1
+  index: -1
+idle/a_00
+  rotate: true
+  xy: 614, 533
+  size: 302, 242
+  orig: 314, 242
+  offset: 6, 0
+  index: -1
+idle/a_01
+  rotate: true
+  xy: 613, 229
+  size: 302, 242
+  orig: 314, 242
+  offset: 6, 0
+  index: -1
+idle/a_11
+  rotate: true
+  xy: 613, 229
+  size: 302, 242
+  orig: 314, 242
+  offset: 6, 0
+  index: -1
+idle/a_02
+  rotate: false
+  xy: 166, 2
+  size: 302, 241
+  orig: 314, 242
+  offset: 6, 1
+  index: -1
+idle/a_10
+  rotate: false
+  xy: 166, 2
+  size: 302, 241
+  orig: 314, 242
+  offset: 6, 1
+  index: -1
+idle/a_03
+  rotate: false
+  xy: 308, 415
+  size: 303, 239
+  orig: 314, 242
+  offset: 6, 3
+  index: -1
+idle/a_09
+  rotate: false
+  xy: 308, 415
+  size: 303, 239
+  orig: 314, 242
+  offset: 6, 3
+  index: -1
+idle/a_04
+  rotate: false
+  xy: 2, 415
+  size: 303, 238
+  orig: 314, 242
+  offset: 6, 4
+  index: -1
+idle/a_08
+  rotate: false
+  xy: 2, 415
+  size: 303, 238
+  orig: 314, 242
+  offset: 6, 4
+  index: -1
+idle/a_05
+  rotate: false
+  xy: 2, 655
+  size: 304, 237
+  orig: 314, 242
+  offset: 5, 5
+  index: -1
+idle/a_07
+  rotate: false
+  xy: 2, 655
+  size: 304, 237
+  orig: 314, 242
+  offset: 5, 5
+  index: -1
+idle/a_06
+  rotate: false
+  xy: 308, 656
+  size: 304, 236
+  orig: 314, 242
+  offset: 5, 6
+  index: -1

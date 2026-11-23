@@ -1,0 +1,174 @@
+
+yegucheng.png
+size: 995,995
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/attack_01
+  rotate: false
+  xy: 873, 849
+  size: 117, 144
+  orig: 172, 200
+  offset: 22, 10
+  index: -1
+attack/attack_02
+  rotate: true
+  xy: 725, 883
+  size: 110, 144
+  orig: 172, 200
+  offset: 22, 10
+  index: -1
+attack/attack_03
+  rotate: false
+  xy: 874, 557
+  size: 114, 144
+  orig: 172, 200
+  offset: 22, 10
+  index: -1
+attack/attack_04
+  rotate: false
+  xy: 721, 562
+  size: 150, 144
+  orig: 172, 200
+  offset: 22, 10
+  index: -1
+attack/attack_05
+  rotate: true
+  xy: 721, 424
+  size: 136, 151
+  orig: 172, 200
+  offset: 22, 10
+  index: -1
+attack/attack_06
+  rotate: true
+  xy: 166, 30
+  size: 102, 190
+  orig: 172, 200
+  offset: 22, 10
+  index: -1
+attack/attack_07
+  rotate: true
+  xy: 812, 199
+  size: 109, 151
+  orig: 172, 200
+  offset: 15, 3
+  index: -1
+attack/attack_08
+  rotate: true
+  xy: 358, 8
+  size: 124, 144
+  orig: 172, 200
+  offset: 0, 10
+  index: -1
+attack/attack_09
+  rotate: true
+  xy: 812, 310
+  size: 112, 154
+  orig: 172, 200
+  offset: 12, 0
+  index: -1
+attack/attack_10
+  rotate: true
+  xy: 725, 771
+  size: 110, 144
+  orig: 172, 200
+  offset: 22, 10
+  index: -1
+attack/attack_11
+  rotate: false
+  xy: 873, 703
+  size: 115, 144
+  orig: 172, 200
+  offset: 22, 10
+  index: -1
+fx/s1_dg_00027
+  rotate: true
+  xy: 490, 168
+  size: 251, 165
+  orig: 272, 188
+  offset: 19, 10
+  index: -1
+fx/s1_dg_00030
+  rotate: false
+  xy: 504, 4
+  size: 239, 162
+  orig: 272, 188
+  offset: 27, 14
+  index: -1
+fx/s1_dg_00033
+  rotate: true
+  xy: 657, 195
+  size: 224, 153
+  orig: 272, 188
+  offset: 37, 18
+  index: -1
+fx/s1_dg_00036
+  rotate: false
+  xy: 745, 48
+  size: 208, 145
+  orig: 272, 188
+  offset: 48, 24
+  index: -1
+fx/s1_dg_00039
+  rotate: false
+  xy: 2, 2
+  size: 162, 130
+  orig: 272, 188
+  offset: 81, 34
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 248, 134
+  size: 240, 285
+  orig: 245, 285
+  offset: 0, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 249, 421
+  size: 235, 285
+  orig: 245, 285
+  offset: 0, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 486, 421
+  size: 233, 285
+  orig: 245, 285
+  offset: 0, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 490, 708
+  size: 233, 285
+  orig: 245, 285
+  offset: 0, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 249, 708
+  size: 239, 285
+  orig: 245, 285
+  offset: 0, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 2, 134
+  size: 244, 285
+  orig: 245, 285
+  offset: 0, 0
+  index: -1
+idle/idle_6
+  rotate: false
+  xy: 2, 708
+  size: 245, 285
+  orig: 245, 285
+  offset: 0, 0
+  index: -1
+idle/idle_7
+  rotate: false
+  xy: 2, 421
+  size: 245, 285
+  orig: 245, 285
+  offset: 0, 0
+  index: -1

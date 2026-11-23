@@ -1,0 +1,160 @@
+
+jingling7.png
+size: 987,987
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/FX/D4/glow2_00004
+  rotate: false
+  xy: 745, 54
+  size: 202, 208
+  orig: 229, 236
+  offset: 13, 13
+  index: -1
+images/FX/Liquid 024 Splash Slash Right_00001
+  rotate: true
+  xy: 195, 91
+  size: 71, 53
+  orig: 210, 210
+  offset: 33, 72
+  index: -1
+images/FX/Liquid 024 Splash Slash Right_00003
+  rotate: true
+  xy: 356, 29
+  size: 140, 63
+  orig: 210, 210
+  offset: 28, 61
+  index: -1
+images/FX/Liquid 024 Splash Slash Right_00005
+  rotate: true
+  xy: 421, 11
+  size: 158, 68
+  orig: 210, 210
+  offset: 26, 49
+  index: -1
+images/FX/Liquid 024 Splash Slash Right_00007
+  rotate: true
+  xy: 526, 76
+  size: 167, 71
+  orig: 210, 210
+  offset: 26, 43
+  index: -1
+images/FX/Liquid 024 Splash Slash Right_00009
+  rotate: false
+  xy: 356, 171
+  size: 168, 72
+  orig: 210, 210
+  offset: 28, 38
+  index: -1
+images/FX/Liquid 024 Splash Slash Right_00011
+  rotate: false
+  xy: 195, 164
+  size: 159, 79
+  orig: 210, 210
+  offset: 38, 33
+  index: -1
+images/FX/Liquid 024 Splash Slash Right_00013
+  rotate: false
+  xy: 2, 162
+  size: 102, 81
+  orig: 210, 210
+  offset: 95, 31
+  index: -1
+images/FX/Liquid 024 Splash Slash Right_00015
+  rotate: false
+  xy: 106, 162
+  size: 87, 81
+  orig: 210, 210
+  offset: 109, 31
+  index: -1
+images/FX/ya
+  rotate: true
+  xy: 949, 231
+  size: 31, 28
+  orig: 41, 42
+  offset: 4, 7
+  index: -1
+images/idle/a0000
+  rotate: false
+  xy: 2, 739
+  size: 245, 246
+  orig: 512, 518
+  offset: 108, 106
+  index: -1
+images/idle/a0003
+  rotate: true
+  xy: 2, 492
+  size: 245, 246
+  orig: 512, 518
+  offset: 108, 110
+  index: -1
+images/idle/a0006
+  rotate: false
+  xy: 744, 740
+  size: 241, 245
+  orig: 512, 518
+  offset: 112, 115
+  index: -1
+images/idle/a0009
+  rotate: true
+  xy: 249, 740
+  size: 245, 246
+  orig: 512, 518
+  offset: 108, 121
+  index: -1
+images/idle/a0012
+  rotate: false
+  xy: 497, 492
+  size: 245, 245
+  orig: 512, 518
+  offset: 108, 129
+  index: -1
+images/idle/a0015
+  rotate: false
+  xy: 250, 492
+  size: 245, 246
+  orig: 512, 518
+  offset: 108, 136
+  index: -1
+images/idle/a0018
+  rotate: true
+  xy: 2, 245
+  size: 245, 246
+  orig: 512, 518
+  offset: 108, 136
+  index: -1
+images/idle/a0021
+  rotate: false
+  xy: 498, 245
+  size: 245, 245
+  orig: 512, 518
+  offset: 108, 133
+  index: -1
+images/idle/a0024
+  rotate: true
+  xy: 250, 245
+  size: 245, 246
+  orig: 512, 518
+  offset: 108, 128
+  index: -1
+images/idle/a0027
+  rotate: false
+  xy: 744, 500
+  size: 237, 238
+  orig: 512, 518
+  offset: 116, 121
+  index: -1
+images/idle/a0030
+  rotate: false
+  xy: 745, 264
+  size: 233, 234
+  orig: 512, 518
+  offset: 120, 115
+  index: -1
+images/idle/a0033
+  rotate: false
+  xy: 497, 739
+  size: 245, 246
+  orig: 512, 518
+  offset: 108, 109
+  index: -1

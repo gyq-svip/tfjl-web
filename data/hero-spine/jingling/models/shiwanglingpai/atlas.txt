@@ -1,0 +1,216 @@
+
+shiwanglingpai.png
+size: 579,579
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+1/shengzi_00
+  rotate: false
+  xy: 337, 464
+  size: 51, 113
+  orig: 70, 114
+  offset: 0, 1
+  index: -1
+1/shengzi_01
+  rotate: false
+  xy: 390, 464
+  size: 47, 113
+  orig: 70, 114
+  offset: 0, 1
+  index: -1
+1/shengzi_02
+  rotate: true
+  xy: 337, 360
+  size: 45, 114
+  orig: 70, 114
+  offset: 0, 0
+  index: -1
+1/shengzi_03
+  rotate: true
+  xy: 453, 365
+  size: 44, 114
+  orig: 70, 114
+  offset: 0, 0
+  index: -1
+1/shengzi_04
+  rotate: true
+  xy: 381, 267
+  size: 44, 114
+  orig: 70, 114
+  offset: 0, 0
+  index: -1
+1/shengzi_05
+  rotate: true
+  xy: 381, 313
+  size: 45, 114
+  orig: 70, 114
+  offset: 0, 0
+  index: -1
+1/shengzi_06
+  rotate: true
+  xy: 379, 69
+  size: 48, 114
+  orig: 70, 114
+  offset: 0, 0
+  index: -1
+1/shengzi_07
+  rotate: true
+  xy: 451, 411
+  size: 51, 114
+  orig: 70, 114
+  offset: 0, 0
+  index: -1
+1/shengzi_08
+  rotate: false
+  xy: 493, 464
+  size: 55, 113
+  orig: 70, 114
+  offset: 0, 1
+  index: -1
+1/shengzi_09
+  rotate: true
+  xy: 379, 119
+  size: 59, 112
+  orig: 70, 114
+  offset: 0, 2
+  index: -1
+1/shengzi_10
+  rotate: false
+  xy: 314, 67
+  size: 63, 111
+  orig: 70, 114
+  offset: 0, 3
+  index: -1
+1/shengzi_11
+  rotate: false
+  xy: 312, 248
+  size: 67, 110
+  orig: 70, 114
+  offset: 0, 4
+  index: -1
+1/shengzi_12
+  rotate: false
+  xy: 194, 358
+  size: 69, 109
+  orig: 70, 114
+  offset: 0, 5
+  index: -1
+1/shengzi_13
+  rotate: false
+  xy: 194, 469
+  size: 70, 108
+  orig: 70, 114
+  offset: 0, 6
+  index: -1
+1/shengzi_14
+  rotate: false
+  xy: 265, 360
+  size: 70, 107
+  orig: 70, 114
+  offset: 0, 7
+  index: -1
+1/shengzi_15
+  rotate: false
+  xy: 266, 470
+  size: 69, 107
+  orig: 70, 114
+  offset: 0, 7
+  index: -1
+1/shengzi_16
+  rotate: true
+  xy: 312, 180
+  size: 66, 108
+  orig: 70, 114
+  offset: 0, 6
+  index: -1
+1/shengzi_17
+  rotate: true
+  xy: 314, 2
+  size: 63, 109
+  orig: 70, 114
+  offset: 0, 5
+  index: -1
+1/shengzi_18
+  rotate: true
+  xy: 425, 8
+  size: 59, 110
+  orig: 70, 114
+  offset: 0, 4
+  index: -1
+1/shengzi_19
+  rotate: true
+  xy: 337, 407
+  size: 55, 112
+  orig: 70, 114
+  offset: 0, 2
+  index: -1
+fx/xing1
+  rotate: false
+  xy: 191, 12
+  size: 30, 30
+  orig: 30, 30
+  offset: 0, 0
+  index: -1
+fxg01
+  rotate: true
+  xy: 495, 74
+  size: 64, 55
+  orig: 97, 68
+  offset: 0, 0
+  index: -1
+fxg02
+  rotate: false
+  xy: 422, 202
+  size: 69, 63
+  orig: 92, 97
+  offset: 23, 0
+  index: -1
+fxg03
+  rotate: true
+  xy: 493, 204
+  size: 61, 72
+  orig: 66, 88
+  offset: 0, 16
+  index: -1
+fxg04
+  rotate: false
+  xy: 493, 140
+  size: 57, 62
+  orig: 82, 99
+  offset: 0, 0
+  index: -1
+fxg05
+  rotate: false
+  xy: 191, 44
+  size: 121, 125
+  orig: 121, 125
+  offset: 0, 0
+  index: -1
+yuxi
+  rotate: false
+  xy: 2, 158
+  size: 155, 192
+  orig: 263, 254
+  offset: 54, 31
+  index: -1
+yuxi2
+  rotate: false
+  xy: 159, 171
+  size: 151, 179
+  orig: 263, 254
+  offset: 57, 41
+  index: -1
+yuxi3
+  rotate: true
+  xy: 2, 4
+  size: 152, 187
+  orig: 263, 254
+  offset: 54, 36
+  index: -1
+yuxi4
+  rotate: false
+  xy: 2, 352
+  size: 190, 225
+  orig: 263, 254
+  offset: 36, 14
+  index: -1

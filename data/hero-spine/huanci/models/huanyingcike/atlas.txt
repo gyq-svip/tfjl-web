@@ -1,0 +1,146 @@
+
+huanyingcike.png
+size: 613,613
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/FX/d1/55_000
+  rotate: false
+  xy: 2, 9
+  size: 119, 104
+  orig: 119, 119
+  offset: 0, 0
+  index: -1
+images/FX/d1/55_001
+  rotate: false
+  xy: 433, 166
+  size: 119, 119
+  orig: 119, 119
+  offset: 0, 0
+  index: -1
+images/FX/d1/55_002
+  rotate: true
+  xy: 153, 164
+  size: 119, 118
+  orig: 119, 119
+  offset: 0, 1
+  index: -1
+images/FX/d1/55_003
+  rotate: false
+  xy: 195, 43
+  size: 119, 119
+  orig: 119, 119
+  offset: 0, 0
+  index: -1
+images/FX/d1/55_004
+  rotate: true
+  xy: 502, 492
+  size: 119, 102
+  orig: 119, 119
+  offset: 0, 17
+  index: -1
+images/FX/d1/55_005
+  rotate: false
+  xy: 554, 224
+  size: 50, 61
+  orig: 119, 119
+  offset: 0, 36
+  index: -1
+images/FX/d1/55_006
+  rotate: false
+  xy: 316, 45
+  size: 119, 119
+  orig: 119, 119
+  offset: 0, 0
+  index: -1
+images/attack/a0040
+  rotate: true
+  xy: 123, 6
+  size: 107, 70
+  orig: 179, 179
+  offset: 32, 39
+  index: -1
+images/attack/a0045
+  rotate: false
+  xy: 305, 221
+  size: 126, 68
+  orig: 179, 179
+  offset: 16, 40
+  index: -1
+images/attack/a0049
+  rotate: false
+  xy: 437, 90
+  size: 98, 74
+  orig: 179, 179
+  offset: 37, 40
+  index: -1
+images/attack/a0053
+  rotate: false
+  xy: 537, 89
+  size: 74, 75
+  orig: 179, 179
+  offset: 51, 41
+  index: -1
+images/attack/a0059
+  rotate: false
+  xy: 437, 14
+  size: 91, 74
+  orig: 179, 179
+  offset: 38, 41
+  index: -1
+images/idle/a0000
+  rotate: false
+  xy: 2, 455
+  size: 167, 156
+  orig: 358, 358
+  offset: 89, 79
+  index: -1
+images/idle/a0004
+  rotate: true
+  xy: 2, 285
+  size: 168, 153
+  orig: 358, 358
+  offset: 82, 78
+  index: -1
+images/idle/a0008
+  rotate: false
+  xy: 171, 458
+  size: 166, 153
+  orig: 358, 358
+  offset: 78, 74
+  index: -1
+images/idle/a0012
+  rotate: true
+  xy: 339, 454
+  size: 157, 161
+  orig: 358, 358
+  offset: 78, 63
+  index: -1
+images/idle/a0016
+  rotate: false
+  xy: 2, 115
+  size: 149, 168
+  orig: 358, 358
+  offset: 79, 56
+  index: -1
+images/idle/a0020
+  rotate: false
+  xy: 157, 286
+  size: 146, 167
+  orig: 358, 358
+  offset: 81, 58
+  index: -1
+images/idle/a0024
+  rotate: false
+  xy: 461, 287
+  size: 148, 165
+  orig: 358, 358
+  offset: 83, 63
+  index: -1
+images/idle/a0028
+  rotate: false
+  xy: 305, 291
+  size: 154, 161
+  orig: 358, 358
+  offset: 86, 70
+  index: -1

@@ -1,0 +1,146 @@
+
+jiqihoupifu.png
+size: 838,838
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_02
+  rotate: true
+  xy: 2, 5
+  size: 111, 125
+  orig: 123, 135
+  offset: 6, 2
+  index: -1
+attack/atk_04
+  rotate: false
+  xy: 252, 13
+  size: 78, 126
+  orig: 123, 135
+  offset: 7, 2
+  index: -1
+attack/atk_05
+  rotate: false
+  xy: 332, 16
+  size: 86, 123
+  orig: 123, 135
+  offset: 4, 2
+  index: -1
+attack/atk_06
+  rotate: false
+  xy: 730, 587
+  size: 95, 125
+  orig: 123, 135
+  offset: 9, 2
+  index: -1
+attack/atk_07
+  rotate: false
+  xy: 730, 714
+  size: 98, 122
+  orig: 123, 135
+  offset: 16, 2
+  index: -1
+attack/atk_08
+  rotate: true
+  xy: 129, 14
+  size: 102, 121
+  orig: 123, 135
+  offset: 16, 2
+  index: -1
+fx/atk_04
+  rotate: true
+  xy: 729, 363
+  size: 70, 71
+  orig: 123, 135
+  offset: 9, 38
+  index: -1
+fx/atk_07
+  rotate: false
+  xy: 729, 435
+  size: 80, 64
+  orig: 123, 135
+  offset: 31, 42
+  index: -1
+fx/baodian1_add_00029
+  rotate: false
+  xy: 642, 24
+  size: 160, 166
+  orig: 186, 192
+  offset: 13, 13
+  index: -1
+fx/baodian1_add_00030
+  rotate: false
+  xy: 460, 2
+  size: 180, 188
+  orig: 186, 192
+  offset: 3, 2
+  index: -1
+fx/baodian1_add_00031
+  rotate: true
+  xy: 490, 192
+  size: 186, 192
+  orig: 186, 192
+  offset: 0, 0
+  index: -1
+fx/juguangdian
+  rotate: false
+  xy: 729, 501
+  size: 84, 84
+  orig: 96, 96
+  offset: 6, 6
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 231, 141
+  size: 227, 236
+  orig: 234, 244
+  offset: 0, 0
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 491, 610
+  size: 226, 237
+  orig: 234, 244
+  offset: 0, 0
+  index: -1
+idle/idle_2
+  rotate: false
+  xy: 2, 598
+  size: 227, 238
+  orig: 234, 244
+  offset: 0, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 2, 358
+  size: 227, 238
+  orig: 234, 244
+  offset: 1, 0
+  index: -1
+idle/idle_4
+  rotate: false
+  xy: 2, 118
+  size: 227, 238
+  orig: 234, 244
+  offset: 2, 0
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 252, 609
+  size: 227, 237
+  orig: 234, 244
+  offset: 3, 0
+  index: -1
+idle/idle_6
+  rotate: true
+  xy: 491, 380
+  size: 228, 236
+  orig: 234, 244
+  offset: 2, 0
+  index: -1
+idle/idle_7
+  rotate: true
+  xy: 252, 379
+  size: 228, 236
+  orig: 234, 244
+  offset: 1, 0
+  index: -1

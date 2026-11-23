@@ -1,0 +1,104 @@
+
+kongmingdeng.png
+size: 481,481
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+fx/glow2_00004
+  rotate: false
+  xy: 2, 333
+  size: 141, 146
+  orig: 160, 165
+  offset: 9, 9
+  index: -1
+fx/kmdeng01
+  rotate: false
+  xy: 417, 215
+  size: 25, 25
+  orig: 27, 27
+  offset: 1, 1
+  index: -1
+fx/kmdeng02
+  rotate: true
+  xy: 120, 148
+  size: 29, 1
+  orig: 29, 1
+  offset: 0, 0
+  index: -1
+fx/kmdeng03
+  rotate: false
+  xy: 449, 449
+  size: 30, 30
+  orig: 32, 32
+  offset: 1, 1
+  index: -1
+idle/idle_00
+  rotate: true
+  xy: 299, 359
+  size: 120, 148
+  orig: 134, 165
+  offset: 7, 10
+  index: -1
+idle/idle_01
+  rotate: true
+  xy: 123, 123
+  size: 119, 146
+  orig: 134, 165
+  offset: 8, 13
+  index: -1
+idle/idle_02
+  rotate: true
+  xy: 271, 122
+  size: 118, 144
+  orig: 134, 165
+  offset: 9, 15
+  index: -1
+idle/idle_03
+  rotate: true
+  xy: 267, 4
+  size: 116, 144
+  orig: 134, 165
+  offset: 11, 15
+  index: -1
+idle/idle_04
+  rotate: true
+  xy: 120, 6
+  size: 115, 145
+  orig: 134, 165
+  offset: 12, 14
+  index: -1
+idle/idle_05
+  rotate: true
+  xy: 297, 242
+  size: 115, 148
+  orig: 134, 165
+  offset: 12, 11
+  index: -1
+idle/idle_06
+  rotate: true
+  xy: 145, 244
+  size: 115, 150
+  orig: 134, 165
+  offset: 12, 9
+  index: -1
+idle/idle_07
+  rotate: false
+  xy: 2, 25
+  size: 116, 152
+  orig: 134, 165
+  offset: 11, 7
+  index: -1
+idle/idle_08
+  rotate: true
+  xy: 145, 361
+  size: 118, 152
+  orig: 134, 165
+  offset: 9, 7
+  index: -1
+idle/idle_09
+  rotate: false
+  xy: 2, 179
+  size: 119, 152
+  orig: 134, 165
+  offset: 8, 7
+  index: -1

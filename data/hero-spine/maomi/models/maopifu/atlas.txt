@@ -1,0 +1,167 @@
+
+maopifu.png
+size: 1038,1038
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/a0000
+  rotate: false
+  xy: 644, 801
+  size: 319, 235
+  orig: 640, 480
+  offset: 153, 105
+  index: -1
+images/a0004
+  rotate: false
+  xy: 323, 800
+  size: 319, 236
+  orig: 640, 480
+  offset: 153, 104
+  index: -1
+images/a0008
+  rotate: false
+  xy: 322, 302
+  size: 318, 243
+  orig: 640, 480
+  offset: 154, 101
+  index: -1
+images/a0012
+  rotate: false
+  xy: 323, 547
+  size: 318, 251
+  orig: 640, 480
+  offset: 154, 101
+  index: -1
+images/a0016
+  rotate: false
+  xy: 2, 780
+  size: 319, 256
+  orig: 640, 480
+  offset: 153, 103
+  index: -1
+images/a0020
+  rotate: false
+  xy: 644, 544
+  size: 318, 255
+  orig: 640, 480
+  offset: 153, 105
+  index: -1
+images/a0024
+  rotate: false
+  xy: 2, 530
+  size: 318, 248
+  orig: 640, 480
+  offset: 152, 107
+  index: -1
+images/a0028
+  rotate: false
+  xy: 2, 288
+  size: 318, 240
+  orig: 640, 480
+  offset: 153, 108
+  index: -1
+images/a0039
+  rotate: true
+  xy: 642, 383
+  size: 159, 125
+  orig: 320, 240
+  offset: 66, 52
+  index: -1
+images/a0043
+  rotate: false
+  xy: 638, 6
+  size: 155, 132
+  orig: 320, 240
+  offset: 61, 56
+  index: -1
+images/a0045
+  rotate: false
+  xy: 795, 5
+  size: 155, 129
+  orig: 320, 240
+  offset: 63, 59
+  index: -1
+images/a0047
+  rotate: false
+  xy: 878, 136
+  size: 157, 127
+  orig: 320, 240
+  offset: 71, 60
+  index: -1
+images/a0049
+  rotate: true
+  xy: 769, 384
+  size: 158, 122
+  orig: 320, 240
+  offset: 82, 60
+  index: -1
+images/a0051
+  rotate: false
+  xy: 878, 265
+  size: 158, 117
+  orig: 320, 240
+  offset: 90, 61
+  index: -1
+images/a0055
+  rotate: true
+  xy: 759, 222
+  size: 159, 117
+  orig: 320, 240
+  offset: 85, 59
+  index: -1
+images/a0059
+  rotate: true
+  xy: 893, 384
+  size: 158, 117
+  orig: 320, 240
+  offset: 78, 57
+  index: -1
+images/a0063
+  rotate: true
+  xy: 638, 140
+  size: 160, 119
+  orig: 320, 240
+  offset: 76, 54
+  index: -1
+images/fx/mowangzhili_19
+  rotate: false
+  xy: 448, 31
+  size: 170, 79
+  orig: 248, 120
+  offset: 39, 20
+  index: -1
+images/fx/mowangzhili_20
+  rotate: true
+  xy: 2, 42
+  size: 244, 112
+  orig: 248, 120
+  offset: 1, 3
+  index: -1
+images/fx/mowangzhili_21
+  rotate: true
+  xy: 116, 42
+  size: 244, 112
+  orig: 248, 120
+  offset: 2, 4
+  index: -1
+images/fx/mowangzhili_22
+  rotate: true
+  xy: 230, 43
+  size: 243, 109
+  orig: 248, 120
+  offset: 2, 5
+  index: -1
+images/fx/mowangzhili_23
+  rotate: true
+  xy: 341, 67
+  size: 233, 105
+  orig: 248, 120
+  offset: 7, 7
+  index: -1
+images/fx/qian
+  rotate: false
+  xy: 448, 112
+  size: 188, 188
+  orig: 200, 200
+  offset: 6, 6
+  index: -1

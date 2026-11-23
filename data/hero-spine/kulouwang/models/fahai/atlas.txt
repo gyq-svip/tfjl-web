@@ -1,0 +1,132 @@
+
+fahai.png
+size: 936,936
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack1/atk1_1
+  rotate: false
+  xy: 808, 325
+  size: 122, 164
+  orig: 190, 191
+  offset: 5, 12
+  index: -1
+attack1/atk1_2
+  rotate: true
+  xy: 168, 17
+  size: 110, 172
+  orig: 190, 191
+  offset: 7, 12
+  index: -1
+attack1/atk1_3
+  rotate: true
+  xy: 2, 5
+  size: 122, 164
+  orig: 190, 191
+  offset: 4, 12
+  index: -1
+attack1/atk1_4
+  rotate: false
+  xy: 578, 196
+  size: 182, 127
+  orig: 190, 191
+  offset: 2, 12
+  index: -1
+attack1/atk1_5
+  rotate: true
+  xy: 808, 491
+  size: 184, 126
+  orig: 190, 191
+  offset: 1, 12
+  index: -1
+attack1/atk1_6
+  rotate: true
+  xy: 578, 19
+  size: 175, 128
+  orig: 190, 191
+  offset: 1, 12
+  index: -1
+attack1/atk1_7
+  rotate: false
+  xy: 708, 25
+  size: 151, 131
+  orig: 190, 191
+  offset: 1, 12
+  index: -1
+fx/atk_0
+  rotate: false
+  xy: 762, 158
+  size: 141, 165
+  orig: 280, 280
+  offset: 81, 80
+  index: -1
+fx/atk_1
+  rotate: true
+  xy: 342, 23
+  size: 104, 152
+  orig: 280, 280
+  offset: 109, 88
+  index: -1
+fx/atk_2
+  rotate: false
+  xy: 838, 796
+  size: 85, 138
+  orig: 280, 280
+  offset: 122, 95
+  index: -1
+idle/idle_0
+  rotate: false
+  xy: 290, 388
+  size: 257, 286
+  orig: 258, 286
+  offset: 1, 0
+  index: -1
+idle/idle_1
+  rotate: false
+  xy: 549, 388
+  size: 257, 286
+  orig: 258, 286
+  offset: 1, 0
+  index: -1
+idle/idle_2
+  rotate: true
+  xy: 550, 677
+  size: 257, 286
+  orig: 258, 286
+  offset: 1, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 2, 648
+  size: 258, 286
+  orig: 258, 286
+  offset: 0, 0
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 2, 388
+  size: 258, 286
+  orig: 258, 286
+  offset: 0, 0
+  index: -1
+idle/idle_5
+  rotate: true
+  xy: 262, 676
+  size: 258, 286
+  orig: 258, 286
+  offset: 0, 0
+  index: -1
+idle/idle_6
+  rotate: true
+  xy: 2, 129
+  size: 257, 286
+  orig: 258, 286
+  offset: 1, 0
+  index: -1
+idle/idle_7
+  rotate: true
+  xy: 290, 129
+  size: 257, 286
+  orig: 258, 286
+  offset: 1, 0
+  index: -1

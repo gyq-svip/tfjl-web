@@ -1,0 +1,363 @@
+
+feidie.png
+size: 838,838
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+images/FX/01/111_000
+  rotate: true
+  xy: 766, 753
+  size: 83, 70
+  orig: 102, 102
+  offset: 16, 13
+  index: -1
+images/FX/01/111_001
+  rotate: false
+  xy: 653, 356
+  size: 83, 87
+  orig: 102, 102
+  offset: 10, 6
+  index: -1
+images/FX/01/111_002
+  rotate: false
+  xy: 653, 280
+  size: 74, 74
+  orig: 102, 102
+  offset: 16, 9
+  index: -1
+images/FX/01/111_003
+  rotate: false
+  xy: 766, 684
+  size: 70, 67
+  orig: 102, 102
+  offset: 16, 19
+  index: -1
+images/FX/Energy 090 Ray Right_00002
+  rotate: true
+  xy: 453, 31
+  size: 40, 86
+  orig: 160, 160
+  offset: 6, 40
+  index: -1
+images/FX/Energy 090 Ray Right_00004
+  rotate: true
+  xy: 541, 30
+  size: 41, 84
+  orig: 160, 160
+  offset: 23, 41
+  index: -1
+images/FX/Energy 090 Ray Right_00006
+  rotate: true
+  xy: 627, 16
+  size: 40, 81
+  orig: 160, 160
+  offset: 41, 42
+  index: -1
+images/FX/Energy 090 Ray Right_00008
+  rotate: false
+  xy: 729, 278
+  size: 39, 76
+  orig: 160, 160
+  offset: 58, 45
+  index: -1
+images/FX/Energy 090 Ray Right_00010
+  rotate: false
+  xy: 732, 76
+  size: 37, 70
+  orig: 160, 160
+  offset: 74, 48
+  index: -1
+images/FX/Energy 090 Ray Right_00012
+  rotate: true
+  xy: 668, 463
+  size: 37, 63
+  orig: 160, 160
+  offset: 87, 51
+  index: -1
+images/FX/Energy 090 Ray Right_00014
+  rotate: false
+  xy: 737, 511
+  size: 35, 58
+  orig: 160, 160
+  offset: 99, 54
+  index: -1
+images/FX/Energy 090 Ray Right_00016
+  rotate: true
+  xy: 774, 495
+  size: 32, 52
+  orig: 160, 160
+  offset: 107, 57
+  index: -1
+images/FX/b1/b1_000
+  rotate: false
+  xy: 738, 361
+  size: 31, 32
+  orig: 136, 136
+  offset: 20, 47
+  index: -1
+images/FX/b1/b1_001
+  rotate: false
+  xy: 775, 575
+  size: 61, 63
+  orig: 136, 136
+  offset: 12, 27
+  index: -1
+images/FX/b1/b1_002
+  rotate: false
+  xy: 340, 7
+  size: 111, 64
+  orig: 136, 136
+  offset: 7, 31
+  index: -1
+images/FX/b1/b1_003
+  rotate: true
+  xy: 733, 200
+  size: 76, 40
+  orig: 136, 136
+  offset: 23, 43
+  index: -1
+images/FX/b1/b1_004
+  rotate: true
+  xy: 692, 502
+  size: 73, 43
+  orig: 136, 136
+  offset: 28, 42
+  index: -1
+images/FX/b1/b1_005
+  rotate: true
+  xy: 738, 571
+  size: 67, 35
+  orig: 136, 136
+  offset: 35, 46
+  index: -1
+images/FX/b1/b1_006
+  rotate: false
+  xy: 2, 3
+  size: 30, 11
+  orig: 136, 136
+  offset: 43, 54
+  index: -1
+images/FX/h6/h6_000
+  rotate: false
+  xy: 653, 254
+  size: 24, 24
+  orig: 68, 51
+  offset: 0, 19
+  index: -1
+images/FX/h6/h6_001
+  rotate: false
+  xy: 710, 16
+  size: 34, 40
+  orig: 68, 51
+  offset: 1, 10
+  index: -1
+images/FX/h6/h6_002
+  rotate: false
+  xy: 733, 148
+  size: 50, 50
+  orig: 68, 51
+  offset: 2, 0
+  index: -1
+images/FX/h6/h6_004
+  rotate: false
+  xy: 775, 529
+  size: 61, 44
+  orig: 68, 51
+  offset: 6, 6
+  index: -1
+images/FX/h6/h6_005
+  rotate: true
+  xy: 692, 577
+  size: 59, 44
+  orig: 68, 51
+  offset: 9, 7
+  index: -1
+images/FX/h6/h6_006
+  rotate: true
+  xy: 771, 96
+  size: 50, 47
+  orig: 68, 51
+  offset: 17, 4
+  index: -1
+images/FX/h6/h6_008
+  rotate: true
+  xy: 771, 62
+  size: 32, 48
+  orig: 68, 51
+  offset: 31, 3
+  index: -1
+images/FX/h6/h6_010
+  rotate: false
+  xy: 814, 350
+  size: 14, 25
+  orig: 68, 51
+  offset: 36, 3
+  index: -1
+images/FX/j3
+  rotate: false
+  xy: 635, 58
+  size: 95, 95
+  orig: 102, 102
+  offset: 4, 3
+  index: -1
+images/FX/qi2/2_000
+  rotate: false
+  xy: 668, 503
+  size: 22, 133
+  orig: 82, 205
+  offset: 28, 64
+  index: -1
+images/FX/qi2/2_002
+  rotate: false
+  xy: 697, 684
+  size: 67, 152
+  orig: 82, 205
+  offset: 7, 49
+  index: -1
+images/FX/qi2/2_004
+  rotate: true
+  xy: 182, 10
+  size: 53, 156
+  orig: 82, 205
+  offset: 17, 36
+  index: -1
+images/FX/qi2/2_006
+  rotate: true
+  xy: 2, 16
+  size: 47, 178
+  orig: 82, 205
+  offset: 16, 4
+  index: -1
+images/FX/qi2/2_008
+  rotate: true
+  xy: 697, 640
+  size: 42, 110
+  orig: 82, 205
+  offset: 16, 2
+  index: -1
+images/FX/qi2/2_009
+  rotate: false
+  xy: 797, 13
+  size: 35, 47
+  orig: 82, 205
+  offset: 14, 3
+  index: -1
+images/FX/w4
+  rotate: false
+  xy: 635, 155
+  size: 96, 97
+  orig: 102, 102
+  offset: 3, 5
+  index: -1
+images/FX/zha/zha_001
+  rotate: false
+  xy: 771, 350
+  size: 41, 43
+  orig: 51, 51
+  offset: 6, 1
+  index: -1
+images/FX/zha/zha_003
+  rotate: false
+  xy: 787, 396
+  size: 46, 47
+  orig: 51, 51
+  offset: 4, 1
+  index: -1
+images/FX/zha/zha_005
+  rotate: false
+  xy: 738, 395
+  size: 47, 48
+  orig: 51, 51
+  offset: 3, 1
+  index: -1
+images/FX/zha/zha_006
+  rotate: false
+  xy: 746, 13
+  size: 49, 47
+  orig: 51, 51
+  offset: 2, 2
+  index: -1
+images/FX/zha/zha_007
+  rotate: false
+  xy: 775, 445
+  size: 49, 48
+  orig: 51, 51
+  offset: 1, 2
+  index: -1
+images/FX/zha/zha_009
+  rotate: false
+  xy: 770, 302
+  size: 45, 46
+  orig: 51, 51
+  offset: 1, 4
+  index: -1
+images/FX/zha/zha_012
+  rotate: false
+  xy: 453, 4
+  size: 44, 25
+  orig: 51, 51
+  offset: 1, 14
+  index: -1
+images/FX/zha/zha_014
+  rotate: false
+  xy: 814, 377
+  size: 22, 17
+  orig: 51, 51
+  offset: 9, 16
+  index: -1
+images/a0000
+  rotate: false
+  xy: 2, 658
+  size: 372, 178
+  orig: 410, 410
+  offset: 4, 120
+  index: -1
+images/a0004
+  rotate: false
+  xy: 2, 462
+  size: 353, 194
+  orig: 410, 410
+  offset: 13, 108
+  index: -1
+images/a0008
+  rotate: false
+  xy: 2, 65
+  size: 333, 201
+  orig: 410, 410
+  offset: 22, 112
+  index: -1
+images/a0012
+  rotate: false
+  xy: 357, 445
+  size: 309, 191
+  orig: 410, 410
+  offset: 33, 132
+  index: -1
+images/a0016
+  rotate: false
+  xy: 337, 73
+  size: 296, 179
+  orig: 410, 410
+  offset: 39, 150
+  index: -1
+images/a0020
+  rotate: false
+  xy: 348, 254
+  size: 303, 189
+  orig: 410, 410
+  offset: 35, 134
+  index: -1
+images/a0024
+  rotate: false
+  xy: 376, 638
+  size: 319, 198
+  orig: 410, 410
+  offset: 27, 115
+  index: -1
+images/a0028
+  rotate: false
+  xy: 2, 268
+  size: 344, 192
+  orig: 410, 410
+  offset: 16, 110
+  index: -1

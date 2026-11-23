@@ -1,0 +1,139 @@
+
+huafuren.png
+size: 805,805
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+attack/atk_0
+  rotate: true
+  xy: 210, 713
+  size: 90, 153
+  orig: 104, 153
+  offset: 10, 0
+  index: -1
+attack/atk_1
+  rotate: true
+  xy: 365, 711
+  size: 92, 153
+  orig: 104, 153
+  offset: 8, 0
+  index: -1
+attack/atk_2
+  rotate: false
+  xy: 675, 650
+  size: 98, 153
+  orig: 104, 153
+  offset: 3, 0
+  index: -1
+attack/atk_3
+  rotate: true
+  xy: 312, 608
+  size: 101, 153
+  orig: 104, 153
+  offset: 0, 0
+  index: -1
+attack/atk_4
+  rotate: true
+  xy: 467, 607
+  size: 102, 153
+  orig: 104, 153
+  offset: 0, 0
+  index: -1
+attack/atk_5
+  rotate: true
+  xy: 157, 611
+  size: 100, 153
+  orig: 104, 153
+  offset: 2, 0
+  index: -1
+attack/atk_6
+  rotate: true
+  xy: 2, 626
+  size: 94, 153
+  orig: 104, 153
+  offset: 7, 0
+  index: -1
+attack/atk_7
+  rotate: true
+  xy: 520, 711
+  size: 92, 153
+  orig: 104, 153
+  offset: 9, 0
+  index: -1
+idle/idle_0
+  rotate: true
+  xy: 2, 436
+  size: 173, 306
+  orig: 189, 306
+  offset: 11, 0
+  index: -1
+idle/idle_1
+  rotate: true
+  xy: 310, 432
+  size: 173, 306
+  orig: 189, 306
+  offset: 12, 0
+  index: -1
+idle/idle_2
+  rotate: true
+  xy: 2, 257
+  size: 177, 306
+  orig: 189, 306
+  offset: 10, 0
+  index: -1
+idle/idle_3
+  rotate: false
+  xy: 622, 344
+  size: 180, 304
+  orig: 189, 306
+  offset: 7, 0
+  index: -1
+idle/idle_4
+  rotate: true
+  xy: 309, 66
+  size: 185, 303
+  orig: 189, 306
+  offset: 1, 0
+  index: -1
+idle/idle_5
+  rotate: false
+  xy: 618, 38
+  size: 185, 304
+  orig: 189, 306
+  offset: 0, 0
+  index: -1
+idle/idle_6
+  rotate: true
+  xy: 2, 74
+  size: 181, 305
+  orig: 189, 306
+  offset: 2, 0
+  index: -1
+idle/idle_7
+  rotate: true
+  xy: 310, 253
+  size: 177, 306
+  orig: 189, 306
+  offset: 6, 0
+  index: -1
+images/fx/glow2_00004
+  rotate: true
+  xy: 126, 722
+  size: 81, 82
+  orig: 92, 94
+  offset: 5, 6
+  index: -1
+images/fx/qb
+  rotate: false
+  xy: 2, 743
+  size: 60, 60
+  orig: 60, 60
+  offset: 0, 0
+  index: -1
+images/fx/qb2
+  rotate: false
+  xy: 64, 743
+  size: 60, 60
+  orig: 60, 60
+  offset: 0, 0
+  index: -1
