@@ -11,7 +11,6 @@ import 'net_check_sheet.dart';
 import 'layout_config.dart';
 import 'floating_panel.dart';
 import 'notepad_sheet.dart';
-import 'script_gen.dart';
 import 'script_sheet.dart';
 import 'activity_calc.dart';
 import 'calc_sheet.dart';
@@ -67,6 +66,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   bool layoutEditing = false;            // 默认锁定
   bool topBarAutoHide = false;           // 顶栏自动隐藏（可开关）
   bool topBarExpanded = true;            // 下拉行当前是否展开
+  int navTab = 0;                        // 底部 TAB：0主页 1工具 2设置
   bool poolSideMine = true;              // 悬浮卡池当前服务哪一侧
   bool poolOverlayOpen = false;          // 悬浮卡池是否显示
   bool notepadOverlayOpen = false;       // 悬浮记事本是否显示
@@ -129,7 +129,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   void refresh() => setState(() {});
 
-  /// 本地项目改动持久化（共享模式不写本地库）
+  /// 共享项目改动持久化（共享模式不写本地库）
   Future<void> persistProject() async {
     if (gistId.isNotEmpty || proj == null) return;
     final lib = await ProjectLibrary.load();
@@ -139,6 +139,35 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         await ProjectLibrary.save(lib);
         return;
       }
+    }
+  }
+
+  /// ☁ 共享阵容一键复制到本地（含记事本/脚本/站位），复制后切到本地模式自由微调
+  Future<void> _copyShareToLocal() async {
+    if (proj == null) return;
+    String name = '${proj!['name'] ?? '共享阵容'}·本地';
+    // 重名自动加序号
+    final lib = await ProjectLibrary.load();
+    final names = lib.map((e) => (e as Map)['name']?.toString() ?? '').toSet();
+    for (var i = 2; names.contains(name); i++) {
+      name = '${proj!['name'] ?? '共享阵容'}·本地$i';
+    }
+    final copy = Map<String, dynamic>.from(proj!);
+    copy['name'] = name;
+    copy['category'] = proj!['category']?.toString().isNotEmpty == true ? proj!['category'] : '共享备份';
+    await ProjectLibrary.addProject(copy['category'].toString(), name, copy);
+    SharedPreferences.getInstance().then((p) => p.setString('lastLocal', name));
+    setState(() {
+      proj = copy;
+      sourceMode = 0;
+      gistId = '';
+      lastLocalName = name;
+      navTab = 0;
+    });
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('✅ 已复制为本地项目「$name」，现在可以自由微调了'),
+        duration: const Duration(seconds: 2)));
     }
   }
 
@@ -284,7 +313,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 ),
               ),
             GestureDetector(
-              onTap: _showToolsMenu,
+              onTap: () => setState(() => navTab = 1),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(color: const Color(0xFFFFB300), borderRadius: BorderRadius.circular(7)),
@@ -574,59 +603,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     ));
   }
 
-  // ------------------------------------------------------- 工具菜单
-  void _showToolsMenu() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF1A1A2E),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => SafeArea(
-        child: Container(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.82),
-          child: SingleChildScrollView(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Padding(padding: EdgeInsets.all(12), child: Align(alignment: Alignment.centerLeft, child: Text('🧰 工具 v${AppData.appVersion}', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))))),
-        ListTile(leading: const Text('📚', style: TextStyle(fontSize: 20)), title: const Text('阵容图库', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-          subtitle: const Text('精选 · 活动 7 天 A/B · 大航海 223 套', style: TextStyle(fontSize: 10, color: Colors.white54)),
-          onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryPage())); }),
-        ListTile(leading: const Text('📖', style: TextStyle(fontSize: 20)), title: const Text('使用说明', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-          subtitle: const Text('上下卡 / 设置 / 卡池的用法', style: TextStyle(fontSize: 10, color: Colors.white54)),
-          onTap: () { Navigator.pop(context); _showHelp(); }),
-        ListTile(leading: const Text('📝', style: TextStyle(fontSize: 20)), title: const Text('记事本', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-          subtitle: const Text('当前阵容的笔记，随项目走、自动保存', style: TextStyle(fontSize: 10, color: Colors.white54)),
-          onTap: () { Navigator.pop(context); setState(() => notepadOverlayOpen = true); }),
-        ListTile(leading: const Text('📜', style: TextStyle(fontSize: 20)), title: const Text('脚本生成', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-          subtitle: const Text('活动/隐藏榜/深海 · 照搬网页规则，自动适配老马', style: TextStyle(fontSize: 10, color: Colors.white54)),
-          onTap: () { Navigator.pop(context); setState(() => scriptOverlayOpen = true); }),
-        ListTile(leading: const Text('🧮', style: TextStyle(fontSize: 20)), title: const Text('活动计算器', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-          subtitle: const Text('商品从后台读取，动态规划算最优购买', style: TextStyle(fontSize: 10, color: Colors.white54)),
-          onTap: () { Navigator.pop(context); setState(() => calcOverlayOpen = true); }),
-        ListTile(leading: const Text('🌐', style: TextStyle(fontSize: 20)), title: const Text('网络自检', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-          subtitle: const Text('共享打不开？测一下是哪个环节不通', style: TextStyle(fontSize: 10, color: Colors.white54)),
-          onTap: () { Navigator.pop(context); _showNetCheck(); }),
-        StatefulBuilder(builder: (ctx, setSheet) => ListTile(
-          leading: const Text('🔽', style: TextStyle(fontSize: 20)),
-          title: const Text('顶栏自动隐藏', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-          subtitle: Text('开：平时收起，点顶部 ▾ 或下滑唤出，选完自动收起', style: TextStyle(fontSize: 10, color: Colors.white54)),
-          trailing: Switch(
-            value: topBarAutoHide,
-            activeColor: const Color(0xFF2BB3A3),
-            onChanged: (v) async {
-              setState(() { topBarAutoHide = v; topBarExpanded = !v; });
-              setSheet(() {});
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setBool('topbar_autohide', v);
-            },
-          ),
-        )),
-        const SizedBox(height: 8),
-        ]),
-      ),
-      ),
-    ));
-  }
-
   void _showNetCheck() {
     showModalBottomSheet(
       context: context,
@@ -667,11 +643,58 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(children: [
+      body: loading
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF2BB3A3)))
+          : IndexedStack(index: navTab, children: [
+              _homeBody(),   // 0 主页：画布 + 悬浮面板
+              _toolsPage(),  // 1 工具
+              _settingsPage(), // 2 设置
+            ]),
+      bottomNavigationBar: loading ? null : _bottomNav(),
+    );
+  }
+
+  /// 底部 TAB 导航（主页 / 工具 / 设置）
+  Widget _bottomNav() {
+    Widget item(int idx, String icon, String label) {
+      final on = navTab == idx;
+      return Expanded(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => setState(() => navTab = idx),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Text(icon, style: TextStyle(fontSize: 17, color: on ? const Color(0xFF2BB3A3) : Colors.white38)),
+            const SizedBox(height: 1),
+            Text(label, style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold,
+                color: on ? const Color(0xFF2BB3A3) : Colors.white38)),
+          ]),
+        ),
+      );
+    }
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF12122A),
+        border: Border(top: BorderSide(color: Color(0xFF2BB3A3), width: 0.5)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 48,
+          child: Row(children: [
+            item(0, '🏠', '主页'),
+            item(1, '🧰', '工具'),
+            item(2, '⚙️', '设置'),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  /// 主页画布（原 build 主体）
+  Widget _homeBody() {
+    return Stack(children: [
         SafeArea(
-        child: loading
-            ? const Center(child: CircularProgressIndicator(color: Color(0xFF2BB3A3)))
-            : Column(children: [
+        child: Column(children: [
                 buildTopBar(),
                 if (packPct >= 0) _packProgress(),
                 Padding(
@@ -680,6 +703,17 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     Text('⚔ ${proj?['name'] ?? '出战选择'}',
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))),
                     const Spacer(),
+                    // 共享模式：一键复制到本地（含记事本/脚本/站位，复制后可自由微调）
+                    if (sourceMode == 1)
+                      GestureDetector(
+                        onTap: _copyShareToLocal,
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(color: const Color(0xFF7986CB), borderRadius: BorderRadius.circular(6)),
+                          child: const Text('📋 复制到本地', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.white)),
+                        ),
+                      ),
                     if (layoutEditing)
                       const Text('编辑中', style: TextStyle(fontSize: 9, color: Color(0xFFFFD24A))),
                     GestureDetector(
@@ -739,7 +773,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             accent: const Color(0xFF9BE9E0),
             onClose: () => setState(() => notepadOverlayOpen = false),
             defaultRect: const Rect.fromLTWH(0.18, 0.18, 0.66, 0.62),
-            child: NotepadSheet(proj: proj!, onChanged: persistProject),
+            child: NotepadSheet(proj: proj!, readOnly: gistId.isNotEmpty, onChanged: persistProject),
           ),
         // 悬浮脚本生成
         if (scriptOverlayOpen)
@@ -761,7 +795,122 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             defaultRect: const Rect.fromLTWH(0.08, 0.10, 0.84, 0.80),
             child: CalcSheet(calc: _activityCalc),
           ),
-      ]),  // Stack
+      ]);  // Stack
+  }
+
+  // ------------------------------------------------------- 🧰 工具页（底部 TAB）
+  Widget _toolsPage() {
+    Widget tool(String icon, String title, String sub, VoidCallback onTap, {Color accent = const Color(0xFF2BB3A3)}) {
+      return GestureDetector(
+        onTap: onTap,
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+          padding: const EdgeInsets.all(11),
+          decoration: BoxDecoration(color: const Color(0xFF15152A), borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: accent.withAlpha(40))),
+          child: Row(children: [
+            Text(icon, style: const TextStyle(fontSize: 22)),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+              const SizedBox(height: 2),
+              Text(sub, style: const TextStyle(fontSize: 10, color: Colors.white38)),
+            ])),
+            const Icon(Icons.chevron_right, size: 18, color: Colors.white24),
+          ]),
+        ),
+      );
+    }
+    return SafeArea(
+      child: Column(children: [
+        const Padding(padding: EdgeInsets.all(12), child: Align(alignment: Alignment.centerLeft,
+            child: Text('🧰 工具 v${AppData.appVersion}', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))))),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(children: [
+              tool('📚', '阵容图库', '精选 · 活动 7 天 A/B · 大航海 223 套', () { Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryPage())); },
+                  accent: const Color(0xFF4ECDC4)),
+              tool('📖', '使用说明', '上下卡 / 设置 / 卡池的用法', _showHelp, accent: const Color(0xFF7986CB)),
+              tool('📝', '记事本', '当前阵容的笔记，随项目走、自动保存', () => setState(() { navTab = 0; notepadOverlayOpen = true; }),
+                  accent: const Color(0xFF9BE9E0)),
+              tool('📜', '脚本生成', '活动/隐藏榜/深海 · 照搬网页规则，自动适配老马', () => setState(() { navTab = 0; scriptOverlayOpen = true; }),
+                  accent: const Color(0xFFFF9800)),
+              tool('🧮', '活动计算器', '商品从后台读取，动态规划算最优购买', () => setState(() { navTab = 0; calcOverlayOpen = true; }),
+                  accent: const Color(0xFF4CAF50)),
+              tool('🌐', '网络自检', '共享打不开？测一下是哪个环节不通', _showNetCheck, accent: const Color(0xFF67D2F5)),
+              tool('✎', '编辑布局', '自由拖动/缩放各模块位置和大小', () => setState(() { navTab = 0; layoutEditing = !layoutEditing; }),
+                  accent: const Color(0xFFFFD24A)),
+              const SizedBox(height: 8),
+            ]),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  // ------------------------------------------------------- ⚙️ 设置页（底部 TAB）
+  Widget _settingsPage() {
+    return SafeArea(
+      child: ListView(padding: const EdgeInsets.fromLTRB(10, 10, 10, 20), children: [
+        const Padding(padding: EdgeInsets.only(left: 4, bottom: 8),
+            child: Text('⚙️ 设置', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A)))),
+        // 界面
+        _settingsSection('界面'),
+        Container(margin: const EdgeInsets.fromLTRB(0, 0, 0, 10), padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(color: const Color(0xFF15152A), borderRadius: BorderRadius.circular(12)),
+          child: StatefulBuilder(builder: (ctx, setSheet) => SwitchListTile(
+            value: topBarAutoHide,
+            activeColor: const Color(0xFF2BB3A3),
+            title: const Text('顶栏自动隐藏', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+            subtitle: const Text('开：平时收起，点顶部 ▾ 或下滑唤出，选完自动收起', style: TextStyle(fontSize: 10, color: Colors.white38)),
+            onChanged: (v) async {
+              setState(() { topBarAutoHide = v; topBarExpanded = !v; });
+              setSheet(() {});
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('topbar_autohide', v);
+            },
+          )),
+        ),
+        // 更新
+        _settingsSection('更新'),
+        _settingsRow('🔄', '检查更新', '从 Gitee 拉最新安装包版本比对', () async {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('正在检查更新…'), duration: Duration(seconds: 1)));
+          await VersionCheck.check(context);
+        }),
+        _settingsRow('📦', '当前版本', 'v${AppData.appVersion} · 安装包在 Gitee（app-v1 发行版）', () {},
+            trailing: Text('v${AppData.appVersion}', style: const TextStyle(fontSize: 11, color: Color(0xFF2BB3A3), fontWeight: FontWeight.bold))),
+        // 网络
+        _settingsSection('网络'),
+        _settingsRow('🌐', '网络自检', '共享打不开？逐环节测试定位问题', _showNetCheck),
+        _settingsRow('📡', '手机在线心跳', '后台自动上报，管理员面板显示 📱 手机在线', () {}),
+        // 关于
+        _settingsSection('关于'),
+        _settingsRow('📖', '使用说明', '上下卡 / 设置 / 卡池的用法', _showHelp),
+      ]),
+    );
+  }
+
+  Widget _settingsSection(String title) => Padding(padding: const EdgeInsets.fromLTRB(4, 6, 0, 5),
+      child: Text(title, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF6C7A92))));
+
+  Widget _settingsRow(String icon, String title, String sub, VoidCallback onTap, {Widget? trailing}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(color: const Color(0xFF15152A), borderRadius: BorderRadius.circular(12)),
+        child: Row(children: [
+          Text(icon, style: const TextStyle(fontSize: 18)),
+          const SizedBox(width: 10),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Colors.white)),
+            const SizedBox(height: 2),
+            Text(sub, style: const TextStyle(fontSize: 10, color: Colors.white38)),
+          ])),
+          if (trailing != null) trailing,
+        ]),
+      ),
     );
   }
 
