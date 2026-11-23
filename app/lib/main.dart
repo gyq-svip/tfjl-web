@@ -1309,6 +1309,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     Expanded(child: Text(LayoutConfig.moduleNames[moduleId] ?? moduleId,
                         style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: accent),
                         overflow: TextOverflow.ellipsis)),
+                    // 🔴 手牌模块：标题栏右侧合并 10/10 + 战车(车名简写+总减伤) + 卡池（省一行）
+                    if (moduleId == 'myHand' || moduleId == 'mateHand')
+                      ..._handTitleExtras(moduleId == 'myHand'),
                   ]),
                 ),
               ),
@@ -1446,47 +1449,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     final drTable = isMine ? '我的' : '队友';
     final bd = DrSystem.breakdown(handCards: hand, tableName: drTable, chariot: chariot);
     final dr = bd['total']!;
-    final mainN = chariot?['main'] ?? 1;
-    final subN = chariot?['sub'] ?? 0;
-    final mainLv = chariot?['mainLv'] ?? 1;
     final g = 3.0;
-    // 顶部按钮行约 22px；2 排卡片
+    // 标题栏已合并 10/10 + 战车 + 卡池（不再单独占一行），2 排卡片直接铺满
     final cardWByWidth = (boxW - 6 - g * 4) / 5;
-    final cardHByHeight = (boxH - 26 - 6 - g) / 2;
+    final cardHByHeight = (boxH - 8 - g) / 2;
     final cw = (cardWByWidth < cardHByHeight / 0.82 ? cardWByWidth : cardHByHeight / 0.82).clamp(16.0, 200.0);
     final ch = cw * 0.82;
 
     return Padding(
       padding: const EdgeInsets.only(top: 6),
       child: Column(children: [
-        Row(children: [
-          Text('${hand.length}/10',
-              style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: isMine ? const Color(0xFF67D2F5) : const Color(0xFFC79BF0))),
-          const Spacer(),
-          GestureDetector(
-            onTap: () => _showDrDetails(isMine, bd),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: dr > 0 ? const Color(0x33FFD24A) : Colors.white.withAlpha(20),
-                borderRadius: BorderRadius.circular(5),
-              ),
-              child: Text('🚂 $mainN/$subN Lv$mainLv  🛡${dr.toStringAsFixed(1)}%',
-                  style: TextStyle(fontSize: 8.5,
-                      color: dr > 0 ? const Color(0xFFFFD24A) : Colors.white24)),
-            ),
-          ),
-          const SizedBox(width: 4),
-          GestureDetector(
-            onTap: () => showPoolDialog(isMine),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(color: const Color(0xFF2BB3A3), borderRadius: BorderRadius.circular(5)),
-              child: const Text('🎴 卡池', style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: Color(0xFF07231F))),
-            ),
-          ),
-        ]),
-        const SizedBox(height: 4),
         Container(
           decoration: BoxDecoration(color: Colors.white.withAlpha(20), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white.withAlpha(25))),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -1555,6 +1527,45 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
+  /// 手牌模块标题栏右侧的紧凑信息：10/10 + 🚂车名+总减伤徽章 + 🎴卡池
+  List<Widget> _handTitleExtras(bool isMine) {
+    final hand = handCards(isMine);
+    final chariot = proj?[isMine ? 'myChariot' : 'teammateChariot'] as Map<String, dynamic>?;
+    final bd = DrSystem.breakdown(handCards: hand, tableName: isMine ? '我的' : '队友', chariot: chariot);
+    final dr = bd['total']!;
+    final mainN = chariot?['main'] ?? 1;
+    final subN = chariot?['sub'] ?? 0;
+    final mainLv = chariot?['mainLv'] ?? 1;
+    final c = isMine ? const Color(0xFF67D2F5) : const Color(0xFFC79BF0);
+    return [
+      Text('${hand.length}/10',
+          style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: c)),
+      const SizedBox(width: 4),
+      GestureDetector(
+        onTap: () => _showDrDetails(isMine, bd),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+          decoration: BoxDecoration(
+            color: dr > 0 ? const Color(0x33FFD24A) : Colors.white.withAlpha(18),
+            borderRadius: BorderRadius.circular(5),
+          ),
+          child: Text('🚂${AppData.chariotShort(mainN, subN)} 🛡${dr.toStringAsFixed(1)}%',
+              style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold,
+                  color: dr > 0 ? const Color(0xFFFFD24A) : Colors.white24)),
+        ),
+      ),
+      const SizedBox(width: 4),
+      GestureDetector(
+        onTap: () => showPoolDialog(isMine),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+          decoration: BoxDecoration(color: const Color(0xFF2BB3A3), borderRadius: BorderRadius.circular(5)),
+          child: const Text('🎴卡池', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF07231F))),
+        ),
+      ),
+    ];
+  }
+
   /// 🛡 减伤详情弹窗：拆分明细（洗炼/酋长/小野/宝库/战车）+ 战车配置 + 管理入口
   void _showDrDetails(bool isMine, Map<String, double> bd) {
     final drTable = isMine ? '我的' : '队友';
@@ -1582,7 +1593,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         const SizedBox(height: 8),
         Text(DrSystem.tooltip(bd), style: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.5)),
         const Divider(color: Colors.white12, height: 18),
-        Text('🚂 ${isMine ? "我方" : "队友"}战车：主车 $mainN 号（Lv$mainLv）· 副车 ${((subN ?? 0) as int) <= 0 ? "未设置" : "$subN 号"}',
+        Text('🚂 ${isMine ? "我方" : "队友"}战车：${AppData.chariotShort(mainN, subN)}（主车 $mainN 号 Lv$mainLv · 副车 ${((subN ?? 0) as int) <= 0 ? "未设置" : "$subN 号"}）',
             style: const TextStyle(fontSize: 11.5, color: Colors.white54)),
         const Text('只有「走马江湖号」计减伤；主车 3×等级+6，副车再乘融合系数',
             style: TextStyle(fontSize: 10, color: Colors.white38)),
@@ -1604,21 +1615,147 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     ));
   }
 
+  /// 🚂 战车设置（与网页同步：23 辆选车 + 等级 + 副车 + 副车融合系数；只有走马江湖号计减伤）
   void showChariotDialog(Map<String, dynamic>? c, bool isMine) {
-    final buf = StringBuffer();
-    if (c == null) {
-      buf.write('这个阵容没保存战车数据（旧版分享）。\n默认按主战车 1 / 副战车 0 计算减伤。');
-    } else {
-      buf.writeln('主战车：${c['main']} 号${c['main'] == 11 ? "（走马江湖号）" : ""}  Lv${c['mainLv'] ?? 1}');
-      buf.writeln('副战车：${((c['sub'] ?? 0) as int) <= 0 ? "未设置" : "${c['sub']} 号"}');
-      buf.writeln('减伤：${AppData.chariotSideDr(c)}%');
-      buf.write('\n（只有「走马江湖号」计减伤；主车 3×等级+6，副车再乘融合系数）');
+    final sideKey = isMine ? 'myChariot' : 'teammateChariot';
+    final st = Map<String, dynamic>.from(c ?? {});
+    st['main'] = (st['main'] ?? 1) as int;
+    st['mainLv'] = ((st['mainLv'] ?? 1) as int).clamp(1, 20);
+    st['sub'] = (st['sub'] ?? 0) as int;
+    st['subLv'] = ((st['subLv'] ?? 1) as int).clamp(1, 20);
+    st['subFusion'] = (st['subFusion'] ?? 0) as int;
+
+    void persist() {
+      proj![sideKey] = st;
+      persistProject();
     }
-    showDialog(context: context, builder: (_) => AlertDialog(
-      title: Text(isMine ? '我方战车' : '队友战车'),
-      content: Text(buf.toString(), style: const TextStyle(fontSize: 12, height: 1.5)),
-      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('关闭'))],
-    ));
+
+    late StateSetter setSheet;
+
+    Widget carChips(String field) {
+      return SizedBox(
+        height: 150,
+        child: GridView.builder(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, childAspectRatio: 2.6, mainAxisSpacing: 4, crossAxisSpacing: 4),
+          itemCount: AppData.chariotList.length + (field == 'sub' ? 1 : 0),
+          itemBuilder: (_, i) {
+            final idx = field == 'sub' ? (i == 0 ? 0 : i) : i + 1;
+            final selected = st[field] == idx;
+            final isDr = AppData.chariotIsDr(idx);
+            final name = idx == 0 ? '未设置' : AppData.chariotName(idx);
+            return GestureDetector(
+              onTap: () { st[field] = idx; persist(); setSheet(() {}); },
+              child: Container(
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 3),
+                decoration: BoxDecoration(
+                  color: selected ? const Color(0xFF2BB3A3) : Colors.white.withAlpha(25),
+                  borderRadius: BorderRadius.circular(7),
+                  border: isDr ? Border.all(color: const Color(0x884ade80), width: 0.8) : null,
+                ),
+                child: Text('$name${isDr ? " 🛡" : ""}',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold,
+                        color: selected ? const Color(0xFF07231F) : (isDr ? const Color(0xFF9BE9E0) : Colors.white60))),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF16162C),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, ss) {
+          setSheet = ss;
+          final dr = AppData.chariotSideDr(st);
+          return SafeArea(
+            child: Container(
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.88),
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+              child: SingleChildScrollView(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Text('🚂 ${isMine ? "我方" : "队友"}战车设置', style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: dr > 0 ? const Color(0x334ade80) : Colors.white.withAlpha(20),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text('🛡 ${dr.toStringAsFixed(1)}%',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold,
+                              color: dr > 0 ? const Color(0xFF4ade80) : Colors.white24)),
+                    ),
+                  ]),
+                  const Text('只有「走马江湖号 🛡」计减伤：主车 3×等级+6，副车再乘融合系数',
+                      style: TextStyle(fontSize: 10, color: Colors.white38)),
+                  const SizedBox(height: 10),
+                  // 主车
+                  Text('主战车：${AppData.chariotName(st["main"])}（Lv${st["mainLv"]}）',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4ECDC4))),
+                  const SizedBox(height: 5),
+                  carChips('main'),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(activeTrackColor: const Color(0xFF4ECDC4), thumbColor: const Color(0xFF4ECDC4), inactiveTrackColor: Colors.white24),
+                    child: Slider(
+                      min: 1, max: 20, divisions: 19, value: (st['mainLv'] as int).toDouble(),
+                      label: 'Lv ${st['mainLv']}',
+                      onChanged: (v) { st['mainLv'] = v.round(); persist(); setSheet(() {}); },
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  // 副车
+                  Text('副战车：${(st["sub"] as int) <= 0 ? "未设置" : AppData.chariotName(st["sub"] as int) + "（Lv${st["subLv"]}）"}',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFF0932B))),
+                  const SizedBox(height: 5),
+                  carChips('sub'),
+                  if ((st['sub'] as int) > 0) ...[
+                    SliderTheme(
+                      data: SliderTheme.of(context).copyWith(activeTrackColor: const Color(0xFFF0932B), thumbColor: const Color(0xFFF0932B), inactiveTrackColor: Colors.white24),
+                      child: Slider(
+                        min: 1, max: 20, divisions: 19, value: (st['subLv'] as int).toDouble(),
+                        label: 'Lv ${st['subLv']}',
+                        onChanged: (v) { st['subLv'] = v.round(); persist(); setSheet(() {}); },
+                      ),
+                    ),
+                    const Text('副车融合系数（副车被融合后保留的减伤比例）',
+                        style: TextStyle(fontSize: 10.5, color: Colors.white38)),
+                    const SizedBox(height: 4),
+                    Row(children: [
+                      for (var f = 0; f < 4; f++)
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () { st['subFusion'] = f; persist(); setSheet(() {}); },
+                            child: Container(
+                              margin: EdgeInsets.only(right: f < 3 ? 6 : 0),
+                              padding: const EdgeInsets.symmetric(vertical: 7),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: st['subFusion'] == f ? const Color(0xFFF0932B) : Colors.white.withAlpha(25),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text('${[50, 60, 70, 80][f]}%',
+                                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold,
+                                      color: st['subFusion'] == f ? const Color(0xFF1A1A2E) : Colors.white60)),
+                            ),
+                          ),
+                        ),
+                    ]),
+                  ],
+                  const SizedBox(height: 10),
+                ]),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   // ------------------------------------------------------- 卡池
@@ -1647,7 +1784,15 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         onChanged: () { refresh(); persistProject(); },
         onPlace: () { Navigator.pop(context); autoPlace(isMine, handIdx); },
         onTakeOff: () { Navigator.pop(context); takeOff(isMine, handIdx); },
-        onRemove: () { Navigator.pop(context); hand.removeAt(handIdx); refresh(); },
+        // 🔴 修复：handCards() 返回的是副本，必须删 proj 里的真实列表，否则移不出手牌
+        onRemove: () {
+          Navigator.pop(context);
+          final key = isMine ? 'myHandCards' : 'teammateHandCards';
+          final real = proj?[key] as List?;
+          if (real != null && handIdx < real.length) real.removeAt(handIdx);
+          refresh();
+          persistProject();
+        },
       ),
     );
   }

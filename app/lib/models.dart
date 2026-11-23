@@ -19,7 +19,7 @@ class PoolCard {
 }
 
 class AppData {
-  static const appVersion = '1.7.1';
+  static const appVersion = '1.7.4';
   static final AppData I = AppData._();
   AppData._();
 
@@ -218,6 +218,34 @@ class AppData {
     if (main == 11) v += mainLv * 3 + 6;
     if (sub == 11) v += (subLv * 3 + 6) * const [0.5, 0.6, 0.7, 0.8][subF.clamp(0, 3)];
     return (v * 10).roundToDouble() / 10;
+  }
+
+  /// 23 辆战车（顺序与网页 CHARIOT_LIST 一致；11号=走马江湖号是唯一减伤车）
+  static const chariotList = [
+    '图腾战车', '皇家宝藏号', '花好月圆号', '先祖之魂号', '上古之树号', '胜利女神号',
+    '冰封之魂号', '沉鱼落雁号', '钢铁之心号', '熔岩巨兽号', '走马江湖号', '富甲天下号',
+    '银河之光号', '银河之星号', '葫芦神山号', '飞龙在天号', '花果神山号', '地精飞艇号',
+    '寂静之月号', '神剑山庄号', '浴火凤凰号', '山河社稷号', '狮王争霸号',
+  ];
+
+  static String chariotName(int idx) =>
+      (idx >= 1 && idx <= chariotList.length) ? chariotList[idx - 1] : '';
+
+  static bool chariotIsDr(int idx) => chariotName(idx).contains('走马');
+
+  /// 战车简写（网页 chariotShort）：只设主车 → 主车名去"号"；
+  /// 主+副 → 两车开头2字相同则各取后2字（银河之光+银河之星→之光之星），否则各取前2字
+  static String chariotShort(int main, int sub) {
+    final a = chariotName(main);
+    if (a.isEmpty) return '未设置';
+    final ca = a.endsWith('号') ? a.substring(0, a.length - 1) : a;
+    if (sub <= 0 || sub == main) return ca;
+    final b = chariotName(sub);
+    if (b.isEmpty) return ca;
+    final cb = b.endsWith('号') ? b.substring(0, b.length - 1) : b;
+    final sameHead = ca.length >= 2 && cb.length >= 2 && ca.substring(0, 2) == cb.substring(0, 2);
+    if (sameHead) return ca.substring(ca.length - 2) + cb.substring(cb.length - 2);
+    return ca.substring(0, 2) + cb.substring(0, 2);
   }
 
   /// project.json 手牌里的卡
