@@ -955,7 +955,7 @@
             } catch (e) {}
             const probe = await _runDiagWriteProbe();
             if (entries.length === 0) {
-                const hb = { ok: probe.ok, ts: probe.ts, err: probe.err || null, appVersion: _appVer, appExeVersion: _appExeVer, platform: (_isTauri ? 'app' : 'web') };
+                const hb = { ok: probe.ok, ts: probe.ts, err: probe.err || null, appVersion: _appVer, appExeVersion: _appExeVer, platform: (_isTauri ? 'app' : 'web'), os: _detectOs() };
                 try { localStorage.setItem(DIAG_HEARTBEAT_KEY, JSON.stringify(hb)); } catch (e) {}
                 console.log('[DIAG] 缓冲为空，改发心跳上报（写盘健康=' + probe.ok + '）');
             }
@@ -981,6 +981,7 @@
                 appVersion: _appVer,
                 appExeVersion: _appExeVer,
                 platform: (_isTauri ? 'app' : 'web'),
+                os: _detectOs(),   // 🔴 2026-11-24 系统标识：android/ios/windows/macos/linux（后台区分 安卓/苹果/PC/网页）
                 // 📅 按天统计字段（2026-09-01 新增）：当天上传/写入/操作次数 + 所属日期
                 day: _dayStat.date,
                 dayUploads: _dayStat.uploads,
@@ -20709,7 +20710,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                     const ls = e.lastSeen || 0;
                     if (ls && (now - ls) <= win) {
                         if (_olTs(data.online_users[e.id]) < ls) {
-                            data.online_users[e.id] = { t: ls, nick: e.nick || '', src: e.src === 'app' ? 'app' : 'web' };
+                            data.online_users[e.id] = { t: ls, nick: e.nick || '', src: e.src === 'app' ? 'app' : 'web', os: e.os || '' };
                         }
                         continue; // 判定窗口内 = 在线，不进离线列表
                     }
@@ -20797,7 +20798,36 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
 
         // 在线用户条目统一为对象 { t: 最后活跃时间戳, nick: 昵称, src: 'app'|'web' }（旧数据可能为纯数字时间戳，需兼容）
         function _olTs(v) { return (v && typeof v === 'object') ? (v.t || 0) : (typeof v === 'number' ? v : 0); }
-        function _olRec(nick, src, bg) { const r = { t: Date.now(), nick: (nick || '').toString().slice(0, 24), src: src === 'app' ? 'app' : 'web' }; if (bg) r.bg = 1; return r; }
+        // 🔴 2026-11-24 平台识别（在线日志 / 诊断表格 / 设备列表统一用）：安卓 / 苹果 / PC 桌面端 / 网页
+        function _detectOs() {
+            try {
+                const ua = navigator.userAgent || '';
+                if (/iPhone|iPad|iPod/i.test(ua)) return 'ios';
+                if (/Android/i.test(ua)) return 'android';
+                if (/Windows/i.test(ua)) return 'windows';
+                if (/Mac OS X|Macintosh/i.test(ua)) return 'macos';
+                if (/Linux/i.test(ua)) return 'linux';
+            } catch (e) {}
+            return '';
+        }
+        // platform: 'mobile'(手机APP) / 'app'(PC桌面客户端) / 'web'(浏览器) ；os: android/ios/windows/macos/linux
+        function _platInfo(platform, os) {
+            const p = (platform || '').toString();
+            const o = (os || '').toString().toLowerCase();
+            if (p === 'mobile') {
+                if (o === 'ios') return { icon: '🍎', label: '苹果' };
+                if (o === 'android') return { icon: '📱', label: '安卓' };
+                return { icon: '📱', label: '手机' };
+            }
+            if (p === 'app') return { icon: '🖥️', label: 'PC' };
+            if (p === 'web') return { icon: '🌐', label: '网页' };
+            // 老数据没有 platform 字段：按 os 推断
+            if (o === 'ios') return { icon: '🍎', label: '苹果' };
+            if (o === 'android') return { icon: '📱', label: '安卓' };
+            if (o === 'windows' || o === 'macos' || o === 'linux') return { icon: '🖥️', label: 'PC' };
+            return { icon: '🌐', label: '网页' };
+        }
+        function _olRec(nick, src, bg, os) { const r = { t: Date.now(), nick: (nick || '').toString().slice(0, 24), src: src === 'app' ? 'app' : 'web', os: os || _detectOs() }; if (bg) r.bg = 1; return r; }
         function _myNick() { return (localStorage.getItem('TFJL_UserName') || '').trim(); }
         // s1.0.107：桌面 App（含最小化到托盘）持续心跳，也应算在线。
         // 窗口隐藏后 WebView 会节流定时器（最低约 1 次/分钟），故 src==='app' 的条目判定窗口放宽到 15 分钟；
@@ -20910,7 +20940,7 @@ window.runHeartbeatSelfCheck = runHeartbeatSelfCheck;
                 if (ts === 0) return;
                 const r = (rec && typeof rec === 'object') ? rec : null;
                 const arr = counterData.offline_history.filter(e => e.id !== id);
-                arr.push({ id: id, nick: (r && r.nick) || '', src: (r && r.src) === 'app' ? 'app' : 'web', lastSeen: ts, offlineAt: Date.now() });
+                arr.push({ id: id, nick: (r && r.nick) || '', src: (r && r.src) === 'app' ? 'app' : 'web', os: (r && r.os) || '', lastSeen: ts, offlineAt: Date.now() });
                 counterData.offline_history = arr.filter(e => e.offlineAt >= _offlineCutoff()).slice(-OFFLINE_MAX);
             } catch (e) {}
         }
@@ -31775,7 +31805,7 @@ ${maSection}
                     const nick = (payload.nick || '') + '';
                     const dev = payload.deviceId || '';
                     if (nick.toLowerCase().indexOf(kw) >= 0 && dev) {
-                        hits.push({ nick: nick, dev: dev, last: payload.lastUpload || 0, ver: payload.appVersion || '', plat: payload.platform || '' });
+                        hits.push({ nick: nick, dev: dev, last: payload.lastUpload || 0, ver: payload.appVersion || '', plat: payload.platform || '', os: payload.os || '' });
                     }
                 });
                 if (!hits.length) { if (box) box.innerHTML = '<span style="color:#fbbf24;">未找到匹配昵称（该用户可能未上报诊断）</span>'; return; }
@@ -31830,6 +31860,7 @@ ${maSection}
                         last: payload.lastUpload || 0,
                         ver: payload.appVersion || '',
                         plat: payload.platform || '',
+                        os: payload.os || '',
                         blacklisted: false
                     });
                 });
@@ -32328,7 +32359,8 @@ ${maSection}
                         const C_NICK = '#4ade80', C_ID = '#64748b', C_TIME = '#94a3b8', C_NUM = '#fbbf24', C_FRONTV = '#60a5fa', C_DESKV = '#a78bfa', C_OK = '#4ade80', C_BAD = '#f87171', C_BUF = '#a78bfa';
                         const _colorWho = (who) => who.replace(/^([^(（]+)[(（]([^)）]+)[)）]?$/, '<b style="color:' + C_NICK + ';">$1</b><span style="color:' + C_ID + ';">($2)</span>');
                         // 🔴 平台标识：app=桌面 / web=网页 / mobile=手机（含手机在线心跳）
-                        const _platLabel = (p) => (p === 'mobile' ? '📱 手机' : (p === 'app' ? '🖥️ 桌面' : '🌐 网页'));
+                        // 🔴 2026-11-24 平台细分：安卓 / 苹果 / PC / 网页（os 缺失时回退按 platform 判断）
+                        const _platLabel = (p, os) => { const _pi = _platInfo(p, os); return _pi.icon + ' ' + _pi.label; };
                         // 🔴 2026-09-10：按用户 TOP / 按 Gist 文件 TOP / 按功能 TOP 均展示全部（原来只取前 10）
                         const uTop = sortBy(perUser), gTop = sortBy(perGist), fTop = sortBy(perFn);
                         const uMax = uTop.length ? uTop[0].v : 1, gMax = gTop.length ? gTop[0].v : 1, fMax = fTop.length ? fTop[0].v : 1;
@@ -32353,6 +32385,7 @@ ${maSection}
                                         who: m.who, anonId: m.anonId, last: m.last,
                                         uploads: p.dayUploads || 0, writes: p.dayWrites || 0, ops: p.dayOps || 0,
                                         plat: p.platform || m.plat || '?',
+                                        os: p.os || m.os || '',
                                         fv: p.appVersion || m.ver || '',
                                         ev: p.appExeVersion || ''
                                     };
@@ -32385,7 +32418,7 @@ ${maSection}
                                         dayHtml += '<td style="text-align:right;padding:3px 6px;color:#fbbf24;font-weight:700;">' + u.uploads + '</td>';
                                         dayHtml += '<td style="text-align:right;padding:3px 6px;color:#f87171;">' + u.writes + '</td>';
                                         dayHtml += '<td style="text-align:right;padding:3px 6px;color:#a78bfa;">' + u.ops + '</td>';
-                                        dayHtml += '<td style="padding:3px 6px;">' + _platLabel(u.plat) + '</td>';
+                                        dayHtml += '<td style="padding:3px 6px;">' + _platLabel(u.plat, u.os) + '</td>';
                                         dayHtml += '<td style="padding:3px 6px;">' + _ev + ' / ' + _fv + '</td>';
                                         dayHtml += '</tr>';
                                     });
@@ -32656,7 +32689,7 @@ ${maSection}
                                 + '<td style="padding:3px 6px;">' + _hb + ' ' + _wk + '</td>'
                                 + '<td style="padding:3px 6px;color:#60a5fa;">' + _fv + '</td>'
                                 + '<td style="padding:3px 6px;color:#a78bfa;">' + _ev + '</td>'
-                                + '<td style="padding:3px 6px;color:#94a3b8;">' + _platLabel(m.plat) + '</td>'
+                                + '<td style="padding:3px 6px;color:#94a3b8;">' + _platLabel(m.plat, m.payload && m.payload.os) + '</td>'
                                 + '<td style="padding:3px 6px;text-align:right;color:#fbbf24;font-weight:700;">' + m.count + '</td>'
                                 + '<td style="padding:3px 6px;text-align:right;color:#7dd3fc;">' + (m.local || 0) + '</td>'
                                 + '<td style="padding:3px 6px;text-align:right;color:#4ade80;font-weight:700;">' + ((m.count || 0) + (m.local || 0)) + '</td>'
@@ -33952,7 +33985,7 @@ ${maSection}
                     const last = p.lastUpload || 0;
                     const online = (now - last) <= ONLINE_MS;
                     const nick = (p.nick && p.nick !== '游客' && !/^device_/.test(p.nick)) ? p.nick : (dev.slice(0, 12));
-                    const plat = p.platform === 'mobile' ? '📱手机' : (p.platform === 'app' ? '🖥️APP' : (p.platform === 'web' ? '🌐网页' : '?'));
+                    const _pi = _platInfo(p.platform, p.os); const plat = _pi.icon + _pi.label;
                     const ver = p.appVersion || '未知';
                     list.push({ dev, nick, ver, plat, last, online });
                 });
@@ -37774,7 +37807,7 @@ ${maSection}
                     const _ts = _olTs(_rec);
                     if (_olAlive(_rec, _onTo2, _now2)) {
                         const _r = (_rec && typeof _rec === 'object') ? _rec : {};
-                        _onlineList.push({ id: _oid, t: _ts, nick: _r.nick || '匿名', src: _r.src || 'web', bg: !!_r.bg });
+                        _onlineList.push({ id: _oid, t: _ts, nick: _r.nick || '匿名', src: _r.src || 'web', bg: !!_r.bg, os: _r.os || '' });
                     }
                 }
             }
@@ -37787,7 +37820,7 @@ ${maSection}
                     const shortId = o.id.length > 16 ? o.id.slice(0, 10) + '…' : o.id;
                     return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.78rem;background:rgba(255,255,255,0.04);border-radius:6px;padding:5px 8px;">
                         <span><span style="color:#4ade80;">●</span> ${escapeHtml(o.nick)} <span style="color:rgba(255,255,255,0.35);font-size:0.7rem;">@${escapeHtml(shortId)}</span></span>
-                        <span style="color:rgba(255,255,255,0.5);">${o.src === 'app' ? '📱' : '🌐'}${o.bg ? '<span style="color:#ffb74d;" title="最小化到托盘后台运行">·托盘</span>' : ''} ${agoStr}</span>
+                        <span style="color:rgba(255,255,255,0.5);"><span title="${_platInfo(o.src, o.os).label}">${_platInfo(o.src, o.os).icon}</span>${o.bg ? '<span style="color:#ffb74d;" title="最小化到托盘后台运行">·托盘</span>' : ''} ${agoStr}</span>
                     </div>`;
                 }).join('') + `</div>`;
             } else {
