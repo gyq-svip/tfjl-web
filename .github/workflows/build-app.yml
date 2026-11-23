@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-14
     timeout-minutes: 60
     steps:
       - name: Checkout code

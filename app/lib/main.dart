@@ -1129,6 +1129,21 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             _showBgPicker,
             trailing: Text(BgSetting.shortLabel,
                 style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2BB3A3)))),
+        // 🎚 背景总开关（不喜欢背景的直接关掉，也不下载视频、不耗流量）
+        Container(margin: const EdgeInsets.fromLTRB(0, 0, 0, 8), padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(color: const Color(0xFF15152A), borderRadius: BorderRadius.circular(12)),
+          child: StatefulBuilder(builder: (ctx, setSheet) => SwitchListTile(
+            value: BgSetting.enabled,
+            activeColor: const Color(0xFF2BB3A3),
+            title: const Text('显示主页背景', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+            subtitle: const Text('关闭后主页不显示任何背景（也不会下载内置视频，省流量）', style: TextStyle(fontSize: 10, color: Colors.white38)),
+            onChanged: (v) async {
+              await BgSetting.setEnabled(v);
+              if (mounted) setState(() {});
+              setSheet(() {});
+            },
+          )),
+        ),
         _settingsRow('✎', '编辑布局', '自由拖动/缩放各模块位置和大小（主页进入编辑态）', () {
           setState(() { navTab = 0; layoutEditing = !layoutEditing; });
         },

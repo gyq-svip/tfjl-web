@@ -6,9 +6,11 @@ import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 
 /// 🖼 主页背景（内置主题视频 / 本地图片 / 本地视频）
-/// 存 prefs：app_bg_type(none/image/video/theme) / app_bg_path / app_bg_theme / app_bg_opacity
+/// 存 prefs：app_bg_enabled / app_bg_type(none/image/video/theme) / app_bg_path / app_bg_theme / app_bg_opacity
 /// 默认（从未设置过）= 内置主题「伽罗」，与 PC 端 bg-themes 清单的 defaultBg(bvid:tmvtdwbxi1imx) 一致
+/// 🔴 内置主题只会下载一次（落到本地 bg/theme_<id>.mp4），之后永远本地播放，不再走流量
 class BgSetting {
+  static const _enabledKey = 'app_bg_enabled';
   static const _typeKey = 'app_bg_type';
   static const _pathKey = 'app_bg_path';
   static const _opacityKey = 'app_bg_opacity';
@@ -36,7 +38,8 @@ class BgSetting {
   /// PC 端清单里的 defaultBg = bvid:tmvtdwbxi1imx（伽罗）
   static const defaultThemeId = 'tmvtdwbxi1imx';
 
-  static String type = 'theme';          // none / image / video / theme
+  static bool enabled = true;             // 总开关（不喜欢背景的可以关）
+  static String type = 'theme';           // none / image / video / theme
   static String path = '';
   static String themeId = defaultThemeId;
   static double opacity = 0.5;
@@ -50,6 +53,7 @@ class BgSetting {
 
   static Future<void> load() async {
     final p = await SharedPreferences.getInstance();
+    enabled = p.getBool(_enabledKey) ?? true;
     final savedType = p.getString(_typeKey);
     path = p.getString(_pathKey) ?? '';
     themeId = p.getString(_themeKey) ?? defaultThemeId;
@@ -66,10 +70,16 @@ class BgSetting {
 
   static Future<void> save() async {
     final p = await SharedPreferences.getInstance();
+    await p.setBool(_enabledKey, enabled);
     await p.setString(_typeKey, type);
     await p.setString(_pathKey, path);
     await p.setString(_themeKey, themeId);
     await p.setDouble(_opacityKey, opacity);
+  }
+
+  static Future<void> setEnabled(bool v) async {
+    enabled = v;
+    await save();
   }
 
   /// 内置主题缓存文件（Documents/bg/theme_<id>.mp4）
@@ -80,15 +90,26 @@ class BgSetting {
     return File('${bgDir.path}/theme_$id.mp4');
   }
 
-  static bool _downloading = false;
-
-  /// 后台下载内置主题视频到本地缓存（下次启动秒开、省流量）。失败静默。
-  static Future<void> ensureThemeCached(String id, String url) async {
-    if (_downloading) return;
+  /// 本地是否已有缓存
+  static Future<bool> isThemeCached(String id) async {
     try {
       final f = await themeCacheFile(id);
-      if (f.existsSync() && f.lengthSync() > 500 * 1024) return;   // 已缓存
-      _downloading = true;
+      return f.existsSync() && f.lengthSync() > 500 * 1024;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static final Set<String> _downloading = {};
+  static void Function(String id, double pct)? onDownloadProgress;
+
+  /// 下载内置主题视频到本地（只下一次）。返回是否成功。已有缓存直接返回 true。
+  static Future<bool> ensureThemeCached(String id, String url) async {
+    try {
+      final f = await themeCacheFile(id);
+      if (f.existsSync() && f.lengthSync() > 500 * 1024) return true;   // 已缓存
+      if (_downloading.contains(id)) return false;                     // 正在下，别并发
+      _downloading.add(id);
       final tmp = File('${f.path}.part');
       final client = http.Client();
       final req = http.Request('GET', Uri.parse(url));
@@ -97,23 +118,35 @@ class BgSetting {
       req.followRedirects = true;
       req.maxRedirects = 6;
       final resp = await client.send(req).timeout(const Duration(seconds: 30));
-      if (resp.statusCode != 200) { client.close(); _downloading = false; return; }
+      if (resp.statusCode != 200) {
+        client.close();
+        _downloading.remove(id);
+        debugPrint('[BgTheme] HTTP ${resp.statusCode}');
+        return false;
+      }
+      final total = resp.contentLength ?? 0;
       final sink = tmp.openSync(mode: FileMode.write);
+      var received = 0;
       await for (final chunk in resp.stream) {
         sink.writeFromSync(chunk);
+        received += chunk.length;
+        if (total > 0) onDownloadProgress?.call(id, received / total);
       }
       sink.flushSync();
       sink.closeSync();
       client.close();
+      _downloading.remove(id);
       if (tmp.lengthSync() > 500 * 1024) {
         if (f.existsSync()) f.deleteSync();
         tmp.renameSync(f.path);
-        debugPrint('[BgTheme] 已缓存 ${f.path} (${(f.lengthSync() / 1048576).toStringAsFixed(1)}MB)');
+        debugPrint('[BgTheme] 缓存完成 ${f.path} (${(f.lengthSync() / 1048576).toStringAsFixed(1)}MB)');
+        return true;
       }
+      return false;
     } catch (e) {
-      debugPrint('[BgTheme] 缓存失败: $e');
-    } finally {
-      _downloading = false;
+      _downloading.remove(id);
+      debugPrint('[BgTheme] 下载失败: $e');
+      return false;
     }
   }
 
@@ -154,6 +187,7 @@ class BgSetting {
 
   /// 设置页显示的一行说明
   static String get summary {
+    if (!enabled) return '已关闭（主页不显示背景）';
     if (type == 'theme') return '内置主题：${themeName(themeId)} · 透明度 ${(opacity * 100).round()}%';
     if (type == 'image') return '图片背景 · 透明度 ${(opacity * 100).round()}%';
     if (type == 'video') return '视频背景 · 透明度 ${(opacity * 100).round()}%';
@@ -161,6 +195,7 @@ class BgSetting {
   }
 
   static String get shortLabel {
+    if (!enabled) return '关';
     if (type == 'theme') return themeName(themeId);
     if (type == 'image') return '图片';
     if (type == 'video') return '视频';
@@ -188,6 +223,8 @@ class BgLayer extends StatefulWidget {
 
 class _BgLayerState extends State<BgLayer> {
   VideoPlayerController? _vc;
+  bool _preparing = false;          // 首次下载/初始化中
+  double _pct = 0;
 
   @override
   void initState() {
@@ -207,26 +244,40 @@ class _BgLayerState extends State<BgLayer> {
 
   Future<void> _init() async {
     try {
+      if (!BgSetting.enabled || widget.type == 'none') return;
       if (widget.type == 'video') {
         if (widget.path.isEmpty) return;
         final f = File(widget.path);
         if (!f.existsSync()) return;
         await _play(VideoPlayerController.file(f));
-      } else if (widget.type == 'theme') {
-        final theme = BgSetting.themeById(widget.themeId);
-        final id = theme['id']!;
-        final url = theme['url']!;
-        final cache = await BgSetting.themeCacheFile(id);
-        if (cache.existsSync() && cache.lengthSync() > 500 * 1024) {
-          await _play(VideoPlayerController.file(cache));   // 本地缓存秒开
-        } else {
-          // 未缓存：先网络流式播放（立即有画面），同时后台下载缓存
-          await _play(VideoPlayerController.networkUrl(Uri.parse(url)));
-          BgSetting.ensureThemeCached(id, url);
-        }
+        return;
+      }
+      if (widget.type != 'theme') return;
+
+      final theme = BgSetting.themeById(widget.themeId);
+      final id = theme['id']!;
+      final url = theme['url']!;
+      final cache = await BgSetting.themeCacheFile(id);
+      // ① 已有本地缓存 → 直接播（永不耗流量）
+      if (cache.existsSync() && cache.lengthSync() > 500 * 1024) {
+        await _play(VideoPlayerController.file(cache));
+        return;
+      }
+      // ② 首次：先下载完再播（只下载一次），期间显示小提示
+      if (mounted) setState(() { _preparing = true; _pct = 0; });
+      BgSetting.onDownloadProgress = (tid, p) {
+        if (tid == id && mounted) setState(() => _pct = p);
+      };
+      final ok = await BgSetting.ensureThemeCached(id, url);
+      BgSetting.onDownloadProgress = null;
+      if (!mounted) return;
+      setState(() => _preparing = false);
+      if (ok && cache.existsSync()) {
+        await _play(VideoPlayerController.file(cache));
       }
     } catch (e) {
       debugPrint('[BgLayer] 初始化失败: $e');
+      if (mounted) setState(() => _preparing = false);
     }
   }
 
@@ -250,7 +301,7 @@ class _BgLayerState extends State<BgLayer> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.type == 'none') return const SizedBox.shrink();
+    if (!BgSetting.enabled || widget.type == 'none') return const SizedBox.shrink();
     Widget child;
     if (widget.type == 'image') {
       if (widget.path.isEmpty) return const SizedBox.shrink();
@@ -258,7 +309,31 @@ class _BgLayerState extends State<BgLayer> {
           errorBuilder: (_, __, ___) => const SizedBox.shrink());
     } else {
       final vc = _vc;
-      if (vc == null || !vc.value.isInitialized) return const SizedBox.shrink();
+      if (vc == null || !vc.value.isInitialized) {
+        // 首次使用正在下载内置视频：右下角小提示（不打扰、不影响点击）
+        if (_preparing) {
+          return IgnorePointer(
+            child: Align(
+              alignment: Alignment.bottomRight,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 10, bottom: 58),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xCC0C0C17),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    _pct > 0 ? '背景下载中 ${(_pct * 100).toStringAsFixed(0)}%' : '背景下载中…',
+                    style: const TextStyle(fontSize: 9.5, color: Color(0xFF8A96AC)),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+        return const SizedBox.shrink();
+      }
       final s = vc.value.size;
       child = ClipRect(
         child: FittedBox(
