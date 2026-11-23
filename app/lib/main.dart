@@ -478,17 +478,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     }
     return Row(children: [
       for (final k in _quickOrder.take(5))
-        Flexible(
-          child: GestureDetector(
-            onTap: () => _runQuick(k),
-            onLongPress: _editQuickActions,
-            child: Container(
-              margin: const EdgeInsets.only(left: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
-              decoration: BoxDecoration(color: Colors.white.withAlpha(28), borderRadius: BorderRadius.circular(6)),
-              child: Text(_quickDefs[k]!.join(''),
-                  style: const TextStyle(fontSize: 9.5, color: Color(0xFFCFD6E6)), overflow: TextOverflow.ellipsis),
-            ),
+        GestureDetector(
+          onTap: () => _runQuick(k),
+          onLongPress: _editQuickActions,
+          child: Container(
+            width: 30, height: 26, margin: const EdgeInsets.only(left: 4), alignment: Alignment.center,
+            decoration: BoxDecoration(color: Colors.white.withAlpha(28), borderRadius: BorderRadius.circular(6)),
+            child: Text(_quickDefs[k]![0], style: const TextStyle(fontSize: 12.5)),
           ),
         ),
       GestureDetector(
