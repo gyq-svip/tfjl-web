@@ -32327,6 +32327,8 @@ ${maSection}
                         // 🔴 2026-08-29 诊断面板统一配色常量（同类参数同色，便于一眼分辨）
                         const C_NICK = '#4ade80', C_ID = '#64748b', C_TIME = '#94a3b8', C_NUM = '#fbbf24', C_FRONTV = '#60a5fa', C_DESKV = '#a78bfa', C_OK = '#4ade80', C_BAD = '#f87171', C_BUF = '#a78bfa';
                         const _colorWho = (who) => who.replace(/^([^(（]+)[(（]([^)）]+)[)）]?$/, '<b style="color:' + C_NICK + ';">$1</b><span style="color:' + C_ID + ';">($2)</span>');
+                        // 🔴 平台标识：app=桌面 / web=网页 / mobile=手机（含手机在线心跳）
+                        const _platLabel = (p) => (p === 'mobile' ? '📱 手机' : (p === 'app' ? '🖥️ 桌面' : '🌐 网页'));
                         // 🔴 2026-09-10：按用户 TOP / 按 Gist 文件 TOP / 按功能 TOP 均展示全部（原来只取前 10）
                         const uTop = sortBy(perUser), gTop = sortBy(perGist), fTop = sortBy(perFn);
                         const uMax = uTop.length ? uTop[0].v : 1, gMax = gTop.length ? gTop[0].v : 1, fMax = fTop.length ? fTop[0].v : 1;
@@ -32383,7 +32385,7 @@ ${maSection}
                                         dayHtml += '<td style="text-align:right;padding:3px 6px;color:#fbbf24;font-weight:700;">' + u.uploads + '</td>';
                                         dayHtml += '<td style="text-align:right;padding:3px 6px;color:#f87171;">' + u.writes + '</td>';
                                         dayHtml += '<td style="text-align:right;padding:3px 6px;color:#a78bfa;">' + u.ops + '</td>';
-                                        dayHtml += '<td style="padding:3px 6px;">' + (u.plat === 'app' ? '🖥️ 桌面' : '🌐 网页') + '</td>';
+                                        dayHtml += '<td style="padding:3px 6px;">' + _platLabel(u.plat) + '</td>';
                                         dayHtml += '<td style="padding:3px 6px;">' + _ev + ' / ' + _fv + '</td>';
                                         dayHtml += '</tr>';
                                     });
@@ -32654,7 +32656,7 @@ ${maSection}
                                 + '<td style="padding:3px 6px;">' + _hb + ' ' + _wk + '</td>'
                                 + '<td style="padding:3px 6px;color:#60a5fa;">' + _fv + '</td>'
                                 + '<td style="padding:3px 6px;color:#a78bfa;">' + _ev + '</td>'
-                                + '<td style="padding:3px 6px;color:#94a3b8;">' + (m.plat || '?') + '</td>'
+                                + '<td style="padding:3px 6px;color:#94a3b8;">' + _platLabel(m.plat) + '</td>'
                                 + '<td style="padding:3px 6px;text-align:right;color:#fbbf24;font-weight:700;">' + m.count + '</td>'
                                 + '<td style="padding:3px 6px;text-align:right;color:#7dd3fc;">' + (m.local || 0) + '</td>'
                                 + '<td style="padding:3px 6px;text-align:right;color:#4ade80;font-weight:700;">' + ((m.count || 0) + (m.local || 0)) + '</td>'
@@ -33254,17 +33256,49 @@ ${maSection}
                         let code = '', tries = 0;
                         do { code = _rand6(); tries++; } while (activeCodes.has(code) && tries < 50);
                         if (activeCodes.has(code)) throw new Error('生成失败，请重试');
-                        // 🔴 管理员可自定义有效期（opts.ttlMs）；个人中心/undefined 仍用默认 30 分钟
-                        let ttl = TTL_MS;
-                        if (o.ttlMs && Number(o.ttlMs) > 0) ttl = Math.min(Number(o.ttlMs), 365 * 86400000); // 上限 365 天
+                        // 🔴 管理员可自定义有效期（opts.expireAt 绝对截止时间戳 优先 > opts.ttlMs 相对时长）；个人中心仍用默认 30 分钟
+                        let ttl = TTL_MS, expireAt = now + ttl;
+                        if (o.ttlMs && Number(o.ttlMs) > 0) { ttl = Math.min(Number(o.ttlMs), 365 * 86400000); expireAt = now + ttl; }
+                        if (o.expireAt && Number(o.expireAt) > now) { expireAt = Number(o.expireAt); ttl = expireAt - now; }
                         const rec = { code, by: by||'匿名', byDev: dev||'', note: String(note||'').slice(0,40),
-                            createdAt: now, expireAt: now + ttl, usedBy:'', usedDev:'', usedAt:0, status:'active' };
+                            createdAt: now, expireAt: expireAt, usedBy:'', usedDev:'', usedAt:0, status:'active' };
                         if (ttl !== TTL_MS) rec.ttlLabel = ttl >= 86400000 ? (Math.round(ttl/86400000) + '天') : (Math.round(ttl/3600000) + '小时');
+                        if (o.batchNo) rec.batchNo = o.batchNo;
                         if (o.personal) rec.personal = true;   // 标记个人生成，用于限额统计
                         if (o.bypassLimit) rec.admin = true;   // 标记管理员生成
                         store.codes.push(rec);
                         _clean(store);
                         return rec;
+                    });
+                },
+                // 🔴 批量生成（管理员专用）：一次生成 count 个码，共享同一 expireAt 截止时间和批次号
+                //    在一次 _mutate 事务内完成，保证原子性（要么全成功要么全失败）
+                generateBatch: function (by, dev, note, count, opts) {
+                    const o = Object.assign({}, opts || {});
+                    const n = Math.max(1, Math.min(50, parseInt(count) || 1)); // 最多 50 个
+                    const batchNo = 'B' + Date.now().toString(36).slice(-6);
+                    o.batchNo = batchNo;
+                    return _mutate(async (store) => {
+                        const now = Date.now();
+                        let ttl = TTL_MS, expireAt = now + ttl;
+                        if (o.ttlMs && Number(o.ttlMs) > 0) { ttl = Math.min(Number(o.ttlMs), 365 * 86400000); expireAt = now + ttl; }
+                        if (o.expireAt && Number(o.expireAt) > now) { expireAt = Number(o.expireAt); ttl = expireAt - now; }
+                        const activeCodes = new Set(store.codes.filter(c => _status(c) === 'active').map(c => c.code));
+                        const recs = [];
+                        for (let i = 0; i < n; i++) {
+                            let code = '', tries = 0;
+                            do { code = _rand6(); tries++; } while ((activeCodes.has(code) || recs.some(r => r.code === code)) && tries < 50);
+                            if (activeCodes.has(code) || recs.some(r => r.code === code)) throw new Error('生成失败，请重试');
+                            activeCodes.add(code);
+                            const rec = { code, by: by||'匿名', byDev: dev||'', note: String(note||'').slice(0,40),
+                                createdAt: now, expireAt: expireAt, usedBy:'', usedDev:'', usedAt:0, status:'active',
+                                batchNo: batchNo, admin: true };
+                            if (ttl !== TTL_MS) rec.ttlLabel = ttl >= 86400000 ? (Math.round(ttl/86400000) + '天') : (Math.round(ttl/3600000) + '小时');
+                            store.codes.push(rec);
+                            recs.push(rec);
+                        }
+                        _clean(store);
+                        return recs;
                     });
                 },
                 // 登录门校验并使用：code=输入码，dev=设备；nick 此时通常为空（先输码进门，设昵称后再回填）
@@ -33909,7 +33943,7 @@ ${maSection}
                     const last = p.lastUpload || 0;
                     const online = (now - last) <= ONLINE_MS;
                     const nick = (p.nick && p.nick !== '游客' && !/^device_/.test(p.nick)) ? p.nick : (dev.slice(0, 12));
-                    const plat = p.platform === 'app' ? 'APP' : (p.platform === 'web' ? '网页' : '?');
+                    const plat = p.platform === 'mobile' ? '📱手机' : (p.platform === 'app' ? '🖥️APP' : (p.platform === 'web' ? '🌐网页' : '?'));
                     const ver = p.appVersion || '未知';
                     list.push({ dev, nick, ver, plat, last, online });
                 });
@@ -36060,47 +36094,56 @@ ${maSection}
         }
         window.adminRenderInvites = adminRenderInvites;
 
+        function adminCopyInvite() {
+            // 显示层可能包含多个码（换行分隔），一并复制
+            const code = (document.getElementById('adminInviteCodeText') || {}).textContent?.trim() || '';
+            if (!code || code === '------') return;
+            try {
+                const ta = document.createElement('textarea'); ta.value = code; ta.style.position = 'fixed'; ta.style.opacity = '0';
+                document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+                const msg = document.getElementById('adminInviteGenMsg'); if (msg) msg.textContent = '✅ 已复制 ' + code.split('\n').length + ' 个邀请码';
+            } catch (e) {}
+        }
+
         async function adminGenerateInvite() {
             if (!window.__invite) { const m = document.getElementById('adminInviteGenMsg'); if (m) m.textContent = '❌ 邀请码功能未就绪'; return; }
             const note = (document.getElementById('adminInviteNote') || {}).value || '';
             const msg = document.getElementById('adminInviteGenMsg');
-            // 有效期：下拉预设 + 自定义天数（input type=number）
-            const ttlSel = (document.getElementById('adminInviteTTL') || {}).value || '1800000';
-            let ttlMs = 1800000, ttlText = '30分钟';
-            if (ttlSel === 'custom') {
-                const days = parseFloat((document.getElementById('adminInviteTTLDays') || {}).value) || 1;
-                ttlMs = days * 86400000;
-                ttlText = days + '天';
+            const count = Math.max(1, Math.min(50, parseInt((document.getElementById('adminInviteCount') || {}).value) || 1));
+            // 截止日期：datetime-local 优先；没填则用下拉的时长
+            const dtVal = (document.getElementById('adminInviteExpireAt') || {}).value || '';
+            let opts = { bypassLimit: true };
+            let expText = '';
+            if (dtVal) {
+                const ts = new Date(dtVal).getTime();
+                if (!(ts > Date.now())) { if (msg) msg.textContent = '❌ 截止时间必须晚于现在'; return; }
+                opts.expireAt = ts;
+                expText = new Date(ts).toLocaleString('zh-CN', { hour12:false });
             } else {
-                ttlMs = Number(ttlSel);
+                const ttlSel = (document.getElementById('adminInviteTTL') || {}).value || '1800000';
+                let ttlMs = 1800000;
+                if (ttlSel === 'custom') ttlMs = (parseFloat((document.getElementById('adminInviteTTLDays') || {}).value) || 1) * 86400000;
+                else ttlMs = Number(ttlSel);
+                opts.ttlMs = ttlMs;
                 const map = { '1800000':'30分钟', '7200000':'2小时', '21600000':'6小时', '86400000':'1天', '259200000':'3天', '604800000':'7天', '2592000000':'30天' };
-                ttlText = map[ttlSel] || Math.round(ttlMs/60000) + '分钟';
+                expText = (map[ttlSel] || Math.round(ttlMs/60000) + '分钟') + '后';
             }
             if (msg) msg.textContent = '生成中…';
             try {
                 const nick = localStorage.getItem('TFJL_UserName') || '管理员';
                 const dev = (typeof getDeviceId === 'function') ? getDeviceId() : '';
-                const rec = await window.__invite.generate(nick, dev, note.trim(), { bypassLimit: true, ttlMs: ttlMs });
-                document.getElementById('adminInviteCodeText').textContent = rec.code;
-                document.getElementById('adminInviteGenResult').style.display = 'block';
-                const exp = new Date(rec.expireAt);
-                if (msg) msg.textContent = '✅ 生成成功（' + ttlText + '有效），到期：' + exp.toLocaleString('zh-CN', { hour12:false });
+                const recs = await window.__invite.generateBatch(nick, dev, note.trim(), count, opts);
+                const codes = recs.map(r => r.code);
+                const display = document.getElementById('adminInviteCodeText');
+                if (display) { display.textContent = codes.join('\n'); display.style.fontSize = codes.length > 6 ? '1.1rem' : '2rem'; display.style.lineHeight = codes.length > 6 ? '1.5' : ''; }
+                const result = document.getElementById('adminInviteGenResult'); if (result) result.style.display = 'block';
+                if (msg) msg.textContent = '✅ 生成 ' + recs.length + ' 个邀请码，截止：' + expText + '（点码可全部复制）';
                 adminLoadInvites();
             } catch (e) {
                 if (msg) msg.textContent = '❌ 生成失败：' + (e && e.message ? e.message : e);
             }
         }
         window.adminGenerateInvite = adminGenerateInvite;
-
-        function adminCopyInvite() {
-            const code = document.getElementById('adminInviteCodeText').textContent.trim();
-            if (!code || code === '------') return;
-            try {
-                const ta = document.createElement('textarea'); ta.value = code; ta.style.position = 'fixed'; ta.style.opacity = '0';
-                document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
-                const msg = document.getElementById('adminInviteGenMsg'); if (msg) msg.textContent = '✅ 已复制 ' + code;
-            } catch (e) {}
-        }
         window.adminCopyInvite = adminCopyInvite;
 
         async function adminRevokeInvite(code) {

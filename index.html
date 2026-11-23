@@ -2724,9 +2724,22 @@
                             管理员可在此生成、查看全部记录（含到期时间）、作废任意码。
                         </div>
                     </div>
-                    <label>生成邀请码（管理员）</label>
+                    <label>生成邀请码（管理员 · 支持批量）</label>
                     <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
-                        <input type="text" id="adminInviteNote" maxlength="40" placeholder="备注：给谁 / 用途（选填）" style="flex:1;min-width:160px;">
+                        <input type="text" id="adminInviteNote" maxlength="40" placeholder="备注：给谁 / 用途（选填）" style="flex:1;min-width:150px;">
+                        <span style="display:flex;align-items:center;gap:4px;">
+                            <span style="color:rgba(255,255,255,0.6);font-size:0.74rem;">数量</span>
+                            <input type="number" id="adminInviteCount" min="1" max="50" value="1" style="width:62px;padding:7px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.4);color:#fff;font-size:0.78rem;outline:none;">
+                            <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;">个(≤50)</span>
+                        </span>
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
+                        <span style="color:rgba(255,255,255,0.7);font-size:0.76rem;">有效期到：</span>
+                        <input type="datetime-local" id="adminInviteExpireAt" style="padding:7px 9px;border-radius:6px;border:1px solid rgba(255,215,0,0.35);background:rgba(0,0,0,0.4);color:#ffd700;font-size:0.78rem;outline:none;">
+                        <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;">留空则用下面时长</span>
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
+                        <span style="color:rgba(255,255,255,0.6);font-size:0.74rem;">或按时长：</span>
                         <select id="adminInviteTTL" onchange="document.getElementById('adminInviteTTLRows').style.display=this.value==='custom'?'flex':'none'" style="padding:7px 9px;border-radius:6px;border:1px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.4);color:#fff;font-size:0.78rem;outline:none;">
                             <option value="1800000">30 分钟（默认）</option>
                             <option value="7200000">2 小时</option>
@@ -2739,11 +2752,11 @@
                         </select>
                         <span id="adminInviteTTLRows" style="display:none;align-items:center;gap:5px;">
                             <input type="number" id="adminInviteTTLDays" min="0.04" max="365" step="0.5" value="7" placeholder="天数" style="width:80px;padding:7px 9px;border-radius:6px;border:1px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.4);color:#fff;font-size:0.78rem;outline:none;">
-                            <span style="color:rgba(255,255,255,0.5);font-size:0.72rem;">天（可填 0.5 等小数）</span>
+                            <span style="color:rgba(255,255,255,0.5);font-size:0.72rem;">天</span>
                         </span>
                     </div>
                     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
-                        <button class="admin-btn" style="background:linear-gradient(135deg,#4fc3f7,#2f80ed);" onclick="adminGenerateInvite()">🎲 生成</button>
+                        <button class="admin-btn" style="background:linear-gradient(135deg,#4fc3f7,#2f80ed);" onclick="adminGenerateInvite()">🎲 批量生成</button>
                         <button class="admin-btn admin-btn-secondary" onclick="adminLoadInvites()">🔄 刷新列表</button>
                     </div>
                     <div id="adminInviteGenMsg" style="color:#ffd700;font-size:0.78rem;min-height:16px;margin-bottom:6px;"></div>
