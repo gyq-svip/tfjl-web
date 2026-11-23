@@ -30,7 +30,9 @@ class DrSystem {
       if (s != null && s.isNotEmpty) {
         final d = jsonDecodeMap(s);
         if (d != null) {
-          _tables = d;
+          // 🔴 存盘格式是 {'tables':{...}}（与网页 serializeDrTables 一致）；直接表字典也兼容
+          final t = (d['tables'] is Map) ? Map<String, dynamic>.from(d['tables'] as Map) : d;
+          _tables = t;
           _ensureDefaults();
           return;
         }
@@ -66,6 +68,13 @@ class DrSystem {
     return jsonEncodeMap({'tables': _tables ?? _defaults()});
   }
 
+  /// 测试专用：重置缓存并重新加载
+  static Future<void> reloadForTest() async {
+    _loaded = false;
+    _tables = null;
+    await load();
+  }
+
   static Map<String, dynamic> _defaults() => {
         for (final n in tableNames)
           n: {'洗炼': <String, double>{}, '小野': 0.0, '酋长': 0.0, '宝库': 0.0},
@@ -88,9 +97,20 @@ class DrSystem {
     return (t[name] as Map<String, dynamic>?) ?? (_defaults()[name] as Map<String, dynamic>);
   }
 
-  static Map<String, double> refineMap(String name) {
-    final r = table(name)['洗炼'];
-    return (r is Map<String, double>) ? r : Map<String, double>.from(r as Map);
+  /// 🔴 返回「真实可变」的洗炼 Map（原来是 copy，setRefine 全写丢）
+  static Map<String, dynamic> refineMap(String name) {
+    final t = table(name);
+    final r = t['洗炼'];
+    if (r is Map<String, dynamic>) return r;
+    final m = Map<String, dynamic>.from(r as Map);
+    t['洗炼'] = m;
+    return m;
+  }
+
+  /// 洗炼取值（num → double，缺失=0）
+  static double refineVal(String tableName, String hero) {
+    final v = refineMap(tableName)[hero];
+    return (num.tryParse('$v') ?? 0).toDouble();
   }
 
   static double specialVal(String name, String key) {
@@ -99,7 +119,7 @@ class DrSystem {
   }
 
   static void setRefine(String tableName, String hero, double? val) {
-    final m = refineMap(tableName);
+    final m = refineMap(tableName);   // 真实可变 map
     if (val == null || val <= 0) {
       m.remove(hero);
     } else {
@@ -117,18 +137,14 @@ class DrSystem {
 
   /// 洗炼 key 匹配：整名 > 融合主卡 > 非分隔符融合最长基础卡匹配（网页 findBaseCardInFusion）
   static String? refineKeyFor(String table, String cardName) {
-    final m = refineMap(table);
     final official = AppData.officialName(cardName);
-    if ((m[official] ?? 0) > 0) return official;
+    if (refineVal(table, official) > 0) return official;
     final f = AppData.I.splitFusion(official);
-    if (f != null) {
-      if ((m[f[0]] ?? 0) > 0) return f[0];
-      // 副卡方向：融合名以副卡开头的情况（火炮火灵 主卡是火炮）splitFusion 已覆盖
-    }
-    // 非分隔符融合回退：所有已设减伤的英雄名里找最长子串匹配（如 火炮射线 → 火炮）
+    if (f != null && refineVal(table, f[0]) > 0) return f[0];
+    // 非分隔符融合回退：已设减伤的英雄名里找最长子串匹配（如 火炮射线 → 火炮）
     String? best;
-    for (final k in m.keys) {
-      if ((m[k] ?? 0) <= 0 || k.contains('精灵')) continue;
+    for (final k in refineMap(table).keys) {
+      if (refineVal(table, k) <= 0 || k.contains('精灵')) continue;
       if (official != k && official.contains(k)) {
         if (best == null || k.length > best.length) best = k;
       }
@@ -149,7 +165,6 @@ class DrSystem {
       bd['chariot'] = bd['chariot']! + cDr;
       bd['total'] = bd['total']! + cDr;
     }
-    final m = refineMap(tableName);
     final seen = <String>{};
     for (final raw in handCards) {
       if (raw is! Map) continue;
@@ -163,7 +178,7 @@ class DrSystem {
       final key = refineKeyFor(tableName, official);
       if (key != null && !seen.contains(key)) {
         seen.add(key);
-        final v = (m[key] ?? 0).toDouble();
+        final v = refineVal(tableName, key);
         if (v > 0) {
           bd['refine'] = bd['refine']! + v;
           bd['total'] = bd['total']! + v;
@@ -395,7 +410,7 @@ class _DrManagePageState extends State<DrManagePage> {
       if (_profFilter != 'all' && _profFilter != 'fav' && p.prof != _profFilter) return false;
       if (q.isNotEmpty) {
         final official = AppData.officialName(p.name);
-        final hasVal = (DrSystem.refineMap(table)[p.name] ?? 0) > 0;
+        final hasVal = DrSystem.refineVal(table, p.name) > 0;
         if (!p.name.contains(q) && !official.contains(q) && !hasVal) return false;
       }
       return true;
@@ -670,5 +685,5 @@ class _DrManagePageState extends State<DrManagePage> {
       _editValueDialog('$sp 特殊技能减伤（$table 表）', DrSystem.specialVal(table, sp), (v) => DrSystem.setSpecial(table, sp, v));
 
   Future<void> _editHero(String h) =>
-      _editValueDialog('$h 洗炼减伤（$table 表）', DrSystem.refineMap(table)[h] ?? 0, (v) => DrSystem.setRefine(table, h, v));
+      _editValueDialog('$h 洗炼减伤（$table 表）', DrSystem.refineVal(table, h), (v) => DrSystem.setRefine(table, h, v));
 }

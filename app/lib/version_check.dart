@@ -24,7 +24,7 @@ class VersionCheck {
   static const _versionUrl = 'https://gyq-svip.github.io/tfjl-web/app-version.json';
 
   /// 拉最新版本信息。失败抛异常（带原因），成功返回版本信息
-  static Future<({String ver, String apkUrl, String ipaUrl, String body})> _fetchLatest() async {
+  static Future<({String ver, String apkUrl, String ipaUrl, String body, String apk2})> _fetchLatest() async {
     final http.Response r;
     try {
       r = await http
@@ -46,6 +46,7 @@ class VersionCheck {
       apkUrl: d['apk']?.toString() ?? '',
       ipaUrl: d['ipa']?.toString() ?? '',
       body: d['body']?.toString() ?? '',
+      apk2: d['apk2']?.toString() ?? '',
     );
   }
 
@@ -63,7 +64,7 @@ class VersionCheck {
 
   /// 设置页手动「检查更新」：无论结果如何都给出明确反馈
   static Future<void> manualCheck(BuildContext context) async {
-    ({String ver, String apkUrl, String ipaUrl, String body})? info;
+    ({String ver, String apkUrl, String ipaUrl, String body, String apk2})? info;
     String? err;
     try {
       info = await _fetchLatest();
@@ -85,7 +86,7 @@ class VersionCheck {
     await _showUpdateDialog(context, info);
   }
 
-  static Future<void> _showUpdateDialog(BuildContext context, ({String ver, String apkUrl, String ipaUrl, String body}) info) async {
+  static Future<void> _showUpdateDialog(BuildContext context, ({String ver, String apkUrl, String ipaUrl, String body, String apk2}) info) async {
     final isIOS = Platform.isIOS;
     await showDialog(
       context: context,
@@ -178,7 +179,7 @@ class VersionCheck {
   }
 
   /// 安卓应用内下载 APK → 拉起系统安装器（含进度弹窗）；失败退浏览器
-  static Future<void> _downloadAndInstall(BuildContext context, ({String ver, String apkUrl, String ipaUrl, String body}) info) async {
+  static Future<void> _downloadAndInstall(BuildContext context, ({String ver, String apkUrl, String ipaUrl, String body, String apk2}) info) async {
     final pct = ValueNotifier<double?>(null);
     var cancelled = false;
     unawaited(showDialog(
@@ -209,30 +210,53 @@ class VersionCheck {
       ),
     ));
     try {
-      final req = http.Request('GET', Uri.parse(info.apkUrl));
-      final resp = await req.send().timeout(const Duration(seconds: 30));
-      if (resp.statusCode != 200) throw Exception('HTTP ${resp.statusCode}');
-      final total = resp.contentLength ?? 0;
-      final f = File('${Directory.systemTemp.path}${Platform.pathSeparator}tfjl-android-v${info.ver}.apk');
-      final sink = f.openSync(mode: FileMode.write);
-      var received = 0;
-      await for (final chunk in resp.stream) {
-        sink.writeFromSync(chunk);
-        received += chunk.length;
-        if (total > 0) pct.value = received / total;
+      // 🔴 加固：带浏览器 UA + 自动跟随重定向（Gitee 302→302→对象存储），多源自动切换，报错带原因
+      final urls = [info.apkUrl, if (info.apk2.isNotEmpty) info.apk2];
+      File? apk;
+      Object? lastErr;
+      for (final url in urls) {
+        if (url.isEmpty) continue;
+        try {
+          final client = http.Client();
+          final req = http.Request('GET', Uri.parse(url));
+          req.headers['User-Agent'] =
+              'Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36';
+          req.followRedirects = true;
+          req.maxRedirects = 6;
+          final resp = await client.send(req).timeout(const Duration(seconds: 30));
+          if (resp.statusCode != 200) throw Exception('HTTP ${resp.statusCode}');
+          final total = resp.contentLength ?? 0;
+          final f = File('${Directory.systemTemp.path}${Platform.pathSeparator}tfjl-android-v${info.ver}.apk');
+          final sink = f.openSync(mode: FileMode.write);
+          var received = 0;
+          await for (final chunk in resp.stream) {
+            sink.writeFromSync(chunk);
+            received += chunk.length;
+            if (total > 0) pct.value = received / total;
+          }
+          sink.flushSync();
+          sink.closeSync();
+          client.close();
+          if (received < 5 * 1024 * 1024) throw Exception('文件过小（$received 字节，可能被拦截）');
+          apk = f;
+          break;
+        } catch (e) {
+          lastErr = e;
+        }
       }
-      sink.flushSync();
-      sink.closeSync();
-      if (cancelled) return;   // 用户取消了下载（文件留缓存，下次覆盖）
-      // 拉起系统安装器
-      final open = await OpenFilex.open(f.path, type: 'application/vnd.android.package-archive');
+      if (cancelled) return;
+      if (apk == null) throw lastErr ?? Exception('下载失败');
+      final open = await OpenFilex.open(apk.path, type: 'application/vnd.android.package-archive');
       if (open.type != ResultType.done && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('安装器打开失败：${open.message}，改用浏览器下载'),
+            duration: const Duration(seconds: 3)));
         launchUrl(Uri.parse(info.apkUrl), mode: LaunchMode.externalApplication);
       }
-    } catch (_) {
+    } catch (e) {
       if (context.mounted && !cancelled) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('应用内下载失败，改用浏览器下载'), duration: Duration(seconds: 2)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('应用内下载失败（$e），改用浏览器下载'), duration: const Duration(seconds: 3)));
         launchUrl(Uri.parse(info.apkUrl), mode: LaunchMode.externalApplication);
       }
     } finally {

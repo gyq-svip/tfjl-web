@@ -19,6 +19,9 @@ import 'mobile_heartbeat.dart';
 import 'version_check.dart';
 import 'backup_transfer.dart';
 import 'dr_system.dart';
+import 'bg_setting.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:file_picker/file_picker.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -107,6 +110,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     _activityCalc.load();   // 活动配置后台加载（缓存秒开）
     _loadQuick();           // 顶栏快捷功能配置
     DrSystem.load();        // 减伤表（洗炼/特殊技能）
+    BgSetting.load().then((_) { if (mounted) setState(() {}); });   // 主页背景
     // 用户昵称（注册制，与网页 TFJL_UserName 同键；老用户旧键兼容兜底）
     final prefs0 = await SharedPreferences.getInstance();
     if (mounted) {
@@ -861,6 +865,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   /// 主页画布（原 build 主体）
   Widget _homeBody() {
     return Stack(children: [
+        // 🖼 背景层（图片/视频，IgnorePointer 不影响点击）
+        Positioned.fill(child: BgLayer(type: BgSetting.type, path: BgSetting.path, opacity: BgSetting.opacity)),
         SafeArea(
         child: Column(children: [
                 buildTopBar(),   // 第一行常驻（标题+快捷chips；关闭自动隐藏时下拉行也在这里）
@@ -1093,6 +1099,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         _settingsRow('🎁', '生成邀请码', '6位一次性邀请码（每天5个，30分钟有效）', _generateInvite),
         // 界面
         _settingsSection('界面'),
+        _settingsRow('🖼', '主页背景（图片 / 视频）',
+            BgSetting.type == 'none'
+                ? '未设置 · 点选本地图片或视频做背景'
+                : (BgSetting.type == 'image' ? '图片背景 · 透明度 ${(BgSetting.opacity * 100).round()}%' : '视频背景 · 透明度 ${(BgSetting.opacity * 100).round()}%'),
+            _showBgPicker,
+            trailing: Text(BgSetting.type == 'none' ? '无' : (BgSetting.type == 'image' ? '图片' : '视频'),
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2BB3A3)))),
         _settingsRow('✎', '编辑布局', '自由拖动/缩放各模块位置和大小（主页进入编辑态）', () {
           setState(() { navTab = 0; layoutEditing = !layoutEditing; });
         },
@@ -1179,6 +1192,99 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           content: Text('✅ 已注册昵称「$nick」'), duration: const Duration(seconds: 2)));
     }
   }
+
+  /// 🖼 背景选择弹窗：图片 / 视频 / 透明度 / 清除
+  void _showBgPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1A2E),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(14))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          Future<void> pick(bool video) async {
+            final picked = await FilePicker.platform.pickFiles(
+              type: FileType.custom,
+              allowedExtensions: video ? ['mp4', 'mov', 'm4v', 'webm'] : ['jpg', 'jpeg', 'png', 'webp', 'gif'],
+            );
+            final p = picked?.files.single.path;
+            if (p == null) return;
+            final ext = p.split('.').last.toLowerCase();
+            final dst = await BgSetting.copyIntoApp(p, ext);
+            if (dst == null) return;
+            BgSetting.type = video ? 'video' : 'image';
+            BgSetting.path = dst;
+            await BgSetting.save();
+            if (mounted) setState(() {});
+            setSheet(() {});
+            if (ctx.mounted) Navigator.pop(ctx);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(video ? '✅ 已设置视频背景' : '✅ 已设置图片背景'),
+                  duration: const Duration(seconds: 2)));
+            }
+          }
+
+          return SafeArea(
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('🖼 主页背景', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))),
+                const SizedBox(height: 4),
+                const Text('选本地图片或视频做主页画布背景（视频静音循环播放）', style: TextStyle(fontSize: 10.5, color: Colors.white38)),
+                const SizedBox(height: 12),
+                Row(children: [
+                  Expanded(child: _bgBtn('🖼 选图片', () => pick(false))),
+                  const SizedBox(width: 8),
+                  Expanded(child: _bgBtn('🎬 选视频', () => pick(true))),
+                ]),
+                const SizedBox(height: 10),
+                Row(children: [
+                  const Text('透明度', style: TextStyle(fontSize: 11, color: Colors.white54)),
+                  Expanded(
+                    child: Slider(
+                      value: BgSetting.opacity.clamp(0.1, 1.0),
+                      min: 0.1, max: 1.0, divisions: 9,
+                      activeColor: const Color(0xFF2BB3A3),
+                      label: '${(BgSetting.opacity * 100).round()}%',
+                      onChanged: (v) async {
+                        BgSetting.opacity = v;
+                        await BgSetting.save();
+                        if (mounted) setState(() {});
+                        setSheet(() {});
+                      },
+                    ),
+                  ),
+                  Text('${(BgSetting.opacity * 100).round()}%', style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                ]),
+                const SizedBox(height: 4),
+                GestureDetector(
+                  onTap: () async {
+                    await BgSetting.clear();
+                    if (mounted) setState(() {});
+                    if (ctx.mounted) Navigator.pop(ctx);
+                  },
+                  child: Container(
+                    width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 9), alignment: Alignment.center,
+                    decoration: BoxDecoration(color: const Color(0x33FF8A80), borderRadius: BorderRadius.circular(8)),
+                    child: const Text('🗑 清除背景', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFFFF8A80))),
+                  ),
+                ),
+              ]),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _bgBtn(String label, VoidCallback onTap) => GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10), alignment: Alignment.center,
+          decoration: BoxDecoration(color: const Color(0xFF2BB3A3), borderRadius: BorderRadius.circular(9)),
+          child: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF07231F))),
+        ),
+      );
 
   /// 🎁 生成邀请码（照搬网页个人中心 generate：30分钟有效/一次性/每天5个）
   Future<void> _generateInvite() async {

@@ -632,7 +632,7 @@ class SettingsSheetState extends State<SettingsSheet> {
   Widget _drSection() {
     final drTable = widget.isMine ? '我的' : '队友';
     final cur = DrSystem.refineKeyFor(drTable, name);
-    final val = cur != null ? (DrSystem.refineMap(drTable)[cur] ?? 0) : 0.0;
+    final val = cur != null ? DrSystem.refineVal(drTable, cur) : 0.0;
     final vTxt = val == val.roundToDouble() ? val.toInt().toString() : val.toStringAsFixed(1);
     return GestureDetector(
       onTap: () async {
