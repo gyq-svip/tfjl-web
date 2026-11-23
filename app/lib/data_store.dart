@@ -357,6 +357,72 @@ class InviteClient {
     }
   }
 
+  /// 登录门校验并使用邀请码（照搬网页 __invite.redeem）
+  /// 成功会标记 used + 记录使用人昵称/设备/时间（后台「邀请码管理」里能看到谁几点用的）
+  static Future<({bool ok, String msg})> redeem({required String code, required String nick}) async {
+    final c = code.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    if (c.length != 6) return (ok: false, msg: '邀请码为 6 位字母数字');
+    try {
+      // ① 找存储 Gist
+      final idxTxt = await GistClient.readFile(GistClient.masterGist, 'room_index.json');
+      String? gid;
+      if (idxTxt != null && idxTxt.isNotEmpty) {
+        try {
+          final idx = jsonDecode(idxTxt);
+          if (idx is Map) gid = idx['inviteGistId']?.toString();
+        } catch (_) {}
+      }
+      if (gid == null || gid.isEmpty) return (ok: false, msg: '邀请码服务未初始化，请联系管理员');
+
+      // ② 读 store
+      final storeTxt = await GistClient.readFile(gid, _invFile);
+      Map<String, dynamic> store = {'codes': []};
+      if (storeTxt != null && storeTxt.isNotEmpty) {
+        try {
+          final o = jsonDecode(storeTxt);
+          if (o is Map && o['codes'] is List) store = Map<String, dynamic>.from(o);
+        } catch (_) {}
+      }
+      final codes = List<Map<String, dynamic>>.from((store['codes'] as List).map((x) => Map<String, dynamic>.from(x as Map)));
+
+      // ③ 找码 + 状态判定（与网页 _status 一致）
+      Map<String, dynamic>? rec;
+      for (final x in codes) {
+        if ((x['code'] ?? '').toString().toUpperCase() == c) { rec = x; break; }
+      }
+      if (rec == null) return (ok: false, msg: '邀请码不存在');
+      final st = _statusOf(rec);
+      if (st == 'used') return (ok: false, msg: '邀请码已被使用');
+      if (st == 'revoked') return (ok: false, msg: '邀请码已作废');
+      if (st == 'expired') {
+        final label = (rec['ttlLabel'] ?? '').toString();
+        return (ok: false, msg: '邀请码已过期${label.isNotEmpty ? '（$label有效）' : '（30分钟有效）'}');
+      }
+
+      // ④ 标记使用（含使用人昵称，管理员后台可见）
+      final now = DateTime.now().millisecondsSinceEpoch;
+      rec['status'] = 'used';
+      rec['usedBy'] = nick;
+      rec['usedDev'] = await deviceTag();
+      rec['usedAt'] = now;
+      store['codes'] = codes;
+      final ok = await GistClient.writeFile(gid, _invFile, jsonEncode(store));
+      if (!ok) return (ok: false, msg: '云端写入失败，请检查网络后重试');
+      return (ok: true, msg: '已通过');
+    } catch (e) {
+      return (ok: false, msg: '校验失败：$e');
+    }
+  }
+
+  /// 与网页 _status 同规则：used/revoked 优先，其次按 expireAt 判过期
+  static String _statusOf(Map rec) {
+    final st = (rec['status'] ?? '').toString();
+    if (st == 'used' || st == 'revoked') return st;
+    final exp = (num.tryParse('${rec['expireAt']}') ?? 0).toInt();
+    if (DateTime.now().millisecondsSinceEpoch > exp) return 'expired';
+    return 'active';
+  }
+
   static String _rand6() {
     final rnd = Random.secure();
     return List.generate(6, (_) => _chars[rnd.nextInt(_chars.length)]).join();

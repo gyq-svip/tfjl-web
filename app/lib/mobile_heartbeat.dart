@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'data_store.dart';
@@ -12,7 +13,7 @@ class MobileHeartbeat {
   static const _deviceKey = 'mobile_device_anonid';
   static const _nickKey = 'mobile_heartbeat_nick';
   static const _lastKey = 'mobile_heartbeat_last';
-  static const appVersion = '1.7.10';
+  static const appVersion = '1.8.0';
 
   Timer? _timer;
   static final MobileHeartbeat I = MobileHeartbeat._();
@@ -26,6 +27,9 @@ class MobileHeartbeat {
   }
 
   void stop() { _timer?.cancel(); _timer = null; }
+
+  /// 门禁注册完昵称后立即补报一次（否则要等下一个 5 分钟心跳才带上昵称）
+  void pokeNow() { _tick(); }
 
   Future<void> _tick() async {
     try {
@@ -51,6 +55,8 @@ class MobileHeartbeat {
         'appVersion': appVersion,
         'appExeVersion': appVersion,
         'platform': 'mobile',
+        // 🔴 2026-11-24 系统标识：后台区分「📱 安卓 / 🍎 苹果 / 🖥️ PC / 🌐 网页」
+        'os': Platform.isIOS ? 'ios' : (Platform.isAndroid ? 'android' : 'other'),
         'day': DateTime.now().toString().substring(0, 10),
         'dayUploads': 1,
         'entries': [],

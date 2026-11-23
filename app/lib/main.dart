@@ -18,6 +18,8 @@ import 'calc_sheet.dart';
 import 'mobile_heartbeat.dart';
 import 'version_check.dart';
 import 'backup_transfer.dart';
+import 'app_gate.dart';
+import 'gate_page.dart';
 import 'dr_system.dart';
 import 'bg_setting.dart';
 import 'package:file_picker/file_picker.dart';
@@ -105,6 +107,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   Future<void> _init() async {
+    // 🚪 门禁优先：新用户先过「昵称（+邀请码）」，老用户直接放行
+    try {
+      final stage = await AppGate.resolve();
+      if (mounted && stage != GateStage.passed) setState(() => _gateStage = stage);
+    } catch (_) {}
     await AppData.I.load();
     await LayoutConfig.I.load();
     _activityCalc.load();   // 活动配置后台加载（缓存秒开）
@@ -144,7 +151,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     await SkinPack.I.ensurePack();
     if (mounted) setState(() => packPct = -1);
     // APP 内版本检测（Gitee 托管安装包，只留最新一版；有新版弹窗引导下载）
-    if (mounted) VersionCheck.check(context);
+    // 门禁通过后才检查更新（否则会盖在门禁页上）
+    if (mounted && _gateStage == GateStage.passed) VersionCheck.check(context);
   }
 
   List<dynamic> handCards(bool isMine) =>
@@ -814,6 +822,22 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   // ------------------------------------------------------- 页面
   @override
   Widget build(BuildContext context) {
+    // 门禁：新用户必须先注册昵称（管理员开了开关还要邀请码），通过后才能用 App
+    if (_gateStage != GateStage.passed) {
+      return GatePage(
+        needInvite: _gateStage == GateStage.needNickAndInvite,
+        onPassed: () async {
+          final nick = await AppGate.savedNick();
+          if (!mounted) return;
+          setState(() {
+            _gateStage = GateStage.passed;
+            _userNick = nick;
+          });
+          if (mounted) VersionCheck.check(context);   // 进门后再提示更新
+          MobileHeartbeat.I.pokeNow();                 // 昵称已注册，立刻补报心跳
+        },
+      );
+    }
     return Scaffold(
       body: loading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF2BB3A3)))
@@ -1067,6 +1091,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   // ------------------------------------------------------- ⚙️ 设置页（底部 TAB）
   String _userNick = '';
+  GateStage _gateStage = GateStage.passed;   // 新用户门禁（needNick / needNickAndInvite 时先显示门禁页）
 
   Widget _settingsPage() {
     return SafeArea(
