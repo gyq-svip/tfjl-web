@@ -16,6 +16,7 @@ import 'script_sheet.dart';
 import 'activity_calc.dart';
 import 'calc_sheet.dart';
 import 'mobile_heartbeat.dart';
+import 'version_check.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -119,6 +120,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     setState(() => loading = false);
     await SkinPack.I.ensurePack();
     if (mounted) setState(() => packPct = -1);
+    // APP 内版本检测（Gitee 托管安装包，只留最新一版；有新版弹窗引导下载）
+    if (mounted) VersionCheck.check(context);
   }
 
   List<dynamic> handCards(bool isMine) =>
