@@ -2719,13 +2719,30 @@
                     <div style="background:rgba(79,195,247,0.1);border-left:3px solid #4fc3f7;border-radius:6px;padding:12px;margin-bottom:15px;">
                         <div style="color:#4fc3f7;font-size:0.85rem;font-weight:500;">💡 说明</div>
                         <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;margin-top:5px;line-height:1.7;">
-                            新用户凭 6 位邀请码进门（替代原共享密码）。<strong style="color:#ffd700;">30 分钟有效 · 一次性</strong>。<br>
-                            老用户已在个人中心自行生成；管理员可在此生成、查看全部记录、作废任意码。
+                            新用户凭 6 位邀请码进门（替代原共享密码）。<strong style="color:#ffd700;">一次性</strong>。<br>
+                            个人中心生成的码 30 分钟有效；<strong style="color:#4fc3f7;">管理员可自定义有效期（最长 365 天）</strong>，方便提前备好几张长期码给半夜进群的人。<br>
+                            管理员可在此生成、查看全部记录（含到期时间）、作废任意码。
                         </div>
                     </div>
                     <label>生成邀请码（管理员）</label>
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
+                        <input type="text" id="adminInviteNote" maxlength="40" placeholder="备注：给谁 / 用途（选填）" style="flex:1;min-width:160px;">
+                        <select id="adminInviteTTL" onchange="document.getElementById('adminInviteTTLRows').style.display=this.value==='custom'?'flex':'none'" style="padding:7px 9px;border-radius:6px;border:1px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.4);color:#fff;font-size:0.78rem;outline:none;">
+                            <option value="1800000">30 分钟（默认）</option>
+                            <option value="7200000">2 小时</option>
+                            <option value="21600000">6 小时</option>
+                            <option value="86400000">1 天</option>
+                            <option value="259200000">3 天</option>
+                            <option value="604800000">7 天</option>
+                            <option value="2592000000">30 天</option>
+                            <option value="custom">自定义天数…</option>
+                        </select>
+                        <span id="adminInviteTTLRows" style="display:none;align-items:center;gap:5px;">
+                            <input type="number" id="adminInviteTTLDays" min="0.04" max="365" step="0.5" value="7" placeholder="天数" style="width:80px;padding:7px 9px;border-radius:6px;border:1px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.4);color:#fff;font-size:0.78rem;outline:none;">
+                            <span style="color:rgba(255,255,255,0.5);font-size:0.72rem;">天（可填 0.5 等小数）</span>
+                        </span>
+                    </div>
                     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
-                        <input type="text" id="adminInviteNote" maxlength="40" placeholder="备注：给谁 / 用途（选填）" style="flex:1;min-width:180px;">
                         <button class="admin-btn" style="background:linear-gradient(135deg,#4fc3f7,#2f80ed);" onclick="adminGenerateInvite()">🎲 生成</button>
                         <button class="admin-btn admin-btn-secondary" onclick="adminLoadInvites()">🔄 刷新列表</button>
                     </div>

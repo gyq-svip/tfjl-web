@@ -33222,7 +33222,12 @@ ${maSection}
             }
             function _clean(store) {
                 const cutoff = Date.now() - KEEP_DAYS * 86400000;
-                store.codes = store.codes.filter(c => Number(c.createdAt) > cutoff).slice(-500);
+                // 🔴 长期码（管理员自定义到期）不能被 7 天清理误删：只要还没过期就保留
+                store.codes = store.codes.filter(c => {
+                    const expired = Date.now() > (Number(c.expireAt) || 0);
+                    if (!expired) return true;                       // 未过期（含长期码）一律保留
+                    return Number(c.createdAt) > cutoff;             // 已过期的按 7 天清理
+                }).slice(-500);
             }
             const api = {
                 // 生成：by=生成人昵称，dev=生成人设备，note=备注（给谁）
@@ -33249,9 +33254,14 @@ ${maSection}
                         let code = '', tries = 0;
                         do { code = _rand6(); tries++; } while (activeCodes.has(code) && tries < 50);
                         if (activeCodes.has(code)) throw new Error('生成失败，请重试');
+                        // 🔴 管理员可自定义有效期（opts.ttlMs）；个人中心/undefined 仍用默认 30 分钟
+                        let ttl = TTL_MS;
+                        if (o.ttlMs && Number(o.ttlMs) > 0) ttl = Math.min(Number(o.ttlMs), 365 * 86400000); // 上限 365 天
                         const rec = { code, by: by||'匿名', byDev: dev||'', note: String(note||'').slice(0,40),
-                            createdAt: now, expireAt: now + TTL_MS, usedBy:'', usedDev:'', usedAt:0, status:'active' };
+                            createdAt: now, expireAt: now + ttl, usedBy:'', usedDev:'', usedAt:0, status:'active' };
+                        if (ttl !== TTL_MS) rec.ttlLabel = ttl >= 86400000 ? (Math.round(ttl/86400000) + '天') : (Math.round(ttl/3600000) + '小时');
                         if (o.personal) rec.personal = true;   // 标记个人生成，用于限额统计
+                        if (o.bypassLimit) rec.admin = true;   // 标记管理员生成
                         store.codes.push(rec);
                         _clean(store);
                         return rec;
@@ -33267,7 +33277,10 @@ ${maSection}
                         const st = _status(rec);
                         if (st === 'used') return { ok:false, msg:'邀请码已被使用' };
                         if (st === 'revoked') return { ok:false, msg:'邀请码已作废' };
-                        if (st === 'expired') return { ok:false, msg:'邀请码已过期（30分钟有效）' };
+                        if (st === 'expired') {
+                            const tl = rec.ttlLabel || '30分钟';
+                            return { ok:false, msg:'邀请码已过期（' + tl + '有效）' };
+                        }
                         rec.status = 'used'; rec.usedBy = ''; rec.usedDev = dev||''; rec.usedAt = Date.now();
                         return { ok:true, code: code };
                     });
@@ -36036,7 +36049,9 @@ ${maSection}
                     + '</div>'
                     + '<div style="color:rgba(255,255,255,0.6);font-size:0.71rem;line-height:1.7;">'
                     + '生成人：<b style="color:#fff;">' + esc(c.by || '匿名') + '</b> · ' + fmt(c.createdAt) + '<br>'
-                    + '使用人：<b style="color:' + (c.usedBy ? '#7CFC9B' : 'rgba(255,255,255,0.45)') + ';">' + (c.usedBy ? esc(c.usedBy) : '—') + '</b>'
+                    + '到期：<b style="color:' + (st === 'active' ? '#ffd700' : 'rgba(255,255,255,0.45)') + ';">' + fmt(c.expireAt) + '</b>'
+                    + (c.ttlLabel ? '（' + esc(c.ttlLabel) + '）' : '')
+                    + '<br>使用人：<b style="color:' + (c.usedBy ? '#7CFC9B' : 'rgba(255,255,255,0.45)') + ';">' + (c.usedBy ? esc(c.usedBy) : '—') + '</b>'
                     + (c.usedAt ? ' · ' + fmt(c.usedAt) : '')
                     + '</div>'
                     + '</div>';
@@ -36049,14 +36064,27 @@ ${maSection}
             if (!window.__invite) { const m = document.getElementById('adminInviteGenMsg'); if (m) m.textContent = '❌ 邀请码功能未就绪'; return; }
             const note = (document.getElementById('adminInviteNote') || {}).value || '';
             const msg = document.getElementById('adminInviteGenMsg');
+            // 有效期：下拉预设 + 自定义天数（input type=number）
+            const ttlSel = (document.getElementById('adminInviteTTL') || {}).value || '1800000';
+            let ttlMs = 1800000, ttlText = '30分钟';
+            if (ttlSel === 'custom') {
+                const days = parseFloat((document.getElementById('adminInviteTTLDays') || {}).value) || 1;
+                ttlMs = days * 86400000;
+                ttlText = days + '天';
+            } else {
+                ttlMs = Number(ttlSel);
+                const map = { '1800000':'30分钟', '7200000':'2小时', '21600000':'6小时', '86400000':'1天', '259200000':'3天', '604800000':'7天', '2592000000':'30天' };
+                ttlText = map[ttlSel] || Math.round(ttlMs/60000) + '分钟';
+            }
             if (msg) msg.textContent = '生成中…';
             try {
                 const nick = localStorage.getItem('TFJL_UserName') || '管理员';
                 const dev = (typeof getDeviceId === 'function') ? getDeviceId() : '';
-                const rec = await window.__invite.generate(nick, dev, note.trim(), { bypassLimit: true });
+                const rec = await window.__invite.generate(nick, dev, note.trim(), { bypassLimit: true, ttlMs: ttlMs });
                 document.getElementById('adminInviteCodeText').textContent = rec.code;
                 document.getElementById('adminInviteGenResult').style.display = 'block';
-                if (msg) msg.textContent = '✅ 生成成功，有效期至 ' + new Date(rec.expireAt).toLocaleTimeString('zh-CN', { hour12:false });
+                const exp = new Date(rec.expireAt);
+                if (msg) msg.textContent = '✅ 生成成功（' + ttlText + '有效），到期：' + exp.toLocaleString('zh-CN', { hour12:false });
                 adminLoadInvites();
             } catch (e) {
                 if (msg) msg.textContent = '❌ 生成失败：' + (e && e.message ? e.message : e);
