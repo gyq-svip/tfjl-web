@@ -32919,6 +32919,15 @@ ${maSection}
         // remote: 存索引 Gist room_index.json 的字段（全网生效）；local: 存 localStorage（本机生效）
         const FEATURE_TOGGLES = [
             {
+                key: 'appInviteGate',
+                label: '📱 APP 需邀请码',
+                desc: '【APP 门禁】开启：手机 APP 新用户首次使用必须输入有效邀请码（一次性、6位）才能进入，老用户（本地已有昵称）不受影响；关闭：任何人下载装上即用，不限制邀请码。注意：无论开关如何，APP 新用户都必须注册昵称后才能使用（与网页账号一致）。修改后新用户下次启动 APP 生效。',
+                scope: 'remote',
+                remoteField: 'appInviteGate',
+                default: false,
+                apply: (v) => { /* APP 启动时读 room_index.json 的 appInviteGate，网页侧无需额外处理 */ }
+            },
+            {
                 key: 'loginPunch',
                 label: '登录打卡',
                 desc: '开启：每次登录/打开都打卡；关闭：当天每用户仅打卡一次（减少 gist 写频率）',
