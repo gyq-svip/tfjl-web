@@ -1,8 +1,8 @@
 {
-  "version": "1.7.10",
-  "apk": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-app-store/releases/download/app-v1/tfjl-android-v1.7.10.apk",
-  "ipa": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-app-store/releases/download/app-v1/tfjl-ios-v1.7.10.ipa",
-  "body": "修复应用内更新无法安装（安卓补安装权限，下载后直接弹安装器）；减伤计算修复（洗炼/特殊技能不再丢）；主页支持图片/视频背景；图库精选秒开",
-  "updated": "2026-11-24 11:10",
-  "apk2": "https://raw.githubusercontent.com/gyq-svip/tfjl-web/releases/tfjl-android-v1.7.10.apk"
+  "version": "1.8.0",
+  "apk": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-app-store/releases/download/app-v1/tfjl-android-v1.8.0.apk",
+  "ipa": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-app-store/releases/download/app-v1/tfjl-ios-v1.8.0.ipa",
+  "body": "新增使用门禁：新用户必须注册昵称；管理员可在网页「功能开关」开启「APP 需邀请码」，开启后新用户还要输入邀请码。心跳平台区分安卓/苹果。修复应用内更新无法安装、减伤计算、主页背景",
+  "updated": "2026-11-24 01:10",
+  "apk2": "https://raw.githubusercontent.com/gyq-svip/tfjl-web/releases/tfjl-android-v1.8.0.apk"
 }
