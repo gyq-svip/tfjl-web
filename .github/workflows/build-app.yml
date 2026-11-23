@@ -66,17 +66,21 @@ jobs:
           path: app/tfjl-assistant-ios-unsigned.ipa
 
       - name: Publish to releases branch (direct links)
-        working-directory: app
+        # 🔴 修复：必须在仓库根执行。原版 working-directory: app 导致
+        #   1) flutter build 改了 ios 工程文件 → `git checkout releases` 被本地改动卡住 →
+        #      落到 orphan，继承整个 main 的 index；
+        #   2) `git rm -rf .` 只清了 app/ 子目录 → releases 分支被塞进全站 1727 个文件。
+        #   现改为根目录 -f 强切 + 根目录全量清空，releases 分支只留 README + 两个安装包。
         run: |
           git config user.name "ci-bot"
           git config user.email "ci@tfjl.local"
           git fetch origin releases || true
-          git checkout releases 2>/dev/null || git checkout --orphan releases
-          git rm -rf . 2>/dev/null || true
-          mv build/app/outputs/flutter-apk/app-release.apk tfjl-android-v${{ steps.ver.outputs.version }}.apk
-          mv tfjl-assistant-ios-unsigned.ipa tfjl-ios-v${{ steps.ver.outputs.version }}.ipa
+          git checkout -f releases 2>/dev/null || git checkout -f --orphan releases
+          git rm -rf --ignore-unmatch . || true
+          mv app/build/app/outputs/flutter-apk/app-release.apk tfjl-android-v${{ steps.ver.outputs.version }}.apk
+          mv app/tfjl-assistant-ios-unsigned.ipa tfjl-ios-v${{ steps.ver.outputs.version }}.ipa
           DATE=$(date '+%Y-%m-%d %H:%M')
-          printf '# APP 安装包\n\n- 更新时间: %s\n- tfjl-android.apk —— 安卓直接安装\n- tfjl-ios-unsigned.ipa —— iPhone 用爱思助手/AltStore 自签安装\n' "$DATE" > README.md
+          printf '# APP 安装包\n\n- 更新时间: %s\n- tfjl-android-v*.apk —— 安卓直接安装\n- tfjl-ios-v*.ipa —— iPhone 用爱思助手/AltStore 自签安装\n' "$DATE" > README.md
           git add -f tfjl-android-v*.apk tfjl-ios-v*.ipa README.md
           git commit -m "packages $DATE" || true
           git push origin releases --force

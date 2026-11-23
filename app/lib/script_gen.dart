@@ -8,8 +8,10 @@ class ScriptGen {
   ];
   // 老马工程卡短名（脚本识别用）
   static const gongChengNames = ['火炮', '咬人娃娃', '潜艇', '宝库', '射线'];
-  // 蛇女加速优先级（火灵>虎弓>风灵>冰鸟>后羿>天使>水灵）
+  // 蛇女加速优先级（火灵>虎弓>风灵>冰鸟>后羿>天使>水灵）—— 活动脚本用（不含小野）
   static const sheNvPriority = ['火灵', '虎弓', '风灵', '冰鸟', '后羿', '天使', '水灵'];
+  // 隐藏榜蛇女加速优先级（parseHiddenScript 2026-09-09：冰鸟插在风灵后、后羿前，小野参与）
+  static const sheNvPriorityHidden = ['火灵', '虎弓', '风灵', '冰鸟', '后羿', '小野', '天使', '水灵'];
 
   /// 官方4字工程卡 → 老马短名（生成脚本输出时用）
   static String toLaoMa(String s) {
@@ -75,6 +77,18 @@ class ScriptGen {
       ...heroNames.where((n) => !_containsAny(n, jingLingNames)),
       ...heroNames.where((n) => _containsAny(n, jingLingNames)),
     ];
+    if (isHidden) {
+      // 🔴 隐藏榜专用重排（照搬网页 parseHiddenScript 2026-09-08 规则）：
+      //   小野/凤凰是「到时间替换上去」的无敌链卡（只在关键时间点扛一次攻击），不是开局上阵卡。
+      //   顺序 = ①其他卡（非精灵非小野非凤凰）→ ②小野 → ③凤凰 → ④精灵（精灵仍最后）。
+      //   效果：其他卡够 6 张时小野/凤凰自然落不到上阵位（开局先不上）；不够时小野优先、凤凰其次补位。
+      heroNames = [
+        ...heroNames.where((n) => !_containsAny(n, jingLingNames) && !n.contains('小野') && !n.contains('凤凰')),
+        ...heroNames.where((n) => n.contains('小野')),
+        ...heroNames.where((n) => n.contains('凤凰')),
+        ...heroNames.where((n) => _containsAny(n, jingLingNames)),
+      ];
+    }
     if (zhenZhanLine.isNotEmpty) zhenZhanLine = '上阵：${heroNames.join(',')}';
 
     final hasGongCheng = heroNames.any((n) => _containsAny(n, gongChengNames));
@@ -116,7 +130,9 @@ class ScriptGen {
     bool isMoHua(String name) => moHuaCards.any((mh) => name.contains(mh) || mh.contains(name));
 
     // 蛇女加速优先级：top2 放 4-5 位，蛇女固定第 6 位
-    final priorityCards = sheNvPriority.where((p) => filteredCards.any((n) => n.contains(p)))
+    //   隐藏榜表含小野（parseHiddenScript）；活动表不含小野（buildScriptBase）
+    final priorityList = isHidden ? sheNvPriorityHidden : sheNvPriority;
+    final priorityCards = priorityList.where((p) => filteredCards.any((n) => n.contains(p)))
         .map((p) => filteredCards.firstWhere((n) => n.contains(p))).toList();
     final sheNvCards = filteredCards.where((n) => n.contains('蛇女')).toList();
     List<String> arranged;
@@ -130,6 +146,15 @@ class ScriptGen {
       arranged.addAll(sheNvCards);
     } else {
       arranged = List.from(first6);
+    }
+    if (isHidden) {
+      // 🔴 照搬网页：小野/凤凰垫到上阵末尾（小野在凤凰前）。
+      //   卡不足 6 张时它们补位上阵但要排最后，保证切卡行的「下{第一张卡}」永远是普通卡。
+      arranged = [
+        ...arranged.where((n) => !n.contains('小野') && !n.contains('凤凰')),
+        ...arranged.where((n) => n.contains('小野')),
+        ...arranged.where((n) => n.contains('凤凰')),
+      ];
     }
 
     final shangKa = StringBuffer();
