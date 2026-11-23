@@ -19,12 +19,19 @@ class VersionCheck {
   static final _assetRe =
       RegExp(r'^tfjl-(android|ios)-v(\d+\.\d+\.\d+)\.(apk|ipa)$');
 
-  /// 拉最新版本信息。返回 null = 检查失败/已是最新
-  static Future<({String ver, String apkUrl, String ipaUrl, String body})?> _fetchLatest() async {
-    final r = await http
-        .get(Uri.parse(_releaseApi))
-        .timeout(const Duration(seconds: 12));
-    if (r.statusCode != 200) return null;
+  /// 拉最新版本信息。失败抛异常（带原因），成功返回版本信息
+  static Future<({String ver, String apkUrl, String ipaUrl, String body})> _fetchLatest() async {
+    final http.Response r;
+    try {
+      r = await http
+          .get(Uri.parse(_releaseApi), headers: {'User-Agent': 'TFJL-App'})
+          .timeout(const Duration(seconds: 12));
+    } catch (e) {
+      throw Exception('网络异常（$e）');
+    }
+    if (r.statusCode != 200) {
+      throw Exception('Gitee 返回 HTTP ${r.statusCode}');
+    }
     final rel = jsonDecode(r.body) as Map<String, dynamic>;
     final assets = (rel['assets'] as List?) ?? const [];
     String? ver, apkUrl, ipaUrl;
@@ -36,7 +43,9 @@ class VersionCheck {
       if (m.group(1) == 'android') { ver = m.group(2); apkUrl = url; }
       if (m.group(1) == 'ios') ipaUrl = url;
     }
-    if (ver == null) return null;
+    if (ver == null) {
+      throw Exception('发行版里没有安卓安装包（附件名不匹配）');
+    }
     return (ver: ver, apkUrl: apkUrl ?? '', ipaUrl: ipaUrl ?? '', body: (rel['body'] ?? '').toString().trim());
   }
 
@@ -44,7 +53,6 @@ class VersionCheck {
   static Future<void> check(BuildContext context) async {
     try {
       final info = await _fetchLatest();
-      if (info == null) return;
       if (_cmp(info.ver, AppData.appVersion) <= 0) return;
       if (!context.mounted) return;
       await _showUpdateDialog(context, info);
@@ -53,29 +61,28 @@ class VersionCheck {
     }
   }
 
-  /// 设置页手动「检查更新」：无论是否有新版都给结果反馈
+  /// 设置页手动「检查更新」：无论结果如何都给出明确反馈
   static Future<void> manualCheck(BuildContext context) async {
+    ({String ver, String apkUrl, String ipaUrl, String body})? info;
+    String? err;
     try {
-      final info = await _fetchLatest();
-      if (!context.mounted) return;
-      if (info == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('检查失败：网络不通或稍后再试'), duration: Duration(seconds: 2)));
-        return;
-      }
-      final c = _cmp(info.ver, AppData.appVersion);
-      if (c <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('✅ 已是最新版本 v${AppData.appVersion}'), duration: const Duration(seconds: 2)));
-        return;
-      }
-      await _showUpdateDialog(context, info);
-    } catch (_) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('检查失败：网络异常'), duration: Duration(seconds: 2)));
-      }
+      info = await _fetchLatest();
+    } catch (e) {
+      err = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
     }
+    if (!context.mounted) return;
+    if (err != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('❌ 检查失败：$err'), duration: const Duration(seconds: 3)));
+      return;
+    }
+    final c = _cmp(info!.ver, AppData.appVersion);
+    if (c <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('✅ 已是最新版本 v${AppData.appVersion}'), duration: const Duration(seconds: 2)));
+      return;
+    }
+    await _showUpdateDialog(context, info);
   }
 
   static Future<void> _showUpdateDialog(BuildContext context, ({String ver, String apkUrl, String ipaUrl, String body}) info) async {
