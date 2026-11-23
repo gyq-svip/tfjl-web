@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
@@ -271,6 +272,109 @@ class ProjectLibrary {
     lib.add({'name': name, 'category': category, 'project': project});
     await save(lib);
   }
+}
+
+/// 🎁 邀请码生成（照搬网页 app-core.js 个人中心 generate：独立私有 Gist invitecodes.json）
+/// 主索引 room_index.json 的 inviteGistId 字段指向存储 Gist。
+class InviteClient {
+  static const _invFile = 'invitecodes.json';
+  static const _chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  static const _ttlMs = 30 * 60 * 1000;          // 30 分钟有效
+  static const _genLimitPerDay = 5;              // 个人每天最多 5 个
+  static const _genMinInterval = 30 * 1000;      // 两次生成最少间隔 30 秒
+
+  /// 生成一个邀请码；成功返回 'OK:码'，失败返回错误文案
+  static Future<String> generate({required String nick}) async {
+    try {
+      // ① 找存储 Gist：room_index.json 顶层 inviteGistId
+      final idxTxt = await GistClient.readFile(GistClient.masterGist, 'room_index.json');
+      String? gid;
+      if (idxTxt != null && idxTxt.isNotEmpty) {
+        try {
+          final idx = jsonDecode(idxTxt);
+          if (idx is Map) gid = idx['inviteGistId']?.toString();
+        } catch (_) {}
+      }
+      if (gid == null || gid.isEmpty) return '邀请码存储未初始化（网页端先在个人中心生成过一次才会创建）';
+
+      // ② 读最新 store
+      final storeTxt = await GistClient.readFile(gid, _invFile);
+      Map<String, dynamic> store = {'codes': []};
+      if (storeTxt != null && storeTxt.isNotEmpty) {
+        try {
+          final o = jsonDecode(storeTxt);
+          if (o is Map && o['codes'] is List) store = Map<String, dynamic>.from(o);
+        } catch (_) {}
+      }
+      final codes = List<Map<String, dynamic>>.from((store['codes'] as List).map((c) => Map<String, dynamic>.from(c as Map)));
+
+      // ③ 个人限额：本机当天 personal 码 ≤5，间隔 ≥30s
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final dev = await deviceTag();
+      final dayStart = DateTime(now);
+      final dayMs = DateTime(dayStart.year, dayStart.month, dayStart.day).millisecondsSinceEpoch;
+      int tsOf(Map c) => (num.tryParse('${c['createdAt']}') ?? 0).toInt();
+      final mineToday = codes.where((c) => c['personal'] == true && c['byDev'] == dev && tsOf(c) >= dayMs).toList();
+      if (mineToday.length >= _genLimitPerDay) {
+        return '今天最多生成 $_genLimitPerDay 个邀请码，请明天再试';
+      }
+      final lastAt = mineToday.fold<int>(0, (mx, c) => tsOf(c) > mx ? tsOf(c) : mx);
+      if (lastAt > 0 && now - lastAt < _genMinInterval) {
+        return '生成太频繁，请 ${((_genMinInterval - (now - lastAt)) / 1000).ceil()} 秒后再试';
+      }
+
+      // ④ 随机 6 位（去易混淆字符），不与已有码重复
+      final active = codes.map<String>((c) => (c['code'] ?? '').toString()).toSet();
+      String code = '';
+      for (var t = 0; t < 50; t++) {
+        code = _rand6();
+        if (!active.contains(code)) break;
+      }
+
+      // ⑤ 落盘（web 同款字段）
+      final rec = <String, dynamic>{
+        'code': code,
+        'by': nick,
+        'byDev': dev,
+        'note': '',
+        'createdAt': now,
+        'expireAt': now + _ttlMs,
+        'usedBy': '', 'usedDev': '', 'usedAt': 0,
+        'status': 'active',
+        'personal': true,
+      };
+      // 过期 7 天清理（未过期一律保留，含长期码）
+      final cutoff = now - 7 * 86400000;
+      codes.removeWhere((c) => now > ((num.tryParse('${c['expireAt']}') ?? 0).toInt()) && tsOf(c) < cutoff);
+      codes.add(rec);
+      while (codes.length > 500) { codes.removeAt(0); }
+      store['codes'] = codes;
+      final ok = await GistClient.writeFile(gid, _invFile, jsonEncode(store));
+      if (!ok) return '写入云端失败（token 失效或网络不通）';
+      return 'OK:$code';
+    } catch (e) {
+      return '生成失败：$e';
+    }
+  }
+
+  static String _rand6() {
+    final rnd = Random.secure();
+    return List.generate(6, (_) => _chars[rnd.nextInt(_chars.length)]).join();
+  }
+
+  /// 本机设备标识（限额统计用，存 prefs）
+  static Future<String> deviceTag() async {
+    if (_deviceTagSync != null) return _deviceTagSync!;
+    final prefs = await SharedPreferences.getInstance();
+    var t = prefs.getString('device_tag');
+    if (t == null || t.isEmpty) {
+      t = _rand6() + _rand6();
+      await prefs.setString('device_tag', t);
+    }
+    _deviceTagSync = t;
+    return t;
+  }
+  static String? _deviceTagSync;
 }
 
 /// 云端共享（Gist）——读走匿名（主索引实测匿名可读），写才需要 token

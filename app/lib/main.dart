@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'models.dart';
@@ -102,6 +103,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     await AppData.I.load();
     await LayoutConfig.I.load();
     _activityCalc.load();   // 活动配置后台加载（缓存秒开）
+    _loadQuick();           // 顶栏快捷功能配置
+    // 用户昵称（个人中心 + 心跳共用）
+    final prefs0 = await SharedPreferences.getInstance();
+    if (mounted) setState(() => _userNick = prefs0.getString('mobile_heartbeat_nick') ?? '');
     MobileHeartbeat.I.start();   // 手机在线心跳（后台，成功后管理员面板显示📱）
     SkinPack.I.onProgress = (p, s) {
       if (!SkinPack.I.ready && mounted) setState(() { packPct = p; loadStage = s; });
@@ -294,7 +299,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         child: Column(children: [
           Row(children: [
             const Text('🛡 塔防助手', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.white)),
-            const Spacer(),
             // 当前项目名（收起时也能看到选了哪个）
             if (topBarAutoHide && !topBarExpanded)
               Padding(
@@ -312,14 +316,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   child: Icon(Icons.expand_more, size: 18, color: Color(0xFF2BB3A3)),
                 ),
               ),
-            GestureDetector(
-              onTap: () => setState(() => navTab = 1),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(color: const Color(0xFFFFB300), borderRadius: BorderRadius.circular(7)),
-                child: const Text('☰ 工具', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF07231F))),
+            const Spacer(),
+            // 可编辑快捷功能 chips（长按任意 chip 打开显隐编辑）
+            if (!(topBarAutoHide && !topBarExpanded))
+              Expanded(
+                child: _quickActionsRow(),
               ),
-            ),
           ]),
           if (showSelectors) ...[
             const SizedBox(height: 3),
@@ -370,6 +372,131 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   /// 选完项目后自动收起顶栏（仅自动隐藏开启时）
   void _maybeCollapseTopBar() {
     if (topBarAutoHide && mounted) setState(() => topBarExpanded = false);
+  }
+
+  // ------------------------------------------------------- 顶栏快捷功能（可编辑）
+  static const _quickDefs = <String, List<String>>{
+    'notepad': ['📝', '记事本'],
+    'library': ['📚', '阵容图库'],
+    'script': ['📜', '脚本'],
+    'calc': ['🧮', '计算器'],
+    'pool': ['🎴', '卡池'],
+    'netcheck': ['🌐', '自检'],
+    'layout': ['✎', '布局'],
+  };
+  static const _quickDefaults = ['notepad', 'library', 'script'];
+  List<String> _quickOrder = [];
+
+  Future<void> _loadQuick() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getStringList('quick_actions') ?? _quickDefaults;
+    // 过滤掉定义里已不存在的 key
+    _quickOrder = saved.where((k) => _quickDefs.containsKey(k)).toList();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _saveQuick() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('quick_actions', _quickOrder);
+  }
+
+  void _runQuick(String key) {
+    switch (key) {
+      case 'notepad': setState(() => notepadOverlayOpen = true);
+      case 'library': Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryPage()));
+      case 'script': setState(() => scriptOverlayOpen = true);
+      case 'calc': setState(() => calcOverlayOpen = true);
+      case 'pool': setState(() => poolOverlayOpen = true);
+      case 'netcheck': _showNetCheck();
+      case 'layout': setState(() => layoutEditing = !layoutEditing);
+    }
+  }
+
+  /// 长按/编辑：勾选要显示的快捷功能
+  void _editQuickActions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1A2E),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(14))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => SafeArea(
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('⚙️ 编辑快捷功能', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))),
+              const SizedBox(height: 4),
+              const Text('勾选显示在顶栏，按住拖动排序暂不支持，最多 5 个',
+                  style: TextStyle(fontSize: 10, color: Colors.white38)),
+              const SizedBox(height: 8),
+              Wrap(spacing: 7, runSpacing: 7, children: [
+                for (final e in _quickDefs.entries)
+                  GestureDetector(
+                    onTap: () {
+                      setSheet(() {
+                        if (_quickOrder.contains(e.key)) {
+                          _quickOrder.remove(e.key);
+                        } else {
+                          if (_quickOrder.length < 5) _quickOrder.add(e.key);
+                        }
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _quickOrder.contains(e.key) ? const Color(0xFF2BB3A3) : Colors.white.withAlpha(35),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text('${e.value[0]} ${e.value[1]}',
+                          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold,
+                              color: _quickOrder.contains(e.key) ? const Color(0xFF07231F) : Colors.white70)),
+                    ),
+                  ),
+              ]),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () { _saveQuick(); Navigator.pop(ctx); if (mounted) setState(() {}); },
+                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2BB3A3)),
+                  child: const Text('完成', style: TextStyle(color: Color(0xFF07231F), fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _quickActionsRow() {
+    if (_quickOrder.isEmpty) {
+      return GestureDetector(
+        onTap: _editQuickActions,
+        child: const Align(alignment: Alignment.centerRight,
+            child: Text('＋ 快捷功能', style: TextStyle(fontSize: 10, color: Color(0xFF2BB3A3)))),
+      );
+    }
+    return Row(children: [
+      for (final k in _quickOrder.take(5))
+        Flexible(
+          child: GestureDetector(
+            onTap: () => _runQuick(k),
+            onLongPress: _editQuickActions,
+            child: Container(
+              margin: const EdgeInsets.only(left: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+              decoration: BoxDecoration(color: Colors.white.withAlpha(28), borderRadius: BorderRadius.circular(6)),
+              child: Text(_quickDefs[k]!.join(''),
+                  style: const TextStyle(fontSize: 9.5, color: Color(0xFFCFD6E6)), overflow: TextOverflow.ellipsis),
+            ),
+          ),
+        ),
+      GestureDetector(
+        onTap: _editQuickActions,
+        child: const Padding(padding: EdgeInsets.only(left: 3),
+            child: Icon(Icons.tune, size: 13, color: Color(0xFF6C7A92))),
+      ),
+    ]);
   }
 
   InputDecoration _ddDecor() => InputDecoration(
@@ -783,7 +910,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             accent: const Color(0xFFFF9800),
             onClose: () => setState(() => scriptOverlayOpen = false),
             defaultRect: const Rect.fromLTWH(0.06, 0.10, 0.88, 0.80),
-            child: const ScriptSheet(),
+            child: ScriptSheet(proj: proj!, onChanged: persistProject),
           ),
         // 悬浮活动计算器
         if (calcOverlayOpen)
@@ -849,11 +976,40 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   // ------------------------------------------------------- ⚙️ 设置页（底部 TAB）
+  String _userNick = '';
+
   Widget _settingsPage() {
     return SafeArea(
       child: ListView(padding: const EdgeInsets.fromLTRB(10, 10, 10, 20), children: [
         const Padding(padding: EdgeInsets.only(left: 4, bottom: 8),
             child: Text('⚙️ 设置', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A)))),
+        // 个人中心（围绕个人用户加功能：昵称 → 邀请码 → 后期扩展）
+        _settingsSection('个人'),
+        Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(color: const Color(0xFF15152A), borderRadius: BorderRadius.circular(12)),
+          child: Row(children: [
+            const Text('👤', style: TextStyle(fontSize: 18)),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('用户昵称', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Colors.white)),
+              const SizedBox(height: 2),
+              const Text('用于邀请码生成记录、共享心跳标识', style: TextStyle(fontSize: 10, color: Colors.white38)),
+            ])),
+            SizedBox(width: 130, height: 34, child: TextField(
+              controller: TextEditingController(text: _userNick),
+              style: const TextStyle(fontSize: 12, color: Colors.white),
+              textAlignVertical: TextAlignVertical.center,
+              decoration: InputDecoration(hintText: '填个昵称', isDense: true, filled: true,
+                fillColor: const Color(0xFF1E1E36), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8)),
+              onChanged: (v) async {
+                _userNick = v;
+                await MobileHeartbeat.I.setNick(v);
+              },
+            )),
+          ]),
+        ),
+        _settingsRow('🎁', '生成邀请码', '6位一次性邀请码（每天5个，30分钟有效）', _generateInvite),
         // 界面
         _settingsSection('界面'),
         Container(margin: const EdgeInsets.fromLTRB(0, 0, 0, 10), padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -873,21 +1029,64 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         ),
         // 更新
         _settingsSection('更新'),
-        _settingsRow('🔄', '检查更新', '从 Gitee 拉最新安装包版本比对', () async {
+        _settingsRow('🔄', '检查更新', '有新版弹窗：安卓自动安装 / iPhone 复制全能签直链', () async {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('正在检查更新…'), duration: Duration(seconds: 1)));
-          await VersionCheck.check(context);
+          await VersionCheck.manualCheck(context);
         }),
-        _settingsRow('📦', '当前版本', 'v${AppData.appVersion} · 安装包在 Gitee（app-v1 发行版）', () {},
+        _settingsRow('📦', '当前版本', 'v${AppData.appVersion}', () {},
             trailing: Text('v${AppData.appVersion}', style: const TextStyle(fontSize: 11, color: Color(0xFF2BB3A3), fontWeight: FontWeight.bold))),
         // 网络
         _settingsSection('网络'),
         _settingsRow('🌐', '网络自检', '共享打不开？逐环节测试定位问题', _showNetCheck),
-        _settingsRow('📡', '手机在线心跳', '后台自动上报，管理员面板显示 📱 手机在线', () {}),
         // 关于
         _settingsSection('关于'),
         _settingsRow('📖', '使用说明', '上下卡 / 设置 / 卡池的用法', _showHelp),
       ]),
     );
+  }
+
+  /// 🎁 生成邀请码（照搬网页个人中心 generate：30分钟有效/一次性/每天5个）
+  Future<void> _generateInvite() async {
+    final nick = _userNick.trim();
+    if (nick.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('先填上面的用户昵称（邀请码会记录是谁生成的）'), duration: Duration(seconds: 2)));
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('正在生成邀请码…'), duration: Duration(seconds: 1)));
+    final r = await InviteClient.generate(nick: nick);
+    if (!mounted) return;
+    if (r.startsWith('OK:')) {
+      final code = r.substring(3);
+      showDialog(context: context, builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1e293b),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(children: const [
+          Icon(Icons.card_giftcard, color: Color(0xFFFFD24A)),
+          SizedBox(width: 8),
+          Text('邀请码已生成', style: TextStyle(color: Colors.white)),
+        ]),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          SelectableText(code, style: const TextStyle(fontSize: 32, letterSpacing: 6, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))),
+          const SizedBox(height: 8),
+          const Text('30 分钟内有效 · 一次性使用 · 已记录生成人',
+              style: TextStyle(fontSize: 11, color: Colors.white38)),
+        ]),
+        actions: [
+          TextButton(
+            onPressed: () { Clipboard.setData(ClipboardData(text: code)); Navigator.pop(ctx); },
+            child: const Text('复制', style: TextStyle(color: Color(0xFF2BB3A3))),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('关闭', style: TextStyle(color: Colors.white.withOpacity(0.6))),
+          ),
+        ],
+      ));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ $r'), duration: const Duration(seconds: 3)));
+    }
   }
 
   Widget _settingsSection(String title) => Padding(padding: const EdgeInsets.fromLTRB(4, 6, 0, 5),

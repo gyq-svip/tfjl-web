@@ -441,4 +441,165 @@ class ScriptGen {
     if (overLimit.isNotEmpty) result = '⚠️ 超出10张上限，已忽略：${overLimit.join('、')}\n$result';
     return toLaoMa(result);
   }
+
+  // ==================================================================
+  // 脚本解析（照搬网页 app-scriptsim.js parseScript / applyWaveUpToWave）
+  // 用途：粘贴老马脚本 → 解析出头部的上阵10卡 + 波次动作 → 模拟到最后一波
+  //      得到每张卡的最终站位，直接应用到我的/队友手牌。
+  // ==================================================================
+
+  /// 解析一段脚本文本。返回 null = 无法解析（没有 上阵： 头）
+  static ParsedScript? parseScript(String text) {
+    final lines = text.replaceAll('\r', '').split('\n');
+    final header = <String>[];
+    var headerDone = false;
+    final waveLines = <String>[];
+    for (final raw in lines) {
+      final line = raw.trim();
+      if (line.isEmpty) { if (!headerDone && header.isNotEmpty) headerDone = true; continue; }
+      if (!headerDone) {
+        if (RegExp(r'^\d+[，,]').hasMatch(line)) { headerDone = true; waveLines.add(line); continue; }
+        header.add(line);
+      } else {
+        waveLines.add(line);
+      }
+    }
+    List<String>? lineup;
+    final skins = <String, String>{};
+    final mohua = <String>[];
+    var mainVehicle = '', subVehicle = '';
+    for (final line in header) {
+      if (RegExp(r'^上阵[：:]').hasMatch(line)) {
+        lineup = _csv(line.replaceFirst(RegExp(r'^上阵[：:]'), ''));
+      } else if (RegExp(r'^皮肤[：:]').hasMatch(line)) {
+        for (final s in _csv(line.replaceFirst(RegExp(r'^皮肤[：:]'), ''))) {
+          final m = RegExp(r'^(.+?)(\d+)$').firstMatch(s);
+          if (m != null) skins[m.group(1)!] = m.group(2)!;
+        }
+      } else if (RegExp(r'^魔化[：:]').hasMatch(line)) {
+        mohua.addAll(_csv(line.replaceFirst(RegExp(r'^魔化[：:]'), '')));
+      } else if (RegExp(r'^主战车[：:]').hasMatch(line)) {
+        mainVehicle = line.replaceFirst(RegExp(r'^主战车[：:]'), '').trim();
+      } else if (RegExp(r'^副战车[：:]').hasMatch(line)) {
+        subVehicle = line.replaceFirst(RegExp(r'^副战车[：:]'), '').trim();
+      }
+    }
+    if (lineup == null || lineup.isEmpty) return null;
+
+    // 波次动作模拟：base → 槽位（0=工程位，1-6=普通位）
+    final slots = List<String?>.filled(7, null);   // 存 base（主卡身份名）
+    // 波次按序处理：先删后上（对齐网页 applyWaveUpToWave）
+    final waveNums = <int>[];
+    final waveActions = <List<Map<String, String>>>[];
+    for (final line in waveLines) {
+      final wm = RegExp(r'^(\d+)[，,](.*)$').firstMatch(line);
+      if (wm == null) continue;
+      final wave = int.tryParse(wm.group(1)!) ?? 0;
+      final actions = <Map<String, String>>[];
+      for (final part in _csv(wm.group(2) ?? '')) {
+        if (part == '强制顺序上卡') continue;
+        if (part == '同排取消') continue;
+        if (part == '停球') continue;
+        final down = RegExp(r'^下(.+)$').firstMatch(part);
+        if (down != null && !part.contains('上')) {
+          actions.add({'type': 'remove', 'hero': _cleanHero(down.group(1)!)});
+          continue;
+        }
+        final up = RegExp(r'^上(.+?)(满|1级|2级|)$').firstMatch(part);
+        if (up != null) {
+          actions.add({'type': 'place', 'hero': _cleanHero(up.group(1)!), 'level': up.group(2)!.isEmpty ? '满' : up.group(2)!});
+          continue;
+        }
+      }
+      waveNums.add(wave);
+      waveActions.add(actions);
+    }
+    final order = List<int>.generate(waveNums.length, (i) => i);
+    order.sort((a, b) => waveNums[a].compareTo(waveNums[b]));
+    for (final wi in order) {
+      final removals = <Map<String, String>>[];
+      final others = <Map<String, String>>[];
+      for (final a in waveActions[wi]) {
+        (a['type'] == 'remove' ? removals : others).add(a);
+      }
+      for (final a in removals) {
+        final base = _identity(a['hero']!);
+        for (var i = 0; i <= 6; i++) {
+          if (slots[i] != null && slots[i] == base) { slots[i] = null; break; }
+        }
+      }
+      for (final a in others) {
+        if (a['type'] != 'place') continue;
+        final base = _identity(a['hero']!);
+        // 已在槽上 → 原地替换（升级形态）
+        var replaced = false;
+        for (var i = 0; i <= 6; i++) {
+          if (slots[i] == base) { slots[i] = base; replaced = true; break; }
+        }
+        if (replaced) continue;
+        if (_isEng(a['hero']!)) {
+          if (slots[0] == null) slots[0] = base;
+        } else {
+          for (var i = 1; i <= 6; i++) {
+            if (slots[i] == null) { slots[i] = base; break; }
+          }
+        }
+      }
+    }
+    // 每张卡的最终槽位 + 等级（最后一次上的等级）
+    final levels = <String, String>{};   // base → '满'/'1级'/'2级'
+    for (final wi in order) {
+      for (final a in waveActions[wi]) {
+        if (a['type'] == 'place') levels[_identity(a['hero']!)] = a['level'] ?? '满';
+      }
+    }
+    final placed = <String, int>{};   // base → slot
+    for (var i = 0; i <= 6; i++) {
+      if (slots[i] != null) placed[slots[i]!] = i;
+    }
+    return ParsedScript(
+      lineup: lineup.map(fromLaoMa).map(officialName).toList(),
+      skins: skins, mohua: mohua,
+      mainVehicle: mainVehicle, subVehicle: subVehicle,
+      placedSlots: placed, levels: levels,
+    );
+  }
+
+  static List<String> _csv(String s) =>
+      s.split(RegExp(r'[,，]')).map((x) => x.trim()).where((x) => x.isNotEmpty).toList();
+
+  static String _cleanHero(String s) =>
+      s.replaceFirst(RegExp(r'^[上下]'), '').replaceFirst(RegExp(r'(满|1级|2级)$'), '').trim();
+
+  /// 卡牌身份名（对齐网页 cardBase：工程变体取工程卡主身份）
+  static String _identity(String name) {
+    final official = officialName(fromLaoMa(name));
+    for (final e in ['邪能火炮', '地精宝库', '侏儒射线', '微型潜艇', '咬人娃娃']) {
+      if (official.contains(e) && !official.startsWith(e)) return e;
+    }
+    return official;
+  }
+
+  static bool _isEng(String name) {
+    final official = officialName(fromLaoMa(name));
+    for (final e in ['邪能火炮', '地精宝库', '侏儒射线', '微型潜艇', '咬人娃娃']) {
+      if (official.contains(e)) return true;
+    }
+    return false;
+  }
+
+  static String officialName(String name) => AppData.officialName(name);
+}
+
+/// 解析结果：上阵10卡（官方名）+ 最终站位（base→槽位）+ 等级 + 皮肤/魔化/战车
+class ParsedScript {
+  final List<String> lineup;          // 上阵行，已转官方名
+  final Map<String, String> skins;    // base短名 → 皮肤编号
+  final List<String> mohua;           // 魔化名单（原样）
+  final String mainVehicle, subVehicle;
+  final Map<String, int> placedSlots; // base身份名 → 槽位0-6
+  final Map<String, String> levels;   // base身份名 → '满'/'1级'/'2级'
+  ParsedScript({required this.lineup, required this.skins, required this.mohua,
+      required this.mainVehicle, required this.subVehicle,
+      required this.placedSlots, required this.levels});
 }
