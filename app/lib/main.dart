@@ -15,6 +15,7 @@ import 'script_gen.dart';
 import 'script_sheet.dart';
 import 'activity_calc.dart';
 import 'calc_sheet.dart';
+import 'mobile_heartbeat.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -100,6 +101,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     await AppData.I.load();
     await LayoutConfig.I.load();
     _activityCalc.load();   // 活动配置后台加载（缓存秒开）
+    MobileHeartbeat.I.start();   // 手机在线心跳（后台，成功后管理员面板显示📱）
     SkinPack.I.onProgress = (p, s) {
       if (!SkinPack.I.ready && mounted) setState(() { packPct = p; loadStage = s; });
     };

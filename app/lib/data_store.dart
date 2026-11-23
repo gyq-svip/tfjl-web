@@ -340,6 +340,28 @@ class GistClient {
     } catch (_) { return ''; }
   }
 
+  /// 写一个 gist 的单个文件（PATCH，需 token）—— 用于手机心跳上报到诊断 Gist
+  static Future<bool> writeFile(String gistId, String fileName, String content) async {
+    try {
+      final token = await fetchToken();
+      if (token.isEmpty) return false;
+      final r = await http.patch(
+        Uri.parse('https://api.github.com/gists/$gistId'),
+        headers: {
+          'User-Agent': 'TFJL-App',
+          'Accept': 'application/vnd.github+json',
+          'Content-Type': 'application/json',
+          'Authorization': 'token $token',
+        },
+        body: jsonEncode({'files': {fileName: {'content': content}}}),
+      ).timeout(const Duration(seconds: 20));
+      return r.statusCode == 200 || r.statusCode == 201;
+    } catch (e) {
+      debugPrint('[Gist] writeFile 失败: $e');
+      return false;
+    }
+  }
+
   /// 读一个 gist 的单个文件内容
   /// ★优先走 gist.githubusercontent.com 直链：无限流、更快、更稳。
   ///   （api.github.com 匿名只有 60 次/小时，切几个阵容就耗尽 → 403 → "加载失败"）
