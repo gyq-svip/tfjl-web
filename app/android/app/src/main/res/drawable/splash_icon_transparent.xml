@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ 开屏用的"透明图标"：占住系统开屏图标位但不显示任何内容 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:width="1dp"
+        android:height="1dp"
+        android:drawable="@android:color/transparent" />
+</layer-list>

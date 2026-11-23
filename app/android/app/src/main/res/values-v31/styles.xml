@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+ 开屏（SplashScreen API）：默认会把启动图标显示在屏幕中间。
+         🔴 修复开屏中间闪现带黑底的图标：背景设为纯白、图标设为透明 drawable，
+         开屏只显示纯色，首帧后无缝进入 Flutter 界面。 -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+        <item name="android:windowSplashScreenBackground">#FFFFFF</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icon_transparent</item>
+    </style>
+</resources>
