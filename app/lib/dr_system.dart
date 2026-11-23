@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:file_picker/file_picker.dart';
 import 'models.dart';
 
 /// 🛡 减伤系统 —— 逐条照搬网页 app-core.js：
@@ -212,9 +214,144 @@ class DrSystem {
   }
 
   static String jsonEncodeMap(Object? o) => const JsonEncoder().convert(o);
+
+  // ================= TXT 导入导出（照搬网页 exportAllDamageReductionToTxt / parseDamageReductionTxt） =================
+
+  static const favKey = 'tdjl_dr_favCards';
+  static List<String> _favs = [];
+
+  static Future<List<String>> loadFavs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final s = prefs.getString(favKey);
+      final l = s == null ? null : List<String>.from((const JsonDecoder().convert(s) as List?) ?? []);
+      _favs = l ?? [];
+    } catch (_) {
+      _favs = [];
+    }
+    return _favs;
+  }
+
+  static Future<void> toggleFav(String cardName) async {
+    if (_favs.contains(cardName)) {
+      _favs.remove(cardName);
+    } else {
+      _favs.insert(0, cardName);
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(favKey, const JsonEncoder().convert(_favs));
+    } catch (_) {}
+  }
+
+  static bool isFav(String cardName) => _favs.contains(cardName);
+
+  /// 导出全部表为 TXT（网页同款格式：===== 表：XXX ===== 分段 + 技能减伤/洗炼减伤两段）
+  static String exportAllTxt() {
+    final buf = StringBuffer();
+    buf.writeln('# 减伤记录配置文件（全部表）');
+    buf.writeln('# 每张表以 ===== 表：表名 ===== 分段，段内分「技能减伤 / 洗炼减伤」');
+    buf.writeln('# 导入时按表名自动分流（不存在的表会自动新建）');
+    buf.writeln('# 导出时间：${DateTime.now().toLocal()}');
+    buf.writeln();
+    for (final name in tableNames) {
+      final t = table(name);
+      buf.writeln('===== 表：$name =====');
+      buf.writeln('----- 技能减伤 -----');
+      for (final k in specialKeys) {
+        buf.writeln('$k=${(num.tryParse('${t[k]}') ?? 0)}');
+      }
+      buf.writeln('----- 洗炼减伤 -----');
+      final m = refineMap(name);
+      for (final c in (m.keys.toList()..sort())) {
+        buf.writeln('$c=${(num.tryParse('${m[c]}') ?? 0)}');
+      }
+      buf.writeln();
+    }
+    return buf.toString();
+  }
+
+  /// 解析 TXT 并写入（网页 parseDamageReductionTxt 全逻辑）：
+  /// 单表文件写入 targetTable；多表文件（===== 表：XXX =====）按表名分流，不存在的表自动新建。
+  /// 返回结果文案。
+  static Future<String> importTxt(String content, String targetTable) async {
+    if (_tables == null) await load();
+    final sharedKeys = specialKeys;
+    var section = '';
+    var curName = targetTable;
+    final touched = <String>{};
+    var recCount = 0;
+
+    void ensureTable(String name) {
+      if (!_tables!.containsKey(name)) {
+        _tables![name] = {'洗炼': <String, double>{}, '小野': 0.0, '酋长': 0.0, '宝库': 0.0};
+      }
+    }
+
+    for (final rawLine in content.split('\n')) {
+      final line = rawLine.replaceFirst(RegExp(r'\r+$'), '');
+      if (line.startsWith('#') || line.trim().isEmpty) continue;
+      if (line.contains('=====')) {
+        if (line.contains('表：')) {
+          final namePart = line.substring(line.indexOf('表：') + 2).replaceFirst(RegExp(r'=+$'), '').trim();
+          if (namePart.isNotEmpty) curName = namePart;
+          section = '';
+          continue;
+        }
+        if (line.contains('洗炼')) {
+          section = 'refine';
+        } else if (line.contains('技能')) {
+          section = 'skill';
+        } else if (line.contains('战车')) {
+          section = 'chariot';
+        }
+        continue;
+      }
+      final m = RegExp(r'^([^=]+)=(\d+(?:\.\d+)?)$').firstMatch(line);
+      if (m == null) continue;
+      var cardName = m.group(1)!.trim();
+      final value = double.tryParse(m.group(2)!);
+      if (cardName == '战车') cardName = '我的战车';
+      if (cardName.isEmpty || value == null) continue;
+      if (cardName == '我的战车' || cardName == '队友战车') continue;   // 废弃字段
+      ensureTable(curName);
+      final tb = _tables![curName] as Map;
+      if (section == 'refine') {
+        (tb['洗炼'] as Map)[cardName] = value;   // 洗炼段：即使叫小野/酋长/宝库也只写洗炼
+        touched.add(curName);
+        recCount++;
+      } else if (section == 'skill') {
+        if (sharedKeys.contains(cardName)) {
+          tb[cardName] = value;
+        } else {
+          (tb['洗炼'] as Map)[cardName] = value;
+        }
+        touched.add(curName);
+        recCount++;
+      } else if (section == 'chariot') {
+        continue;   // 旧导出的战车段忽略
+      } else if (sharedKeys.contains(cardName)) {
+        tb[cardName] = value;   // 老文件无分段：按名字路由
+        touched.add(curName);
+        recCount++;
+      } else {
+        (tb['洗炼'] as Map)[cardName] = value;
+        touched.add(curName);
+        recCount++;
+      }
+    }
+    _ensureDefaults();
+    await save();
+    if (touched.length == 1) {
+      return '已导入到「${touched.first}」表（共 $recCount 条）';
+    } else if (touched.length > 1) {
+      return '已导入 ${touched.length} 张表（共 $recCount 条）：${touched.join('、')}';
+    }
+    return '未找到有效的减伤记录';
+  }
 }
 
-/// 🛡 减伤表管理页（设置某个表的洗炼值 + 小野/酋长/宝库特殊技能减伤）
+/// 🛡 减伤表管理页（照搬网页：英雄全部预设好按职业筛选，点卡填值；常用⭐置顶；TXT 导入导出）
 class DrManagePage extends StatefulWidget {
   final String initialTable;
   const DrManagePage({super.key, this.initialTable = '我的'});
@@ -225,22 +362,54 @@ class DrManagePage extends StatefulWidget {
 class _DrManagePageState extends State<DrManagePage> {
   late String table;
   final _searchCtrl = TextEditingController();
+  String _profFilter = 'all';   // all / fav / 职业英文
+  List<String> _favs = [];
 
   @override
   void initState() {
     super.initState();
     table = widget.initialTable;
-    DrSystem.load();
+    DrSystem.load().then((_) async {
+      _favs = await DrSystem.loadFavs();
+      if (mounted) setState(() {});
+    });
+  }
+
+  /// 全部卡池英雄（预设好，排除精灵球）——与网页 buildDamageReductionCardsList 同思路
+  List<PoolCard> get _allHeroes =>
+      AppData.I.poolByName.values.where((p) => p.prof != 'pokeball').toList()
+        ..sort((a, b) => a.name.compareTo(b.name));
+
+  List<String> get _profChips {
+    final set = <String>{};
+    for (final p in _allHeroes) {
+      set.add(p.prof);
+    }
+    return set.toList();
+  }
+
+  List<PoolCard> get _visibleHeroes {
+    final q = _searchCtrl.text.trim();
+    return _allHeroes.where((p) {
+      if (_profFilter == 'fav' && !DrSystem.isFav(p.name)) return false;
+      if (_profFilter != 'all' && _profFilter != 'fav' && p.prof != _profFilter) return false;
+      if (q.isNotEmpty) {
+        final official = AppData.officialName(p.name);
+        final hasVal = (DrSystem.refineMap(table)[p.name] ?? 0) > 0;
+        if (!p.name.contains(q) && !official.contains(q) && !hasVal) return false;
+      }
+      return true;
+    }).toList()
+      ..sort((a, b) {
+        final fa = DrSystem.isFav(a.name) ? 0 : 1;
+        final fb = DrSystem.isFav(b.name) ? 0 : 1;
+        if (fa != fb) return fa - fb;
+        return a.name.compareTo(b.name);
+      });
   }
 
   @override
   Widget build(BuildContext context) {
-    final refine = DrSystem.refineMap(table);
-    final heroes = refine.keys.where((k) {
-      final q = _searchCtrl.text.trim();
-      return q.isEmpty || k.contains(q);
-    }).toList()
-      ..sort((a, b) => (refine[b] ?? 0).compareTo(refine[a] ?? 0));
     return Scaffold(
       backgroundColor: const Color(0xFF0C0C17),
       appBar: AppBar(
@@ -264,11 +433,49 @@ class _DrManagePageState extends State<DrManagePage> {
               ),
             ),
         ]),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, size: 20),
+            color: const Color(0xFF1E1E36),
+            onSelected: (v) async {
+              if (v == 'exportAll') {
+                final save = await FilePicker.platform.saveFile(
+                    fileName: '减伤记录_全部表.txt', type: FileType.custom, allowedExtensions: ['txt']);
+                if (save == null) return;
+                await File(save).writeAsString(DrSystem.exportAllTxt());
+                if (mounted) _toast('✅ 已导出全部表（PC 端「导入减伤TXT」可整体恢复）：$save');
+              } else if (v == 'exportCur') {
+                final save = await FilePicker.platform.saveFile(
+                    fileName: '减伤记录_$table.txt', type: FileType.custom, allowedExtensions: ['txt']);
+                if (save == null) return;
+                final t = DrSystem.table(table);
+                final buf = StringBuffer('# 减伤记录（$table 表）\n----- 技能减伤 -----\n');
+                for (final k in DrSystem.specialKeys) {
+                  buf.writeln('$k=${(num.tryParse('${t[k]}') ?? 0)}');
+                }
+                buf.writeln('----- 洗炼减伤 -----');
+                final m = DrSystem.refineMap(table);
+                for (final c in (m.keys.toList()..sort())) {
+                  buf.writeln('$c=${(num.tryParse('${m[c]}') ?? 0)}');
+                }
+                await File(save).writeAsString(buf.toString());
+                if (mounted) _toast('✅ 已导出「$table」表：$save');
+              } else if (v == 'import') {
+                await _importTxt();
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'exportAll', height: 38, child: Text('📤 导出全部表 (TXT)', style: TextStyle(fontSize: 12, color: Colors.white))),
+              PopupMenuItem(value: 'exportCur', height: 38, child: Text('📤 导出当前表 (TXT)', style: TextStyle(fontSize: 12, color: Colors.white))),
+              PopupMenuItem(value: 'import', height: 38, child: Text('📥 导入减伤 TXT（多表自动分流）', style: TextStyle(fontSize: 12, color: Colors.white))),
+            ],
+          ),
+        ],
       ),
       body: Column(children: [
-        // 特殊技能减伤（该表的全局值，上阵对应卡才计入）
+        // 特殊技能减伤
         Container(
-          margin: const EdgeInsets.all(8),
+          margin: const EdgeInsets.fromLTRB(8, 8, 8, 4),
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(color: const Color(0xFF15152A), borderRadius: BorderRadius.circular(12)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -299,72 +506,122 @@ class _DrManagePageState extends State<DrManagePage> {
             ]),
           ]),
         ),
-        // 搜索 + 添加
+        // 搜索
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Row(children: [
-            Expanded(child: TextField(
-              controller: _searchCtrl,
-              onChanged: (_) => setState(() {}),
-              style: const TextStyle(fontSize: 12, color: Colors.white),
-              decoration: InputDecoration(hintText: '搜索已设英雄…', isDense: true, filled: true,
-                fillColor: const Color(0xFF15152A), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10)),
-            )),
-            const SizedBox(width: 6),
-            GestureDetector(
-              onTap: _addHero,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                decoration: BoxDecoration(color: const Color(0xFF2BB3A3), borderRadius: BorderRadius.circular(8)),
-                child: const Text('＋ 添加英雄', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF07231F))),
-              ),
-            ),
-          ]),
+          child: TextField(
+            controller: _searchCtrl,
+            onChanged: (_) => setState(() {}),
+            style: const TextStyle(fontSize: 12, color: Colors.white),
+            decoration: InputDecoration(hintText: '搜索英雄（虎弓/蛇女/火炮火灵 都行）…', isDense: true, filled: true,
+              fillColor: const Color(0xFF15152A), prefixIcon: const Icon(Icons.search, size: 18, color: Colors.white24),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10)),
+          ),
+        ),
+        // 职业筛选 chips
+        Container(
+          height: 34,
+          margin: const EdgeInsets.only(top: 5),
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            children: [
+              _chip('all', '全部'),
+              _chip('fav', '⭐ 常用'),
+              for (final p in _profChips) _chip(p, AppData.profName(p)),
+            ],
+          ),
         ),
         const SizedBox(height: 4),
         Expanded(
-          child: heroes.isEmpty
-              ? Center(child: Text(table == '我的' ? '还没有洗炼减伤，点「＋ 添加英雄」' : '该表没有数据',
-                  style: const TextStyle(fontSize: 12, color: Colors.white24)))
-              : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 20),
-                  itemCount: heroes.length,
-                  itemBuilder: (_, i) {
-                    final h = heroes[i];
-                    final v = refine[h] ?? 0;
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 6),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(color: const Color(0xFF15152A), borderRadius: BorderRadius.circular(10)),
-                      child: Row(children: [
-                        Expanded(child: Text(h, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Colors.white),
-                            overflow: TextOverflow.ellipsis)),
-                        GestureDetector(
-                          onTap: () => _editHero(h),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                            decoration: BoxDecoration(color: const Color(0x33FFD24A), borderRadius: BorderRadius.circular(8)),
-                            child: Text('${_v(v)}%', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: () { DrSystem.setRefine(table, h, null); setState(() {}); },
-                          child: const Icon(Icons.close, size: 16, color: Colors.white24),
-                        ),
-                      ]),
-                    );
-                  },
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 20),
+            itemCount: _visibleHeroes.length,
+            itemBuilder: (_, i) {
+              final p = _visibleHeroes[i];
+              final m = DrSystem.refineMap(table);
+              final v = (num.tryParse('${m[p.name]}') ?? 0).toDouble();
+              final fav = DrSystem.isFav(p.name);
+              return Container(
+                margin: const EdgeInsets.only(bottom: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: v > 0 ? const Color(0xFF1A2438) : const Color(0xFF15152A),
+                  borderRadius: BorderRadius.circular(10),
+                  border: v > 0 ? Border.all(color: const Color(0x554ade80)) : null,
                 ),
+                child: Row(children: [
+                  GestureDetector(
+                    onTap: () async { await DrSystem.toggleFav(p.name); _favs = await DrSystem.loadFavs(); setState(() {}); },
+                    child: Text(fav ? '⭐' : '☆', style: const TextStyle(fontSize: 14)),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(p.name,
+                      style: TextStyle(fontSize: 12.5, fontWeight: v > 0 ? FontWeight.bold : FontWeight.normal,
+                          color: v > 0 ? Colors.white : Colors.white60),
+                      overflow: TextOverflow.ellipsis)),
+                  GestureDetector(
+                    onTap: () => _editHero(p.name),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: v > 0 ? const Color(0x334ade80) : Colors.white.withAlpha(25),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(v > 0 ? '${_v(v)}%' : '点击填',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold,
+                              color: v > 0 ? const Color(0xFF4ade80) : Colors.white24)),
+                    ),
+                  ),
+                ]),
+              );
+            },
+          ),
         ),
       ]),
     );
   }
 
+  Widget _chip(String key, String label) {
+    final on = _profFilter == key;
+    return GestureDetector(
+      onTap: () => setState(() => _profFilter = key),
+      child: Container(
+        margin: const EdgeInsets.only(right: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+        decoration: BoxDecoration(
+          color: on ? const Color(0xFF2BB3A3) : Colors.white.withAlpha(28),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Text(label, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold,
+            color: on ? const Color(0xFF07231F) : Colors.white60)),
+      ),
+    );
+  }
+
+  void _toast(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), duration: const Duration(seconds: 3)));
+  }
+
+  /// 📥 导入 TXT（网页 parseDamageReductionTxt：多表自动分流，单表入当前表）
+  Future<void> _importTxt() async {
+    final picked = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['txt'], withData: true);
+    final path = picked?.files.single.path;
+    if (path == null) return;
+    try {
+      final txt = await File(path).readAsString();
+      final r = await DrSystem.importTxt(txt, table);
+      if (mounted) setState(() {});
+      _toast(r);
+    } catch (e) {
+      _toast('❌ 导入失败：$e');
+    }
+  }
+
   static String _v(double v) => v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
 
-  /// 数值编辑弹窗：输入 0-100 的减伤值
+  /// 数值编辑弹窗：输入 0-100 的减伤值 + 快捷值
   Future<void> _editValueDialog(String title, double init, void Function(double) onSave) async {
     final ctl = TextEditingController(text: init > 0 ? _v(init) : '');
     final ok = await showDialog<bool>(
@@ -414,38 +671,4 @@ class _DrManagePageState extends State<DrManagePage> {
 
   Future<void> _editHero(String h) =>
       _editValueDialog('$h 洗炼减伤（$table 表）', DrSystem.refineMap(table)[h] ?? 0, (v) => DrSystem.setRefine(table, h, v));
-
-  /// 添加英雄：输入名字（支持短名，自动转官方名）
-  Future<void> _addHero() async {
-    final ctl = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1e293b),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: const Text('添加洗炼减伤英雄', style: TextStyle(color: Colors.white, fontSize: 14.5)),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: ctl, autofocus: true,
-            style: const TextStyle(color: Colors.white, fontSize: 14),
-            decoration: InputDecoration(hintText: '英雄名（虎弓/蛇女/火炮火灵 都行）', filled: true,
-              fillColor: const Color(0xFF0C0C17), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)),
-          ),
-          const SizedBox(height: 6),
-          const Text('保存后可在列表里再点数值修改', style: TextStyle(fontSize: 10.5, color: Colors.white38)),
-        ]),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('取消', style: TextStyle(color: Colors.white.withOpacity(0.6)))),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2BB3A3)),
-            child: const Text('下一步', style: TextStyle(color: Color(0xFF07231F), fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-    final raw = ctl.text.trim();
-    if (ok != true || raw.isEmpty) return;
-    final official = AppData.officialName(raw);
-    await _editValueDialog('$official 洗炼减伤（$table 表）', 0, (v) => DrSystem.setRefine(table, official, v));
-  }
 }
