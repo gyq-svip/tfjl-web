@@ -104,9 +104,20 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     await LayoutConfig.I.load();
     _activityCalc.load();   // 活动配置后台加载（缓存秒开）
     _loadQuick();           // 顶栏快捷功能配置
-    // 用户昵称（个人中心 + 心跳共用）
+    // 用户昵称（注册制，与网页 TFJL_UserName 同键；老用户旧键兼容兜底）
     final prefs0 = await SharedPreferences.getInstance();
-    if (mounted) setState(() => _userNick = prefs0.getString('mobile_heartbeat_nick') ?? '');
+    if (mounted) {
+      setState(() => _userNick = (prefs0.getString('TFJL_UserName') ?? '').isNotEmpty
+          ? prefs0.getString('TFJL_UserName')!
+          : (prefs0.getString('mobile_heartbeat_nick') ?? ''));
+    }
+    // 管理员远程改名（对齐网页 applyServerNickOverride：diag 里 nickManagedByAdmin → 覆盖本地）
+    MobileHeartbeat.I.applyAdminNickOverride().then((changed) {
+      if (!changed || !mounted) return;
+      SharedPreferences.getInstance().then((p) {
+        if (mounted) setState(() => _userNick = p.getString('TFJL_UserName') ?? _userNick);
+      });
+    });
     MobileHeartbeat.I.start();   // 手机在线心跳（后台，成功后管理员面板显示📱）
     SkinPack.I.onProgress = (p, s) {
       if (!SkinPack.I.ready && mounted) setState(() { packPct = p; loadStage = s; });
@@ -283,88 +294,98 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   // ------------------------------------------------------- 顶栏与项目栏
+  /// 顶栏第一行（常驻）：标题 + 快捷功能 chips +（收起时）项目名/唤出按钮
   Widget buildTopBar() {
-    final fromShare = sourceMode == 1;
-    final showSelectors = !topBarAutoHide || topBarExpanded;
-    return GestureDetector(
-      // 下滑唤出下拉行（仅自动隐藏开启且当前收起时）
-      onVerticalDragEnd: (d) {
-        if (topBarAutoHide && !topBarExpanded && (d.primaryVelocity ?? 0) > 200) {
-          setState(() => topBarExpanded = true);
-        }
-      },
-      child: Container(
-        color: const Color(0xFF12122A),
-        padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-        child: Column(children: [
-          Row(children: [
-            const Text('🛡 塔防助手', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.white)),
-            // 当前项目名（收起时也能看到选了哪个）
-            if (topBarAutoHide && !topBarExpanded)
-              Padding(
-                padding: const EdgeInsets.only(right: 6),
-                child: Text('${proj?['name'] ?? ''}',
-                    style: const TextStyle(fontSize: 10, color: Color(0xFFFFD24A)),
-                    overflow: TextOverflow.ellipsis),
-              ),
-            // 唤出按钮（自动隐藏且收起时显示）
-            if (topBarAutoHide && !topBarExpanded)
-              GestureDetector(
-                onTap: () => setState(() => topBarExpanded = true),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 6),
-                  child: Icon(Icons.expand_more, size: 18, color: Color(0xFF2BB3A3)),
-                ),
-              ),
-            const Spacer(),
-            // 可编辑快捷功能 chips（长按任意 chip 打开显隐编辑）
-            if (!(topBarAutoHide && !topBarExpanded))
-              Expanded(
-                child: _quickActionsRow(),
-              ),
-          ]),
-          if (showSelectors) ...[
-            const SizedBox(height: 3),
-            SizedBox(
-              height: 30,
-              child: Row(children: [
-                Expanded(
-                  flex: 3,
-                  child: DropdownButtonFormField<int>(
-                    value: sourceMode,
-                    dropdownColor: const Color(0xFF1E1E36),
-                    decoration: _ddDecor(),
-                    style: const TextStyle(fontSize: 11, color: Colors.white),
-                    items: const [
-                      DropdownMenuItem(value: 0, child: Text('📱 本地', style: TextStyle(fontSize: 11))),
-                      DropdownMenuItem(value: 1, child: Text('☁ 共享', style: TextStyle(fontSize: 11))),
-                    ],
-                    onChanged: (v) {
-                      if (v == sourceMode) return;
-                      setState(() {
-                        sourceMode = v!;
-                        if (sourceMode == 0) { gistId = ''; _loadLocalCurrent(); }
-                        if (sourceMode == 1 && shareIndex == null) _loadShareIndex();
-                      });
-                      _maybeCollapseTopBar();
-                    },
-                  ),
-                ),
-                const SizedBox(width: 4),
-                if (!fromShare) ..._localSelectors(onPicked: _maybeCollapseTopBar) else ..._shareSelectors(onPicked: _maybeCollapseTopBar),
-                // 展开态收起按钮
-                if (topBarAutoHide)
-                  GestureDetector(
-                    onTap: () => setState(() => topBarExpanded = false),
-                    child: const Padding(
-                      padding: EdgeInsets.only(left: 4),
-                      child: Icon(Icons.expand_less, size: 18, color: Color(0xFF2BB3A3)),
-                    ),
-                  ),
-              ]),
+    return Container(
+      color: const Color(0xFF12122A),
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+      child: SizedBox(
+        height: 30,
+        child: Row(children: [
+          const Text('🛡 塔防助手', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.white)),
+          // 当前项目名（收起时也能看到选了哪个）
+          if (topBarAutoHide && !topBarExpanded)
+            Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: Text('${proj?['name'] ?? ''}',
+                  style: const TextStyle(fontSize: 10, color: Color(0xFFFFD24A)),
+                  overflow: TextOverflow.ellipsis),
             ),
-          ],
+          // 唤出按钮（自动隐藏且收起时显示）
+          if (topBarAutoHide && !topBarExpanded)
+            GestureDetector(
+              onTap: () => setState(() => topBarExpanded = true),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6),
+                child: Icon(Icons.expand_more, size: 18, color: Color(0xFF2BB3A3)),
+              ),
+            ),
+          const Spacer(),
+          // 可编辑快捷功能 chips（长按任意 chip 打开显隐编辑）
+          Expanded(
+            child: _quickActionsRow(),
+          ),
         ]),
+      ),
+    );
+  }
+
+  /// 下拉选择行（本地/共享 → 分类 → 项目）：自动隐藏开启时收进悬浮层，关闭时常驻布局
+  Widget _buildSelectorRow() {
+    final fromShare = sourceMode == 1;
+    return Row(children: [
+      Expanded(
+        flex: 3,
+        child: DropdownButtonFormField<int>(
+          value: sourceMode,
+          dropdownColor: const Color(0xFF1E1E36),
+          decoration: _ddDecor(),
+          style: const TextStyle(fontSize: 11, color: Colors.white),
+          items: const [
+            DropdownMenuItem(value: 0, child: Text('📱 本地', style: TextStyle(fontSize: 11))),
+            DropdownMenuItem(value: 1, child: Text('☁ 共享', style: TextStyle(fontSize: 11))),
+          ],
+          onChanged: (v) {
+            if (v == sourceMode) return;
+            setState(() {
+              sourceMode = v!;
+              if (sourceMode == 0) { gistId = ''; _loadLocalCurrent(); }
+              if (sourceMode == 1 && shareIndex == null) _loadShareIndex();
+            });
+            // 切换本地/共享不收起悬浮层（还要接着选阵容），选完阵容才收
+          },
+        ),
+      ),
+      const SizedBox(width: 4),
+      if (!fromShare) ..._localSelectors(onPicked: _maybeCollapseTopBar) else ..._shareSelectors(onPicked: _maybeCollapseTopBar),
+      // 收起按钮（自动隐藏时）
+      if (topBarAutoHide)
+        GestureDetector(
+          onTap: () => setState(() => topBarExpanded = false),
+          child: const Padding(
+            padding: EdgeInsets.only(left: 4),
+            child: Icon(Icons.expand_less, size: 18, color: Color(0xFF2BB3A3)),
+          ),
+        ),
+    ]);
+  }
+
+  /// 🔴 悬浮下拉选择行（自动隐藏开启 + 展开时）：浮在内容之上，不挤占布局
+  Widget _buildFloatingSelectors() {
+    return Positioned(
+      top: 0, left: 0, right: 0,
+      child: SafeArea(
+        bottom: false,
+        child: Container(
+          margin: const EdgeInsets.only(top: 30),   // 让出常驻第一行
+          padding: const EdgeInsets.fromLTRB(8, 5, 8, 5),
+          decoration: BoxDecoration(
+            color: const Color(0xFF12122A),
+            boxShadow: [BoxShadow(color: Colors.black.withAlpha(90), blurRadius: 10, offset: const Offset(0, 3))],
+            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(10)),
+          ),
+          child: SizedBox(height: 30, child: _buildSelectorRow()),
+        ),
       ),
     );
   }
@@ -739,7 +760,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   void _showHelp() {
     showDialog(context: context, builder: (_) => AlertDialog(
       title: const Text('📖 使用说明'),
-      content: const SingleChildScrollView(child: Text(
+      content: SingleChildScrollView(child: Text(
+        '【界面总览】\n'
+        '· 底部三个 TAB：🏠主页（阵容画布）/ 🧰工具 / ⚙️设置\n'
+        '· 顶栏右侧的图标是快捷功能，点一下直达；点最右 ⚙ 图标可编辑显示哪些\n\n'
         '【上下卡】\n'
         '· 点手牌里未上阵的卡 → 自动按顺序上阵\n'
         '· 点卡槽里的卡 → 取下回手牌\n'
@@ -748,15 +772,26 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         '· 长按手牌或卡槽里的卡 → 设置面板\n'
         '· 点已上阵（变灰）的卡也能打开\n\n'
         '【卡池】\n'
-        '· 点手牌标题旁「🎴 卡池」→ 点卡直接加手牌并上阵（长按只加手牌）\n\n'
+        '· 点手牌标题旁「🎴 卡池」→ 悬浮卡池面板（可拖动/缩放）\n'
+        '· 点卡直接加手牌并上阵（长按只加手牌）\n'
+        '· 同一张卡（含融合形态）只能带 1 张\n\n'
         '【自由拖动布局】\n'
-        '· 按住卡牌拖动：手牌→任意卡槽（指定位置上阵）\n'
-        '· 卡槽→卡槽：移动/交换位置\n'
-        '· 卡槽/手牌→手牌格：取下并按落点重排\n'
-        '· 工程卡只能进 0 号位，精灵球不能上阵\n\n'
-        '【项目】\n'
+        '· 「编辑布局」进入编辑态（卡片抖动）：拖标题移动、拖右下角缩放\n'
+        '· 横屏/竖屏各存一套布局\n'
+        '· 顶栏自动隐藏开启时顶栏悬浮弹出，不挤占卡片区\n\n'
+        '【项目与共享】\n'
         '· 顶栏下拉：本地/共享 → 分类 → 项目\n'
-        '· 本地可新建分类和项目',
+        '· ☁ 共享阵容点「📋 复制到本地」→ 整套复制（含记事本/脚本/站位），自由微调\n'
+        '· 共享项目的记事本只读，复制到本地后可编辑\n'
+        '· 阵容图库（工具页）：精选/活动/大航海，「用此阵容」导入本地\n\n'
+        '【脚本】\n'
+        '· 生成：输入阵容文本 → 活动/隐藏榜/深海脚本（自动适配老马短名）\n'
+        '· 解析上卡：粘贴老马脚本 → 选「我的/队友」→ 解析上卡，按波次模拟最终站位直接上阵\n\n'
+        '【个人】\n'
+        '· 注册昵称（与网页一致，注册后改名找管理员）\n'
+        '· 生成邀请码：6位一次性，30分钟有效，每天5个\n\n'
+        '【更新】\n'
+        '· 设置 → 检查更新：安卓应用内下载自动安装；iPhone 复制直链到全能签安装',
         style: TextStyle(fontSize: 12, height: 1.5))),
       actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('知道了'))],
     ));
@@ -818,7 +853,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     return Stack(children: [
         SafeArea(
         child: Column(children: [
-                buildTopBar(),
+                buildTopBar(),   // 第一行常驻（标题+快捷chips；关闭自动隐藏时下拉行也在这里）
                 if (packPct >= 0) _packProgress(),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
@@ -839,19 +874,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       ),
                     if (layoutEditing)
                       const Text('编辑中', style: TextStyle(fontSize: 9, color: Color(0xFFFFD24A))),
-                    GestureDetector(
-                      onTap: () => setState(() => layoutEditing = !layoutEditing),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: layoutEditing ? const Color(0xFFFFD24A) : const Color(0xFF2BB3A3),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(layoutEditing ? '✓ 完成' : '✎ 编辑布局',
-                            style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold,
-                                color: layoutEditing ? const Color(0xFF1A1A2E) : const Color(0xFF07231F))),
-                      ),
-                    ),
                     if (layoutEditing)
                       GestureDetector(
                         onTap: () async {
@@ -876,6 +898,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 ),
               ]),
         ),  // SafeArea
+        // 🔴 悬浮下拉选择行（自动隐藏开启且展开时）：浮在内容之上，不挤占布局
+        if (topBarAutoHide && topBarExpanded && proj != null) _buildFloatingSelectors(),
         // 悬浮卡池（可拖动/缩放，不挡全屏）
         if (poolOverlayOpen && proj != null)
           FloatingPanel(
@@ -981,40 +1005,42 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             child: Text('⚙️ 设置', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A)))),
         // 个人中心（围绕个人用户加功能：昵称 → 邀请码 → 后期扩展）
         _settingsSection('个人'),
-        Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(color: const Color(0xFF15152A), borderRadius: BorderRadius.circular(12)),
-          child: Row(children: [
-            const Text('👤', style: TextStyle(fontSize: 18)),
-            const SizedBox(width: 10),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('用户昵称', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Colors.white)),
-              const SizedBox(height: 2),
-              const Text('用于邀请码生成记录、共享心跳标识', style: TextStyle(fontSize: 10, color: Colors.white38)),
-            ])),
-            SizedBox(width: 130, height: 34, child: TextField(
-              controller: TextEditingController(text: _userNick),
-              style: const TextStyle(fontSize: 12, color: Colors.white),
-              textAlignVertical: TextAlignVertical.center,
-              decoration: InputDecoration(hintText: '填个昵称', isDense: true, filled: true,
-                fillColor: const Color(0xFF1E1E36), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8)),
-              onChanged: (v) async {
-                _userNick = v;
-                await MobileHeartbeat.I.setNick(v);
-              },
-            )),
-          ]),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _userNick.isEmpty ? _registerNick : null,
+            child: Row(children: [
+              const Text('👤', style: TextStyle(fontSize: 18)),
+              const SizedBox(width: 10),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(_userNick.isEmpty ? '点击注册昵称' : _userNick,
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold,
+                        color: _userNick.isEmpty ? const Color(0xFF2BB3A3) : Colors.white)),
+                const SizedBox(height: 2),
+                Text(_userNick.isEmpty ? '注册后用于邀请码、心跳、共享记录（与网页账号一致）' : '注册昵称 · 与网页一致，改名请联系管理员',
+                    style: const TextStyle(fontSize: 10, color: Colors.white38)),
+              ])),
+              if (_userNick.isEmpty)
+                const Icon(Icons.chevron_right, size: 18, color: Color(0xFF2BB3A3)),
+            ]),
+          ),
         ),
         _settingsRow('🎁', '生成邀请码', '6位一次性邀请码（每天5个，30分钟有效）', _generateInvite),
         // 界面
         _settingsSection('界面'),
+        _settingsRow('✎', '编辑布局', '自由拖动/缩放各模块位置和大小（主页进入编辑态）', () {
+          setState(() { navTab = 0; layoutEditing = !layoutEditing; });
+        },
+            trailing: Text(layoutEditing ? '编辑中' : '关', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold,
+                color: layoutEditing ? const Color(0xFFFFD24A) : Colors.white38))),
         Container(margin: const EdgeInsets.fromLTRB(0, 0, 0, 10), padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(color: const Color(0xFF15152A), borderRadius: BorderRadius.circular(12)),
           child: StatefulBuilder(builder: (ctx, setSheet) => SwitchListTile(
             value: topBarAutoHide,
             activeColor: const Color(0xFF2BB3A3),
             title: const Text('顶栏自动隐藏', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
-            subtitle: const Text('开：平时收起，点顶部 ▾ 或下滑唤出，选完自动收起', style: TextStyle(fontSize: 10, color: Colors.white38)),
+            subtitle: const Text('开：顶栏悬浮弹出，不挤占布局；点顶部 ▾ 或下滑唤出，选完自动收起', style: TextStyle(fontSize: 10, color: Colors.white38)),
             onChanged: (v) async {
               setState(() { topBarAutoHide = v; topBarExpanded = !v; });
               setSheet(() {});
@@ -1041,12 +1067,60 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
+  /// 👤 注册昵称（一次性，与网页 TFJL_UserName 同键同义；注册后改名找管理员）
+  Future<void> _registerNick() async {
+    final ctl = TextEditingController(text: _userNick);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1e293b),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(children: const [
+          Icon(Icons.person_add, color: Color(0xFF2BB3A3)),
+          SizedBox(width: 8),
+          Text('注册昵称', style: TextStyle(color: Colors.white)),
+        ]),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('填一个常用昵称（与网页端一致），用于邀请码生成记录、共享心跳 📱 标识。',
+              style: TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.5)),
+          const SizedBox(height: 10),
+          TextField(controller: ctl, autofocus: true, maxLength: 16,
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+            decoration: InputDecoration(hintText: '例如：老王的手机', isDense: true, filled: true,
+              fillColor: const Color(0xFF0C0C17), counterText: '',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)),
+          ),
+          const SizedBox(height: 6),
+          const Text('⚠️ 注册后不可在此修改；管理员可在后台远程改名。',
+              style: TextStyle(fontSize: 10.5, color: Colors.white38)),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: Text('取消', style: TextStyle(color: Colors.white.withOpacity(0.6)))),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2BB3A3)),
+            child: const Text('注册', style: TextStyle(color: Color(0xFF07231F), fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+    final nick = ctl.text.trim();
+    if (ok != true || nick.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('TFJL_UserName', nick);   // 与网页同键；心跳立即用新昵称
+    setState(() => _userNick = nick);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('✅ 已注册昵称「$nick」'), duration: const Duration(seconds: 2)));
+    }
+  }
+
   /// 🎁 生成邀请码（照搬网页个人中心 generate：30分钟有效/一次性/每天5个）
   Future<void> _generateInvite() async {
     final nick = _userNick.trim();
     if (nick.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('先填上面的用户昵称（邀请码会记录是谁生成的）'), duration: Duration(seconds: 2)));
+      _registerNick();
       return;
     }
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(

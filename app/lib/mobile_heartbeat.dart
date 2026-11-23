@@ -12,7 +12,7 @@ class MobileHeartbeat {
   static const _deviceKey = 'mobile_device_anonid';
   static const _nickKey = 'mobile_heartbeat_nick';
   static const _lastKey = 'mobile_heartbeat_last';
-  static const appVersion = '1.6.3';
+  static const appVersion = '1.6.9';
 
   Timer? _timer;
   static final MobileHeartbeat I = MobileHeartbeat._();
@@ -35,7 +35,10 @@ class MobileHeartbeat {
         anonId = 'm' + DateTime.now().microsecondsSinceEpoch.toString().substring(6);
         await prefs.setString(_deviceKey, anonId);
       }
-      final nick = prefs.getString(_nickKey) ?? prefs.getString('TFJL_UserName') ?? '手机用户';
+      // 注册昵称（与网页 TFJL_UserName 同名同义）：老用户的旧键做兼容兜底
+      final nick = prefs.getString('TFJL_UserName')?.isNotEmpty == true
+          ? prefs.getString('TFJL_UserName')!
+          : (prefs.getString(_nickKey) ?? '手机用户');
       final now = DateTime.now().millisecondsSinceEpoch;
       // 与网页 payload 同构，platform='mobile' 是关键标识
       final payload = {
@@ -61,9 +64,28 @@ class MobileHeartbeat {
     }
   }
 
-  /// 用户设昵称后可更新，下次心跳生效
-  Future<void> setNick(String nick) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_nickKey, nick);
+  /// 🔴 管理员远程改名（对齐网页 applyServerNickOverride）：
+  /// 读本机 diag-<anonId>.json，若管理员打了 nickManagedByAdmin 且服务器 nick ≠ 本机 → 覆盖本机注册昵称。
+  /// 返回是否发生了覆盖（用于刷新界面）。
+  Future<bool> applyAdminNickOverride() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final anonId = prefs.getString(_deviceKey) ?? '';
+      if (anonId.isEmpty) return false;
+      final txt = await GistClient.readFile(diagGistId, 'diag-$anonId.json');
+      if (txt == null || txt.isEmpty) return false;
+      final obj = jsonDecode(txt);
+      if (obj is! Map || obj['nickManagedByAdmin'] != true) return false;
+      final payload = obj['payload'];
+      final serverNick = (payload is Map ? payload['nick'] : null) ?? obj['nick'] ?? '';
+      if (serverNick.toString().isEmpty) return false;
+      if (serverNick.toString() == (prefs.getString('TFJL_UserName') ?? '')) return false;
+      await prefs.setString('TFJL_UserName', serverNick.toString());
+      debugPrint('[昵称管理] 已应用管理员远程昵称: ${prefs.getString('TFJL_UserName')} → $serverNick');
+      return true;
+    } catch (e) {
+      debugPrint('[昵称管理] 应用服务器昵称失败(降级): $e');
+      return false;
+    }
   }
 }
