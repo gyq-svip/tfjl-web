@@ -1,7 +1,7 @@
 {
-  "version": "1.7.7",
-  "apk": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-app-store/releases/download/app-v1/tfjl-android-v1.7.7.apk",
-  "ipa": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-app-store/releases/download/app-v1/tfjl-ios-v1.7.7.ipa",
-  "body": "版本检测修复(改用Pages静态清单,不再Gitee API 403) + 战车设置/车名简写/紧凑布局/移出手牌修复/减伤系统/阵容备份导入导出",
-  "updated": "2026-11-23 21:00"
+  "version": "1.7.8",
+  "apk": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-app-store/releases/download/app-v1/tfjl-android-v1.7.8.apk",
+  "ipa": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-app-store/releases/download/app-v1/tfjl-ios-v1.7.8.ipa",
+  "body": "图库精选本地缓存(秒开+后台刷新+手动刷新)、token提速读取、战车设置/车名简写/紧凑布局/移出手牌修复/减伤系统/备份导入导出",
+  "updated": "2026-11-23 21:50"
 }
