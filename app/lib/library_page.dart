@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'models.dart';
 import 'data_store.dart';
 import 'card_widget.dart';
+import 'dr_system.dart';
 
 /// 📚 阵容图库：⭐精选（在线） / 🏆活动（7天A/B） / 🚢大航海（223套）
 class LibraryPage extends StatefulWidget {
@@ -198,41 +199,101 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   Widget _featuredCard(Map<String, dynamic> it) {
-    final pj = it['data'];
-    if (pj is! Map<String, dynamic>) return const SizedBox();
+    final pjRaw = it['data'];
+    if (pjRaw is! Map) return const SizedBox();
+    final pj = Map<String, dynamic>.from(pjRaw);
     final name = it['name']?.toString() ?? '未命名';
     final cat = it['category']?.toString() ?? '';
-    final aNames = _names(pj['myHandCards']);
-    final bNames = _names(pj['teammateHandCards']);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 7),
-      padding: const EdgeInsets.all(7),
-      decoration: BoxDecoration(color: const Color(0xFF15152A), borderRadius: BorderRadius.circular(10)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Text(name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))),
-          const Spacer(),
-          if (cat.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-              decoration: BoxDecoration(color: const Color(0x332BB3A3), borderRadius: BorderRadius.circular(5)),
-              child: Text(cat, style: const TextStyle(fontSize: 9, color: Color(0xFF9BE9E0))),
+    final aHand = (pj['myHandCards'] as List?) ?? const [];
+    final bHand = (pj['teammateHandCards'] as List?) ?? const [];
+    final ca = pj['myChariot'] is Map ? Map<String, dynamic>.from(pj['myChariot'] as Map) : null;
+    final cb = pj['teammateChariot'] is Map ? Map<String, dynamic>.from(pj['teammateChariot'] as Map) : null;
+    double? drA, drB;
+    try { drA = DrSystem.breakdown(handCards: aHand, tableName: '我的', chariot: ca)['total']; } catch (_) {}
+    try { drB = DrSystem.breakdown(handCards: bHand, tableName: '队友', chariot: cb)['total']; } catch (_) {}
+    String chOf(Map<String, dynamic>? c) {
+      if (c == null) return '';
+      try {
+        return AppData.chariotShort((c['main'] as num?)?.toInt() ?? 1, (c['sub'] as num?)?.toInt() ?? 0);
+      } catch (_) { return ''; }
+    }
+    return LayoutBuilder(builder: (ctx, cs) {
+      const gap = 3.0;
+      final w = ((cs.maxWidth - 14 - gap * 4) / 5).clamp(26.0, 74.0);
+      return Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(color: const Color(0xFF15152A), borderRadius: BorderRadius.circular(10)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Flexible(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A)))),
+            const SizedBox(width: 5),
+            if (cat.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(color: const Color(0x332BB3A3), borderRadius: BorderRadius.circular(5)),
+                child: Text(cat, style: const TextStyle(fontSize: 9, color: Color(0xFF9BE9E0))),
+              ),
+            const Spacer(),
+            GestureDetector(
+              onTap: () => _useProject(pj, name),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(color: const Color(0xFFFFD24A), borderRadius: BorderRadius.circular(6)),
+                child: const Text('📋 用此阵容', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF07231F))),
+              ),
             ),
-          const SizedBox(width: 5),
-          GestureDetector(
-            onTap: () => _useProject(pj, name),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-              decoration: BoxDecoration(color: const Color(0xFFFFD24A), borderRadius: BorderRadius.circular(6)),
-              child: const Text('📋 用此阵容', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF07231F))),
-            ),
-          ),
+          ]),
+          const SizedBox(height: 5),
+          _featGroup('🅰 A组（我方）', const Color(0xFF4ECDC4), aHand, true, pj, w, chOf(ca), drA),
+          const SizedBox(height: 5),
+          _featGroup('🅱 B组（队友）', const Color(0xFFF0932B), bHand, false, pj, w, chOf(cb), drB),
         ]),
-        const SizedBox(height: 4),
-        _heroGroup('🅰 A 组', const Color(0xFF4ECDC4), aNames),
-        _heroGroup('🅱 B 组', const Color(0xFFF0932B), bNames),
+      );
+    });
+  }
+
+  /// 一组 5×2 = 10 张卡（皮肤图 + 等级盾），标题行带战车与减伤%
+  Widget _featGroup(String label, Color color, List hand, bool isMine,
+      Map<String, dynamic> pj, double w, String chariot, double? dr) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Text(label, style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: color)),
+        const SizedBox(width: 6),
+        if (chariot.isNotEmpty)
+          Text('🚂$chariot', style: const TextStyle(fontSize: 8.5, color: Color(0xFF9AA4B8))),
+        if (dr != null) ...[
+          const SizedBox(width: 6),
+          Text('🛡${dr.toStringAsFixed(1)}%', style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: Color(0xFF7CFC9B))),
+        ],
       ]),
-    );
+      const SizedBox(height: 3),
+      for (var r = 0; r < 2; r++)
+        Padding(
+          padding: EdgeInsets.only(top: r > 0 ? 3 : 0),
+          child: Row(children: [
+            for (var c = 0; c < 5; c++)
+              Padding(
+                padding: EdgeInsets.only(right: c < 4 ? 3 : 0),
+                child: Builder(builder: (_) {
+                  final idx = r * 5 + c;
+                  if (idx >= hand.length) {
+                    return Container(
+                      width: w, height: w * 0.92,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha(9),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    );
+                  }
+                  final cd = parseCard(hand[idx], isMine, pj, pack: SkinPack.I);
+                  return CardSlot(data: cd, size: w);
+                }),
+              ),
+          ]),
+        ),
+    ]);
   }
 
   List<String> _names(dynamic hand) {
