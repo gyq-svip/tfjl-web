@@ -890,7 +890,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   Widget _homeBody() {
     return Stack(children: [
         // 🖼 背景层（图片/视频，IgnorePointer 不影响点击）
-        Positioned.fill(child: BgLayer(type: BgSetting.type, path: BgSetting.path, themeId: BgSetting.themeId, opacity: BgSetting.opacity, sound: BgSetting.soundOn)),
+        Positioned.fill(child: BgLayer(type: BgSetting.type, path: BgSetting.path, themeId: BgSetting.themeId, opacity: BgSetting.opacity, sound: BgSetting.soundOn, enabled: BgSetting.enabled)),
         SafeArea(
         child: Column(children: [
                 buildTopBar(),   // 第一行常驻（标题+快捷chips；关闭自动隐藏时下拉行也在这里）
@@ -1274,8 +1274,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 Row(children: [
                   const Text('🔊 背景声音', style: TextStyle(fontSize: 11.5, color: Colors.white70)),
                   const SizedBox(width: 6),
-                  Text(BgSetting.soundOn ? '有声' : '静音',
-                      style: TextStyle(fontSize: 10, color: BgSetting.soundOn ? const Color(0xFF4ade80) : Colors.white38)),
+                  Text(BgSetting.enabled ? (BgSetting.soundOn ? '有声' : '静音') : '静音（背景已关闭）',
+                      style: TextStyle(fontSize: 10, color: (BgSetting.enabled && BgSetting.soundOn) ? const Color(0xFF4ade80) : Colors.white38)),
                   const Spacer(),
                   Transform.scale(
                     scale: 0.7,

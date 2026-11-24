@@ -219,6 +219,7 @@ class BgLayer extends StatefulWidget {
   final String themeId;
   final double opacity;
   final bool sound;
+  final bool enabled;
   const BgLayer({
     super.key,
     required this.type,
@@ -226,6 +227,7 @@ class BgLayer extends StatefulWidget {
     this.themeId = BgSetting.defaultThemeId,
     required this.opacity,
     this.sound = false,
+    this.enabled = true,
   });
 
   @override
@@ -253,11 +255,23 @@ class _BgLayerState extends State<BgLayer> {
     } else if (old.sound != widget.sound) {
       _vc?.setVolume(widget.sound ? 0.6 : 0);   // 只调音量，不重播
     }
+    // 🔴 背景总开关：关掉时必须停止播放并释放（否则画面没了声音还在响）
+    if (old.enabled != widget.enabled) {
+      if (!widget.enabled) {
+        final vc = _vc;
+        _vc = null;
+        try { vc?.pause(); } catch (_) {}
+        try { vc?.dispose(); } catch (_) {}
+        if (mounted) setState(() { _preparing = false; });
+      } else {
+        _init();
+      }
+    }
   }
 
   Future<void> _init() async {
     try {
-      if (!BgSetting.enabled || widget.type == 'none') return;
+      if (!widget.enabled || widget.type == 'none') return;
       if (widget.type == 'video') {
         if (widget.path.isEmpty) return;
         final f = File(widget.path);
@@ -271,6 +285,7 @@ class _BgLayerState extends State<BgLayer> {
       final id = theme['id']!;
       final url = theme['url']!;
       final cache = await BgSetting.themeCacheFile(id);
+      if (!widget.enabled) return;
       // ① 已有本地缓存 → 直接播（永不耗流量）
       if (cache.existsSync() && cache.lengthSync() > 500 * 1024) {
         await _play(VideoPlayerController.file(cache));
@@ -285,6 +300,7 @@ class _BgLayerState extends State<BgLayer> {
       BgSetting.onDownloadProgress = null;
       if (!mounted) return;
       setState(() => _preparing = false);
+      if (!widget.enabled) return;   // 下载期间用户关了背景 → 不播
       if (ok && cache.existsSync()) {
         await _play(VideoPlayerController.file(cache));
       }
@@ -295,7 +311,9 @@ class _BgLayerState extends State<BgLayer> {
   }
 
   Future<void> _play(VideoPlayerController vc) async {
+    if (!widget.enabled) { vc.dispose(); return; }
     await vc.initialize();
+    if (!widget.enabled) { vc.dispose(); return; }
     await vc.setLooping(true);
     await vc.setVolume(widget.sound ? 0.6 : 0);
     await vc.play();
@@ -314,7 +332,7 @@ class _BgLayerState extends State<BgLayer> {
 
   @override
   Widget build(BuildContext context) {
-    if (!BgSetting.enabled || widget.type == 'none') return const SizedBox.shrink();
+    if (!widget.enabled || widget.type == 'none') return const SizedBox.shrink();
     Widget child;
     if (widget.type == 'image') {
       if (widget.path.isEmpty) return const SizedBox.shrink();
