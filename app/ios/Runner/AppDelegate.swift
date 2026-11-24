@@ -31,13 +31,14 @@ private class ShareBridge {
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    let ok = super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    if let controller = window?.rootViewController as? FlutterViewController {
+      setupChannels(controller.binaryMessenger)
+    }
+    return ok
   }
 
-  override func configureFlutterEngine(_ flutterEngine: FlutterEngine) {
-    super.configureFlutterEngine(flutterEngine)
-    let messenger = flutterEngine.binaryMessenger
-
+  private func setupChannels(_ messenger: FlutterBinaryMessenger) {
     FlutterMethodChannel(name: ShareBridge.name, binaryMessenger: messenger)
       .setMethodCallHandler { call, result in
         if call.method == "getPending" {
