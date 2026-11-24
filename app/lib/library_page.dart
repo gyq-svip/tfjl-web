@@ -28,6 +28,10 @@ class _LibraryPageState extends State<LibraryPage> {
   void initState() {
     super.initState();
     _initLoad();
+    // 🔴 2026-11-24 图库独立确保皮肤包就绪：卡图依赖 SkinPack，若主启动时没下完这里补一次
+    if (!SkinPack.I.ready) {
+      SkinPack.I.ensurePack().then((_) { if (mounted) setState(() {}); });
+    }
   }
 
   /// 缓存秒开 + 后台刷新（图库是死数据，很久才更新一次，没必要每次等网络）
@@ -194,8 +198,18 @@ class _LibraryPageState extends State<LibraryPage> {
                 style: const TextStyle(color: Colors.white38, fontSize: 12)),
           ),
         ),
-      for (final itRaw in items) _featuredCard(itRaw as Map<String, dynamic>),
+      for (final itRaw in items.where(_hasCards)) _featuredCard(itRaw as Map<String, dynamic>),
     ]);
+  }
+
+  /// 过滤空阵容（数据里可能有 A/B 都没卡的占位项）
+  bool _hasCards(dynamic e) {
+    if (e is! Map) return false;
+    final d = e['data'];
+    if (d is! Map) return false;
+    final a = (d['myHandCards'] as List?) ?? const [];
+    final b = (d['teammateHandCards'] as List?) ?? const [];
+    return a.isNotEmpty || b.isNotEmpty;
   }
 
   Widget _featuredCard(Map<String, dynamic> it) {
