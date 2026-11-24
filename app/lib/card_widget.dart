@@ -226,9 +226,13 @@ CardData parseCard(dynamic cardRaw, bool isMine, Map<String, dynamic> proj, {Ski
 
   final key = '${isMine ? "my" : "teammate"}_${cardRaw['id'] ?? ''}';
   final levels = proj['cardLevels'] as Map<String, dynamic>? ?? {};
-  final store = (levels[isMine ? 'my' : 'teammate'] as Map<String, dynamic>?) ?? levels;
-  d.level = store[key]?.toString() ?? store[cardRaw['id']?.toString()]?.toString() ?? '1';
-  if (d.level.isEmpty) d.level = '1';
+  // 🔴 2026-11-24 修复：精选数据里 cardLevels 可能是混结构（既有 my_49 平铺，又有 "my":"17" 这种字符串键），
+  //    旧代码强转 Map 会抛类型异常 → 该卡渲染中断 → 整组变空白（案例：「典狱长」A组大片空白）。
+  final rawStore = levels[isMine ? 'my' : 'teammate'];
+  final Map<String, dynamic> store = (rawStore is Map) ? Map<String, dynamic>.from(rawStore) : levels;
+  final lvRaw = store[key] ?? store[cardRaw['id']?.toString()];
+  d.level = (lvRaw is String || lvRaw is num) ? lvRaw.toString() : '1';
+  if (d.level.isEmpty || d.level.length > 3) d.level = '1';   // 防异常值把等级盾撑爆
 
   final mohua = proj['cardMoHua'] as Map<String, dynamic>? ?? {};
   d.hasMohua = mohua[key] == true;

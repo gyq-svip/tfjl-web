@@ -23,11 +23,15 @@ class _LibraryPageState extends State<LibraryPage> {
   static const _cacheAtKey = 'library_featured_cache_at';
   bool _refreshing = false;
   String _cacheTime = '';
+  /// ⭐精选本机设置：{ '<阵容id>_a'/'_b': { chariot:{main,sub,mainLv,subLv}, table:'我的'|'队友' } }
+  Map<String, dynamic> _featCfg = {};
+  static const _featCfgKey = 'library_feat_cfg';
 
   @override
   void initState() {
     super.initState();
     _initLoad();
+    _loadFeatCfg();
     // 🔴 2026-11-24 图库独立确保皮肤包就绪：卡图依赖 SkinPack，若主启动时没下完这里补一次
     if (!SkinPack.I.ready) {
       SkinPack.I.ensurePack().then((_) { if (mounted) setState(() {}); });
@@ -202,6 +206,44 @@ class _LibraryPageState extends State<LibraryPage> {
     ]);
   }
 
+  Future<void> _loadFeatCfg() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final t = prefs.getString(_featCfgKey);
+      if (t != null && t.isNotEmpty) {
+        final j = jsonDecode(t);
+        if (j is Map) {
+          if (mounted) setState(() => _featCfg = Map<String, dynamic>.from(j));
+          else _featCfg = Map<String, dynamic>.from(j);
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveFeatCfg() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_featCfgKey, jsonEncode(_featCfg));
+    } catch (_) {}
+  }
+
+  /// 取某组的有效设置（本机设置优先，否则用数据里的战车 + 默认表）
+  Map<String, dynamic> _sideCfg(String itemId, bool isMine, Map<String, dynamic> pj) {
+    final k = '${itemId}_${isMine ? "a" : "b"}';
+    final c = _featCfg[k];
+    Map<String, dynamic> ch = {};
+    final saved = (c is Map) ? c['chariot'] : null;
+    if (saved is Map && saved.isNotEmpty) {
+      ch = Map<String, dynamic>.from(saved);
+    } else {
+      final raw = pj[isMine ? 'myChariot' : 'teammateChariot'];
+      if (raw is Map) ch = Map<String, dynamic>.from(raw);
+    }
+    final t = (c is Map) ? (c['table']?.toString() ?? '') : '';
+    final table = t.isNotEmpty ? t : (isMine ? '我的' : '队友');
+    return {'chariot': ch, 'table': table};
+  }
+
   /// 过滤空阵容（数据里可能有 A/B 都没卡的占位项）
   bool _hasCards(dynamic e) {
     if (e is! Map) return false;
@@ -218,19 +260,20 @@ class _LibraryPageState extends State<LibraryPage> {
     final pj = Map<String, dynamic>.from(pjRaw);
     final name = it['name']?.toString() ?? '未命名';
     final cat = it['category']?.toString() ?? '';
+    final itemId = (it['id']?.toString().isNotEmpty == true) ? it['id'].toString() : name;
     final aHand = (pj['myHandCards'] as List?) ?? const [];
     final bHand = (pj['teammateHandCards'] as List?) ?? const [];
-    final ca = pj['myChariot'] is Map ? Map<String, dynamic>.from(pj['myChariot'] as Map) : null;
-    final cb = pj['teammateChariot'] is Map ? Map<String, dynamic>.from(pj['teammateChariot'] as Map) : null;
+    final cfgA = _sideCfg(itemId, true, pj);
+    final cfgB = _sideCfg(itemId, false, pj);
     double? drA, drB;
-    try { drA = DrSystem.breakdown(handCards: aHand, tableName: '我的', chariot: ca)['total']; } catch (_) {}
-    try { drB = DrSystem.breakdown(handCards: bHand, tableName: '队友', chariot: cb)['total']; } catch (_) {}
-    String chOf(Map<String, dynamic>? c) {
-      if (c == null) return '';
-      try {
-        return AppData.chariotShort((c['main'] as num?)?.toInt() ?? 1, (c['sub'] as num?)?.toInt() ?? 0);
-      } catch (_) { return ''; }
-    }
+    try {
+      drA = DrSystem.breakdown(handCards: aHand, tableName: cfgA['table'] as String,
+          chariot: cfgA['chariot'] as Map<String, dynamic>)['total'];
+    } catch (_) {}
+    try {
+      drB = DrSystem.breakdown(handCards: bHand, tableName: cfgB['table'] as String,
+          chariot: cfgB['chariot'] as Map<String, dynamic>)['total'];
+    } catch (_) {}
     return LayoutBuilder(builder: (ctx, cs) {
       const gap = 3.0;
       final w = ((cs.maxWidth - 14 - gap * 4) / 5).clamp(26.0, 74.0);
@@ -239,48 +282,210 @@ class _LibraryPageState extends State<LibraryPage> {
         padding: const EdgeInsets.all(7),
         decoration: BoxDecoration(color: const Color(0xFF15152A), borderRadius: BorderRadius.circular(10)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // 🔴 单行头部：名称 · 分类 · A战车减伤 · B战车减伤 · 用此阵容
           Row(children: [
             Flexible(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A)))),
-            const SizedBox(width: 5),
-            if (cat.isNotEmpty)
+            if (cat.isNotEmpty) ...[
+              const SizedBox(width: 4),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                decoration: BoxDecoration(color: const Color(0x332BB3A3), borderRadius: BorderRadius.circular(5)),
-                child: Text(cat, style: const TextStyle(fontSize: 9, color: Color(0xFF9BE9E0))),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                decoration: BoxDecoration(color: const Color(0x332BB3A3), borderRadius: BorderRadius.circular(4)),
+                child: Text(cat, style: const TextStyle(fontSize: 8.5, color: Color(0xFF9BE9E0))),
               ),
+            ],
+            const SizedBox(width: 5),
+            _sideChip(itemId, true, pj, cfgA, drA),
+            const SizedBox(width: 4),
+            _sideChip(itemId, false, pj, cfgB, drB),
             const Spacer(),
             GestureDetector(
               onTap: () => _useProject(pj, name),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                 decoration: BoxDecoration(color: const Color(0xFFFFD24A), borderRadius: BorderRadius.circular(6)),
-                child: const Text('📋 用此阵容', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF07231F))),
+                child: const Text('📋 用此阵容', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF07231F))),
               ),
             ),
           ]),
           const SizedBox(height: 5),
-          _featGroup('🅰 A组（我方）', const Color(0xFF4ECDC4), aHand, true, pj, w, chOf(ca), drA),
+          _featGroup('🅰 A组（我方）', const Color(0xFF4ECDC4), aHand, true, pj, w),
           const SizedBox(height: 5),
-          _featGroup('🅱 B组（队友）', const Color(0xFFF0932B), bHand, false, pj, w, chOf(cb), drB),
+          _featGroup('🅱 B组（队友）', const Color(0xFFF0932B), bHand, false, pj, w),
         ]),
       );
     });
   }
 
-  /// 一组 5×2 = 10 张卡（皮肤图 + 等级盾），标题行带战车与减伤%
+  /// 头部单行的小胶囊：A🚂走马·我方 51% —— 点击可改战车/减伤表
+  Widget _sideChip(String itemId, bool isMine, Map<String, dynamic> pj, Map<String, dynamic> cfg, double? dr) {
+    final ch = cfg['chariot'] as Map<String, dynamic>;
+    final table = cfg['table'] as String;
+    final main = (ch['main'] as num?)?.toInt() ?? 0;
+    final sub = (ch['sub'] as num?)?.toInt() ?? 0;
+    final short = main > 0 ? AppData.chariotShort(main, sub) : '未设车';
+    final color = isMine ? const Color(0xFF4ECDC4) : const Color(0xFFF0932B);
+    return GestureDetector(
+      onTap: () => _showFeatCfg(itemId, isMine, pj),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        decoration: BoxDecoration(
+          color: color.withAlpha(20),
+          borderRadius: BorderRadius.circular(5),
+          border: Border.all(color: color.withAlpha(90)),
+        ),
+        child: Text(
+          '${isMine ? "A" : "B"}🚂$short·$table ${(dr ?? 0).toStringAsFixed(1)}%',
+          style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: color),
+        ),
+      ),
+    );
+  }
+
+  /// 🚂 某组设置：战车（主/副/等级/融合）+ 减伤表（本机保存，仅影响自己看到的数值）
+  void _showFeatCfg(String itemId, bool isMine, Map<String, dynamic> pj) {
+    final key = '${itemId}_${isMine ? "a" : "b"}';
+    final cfg = _sideCfg(itemId, isMine, pj);
+    final ch = Map<String, dynamic>.from(cfg['chariot'] as Map<String, dynamic>);
+    var main = (ch['main'] as num?)?.toInt() ?? 1;
+    var mainLv = ((ch['mainLv'] as num?)?.toInt() ?? 1).clamp(1, 20);
+    var sub = (ch['sub'] as num?)?.toInt() ?? 0;
+    var subLv = ((ch['subLv'] as num?)?.toInt() ?? 1).clamp(1, 20);
+    var subF = ((ch['subFusion'] as num?)?.toInt() ?? 0).clamp(0, 3);
+    var table = cfg['table'] as String;
+    final hand = ((isMine ? pj['myHandCards'] : pj['teammateHandCards']) as List?) ?? const [];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1A2E),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(14))),
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setSheet) {
+        Map<String, dynamic> buildCfg() => {
+              'chariot': {'main': main, 'mainLv': mainLv, 'sub': sub, 'subLv': subLv, 'subFusion': subF},
+              'table': table,
+            };
+        double curDr() {
+          try {
+            return DrSystem.breakdown(handCards: hand, tableName: table, chariot: buildCfg()['chariot'] as Map<String, dynamic>)['total'] ?? 0;
+          } catch (_) { return 0; }
+        }
+        Widget row(String label, Widget child) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(children: [
+                SizedBox(width: 76, child: Text(label, style: const TextStyle(fontSize: 11, color: Colors.white60))),
+                Expanded(child: child),
+              ]),
+            );
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('🚂 ${isMine ? "A组（我方）" : "B组（队友）"} 设置',
+                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))),
+              const SizedBox(height: 2),
+              Text('当前减伤：${curDr().toStringAsFixed(1)}%（本机设置，不影响别人）',
+                  style: const TextStyle(fontSize: 10, color: Color(0xFF7CFC9B))),
+              const SizedBox(height: 10),
+              row('主战车', DropdownButton<int>(
+                value: main,
+                isExpanded: true,
+                dropdownColor: const Color(0xFF1A1A2E),
+                style: const TextStyle(fontSize: 11.5, color: Colors.white),
+                items: [for (var i = 1; i <= AppData.chariotList.length; i++)
+                  DropdownMenuItem(value: i, child: Text('$i. ${AppData.chariotName(i)}${AppData.chariotIsDr(i) ? " 🛡" : ""}'))],
+                onChanged: (v) => setSheet(() { main = v ?? main; }),
+              )),
+              row('主车等级', DropdownButton<int>(
+                value: mainLv,
+                dropdownColor: const Color(0xFF1A1A2E),
+                style: const TextStyle(fontSize: 11.5, color: Colors.white),
+                items: [for (var i = 1; i <= 20; i++) DropdownMenuItem(value: i, child: Text('Lv$i'))],
+                onChanged: (v) => setSheet(() { mainLv = v ?? mainLv; }),
+              )),
+              row('副战车', DropdownButton<int>(
+                value: sub,
+                isExpanded: true,
+                dropdownColor: const Color(0xFF1A1A2E),
+                style: const TextStyle(fontSize: 11.5, color: Colors.white),
+                items: [
+                  const DropdownMenuItem(value: 0, child: Text('未设置')),
+                  for (var i = 1; i <= AppData.chariotList.length; i++)
+                    DropdownMenuItem(value: i, child: Text('$i. ${AppData.chariotName(i)}${AppData.chariotIsDr(i) ? " 🛡" : ""}')),
+                ],
+                onChanged: (v) => setSheet(() { sub = v ?? 0; }),
+              )),
+              if (sub > 0) ...[
+                row('副车等级', DropdownButton<int>(
+                  value: subLv,
+                  dropdownColor: const Color(0xFF1A1A2E),
+                  style: const TextStyle(fontSize: 11.5, color: Colors.white),
+                  items: [for (var i = 1; i <= 20; i++) DropdownMenuItem(value: i, child: Text('Lv$i'))],
+                  onChanged: (v) => setSheet(() { subLv = v ?? subLv; }),
+                )),
+                row('副车融合', DropdownButton<int>(
+                  value: subF,
+                  dropdownColor: const Color(0xFF1A1A2E),
+                  style: const TextStyle(fontSize: 11.5, color: Colors.white),
+                  items: const [
+                    DropdownMenuItem(value: 0, child: Text('50%（0次）')),
+                    DropdownMenuItem(value: 1, child: Text('60%（1次）')),
+                    DropdownMenuItem(value: 2, child: Text('70%（2次）')),
+                    DropdownMenuItem(value: 3, child: Text('80%（3次）')),
+                  ],
+                  onChanged: (v) => setSheet(() { subF = v ?? 0; }),
+                )),
+              ],
+              row('减伤表', Wrap(spacing: 6, children: [
+                for (final t in DrSystem.tableNames)
+                  ChoiceChip(
+                    label: Text(t, style: TextStyle(fontSize: 11, color: table == t ? const Color(0xFF07231F) : Colors.white70)),
+                    selected: table == t,
+                    selectedColor: const Color(0xFF2BB3A3),
+                    backgroundColor: Colors.white.withAlpha(22),
+                    onSelected: (_) => setSheet(() { table = t; }),
+                  ),
+              ])),
+              const SizedBox(height: 4),
+              Row(children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      _featCfg.remove(key);
+                      _saveFeatCfg();
+                      if (mounted) setState(() {});
+                      Navigator.pop(ctx);
+                    },
+                    child: const Text('恢复默认', style: TextStyle(fontSize: 12, color: Colors.white54)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2BB3A3)),
+                    onPressed: () {
+                      _featCfg[key] = buildCfg();
+                      _saveFeatCfg();
+                      if (mounted) setState(() {});
+                      Navigator.pop(ctx);
+                    },
+                    child: const Text('保存', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF07231F))),
+                  ),
+                ),
+              ]),
+            ]),
+          ),
+        );
+      }),
+    );
+  }
+
+  /// 一组 5×2 = 10 张卡（皮肤图 + 等级盾）；战车/减伤已挪到头部单行
   Widget _featGroup(String label, Color color, List hand, bool isMine,
-      Map<String, dynamic> pj, double w, String chariot, double? dr) {
+      Map<String, dynamic> pj, double w) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
         Text(label, style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: color)),
-        const SizedBox(width: 6),
-        if (chariot.isNotEmpty)
-          Text('🚂$chariot', style: const TextStyle(fontSize: 8.5, color: Color(0xFF9AA4B8))),
-        if (dr != null) ...[
-          const SizedBox(width: 6),
-          Text('🛡${dr.toStringAsFixed(1)}%', style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: Color(0xFF7CFC9B))),
-        ],
       ]),
       const SizedBox(height: 3),
       for (var r = 0; r < 2; r++)
@@ -301,7 +506,13 @@ class _LibraryPageState extends State<LibraryPage> {
                       ),
                     );
                   }
-                  final cd = parseCard(hand[idx], isMine, pj, pack: SkinPack.I);
+                  // 单卡异常不能毁掉整组（数据可能有脏字段）
+                  CardData cd;
+                  try {
+                    cd = parseCard(hand[idx], isMine, pj, pack: SkinPack.I);
+                  } catch (_) {
+                    cd = CardData();
+                  }
                   return CardSlot(data: cd, size: w);
                 }),
               ),
