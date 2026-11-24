@@ -1119,11 +1119,31 @@ let _adminVerified=false, _adminLastTok='', _featItems=[], _featData=null, _feat
         return _LL_IDX_GIST;
     }
     async function _featuredLoad(){ const gid=await _featuredGistId(); const tok=_llTok(); const tries=tok?[tok,'']:['']; for(let k=0;k<tries.length;k++){ const t=tries[k]; try{ const r=await fetch('https://api.github.com/gists/'+gid,{headers:t?{'Accept':'application/vnd.github.v3+json','Authorization':'token '+t}:{'Accept':'application/vnd.github.v3+json'}}); if(!r.ok) continue; const d=await r.json(); const f=d.files && d.files['featured_lineups.json']; if(!f) return {items:[]}; let txt=f.content; if(f.truncated) txt=await fetch(f.raw_url).then(x=>x.text()); try{ const j=JSON.parse(txt); return (j && Array.isArray(j.items))?j:{items:[]}; }catch(e){ return {items:[]}; } }catch(e){} } return {items:[]}; }
+    // 🔴 2026-11-24 体积治理：剥掉内嵌 base64 皮肤大图（保留字段结构，值置 null）
+    //    原因：精选 gist 塞进 base64 图后 JSON 达 1.5MB，超 GitHub API 的 1MB content 上限 →
+    //          API 返回截断内容、只有浏览器能读 raw_url，APP（Dart HTTP）读不到 gist raw 域名 → 精选列表为空
+    function _stripHeavyObj(o, depth) {
+        depth = depth || 0;
+        if (depth > 12) return o;
+        if (Array.isArray(o)) return o.map(function (v) { return _stripHeavyObj(v, depth + 1); });
+        if (o && typeof o === 'object') {
+            const r = {};
+            for (const k in o) {
+                const v = o[k];
+                if (typeof v === 'string' && (v.indexOf('data:image') === 0 || v.length > 20000)) { r[k] = null; continue; }
+                r[k] = _stripHeavyObj(v, depth + 1);
+            }
+            return r;
+        }
+        return o;
+    }
     async function _featuredSave(items){ if(!await _ensureAdmin()) return false; const tok=_llTok(); if(!tok) return false; try{
         const maxItems = 20;
         if (items.length > maxItems) { items = items.slice(items.length - maxItems); if(typeof showToast==='function') showToast('精选阵容超过 ' + maxItems + ' 条，已自动保留最新的','warn'); }
-        const body = JSON.stringify({ files: { 'featured_lineups.json': { content: JSON.stringify({ items: items }) } } });
-        if (body.length > 950000) { if(typeof showToast==='function') showToast('精选阵容数据过大，保存失败','error'); return false; }
+        const _liteItems = items.map(function (it) { return _stripHeavyObj(it); });
+        const content = JSON.stringify({ items: _liteItems });
+        const body = JSON.stringify({ files: { 'featured_lineups.json': { content: content } } });
+        if (body.length > 950000) { if(typeof showToast==='function') showToast('精选数据仍过大（' + Math.round(body.length / 1024) + 'KB），已拒绝保存','error'); return false; }
         const r=await fetch('https://api.github.com/gists/'+await _featuredGistId(),{method:'PATCH',headers:{'Accept':'application/vnd.github.v3+json','Content-Type':'application/json','Authorization':'token '+tok},body:body}); return r.ok; }catch(e){ return false; } }
     function _normPj(pj){ return (pj && pj.project) ? pj.project : (pj || {}); }
     function _featSlug(item){ return 'feat_' + String(item.id || item.name || 'x').replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g,'_'); }
