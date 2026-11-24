@@ -47,6 +47,11 @@ class PoolSheetState extends State<PoolSheet> {
     if (mounted) setState(() {});
   }
 
+  /// 默认配置改完后让卡池卡片立即按新皮肤/融合/魔化重绘
+  void _repaintPoolAfterDefaults() {
+    if (mounted) setState(() {});
+  }
+
   /// 卡池预设改动后立刻落盘（之前只改内存不保存 → 退出全丢）
   static Future<void> saveHeroDefaults() async {
     final prefs = await SharedPreferences.getInstance();
@@ -90,7 +95,7 @@ class PoolSheetState extends State<PoolSheet> {
                   min: 0, max: (levels.length - 1).toDouble(), divisions: levels.length - 1, value: lvIdx.toDouble(),
                   activeColor: const Color(0xFF4ECDC4),
                   onChanged: (v) => setSheet(() => lvIdx = v.round()),
-                  onChangeEnd: (v) { lvIdx = v.round(); hs['lv'] = '${levels[lvIdx]}'; globalHeroDefaults[official] = hs; saveHeroDefaults(); setSheet(() {}); },
+                  onChangeEnd: (v) { lvIdx = v.round(); hs['lv'] = '${levels[lvIdx]}'; globalHeroDefaults[official] = hs; saveHeroDefaults(); setSheet(() {}); _repaintPoolAfterDefaults(); },
                 ),
                 const Text('🎨 皮肤', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFFF9800))),
                 SizedBox(
@@ -100,7 +105,7 @@ class PoolSheetState extends State<PoolSheet> {
                     children: [
                       for (final sk in SkinPack.I.skinsOfHero(baseHero))
                         GestureDetector(
-                          onTap: () { hs['skin'] = '默认' == sk ? '' : sk; globalHeroDefaults[official] = hs; saveHeroDefaults(); setSheet(() {}); },
+                          onTap: () { hs['skin'] = '默认' == sk ? '' : sk; globalHeroDefaults[official] = hs; saveHeroDefaults(); setSheet(() {}); _repaintPoolAfterDefaults(); },
                           child: Container(
                             width: 50, height: 50, margin: const EdgeInsets.only(right: 5), padding: const EdgeInsets.all(2),
                             decoration: BoxDecoration(
@@ -118,7 +123,7 @@ class PoolSheetState extends State<PoolSheet> {
                 const SizedBox(height: 6),
                 if (hasMh)
                   GestureDetector(
-                    onTap: () { hs['mohua'] = !(hs['mohua'] == true); globalHeroDefaults[official] = hs; saveHeroDefaults(); setSheet(() {}); },
+                    onTap: () { hs['mohua'] = !(hs['mohua'] == true); globalHeroDefaults[official] = hs; saveHeroDefaults(); setSheet(() {}); _repaintPoolAfterDefaults(); },
                     child: Container(
                       width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 7), alignment: Alignment.center,
                       decoration: BoxDecoration(color: hs['mohua'] == true ? const Color(0xFF7C4BC0) : Colors.white.withAlpha(50), borderRadius: BorderRadius.circular(8)),
@@ -136,7 +141,7 @@ class PoolSheetState extends State<PoolSheet> {
                 const Text('🔗 融合变体（官方）', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF9BE9E0))),
                 if (fusion != null)
                   GestureDetector(
-                    onTap: () { hs['fusion'] = ''; globalHeroDefaults[official] = hs; saveHeroDefaults(); setSheet(() {}); },
+                    onTap: () { hs['fusion'] = ''; globalHeroDefaults[official] = hs; saveHeroDefaults(); setSheet(() {}); _repaintPoolAfterDefaults(); },
                     child: Container(
                       width: double.infinity, margin: const EdgeInsets.only(top: 5), padding: const EdgeInsets.symmetric(vertical: 7), alignment: Alignment.center,
                       decoration: BoxDecoration(color: Colors.white.withAlpha(70), borderRadius: BorderRadius.circular(8)),
@@ -157,7 +162,7 @@ class PoolSheetState extends State<PoolSheet> {
                           subLevels = AppData.availableLevels(st);
                           subIdx = 0;
                         }
-                        setSheet(() {});
+                        setSheet(() {}); _repaintPoolAfterDefaults();
                       },
                       child: Container(
                         width: double.infinity, margin: const EdgeInsets.only(top: 5), padding: const EdgeInsets.symmetric(vertical: 7), alignment: Alignment.center,
@@ -179,7 +184,7 @@ class PoolSheetState extends State<PoolSheet> {
                       hs['sub'] = sub;
                       globalHeroDefaults[official] = hs;
                       saveHeroDefaults();
-                      setSheet(() {});
+                      setSheet(() {}); _repaintPoolAfterDefaults();
                     },
                   ),
                 ],

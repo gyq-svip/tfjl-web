@@ -520,17 +520,26 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             child: Text('＋ 快捷功能', style: TextStyle(fontSize: 10, color: Color(0xFF2BB3A3)))),
       );
     }
-    return Row(children: [
-      for (final k in _quickOrder.take(5))
-        GestureDetector(
-          onTap: () => _runQuick(k),
-          onLongPress: _editQuickActions,
-          child: Container(
-            width: 30, height: 26, margin: const EdgeInsets.only(left: 4), alignment: Alignment.center,
-            decoration: BoxDecoration(color: Colors.white.withAlpha(28), borderRadius: BorderRadius.circular(6)),
-            child: Text(_quickDefs[k]![0], style: const TextStyle(fontSize: 12.5)),
-          ),
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      // 🔴 快捷项可横向滚动，设置按钮固定最右，5 个也不会被挤掉
+      Flexible(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          reverse: true,
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            for (final k in _quickOrder.take(5))
+              GestureDetector(
+                onTap: () => _runQuick(k),
+                onLongPress: _editQuickActions,
+                child: Container(
+                  width: 30, height: 26, margin: const EdgeInsets.only(left: 4), alignment: Alignment.center,
+                  decoration: BoxDecoration(color: Colors.white.withAlpha(28), borderRadius: BorderRadius.circular(6)),
+                  child: Text(_quickDefs[k]![0], style: const TextStyle(fontSize: 12.5)),
+                ),
+              ),
+          ]),
         ),
+      ),
       GestureDetector(
         onTap: _editQuickActions,
         child: const Padding(padding: EdgeInsets.only(left: 3),
@@ -1012,7 +1021,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             accent: const Color(0xFF9BE9E0),
             onClose: () => setState(() => notepadOverlayOpen = false),
             defaultRect: const Rect.fromLTWH(0.18, 0.18, 0.66, 0.62),
-            child: NotepadSheet(proj: proj!, readOnly: gistId.isNotEmpty, onChanged: persistProject),
+            // 🔴 切换项目时强制重建，否则记事本停留在上一个阵容的内容
+            child: NotepadSheet(key: ValueKey('notepad_${sourceMode}_${gistId}_${proj?['name'] ?? ''}'),
+                proj: proj!, readOnly: gistId.isNotEmpty, onChanged: persistProject),
           ),
         // 悬浮脚本生成
         if (scriptOverlayOpen)
@@ -1535,6 +1546,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               // 标题栏（拖这里移动模块）
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
+                // 🔴 长按任意模块标题栏直接进入编辑布局，不必去设置页翻开关
+                onLongPress: () {
+                  if (!layoutEditing) setState(() => layoutEditing = true);
+                },
                 onPanUpdate: layoutEditing ? (d) {
                   setState(() {
                     final nr = rects[moduleId]!;
