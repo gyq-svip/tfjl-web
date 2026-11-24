@@ -890,7 +890,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   Widget _homeBody() {
     return Stack(children: [
         // 🖼 背景层（图片/视频，IgnorePointer 不影响点击）
-        Positioned.fill(child: BgLayer(type: BgSetting.type, path: BgSetting.path, themeId: BgSetting.themeId, opacity: BgSetting.opacity)),
+        Positioned.fill(child: BgLayer(type: BgSetting.type, path: BgSetting.path, themeId: BgSetting.themeId, opacity: BgSetting.opacity, sound: BgSetting.soundOn)),
         SafeArea(
         child: Column(children: [
                 buildTopBar(),   // 第一行常驻（标题+快捷chips；关闭自动隐藏时下拉行也在这里）
@@ -1129,21 +1129,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             _showBgPicker,
             trailing: Text(BgSetting.shortLabel,
                 style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2BB3A3)))),
-        // 🎚 背景总开关（不喜欢背景的直接关掉，也不下载视频、不耗流量）
-        Container(margin: const EdgeInsets.fromLTRB(0, 0, 0, 8), padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(color: const Color(0xFF15152A), borderRadius: BorderRadius.circular(12)),
-          child: StatefulBuilder(builder: (ctx, setSheet) => SwitchListTile(
-            value: BgSetting.enabled,
-            activeColor: const Color(0xFF2BB3A3),
-            title: const Text('显示主页背景', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
-            subtitle: const Text('关闭后主页不显示任何背景（也不会下载内置视频，省流量）', style: TextStyle(fontSize: 10, color: Colors.white38)),
-            onChanged: (v) async {
-              await BgSetting.setEnabled(v);
-              if (mounted) setState(() {});
-              setSheet(() {});
-            },
-          )),
-        ),
         _settingsRow('✎', '编辑布局', '自由拖动/缩放各模块位置和大小（主页进入编辑态）', () {
           setState(() { navTab = 0; layoutEditing = !layoutEditing; });
         },
@@ -1251,6 +1236,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             if (dst == null) return;
             BgSetting.type = video ? 'video' : 'image';
             BgSetting.path = dst;
+            BgSetting.enabled = true;      // 选了文件即视为要用背景
             await BgSetting.save();
             if (mounted) setState(() {});
             setSheet(() {});
@@ -1266,10 +1252,49 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             child: Container(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
               child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('🖼 主页背景', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))),
-                const SizedBox(height: 4),
-                const Text('内置主题（与 PC 端同源；首次会边播边缓存，之后秒开）',
-                    style: TextStyle(fontSize: 10.5, color: Colors.white38)),
+                // 标题 + 显示背景开关（同一个弹窗里控制，不再占用设置页一行）
+                Row(children: [
+                  const Text('🖼 主页背景', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))),
+                  const Spacer(),
+                  const Text('显示背景', style: TextStyle(fontSize: 10.5, color: Colors.white60)),
+                  Transform.scale(
+                    scale: 0.78,
+                    child: Switch(
+                      value: BgSetting.enabled,
+                      activeColor: const Color(0xFF2BB3A3),
+                      onChanged: (v) async {
+                        await BgSetting.setEnabled(v);
+                        if (mounted) setState(() {});
+                        setSheet(() {});
+                      },
+                    ),
+                  ),
+                ]),
+                // 背景声音开关（视频有声音；默认静音，需要时打开）
+                Row(children: [
+                  const Text('🔊 背景声音', style: TextStyle(fontSize: 11.5, color: Colors.white70)),
+                  const SizedBox(width: 6),
+                  Text(BgSetting.soundOn ? '有声' : '静音',
+                      style: TextStyle(fontSize: 10, color: BgSetting.soundOn ? const Color(0xFF4ade80) : Colors.white38)),
+                  const Spacer(),
+                  Transform.scale(
+                    scale: 0.7,
+                    child: Switch(
+                      value: BgSetting.soundOn,
+                      activeColor: const Color(0xFF4ade80),
+                      onChanged: BgSetting.enabled
+                          ? (v) async {
+                              await BgSetting.setSound(v);
+                              if (mounted) setState(() {});
+                              setSheet(() {});
+                            }
+                          : null,
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 2),
+                Text(BgSetting.enabled ? '内置主题（与 PC 端同源；首次下载一次后本地播放，不耗流量）' : '背景已关闭 · 打开上面的开关即可显示（打开后才会下载视频）',
+                    style: TextStyle(fontSize: 10.5, color: BgSetting.enabled ? Colors.white38 : const Color(0xFFFF8A80))),
                 const SizedBox(height: 8),
                 Row(children: [
                   for (var i = 0; i < BgSetting.builtinThemes.length; i++)
@@ -1279,6 +1304,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           final t = BgSetting.builtinThemes[i];
                           BgSetting.type = 'theme';
                           BgSetting.themeId = t['id']!;
+                          BgSetting.enabled = true;     // 选了主题即视为要用背景
                           await BgSetting.save();
                           BgSetting.ensureThemeCached(t['id']!, t['url']!);   // 后台缓存，下次秒开
                           if (mounted) setState(() {});

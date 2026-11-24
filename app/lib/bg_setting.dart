@@ -15,6 +15,7 @@ class BgSetting {
   static const _pathKey = 'app_bg_path';
   static const _opacityKey = 'app_bg_opacity';
   static const _themeKey = 'app_bg_theme';
+  static const _soundKey = 'app_bg_sound';
 
   /// 内置视频主题（与 PC 端同源：Gitee bg-themes 发行版）
   static const builtinThemes = <Map<String, String>>[
@@ -39,6 +40,7 @@ class BgSetting {
   static const defaultThemeId = 'tmvtdwbxi1imx';
 
   static bool enabled = true;             // 总开关（不喜欢背景的可以关）
+  static bool soundOn = false;            // 背景视频声音（默认静音，可开）
   static String type = 'theme';           // none / image / video / theme
   static String path = '';
   static String themeId = defaultThemeId;
@@ -54,6 +56,7 @@ class BgSetting {
   static Future<void> load() async {
     final p = await SharedPreferences.getInstance();
     enabled = p.getBool(_enabledKey) ?? true;
+    soundOn = p.getBool(_soundKey) ?? false;
     final savedType = p.getString(_typeKey);
     path = p.getString(_pathKey) ?? '';
     themeId = p.getString(_themeKey) ?? defaultThemeId;
@@ -71,6 +74,7 @@ class BgSetting {
   static Future<void> save() async {
     final p = await SharedPreferences.getInstance();
     await p.setBool(_enabledKey, enabled);
+    await p.setBool(_soundKey, soundOn);
     await p.setString(_typeKey, type);
     await p.setString(_pathKey, path);
     await p.setString(_themeKey, themeId);
@@ -79,6 +83,11 @@ class BgSetting {
 
   static Future<void> setEnabled(bool v) async {
     enabled = v;
+    await save();
+  }
+
+  static Future<void> setSound(bool v) async {
+    soundOn = v;
     await save();
   }
 
@@ -209,12 +218,14 @@ class BgLayer extends StatefulWidget {
   final String path;
   final String themeId;
   final double opacity;
+  final bool sound;
   const BgLayer({
     super.key,
     required this.type,
     required this.path,
     this.themeId = BgSetting.defaultThemeId,
     required this.opacity,
+    this.sound = false,
   });
 
   @override
@@ -239,6 +250,8 @@ class _BgLayerState extends State<BgLayer> {
       _vc?.dispose();
       _vc = null;
       _init();
+    } else if (old.sound != widget.sound) {
+      _vc?.setVolume(widget.sound ? 0.6 : 0);   // 只调音量，不重播
     }
   }
 
@@ -284,7 +297,7 @@ class _BgLayerState extends State<BgLayer> {
   Future<void> _play(VideoPlayerController vc) async {
     await vc.initialize();
     await vc.setLooping(true);
-    await vc.setVolume(0);
+    await vc.setVolume(widget.sound ? 0.6 : 0);
     await vc.play();
     if (mounted) {
       setState(() => _vc = vc);
