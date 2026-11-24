@@ -294,10 +294,6 @@ class _LibraryPageState extends State<LibraryPage> {
                 child: Text(cat, style: const TextStyle(fontSize: 8.5, color: Color(0xFF9BE9E0))),
               ),
             ],
-            const SizedBox(width: 5),
-            _sideChip(itemId, true, pj, cfgA, drA),
-            const SizedBox(width: 4),
-            _sideChip(itemId, false, pj, cfgB, drB),
             const Spacer(),
             GestureDetector(
               onTap: () => _useProject(pj, name),
@@ -309,9 +305,9 @@ class _LibraryPageState extends State<LibraryPage> {
             ),
           ]),
           const SizedBox(height: 5),
-          _featGroup('🅰 A组（我方）', const Color(0xFF4ECDC4), aHand, true, pj, w),
+          _featGroup('🅰 A组（我方）', const Color(0xFF4ECDC4), aHand, true, pj, w, itemId, cfgA, drA),
           const SizedBox(height: 5),
-          _featGroup('🅱 B组（队友）', const Color(0xFFF0932B), bHand, false, pj, w),
+          _featGroup('🅱 B组（队友）', const Color(0xFFF0932B), bHand, false, pj, w, itemId, cfgB, drB),
         ]),
       );
     });
@@ -436,8 +432,8 @@ class _LibraryPageState extends State<LibraryPage> {
                   onChanged: (v) => setSheet(() { subF = v ?? 0; }),
                 )),
               ],
-              row('减伤表', Wrap(spacing: 6, children: [
-                for (final t in DrSystem.tableNames)
+              row('减伤表', Wrap(spacing: 6, runSpacing: 4, children: [
+                for (final t in DrSystem.tables)
                   ChoiceChip(
                     label: Text(t, style: TextStyle(fontSize: 11, color: table == t ? const Color(0xFF07231F) : Colors.white70)),
                     selected: table == t,
@@ -445,6 +441,21 @@ class _LibraryPageState extends State<LibraryPage> {
                     backgroundColor: Colors.white.withAlpha(22),
                     onSelected: (_) => setSheet(() { table = t; }),
                   ),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const DrManagePage(initialTable: '我的')));
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(18),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: const Text('管理/新建 ›', style: TextStyle(fontSize: 10, color: Color(0xFF7CFC9B))),
+                  ),
+                ),
               ])),
               const SizedBox(height: 4),
               Row(children: [
@@ -480,12 +491,14 @@ class _LibraryPageState extends State<LibraryPage> {
     );
   }
 
-  /// 一组 5×2 = 10 张卡（皮肤图 + 等级盾）；战车/减伤已挪到头部单行
+  /// 一组 5×2 = 10 张卡（皮肤图 + 等级盾）；标题行右侧跟战车·减伤表·减伤%胶囊
   Widget _featGroup(String label, Color color, List hand, bool isMine,
-      Map<String, dynamic> pj, double w) {
+      Map<String, dynamic> pj, double w, String itemId, Map<String, dynamic> cfg, double? dr) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
         Text(label, style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: color)),
+        const SizedBox(width: 6),
+        Flexible(child: _sideChip(itemId, isMine, pj, cfg, dr)),
       ]),
       const SizedBox(height: 3),
       for (var r = 0; r < 2; r++)

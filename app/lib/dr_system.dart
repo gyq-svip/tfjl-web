@@ -92,9 +92,75 @@ class DrSystem {
     }
   }
 
+  /// 当前所有表名（顺序 = 插入顺序；默认必有「我的」「队友」）
+  static List<String> get tables {
+    final t = _tables;
+    if (t == null || t.isEmpty) return List<String>.from(tableNames);
+    final list = t.keys.toList();
+    for (final n in tableNames) {
+      if (!list.contains(n)) list.insert(0, n);
+    }
+    return list;
+  }
+
+  static Map<String, dynamic> _blank() => {'洗炼': <String, double>{}, '小野': 0.0, '酋长': 0.0, '宝库': 0.0};
+
+  /// 🆕 新建表（与网页 getDrTable 一致：任意表名，自动补齐字段）
+  static Future<bool> addTable(String name) async {
+    final n = name.trim();
+    if (n.isEmpty) return false;
+    _tables ??= _defaults();
+    if (_tables!.containsKey(n)) return false;
+    _tables![n] = _blank();
+    await save();
+    return true;
+  }
+
+  /// ✏️ 重命名表
+  static Future<bool> renameTable(String oldName, String newName) async {
+    final n = newName.trim();
+    if (n.isEmpty || oldName == n) return false;
+    _tables ??= _defaults();
+    if (!_tables!.containsKey(oldName) || _tables!.containsKey(n)) return false;
+    final v = _tables!.remove(oldName);
+    _tables![n] = v;
+    await save();
+    return true;
+  }
+
+  /// 🗑 删除表（至少保留 1 张）
+  static Future<bool> removeTable(String name) async {
+    _tables ??= _defaults();
+    if (_tables!.length <= 1) return false;
+    _tables!.remove(name);
+    await save();
+    return true;
+  }
+
+  /// 取表（不存在则创建，绝不返回 null）
   static Map<String, dynamic> table(String name) {
-    final t = _tables ?? _defaults();
-    return (t[name] as Map<String, dynamic>?) ?? (_defaults()[name] as Map<String, dynamic>);
+    _tables ??= _defaults();
+    final t = _tables!;
+    final exist = t[name];
+    if (exist is Map<String, dynamic>) {
+      exist['洗炼'] ??= <String, double>{};
+      for (final k in specialKeys) {
+        exist[k] ??= 0.0;
+      }
+      return exist;
+    }
+    if (exist is Map) {
+      final m = Map<String, dynamic>.from(exist);
+      m['洗炼'] ??= <String, double>{};
+      for (final k in specialKeys) {
+        m[k] ??= 0.0;
+      }
+      t[name] = m;
+      return m;
+    }
+    final nt = _blank();
+    t[name] = nt;
+    return nt;
   }
 
   /// 🔴 返回「真实可变」的洗炼 Map（原来是 copy，setRefine 全写丢）
@@ -269,7 +335,7 @@ class DrSystem {
     buf.writeln('# 导入时按表名自动分流（不存在的表会自动新建）');
     buf.writeln('# 导出时间：${DateTime.now().toLocal()}');
     buf.writeln();
-    for (final name in tableNames) {
+    for (final name in tables) {
       final t = table(name);
       buf.writeln('===== 表：$name =====');
       buf.writeln('----- 技能减伤 -----');
@@ -423,6 +489,95 @@ class _DrManagePageState extends State<DrManagePage> {
       });
   }
 
+  /// 新建表
+  Future<void> _addTable() async {
+    final ctl = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E36),
+        title: const Text('新建减伤表', style: TextStyle(fontSize: 14, color: Colors.white)),
+        content: TextField(
+          controller: ctl,
+          autofocus: true,
+          maxLength: 8,
+          style: const TextStyle(fontSize: 14, color: Colors.white),
+          decoration: const InputDecoration(hintText: '表名，如：第三队 / 小号', counterText: ''),
+          onSubmitted: (v) => Navigator.pop(ctx, v),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, ctl.text), child: const Text('创建')),
+        ],
+      ),
+    );
+    ctl.dispose();
+    if (name == null || name.trim().isEmpty) return;
+    final ok = await DrSystem.addTable(name);
+    if (!mounted) return;
+    if (ok) {
+      setState(() => table = name.trim());
+      _toast('✅ 已新建「${name.trim()}」表');
+    } else {
+      _toast('❌ 表名重复或为空');
+    }
+  }
+
+  /// 长按表：重命名 / 删除
+  Future<void> _tableMenu(String n) async {
+    final act = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E36),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(14))),
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Padding(padding: const EdgeInsets.all(12),
+              child: Text('「$n」表', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white))),
+          ListTile(
+            leading: const Icon(Icons.edit, size: 18, color: Color(0xFF2BB3A3)),
+            title: const Text('重命名', style: TextStyle(fontSize: 13, color: Colors.white)),
+            onTap: () => Navigator.pop(ctx, 'rename'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFFF8A80)),
+            title: const Text('删除该表', style: TextStyle(fontSize: 13, color: Color(0xFFFF8A80))),
+            onTap: () => Navigator.pop(ctx, 'delete'),
+          ),
+        ]),
+      ),
+    );
+    if (!mounted || act == null) return;
+    if (act == 'rename') {
+      final ctl = TextEditingController(text: n);
+      final nn = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF1E1E36),
+          title: const Text('重命名表', style: TextStyle(fontSize: 14, color: Colors.white)),
+          content: TextField(controller: ctl, autofocus: true, maxLength: 8,
+              style: const TextStyle(fontSize: 14, color: Colors.white),
+              decoration: const InputDecoration(counterText: '')),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+            TextButton(onPressed: () => Navigator.pop(ctx, ctl.text), child: const Text('保存')),
+          ],
+        ),
+      );
+      ctl.dispose();
+      if (nn == null) return;
+      final ok = await DrSystem.renameTable(n, nn);
+      if (!mounted) return;
+      if (ok) setState(() => table = nn.trim());
+      _toast(ok ? '✅ 已重命名' : '❌ 名称重复或为空');
+    } else if (act == 'delete') {
+      if (DrSystem.tables.length <= 1) { _toast('❌ 至少保留一张表'); return; }
+      final ok = await DrSystem.removeTable(n);
+      if (!mounted) return;
+      if (ok) setState(() => table = DrSystem.tables.first);
+      _toast(ok ? '🗑 已删除「$n」' : '❌ 删除失败');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -433,20 +588,40 @@ class _DrManagePageState extends State<DrManagePage> {
         title: Row(children: [
           const Text('🛡 减伤表', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
           const SizedBox(width: 10),
-          for (final n in DrSystem.tableNames)
-            GestureDetector(
-              onTap: () => setState(() => table = n),
-              child: Container(
-                margin: const EdgeInsets.only(right: 5),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: table == n ? const Color(0xFF2BB3A3) : Colors.white.withAlpha(35),
-                  borderRadius: BorderRadius.circular(7),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: [
+                for (final n in DrSystem.tables)
+                  GestureDetector(
+                    onTap: () => setState(() => table = n),
+                    onLongPress: () => _tableMenu(n),
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 5),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: table == n ? const Color(0xFF2BB3A3) : Colors.white.withAlpha(35),
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                      child: Text(n, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold,
+                          color: table == n ? const Color(0xFF07231F) : Colors.white70)),
+                    ),
+                  ),
+                GestureDetector(
+                  onTap: _addTable,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(20),
+                      borderRadius: BorderRadius.circular(7),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: const Text('＋', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF7CFC9B))),
+                  ),
                 ),
-                child: Text(n, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold,
-                    color: table == n ? const Color(0xFF07231F) : Colors.white70)),
-              ),
+              ]),
             ),
+          ),
         ]),
         actions: [
           PopupMenuButton<String>(
