@@ -23,6 +23,7 @@ import 'gate_page.dart';
 import 'dr_system.dart';
 import 'bg_setting.dart';
 import 'ui_alpha.dart';
+import 'share_import.dart';
 import 'package:file_picker/file_picker.dart';
 
 void main() {
@@ -79,6 +80,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   bool poolOverlayOpen = false;          // 悬浮卡池是否显示
   bool notepadOverlayOpen = false;       // 悬浮记事本是否显示
   bool scriptOverlayOpen = false;        // 悬浮脚本生成是否显示
+  String? _pendingScript;                 // 系统分享/文件打开导入的脚本预填文本
   bool calcOverlayOpen = false;          // 悬浮计算器是否显示
   final ActivityCalc _activityCalc = ActivityCalc();  // 活动配置（云端读+默认兜底）
   Map<String, dynamic>? proj;
@@ -119,6 +121,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     DrSystem.load();        // 减伤表（洗炼/特殊技能）
     BgSetting.load().then((_) { if (mounted) setState(() {}); });   // 主页背景
     UiAlpha.load();   // 全局界面透明度（含工具/设置/弹窗）
+    ShareImport.init();   // 系统分享/文件打开：脚本与减伤表导入
     // 用户昵称（注册制，与网页 TFJL_UserName 同键；老用户旧键兼容兜底）
     final prefs0 = await SharedPreferences.getInstance();
     if (mounted) {
@@ -860,6 +863,22 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         body: Stack(children: [
           Positioned.fill(child: BgLayer(type: BgSetting.type, path: BgSetting.path, themeId: BgSetting.themeId,
               opacity: BgSetting.opacity, sound: BgSetting.soundOn, enabled: BgSetting.enabled)),
+          ShareImportHandler(onImport: (text, kind) async {
+            if (kind == 'dr') {
+              try {
+                final r = await DrSystem.importTxt(text, '我的');
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r)));
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('减伤导入失败：$e')));
+              }
+            } else {
+              setState(() {
+                _pendingScript = text;
+                scriptOverlayOpen = true;
+                navTab = 0;
+              });
+            }
+          }),
           if (loading)
             const Center(child: CircularProgressIndicator(color: Color(0xFF2BB3A3)))
           else
@@ -1031,9 +1050,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             storageKey: 'floating_panel_script',
             title: '📜 脚本生成（活动/隐藏榜/深海）',
             accent: const Color(0xFFFF9800),
-            onClose: () => setState(() => scriptOverlayOpen = false),
+            onClose: () => setState(() { scriptOverlayOpen = false; _pendingScript = null; }),
             defaultRect: const Rect.fromLTWH(0.06, 0.10, 0.88, 0.80),
-            child: ScriptSheet(proj: proj!, onChanged: persistProject),
+            child: ScriptSheet(proj: proj!, onChanged: persistProject, initialText: _pendingScript),
           ),
         // 悬浮活动计算器
         if (calcOverlayOpen)

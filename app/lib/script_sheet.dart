@@ -7,13 +7,23 @@ import 'script_gen.dart';
 class ScriptSheet extends StatefulWidget {
   final Map<String, dynamic> proj;      // 解析上卡要写入的项目
   final VoidCallback onChanged;         // 应用后持久化
-  const ScriptSheet({super.key, required this.proj, required this.onChanged});
+  final String? initialText;            // 系统分享/文件打开导入时预填脚本
+  const ScriptSheet({super.key, required this.proj, required this.onChanged, this.initialText});
   @override
   State<ScriptSheet> createState() => _ScriptSheetState();
 }
 
 class _ScriptSheetState extends State<ScriptSheet> {
   final _ctrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialText != null && widget.initialText!.isNotEmpty) {
+      _ctrl.text = widget.initialText!;
+    }
+  }
+
   String _result = '';
   String _type = 'activity';
   bool _applyMine = true;   // 解析上卡：true=我的 false=队友
