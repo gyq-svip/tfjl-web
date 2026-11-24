@@ -6,6 +6,7 @@ import 'models.dart';
 import 'data_store.dart';
 import 'card_widget.dart';
 import 'dr_system.dart';
+import 'ui_alpha.dart';
 
 /// 全局英雄默认配置（官方英雄名 → {lv,skin,mohua,fusion,sub:{lv,skin,mohua}}）
 Map<String, dynamic> globalHeroDefaults = {};
@@ -72,7 +73,7 @@ class PoolSheetState extends State<PoolSheet> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF16162C),
+      backgroundColor: UiAlpha.bg(const Color(0xFF16162C)),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheet) => SafeArea(
@@ -640,7 +641,7 @@ class SettingsSheetState extends State<SettingsSheet> {
         final ok = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF1e293b),
+            backgroundColor: UiAlpha.bg(const Color(0xFF1e293b)),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             title: Text('$baseHero 洗炼减伤（$drTable 表）', style: const TextStyle(color: Colors.white, fontSize: 14)),
             content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [

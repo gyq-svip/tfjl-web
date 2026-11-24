@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:open_filex/open_filex.dart';
 import 'models.dart';
+import 'ui_alpha.dart';
 
 /// APP 内版本检测 —— 安装包托管在 Gitee 发行版 tag「app-v1」（只保留最新一版）：
 /// 拉取该 release 的附件名 tfjl-android-v*.apk / tfjl-ios-v*.ipa 解析最新版本号，
@@ -92,7 +93,7 @@ class VersionCheck {
       context: context,
       barrierDismissible: true,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1e293b),
+        backgroundColor: UiAlpha.bg(const Color(0xFF1e293b)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(children: const [
           Icon(Icons.system_update, color: Color(0xFF4ade80)),
@@ -144,7 +145,7 @@ class VersionCheck {
                   showDialog(
                     context: ctx,
                     builder: (c2) => AlertDialog(
-                      backgroundColor: const Color(0xFF1e293b),
+                      backgroundColor: UiAlpha.bg(const Color(0xFF1e293b)),
                       title: const Text('请手动长按复制', style: TextStyle(color: Colors.white, fontSize: 15)),
                       content: SelectableText(info.ipaUrl,
                           style: const TextStyle(color: Color(0xFF67D2F5), fontSize: 12)),
@@ -188,7 +189,7 @@ class VersionCheck {
       builder: (ctx) => PopScope(
         canPop: false,
         child: AlertDialog(
-          backgroundColor: const Color(0xFF1e293b),
+          backgroundColor: UiAlpha.bg(const Color(0xFF1e293b)),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text('正在下载更新', style: TextStyle(color: Colors.white, fontSize: 16)),
           content: ValueListenableBuilder<double?>(

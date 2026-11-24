@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
 import 'models.dart';
+import 'ui_alpha.dart';
 
 /// 🛡 减伤系统 —— 逐条照搬网页 app-core.js：
 /// 数据：drTables = { '我的': {洗炼:{英雄:值}, 小野:0, 酋长:0, 宝库:0}, '队友': {...} }
@@ -495,7 +496,7 @@ class _DrManagePageState extends State<DrManagePage> {
     final name = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E36),
+        backgroundColor: UiAlpha.bg(const Color(0xFF1E1E36), 1.4),
         title: const Text('新建减伤表', style: TextStyle(fontSize: 14, color: Colors.white)),
         content: TextField(
           controller: ctl,
@@ -527,7 +528,7 @@ class _DrManagePageState extends State<DrManagePage> {
   Future<void> _tableMenu(String n) async {
     final act = await showModalBottomSheet<String>(
       context: context,
-      backgroundColor: const Color(0xFF1E1E36),
+      backgroundColor: UiAlpha.bg(const Color(0xFF1E1E36), 1.4),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(14))),
       builder: (ctx) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -552,7 +553,7 @@ class _DrManagePageState extends State<DrManagePage> {
       final nn = await showDialog<String>(
         context: context,
         builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF1E1E36),
+          backgroundColor: UiAlpha.bg(const Color(0xFF1E1E36), 1.4),
           title: const Text('重命名表', style: TextStyle(fontSize: 14, color: Colors.white)),
           content: TextField(controller: ctl, autofocus: true, maxLength: 8,
               style: const TextStyle(fontSize: 14, color: Colors.white),
@@ -581,9 +582,9 @@ class _DrManagePageState extends State<DrManagePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0C0C17),
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF12122A),
+        backgroundColor: UiAlpha.bg(const Color(0xFF12122A)),
         foregroundColor: Colors.white,
         title: Row(children: [
           const Text('🛡 减伤表', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
@@ -626,7 +627,7 @@ class _DrManagePageState extends State<DrManagePage> {
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, size: 20),
-            color: const Color(0xFF1E1E36),
+            color: UiAlpha.bg(const Color(0xFF1E1E36), 1.4),
             onSelected: (v) async {
               if (v == 'exportAll') {
                 final save = await FilePicker.platform.saveFile(
@@ -667,7 +668,7 @@ class _DrManagePageState extends State<DrManagePage> {
         Container(
           margin: const EdgeInsets.fromLTRB(8, 8, 8, 4),
           padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: const Color(0xFF15152A), borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(color: UiAlpha.bg(const Color(0xFF15152A)), borderRadius: BorderRadius.circular(12)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('✨ 特殊技能减伤（上阵对应卡才计入 · 「$table」表）',
                 style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF9BE9E0))),
@@ -817,7 +818,7 @@ class _DrManagePageState extends State<DrManagePage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1e293b),
+        backgroundColor: UiAlpha.bg(const Color(0xFF1e293b)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 14.5)),
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [

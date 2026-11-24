@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'app_gate.dart';
 import 'data_store.dart';
+import 'ui_alpha.dart';
 
 /// 🚪 首次使用门禁页（替换主页显示，不可跳过）
 ///   step 0：注册昵称（必填，与网页账号一致）
@@ -69,7 +70,7 @@ class _GatePageState extends State<GatePage> {
   Widget build(BuildContext context) {
     final totalStep = widget.needInvite ? 2 : 1;
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A14),
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -85,7 +86,7 @@ class _GatePageState extends State<GatePage> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF15152A),
+                  color: UiAlpha.bg(const Color(0xFF15152A), 1.5),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: const Color(0x33FDFDFF)),
                 ),

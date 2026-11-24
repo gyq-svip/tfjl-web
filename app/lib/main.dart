@@ -22,7 +22,7 @@ import 'app_gate.dart';
 import 'gate_page.dart';
 import 'dr_system.dart';
 import 'bg_setting.dart';
-import 'package:file_picker/file_picker.dart';
+import 'ui_alpha.dart';
 import 'package:file_picker/file_picker.dart';
 
 void main() {
@@ -46,7 +46,7 @@ class TfjlApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0C0C17),
+        scaffoldBackgroundColor: Colors.transparent,
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2BB3A3), brightness: Brightness.dark),
         useMaterial3: true,
       ),
@@ -118,6 +118,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     _loadQuick();           // 顶栏快捷功能配置
     DrSystem.load();        // 减伤表（洗炼/特殊技能）
     BgSetting.load().then((_) { if (mounted) setState(() {}); });   // 主页背景
+    UiAlpha.load();   // 全局界面透明度（含工具/设置/弹窗）
     // 用户昵称（注册制，与网页 TFJL_UserName 同键；老用户旧键兼容兜底）
     final prefs0 = await SharedPreferences.getInstance();
     if (mounted) {
@@ -313,7 +314,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   /// 🔴 自动隐藏关闭时：下拉选择行跟在第一行下面常驻显示（修复：重构后漏加回导致项目菜单调不出来）
   Widget buildTopBar() {
     return Container(
-      color: const Color(0xFF12122A),
+      color: UiAlpha.bg(const Color(0xFF12122A)),
       padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
       child: Column(children: [
         SizedBox(
@@ -402,7 +403,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           margin: const EdgeInsets.only(top: 30),   // 让出常驻第一行
           padding: const EdgeInsets.fromLTRB(8, 5, 8, 5),
           decoration: BoxDecoration(
-            color: const Color(0xFF12122A),
+            color: UiAlpha.bg(const Color(0xFF12122A)),
             boxShadow: [BoxShadow(color: Colors.black.withAlpha(90), blurRadius: 10, offset: const Offset(0, 3))],
             borderRadius: const BorderRadius.vertical(bottom: Radius.circular(10)),
           ),
@@ -459,7 +460,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   void _editQuickActions() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1A1A2E),
+      backgroundColor: UiAlpha.bg(const Color(0xFF1A1A2E)),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(14))),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheet) => SafeArea(
@@ -773,7 +774,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF16162C),
+      backgroundColor: UiAlpha.bg(const Color(0xFF16162C)),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (_) => const NetCheckSheet(),
     );
@@ -824,29 +825,43 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   Widget build(BuildContext context) {
     // 门禁：新用户必须先注册昵称（管理员开了开关还要邀请码），通过后才能用 App
     if (_gateStage != GateStage.passed) {
-      return GatePage(
-        needInvite: _gateStage == GateStage.needNickAndInvite,
-        onPassed: () async {
-          final nick = await AppGate.savedNick();
-          if (!mounted) return;
-          setState(() {
-            _gateStage = GateStage.passed;
-            _userNick = nick;
-          });
-          if (mounted) VersionCheck.check(context);   // 进门后再提示更新
-          MobileHeartbeat.I.pokeNow();                 // 昵称已注册，立刻补报心跳
-        },
-      );
+      return Stack(children: [
+        Positioned.fill(child: BgLayer(type: BgSetting.type, path: BgSetting.path, themeId: BgSetting.themeId,
+            opacity: BgSetting.opacity, sound: BgSetting.soundOn, enabled: BgSetting.enabled)),
+        GatePage(
+          needInvite: _gateStage == GateStage.needNickAndInvite,
+          onPassed: () async {
+            final nick = await AppGate.savedNick();
+            if (!mounted) return;
+            setState(() {
+              _gateStage = GateStage.passed;
+              _userNick = nick;
+            });
+            if (mounted) VersionCheck.check(context);   // 进门后再提示更新
+            MobileHeartbeat.I.pokeNow();                 // 昵称已注册，立刻补报心跳
+          },
+        ),
+      ]);
     }
-    return Scaffold(
-      body: loading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF2BB3A3)))
-          : IndexedStack(index: navTab, children: [
+    // 🔴 背景层放在最底层，主页/工具/设置共用同一个播放器；界面透明度改动时整树重建
+    return ValueListenableBuilder<double>(
+      valueListenable: UiAlpha.notifier,
+      builder: (context, _, __) => Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Stack(children: [
+          Positioned.fill(child: BgLayer(type: BgSetting.type, path: BgSetting.path, themeId: BgSetting.themeId,
+              opacity: BgSetting.opacity, sound: BgSetting.soundOn, enabled: BgSetting.enabled)),
+          if (loading)
+            const Center(child: CircularProgressIndicator(color: Color(0xFF2BB3A3)))
+          else
+            IndexedStack(index: navTab, children: [
               _homeBody(),   // 0 主页：画布 + 悬浮面板
               _toolsPage(),  // 1 工具
               _settingsPage(), // 2 设置
             ]),
-      bottomNavigationBar: loading ? null : _bottomNav(),
+        ]),
+        bottomNavigationBar: loading ? null : _bottomNav(),
+      ),
     );
   }
 
@@ -868,9 +883,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       );
     }
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF12122A),
-        border: Border(top: BorderSide(color: Color(0xFF2BB3A3), width: 0.5)),
+      decoration: BoxDecoration(
+        color: UiAlpha.bg(const Color(0xFF12122A)),
+        border: const Border(top: BorderSide(color: Color(0xFF2BB3A3), width: 0.5)),
       ),
       child: SafeArea(
         top: false,
@@ -889,8 +904,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   /// 主页画布（原 build 主体）
   Widget _homeBody() {
     return Stack(children: [
-        // 🖼 背景层（图片/视频，IgnorePointer 不影响点击）
-        Positioned.fill(child: BgLayer(type: BgSetting.type, path: BgSetting.path, themeId: BgSetting.themeId, opacity: BgSetting.opacity, sound: BgSetting.soundOn, enabled: BgSetting.enabled)),
         SafeArea(
         child: Column(children: [
                 buildTopBar(),   // 第一行常驻（标题+快捷chips；关闭自动隐藏时下拉行也在这里）
@@ -948,7 +961,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A2E),
+                  color: UiAlpha.bg(const Color(0xFF1A1A2E)),
                   borderRadius: BorderRadius.circular(22),
                   border: Border.all(color: const Color(0xFFFFD24A), width: 0.8),
                   boxShadow: [BoxShadow(color: Colors.black.withAlpha(120), blurRadius: 12, offset: const Offset(0, 3))],
@@ -1032,7 +1045,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         child: Container(
           margin: const EdgeInsets.fromLTRB(10, 0, 10, 8),
           padding: const EdgeInsets.all(11),
-          decoration: BoxDecoration(color: const Color(0xFF15152A), borderRadius: BorderRadius.circular(12),
+          decoration: BoxDecoration(color: UiAlpha.bg(const Color(0xFF15152A)), borderRadius: BorderRadius.circular(12),
               border: Border.all(color: accent.withAlpha(40))),
           child: Row(children: [
             Text(icon, style: const TextStyle(fontSize: 22)),
@@ -1173,7 +1186,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1e293b),
+        backgroundColor: UiAlpha.bg(const Color(0xFF1e293b)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(children: const [
           Icon(Icons.person_add, color: Color(0xFF2BB3A3)),
@@ -1220,7 +1233,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   void _showBgPicker() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1A1A2E),
+      backgroundColor: UiAlpha.bg(const Color(0xFF1A1A2E)),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(14))),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheet) {
@@ -1357,6 +1370,25 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   ),
                   Text('${(BgSetting.opacity * 100).round()}%', style: const TextStyle(fontSize: 11, color: Colors.white70)),
                 ]),
+                const SizedBox(height: 2),
+                // 🎚 全局界面透明度：0% 全透明（完整露出主题特效），100% 完全不透明
+                Row(children: [
+                  const Text('界面透明', style: TextStyle(fontSize: 11, color: Colors.white54)),
+                  Expanded(
+                    child: Slider(
+                      value: UiAlpha.value,
+                      min: 0, max: 1, divisions: 10,
+                      activeColor: const Color(0xFF2BB3A3),
+                      label: UiAlpha.value <= 0.001 ? '全透明' : '${(UiAlpha.value * 100).round()}%',
+                      onChanged: (v) async {
+                        await UiAlpha.set(v);
+                        setSheet(() {});
+                      },
+                    ),
+                  ),
+                  Text(UiAlpha.value <= 0.001 ? '全透明' : '${(UiAlpha.value * 100).round()}%',
+                      style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                ]),
                 const SizedBox(height: 4),
                 GestureDetector(
                   onTap: () async {
@@ -1401,7 +1433,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     if (r.startsWith('OK:')) {
       final code = r.substring(3);
       showDialog(context: context, builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1e293b),
+        backgroundColor: UiAlpha.bg(const Color(0xFF1e293b)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(children: const [
           Icon(Icons.card_giftcard, color: Color(0xFFFFD24A)),
@@ -1482,7 +1514,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         },
         child: Container(
           decoration: BoxDecoration(
-            color: const Color(0xF014142A),
+            color: UiAlpha.bg(const Color(0xFF14142A)),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: layoutEditing ? const Color(0xFFFFD24A) : accent.withAlpha(60),
@@ -1515,7 +1547,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 onPanEnd: layoutEditing ? (_) => LayoutConfig.I.save(isLandscape) : null,
                 child: Container(
                   height: 24,
-                  color: layoutEditing ? const Color(0x40FFD24A) : const Color(0x18FFFFFF),
+                  color: layoutEditing ? UiAlpha.tint(const Color(0x40FFD24A)) : UiAlpha.tint(const Color(0x18FFFFFF)),
                   padding: const EdgeInsets.symmetric(horizontal: 6),
                   child: Row(children: [
                     if (layoutEditing) Icon(Icons.drag_indicator, size: 14, color: const Color(0xFFFFD24A)),
@@ -1549,7 +1581,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   child: Container(
                     width: 26, height: 26,
                     decoration: BoxDecoration(
-                      color: const Color(0x552BB3A3),
+                      color: UiAlpha.tint(const Color(0x552BB3A3)),
                       borderRadius: const BorderRadius.only(bottomRight: Radius.circular(10)),
                     ),
                     child: const Icon(Icons.zoom_out_map, size: 18, color: Color(0xFF9BE9E0)),
@@ -1565,7 +1597,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   Widget _packProgress() {
     return Container(
-      color: const Color(0xFF12122A),
+      color: UiAlpha.bg(const Color(0xFF12122A)),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(loadStage, style: const TextStyle(fontSize: 10, color: Color(0xFFCFD6E6))),
@@ -1788,7 +1820,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     final mainLv = chariot?['mainLv'] ?? 1;
     final subN = chariot?['sub'] ?? 0;
     showDialog(context: context, builder: (ctx) => AlertDialog(
-      backgroundColor: const Color(0xFF1e293b),
+      backgroundColor: UiAlpha.bg(const Color(0xFF1e293b)),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Row(children: [
         Text(isMine ? '🛡 我方减伤' : '🛡 队友减伤', style: const TextStyle(color: Colors.white, fontSize: 15)),
@@ -1881,7 +1913,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF16162C),
+      backgroundColor: UiAlpha.bg(const Color(0xFF16162C)),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, ss) {
@@ -1990,7 +2022,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF16162C),
+      backgroundColor: UiAlpha.bg(const Color(0xFF16162C)),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (_) => SettingsSheet(
         isMine: isMine, handIdx: handIdx, cardObj: cardObj, proj: proj!,
@@ -2021,7 +2053,7 @@ class _DisabledBox extends StatelessWidget {
       height: 30,
       alignment: Alignment.centerLeft,
       padding: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(color: const Color(0xFF1E1E36), borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(color: UiAlpha.bg(const Color(0xFF1E1E36), 1.4), borderRadius: BorderRadius.circular(8)),
       child: Text(text, style: const TextStyle(fontSize: 11, color: Colors.white38), overflow: TextOverflow.ellipsis),
     );
   }

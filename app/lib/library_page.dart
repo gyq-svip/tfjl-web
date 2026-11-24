@@ -7,6 +7,7 @@ import 'models.dart';
 import 'data_store.dart';
 import 'card_widget.dart';
 import 'dr_system.dart';
+import 'ui_alpha.dart';
 
 /// 📚 阵容图库：⭐精选（在线） / 🏆活动（7天A/B） / 🚢大航海（223套）
 class LibraryPage extends StatefulWidget {
@@ -119,11 +120,11 @@ class _LibraryPageState extends State<LibraryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0C0C17),
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Column(children: [
           Container(
-            color: const Color(0xFF12122A),
+            color: UiAlpha.bg(const Color(0xFF12122A)),
             padding: const EdgeInsets.all(8),
             child: Row(children: [
               GestureDetector(
@@ -280,7 +281,7 @@ class _LibraryPageState extends State<LibraryPage> {
       return Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(color: const Color(0xFF15152A), borderRadius: BorderRadius.circular(10)),
+        decoration: BoxDecoration(color: UiAlpha.bg(const Color(0xFF15152A)), borderRadius: BorderRadius.circular(10)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           // 🔴 紧凑单行：名称 · 分类 · A战车减伤 · 用此阵容（A组标题不再单独占一行）
           _featGroup('🅰 A组（我方）', const Color(0xFF4ECDC4), aHand, true, pj, w, itemId, cfgA, drA,
@@ -361,7 +362,7 @@ class _LibraryPageState extends State<LibraryPage> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1A1A2E),
+      backgroundColor: UiAlpha.bg(const Color(0xFF1A1A2E)),
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(14))),
       builder: (ctx) => StatefulBuilder(builder: (ctx, setSheet) {
@@ -579,7 +580,7 @@ class _LibraryPageState extends State<LibraryPage> {
     return Container(
       margin: const EdgeInsets.only(bottom: 7),
       padding: const EdgeInsets.all(7),
-      decoration: BoxDecoration(color: const Color(0xFF15152A), borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(color: UiAlpha.bg(const Color(0xFF15152A)), borderRadius: BorderRadius.circular(10)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('📜 活动第 $day 天 · 双人 A/B', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))),
         const SizedBox(height: 4),
@@ -607,7 +608,7 @@ class _LibraryPageState extends State<LibraryPage> {
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
       padding: const EdgeInsets.all(7),
-      decoration: BoxDecoration(color: const Color(0xFF15152A), borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(color: UiAlpha.bg(const Color(0xFF15152A)), borderRadius: BorderRadius.circular(8)),
       child: Column(children: [
         GestureDetector(
           onTap: () => setState(() { open ? expandedSailing.remove(n) : expandedSailing.add(n); }),
@@ -708,7 +709,7 @@ class _LibraryPageState extends State<LibraryPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF16162C),
+      backgroundColor: UiAlpha.bg(const Color(0xFF16162C)),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheet) => SafeArea(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:ui' show Rect;
+import 'ui_alpha.dart';
 
 /// 通用悬浮面板：可拖标题移动、拖右下角缩放，位置/大小记忆，不遮挡整个界面。
 /// 对齐网页 openGenericPicker(floating:true) 的体验。
@@ -63,7 +64,7 @@ class _FloatingPanelState extends State<FloatingPanel> {
         color: Colors.transparent,
         child: Container(
           decoration: BoxDecoration(
-            color: const Color(0xF016162C),
+            color: UiAlpha.bg(const Color(0xFF16162C)),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: widget.accent.withAlpha(150), width: 1.5),
             boxShadow: const [BoxShadow(color: Color(0xAA000000), blurRadius: 16, spreadRadius: 2)],
