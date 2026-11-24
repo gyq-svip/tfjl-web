@@ -113,7 +113,7 @@ class PoolSheetState extends State<PoolSheet> {
                               borderRadius: BorderRadius.circular(7)),
                             child: FutureBuilder<File?>(
                               future: Future(() => '默认' == sk ? SkinPack.I.skinFile(baseHero, '') : (SkinPack.I.skinFile(baseHero, sk) ?? SkinPack.I.skinFileByAny(sk))),
-                              builder: (_, s2) => s2.data != null ? ClipRRect(borderRadius: BorderRadius.circular(6), child: Image.file(s2.data!, fit: BoxFit.cover)) : const SizedBox(),
+                              builder: (_, s2) => s2.data != null ? ClipRRect(borderRadius: BorderRadius.circular(6), child: Image.file(s2.data!, fit: BoxFit.cover, cacheWidth: 100, cacheHeight: 100)) : const SizedBox(),
                             ),
                           ),
                         ),
@@ -742,7 +742,7 @@ class SettingsSheetState extends State<SettingsSheet> {
                     return SkinPack.I.skinFile(subHeroName!, '') ?? SkinPack.I.skinFileByAny(subHeroName);
                   }),
                   builder: (_, s2) => s2.data != null
-                      ? ClipRRect(borderRadius: BorderRadius.circular(6), child: Image.file(s2.data!, fit: BoxFit.cover))
+                      ? ClipRRect(borderRadius: BorderRadius.circular(6), child: Image.file(s2.data!, fit: BoxFit.cover, cacheWidth: 100, cacheHeight: 100))
                       : const SizedBox(),
                 )
               : const Center(child: Text('✕', style: TextStyle(fontSize: 18, color: Colors.white54))),

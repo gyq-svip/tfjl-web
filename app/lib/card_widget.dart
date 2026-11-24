@@ -65,7 +65,8 @@ class CardSlot extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             if (d.mainFile != null)
-              Image.file(d.mainFile!, key: ValueKey(d.mainKey + d.mainFile!.path), fit: BoxFit.cover, gaplessPlayback: true)
+              Image.file(d.mainFile!, key: ValueKey(d.mainKey + d.mainFile!.path), fit: BoxFit.cover,
+                  cacheWidth: 160, cacheHeight: 160, gaplessPlayback: true)
             else if (d.filled)
               ColoredBox(color: Color(AppData.qualityColor(d.cardType)).withAlpha(160)),
             // 融合副卡：左上 40% 金框 + 副卡等级/魔化
@@ -84,7 +85,8 @@ class CardSlot extends StatelessWidget {
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(2),
-                          child: Image.file(d.subFile!, key: ValueKey(d.subKey + d.subFile!.path), fit: BoxFit.cover, width: double.infinity, height: double.infinity, gaplessPlayback: true),
+                          child: Image.file(d.subFile!, key: ValueKey(d.subKey + d.subFile!.path), fit: BoxFit.cover,
+                              cacheWidth: 96, cacheHeight: 96, width: double.infinity, height: double.infinity, gaplessPlayback: true),
                         ),
                       ),
                       if (d.subLevel.isNotEmpty)

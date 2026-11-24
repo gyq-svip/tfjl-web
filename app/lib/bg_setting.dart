@@ -245,23 +245,48 @@ class BgLayer extends StatefulWidget {
   State<BgLayer> createState() => _BgLayerState();
 }
 
-class _BgLayerState extends State<BgLayer> {
+class _BgLayerState extends State<BgLayer> with WidgetsBindingObserver {
   VideoPlayerController? _vc;
   bool _preparing = false;          // 首次下载/初始化中
   double _pct = 0;
+  int _gen = 0;                     // 播放器代次：异步初始化回来后丢弃过期实例，防止叠加播放
+  bool _lifePaused = false;         // App 退后台时暂停，避免只留声音+内存堆积
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _init();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      _lifePaused = true;
+      try { _vc?.pause(); } catch (_) {}
+    } else if (state == AppLifecycleState.resumed) {
+      _lifePaused = false;
+      if (widget.enabled && !_lifePaused) {
+        try { _vc?.play(); } catch (_) {}
+      }
+    }
+  }
+
+  void _disposeVc() {
+    _gen++;
+    final vc = _vc;
+    _vc = null;
+    try { vc?.pause(); } catch (_) {}
+    try { vc?.dispose(); } catch (_) {}
   }
 
   @override
   void didUpdateWidget(covariant BgLayer old) {
     super.didUpdateWidget(old);
     if (old.type != widget.type || old.path != widget.path || old.themeId != widget.themeId) {
-      _vc?.dispose();
-      _vc = null;
+      _disposeVc();
       _init();
     } else if (old.sound != widget.sound) {
       _vc?.setVolume(widget.sound ? 0.6 : 0);   // 只调音量，不重播
@@ -269,10 +294,7 @@ class _BgLayerState extends State<BgLayer> {
     // 🔴 背景总开关：关掉时必须停止播放并释放（否则画面没了声音还在响）
     if (old.enabled != widget.enabled) {
       if (!widget.enabled) {
-        final vc = _vc;
-        _vc = null;
-        try { vc?.pause(); } catch (_) {}
-        try { vc?.dispose(); } catch (_) {}
+        _disposeVc();
         if (mounted) setState(() { _preparing = false; });
       } else {
         _init();
@@ -281,13 +303,14 @@ class _BgLayerState extends State<BgLayer> {
   }
 
   Future<void> _init() async {
+    final gen = ++_gen;   // 每次初始化升代，过期异步结果直接丢弃
     try {
       if (!widget.enabled || widget.type == 'none') return;
       if (widget.type == 'video') {
         if (widget.path.isEmpty) return;
         final f = File(widget.path);
         if (!f.existsSync()) return;
-        await _play(VideoPlayerController.file(f));
+        await _play(VideoPlayerController.file(f), gen);
         return;
       }
       if (widget.type != 'theme') return;
@@ -296,48 +319,59 @@ class _BgLayerState extends State<BgLayer> {
       final id = theme['id']!;
       final url = theme['url']!;
       final cache = await BgSetting.themeCacheFile(id);
-      if (!widget.enabled) return;
+      if (!mounted || gen != _gen || !widget.enabled) return;
       // ① 已有本地缓存 → 直接播（永不耗流量）
       if (cache.existsSync() && cache.lengthSync() > 500 * 1024) {
-        await _play(VideoPlayerController.file(cache));
+        await _play(VideoPlayerController.file(cache), gen);
         return;
       }
       // ② 首次：先下载完再播（只下载一次），期间显示小提示
       if (mounted) setState(() { _preparing = true; _pct = 0; });
       BgSetting.onDownloadProgress = (tid, p) {
-        if (tid == id && mounted) setState(() => _pct = p);
+        if (tid == id && mounted && gen == _gen) setState(() => _pct = p);
       };
       final ok = await BgSetting.ensureThemeCached(id, url);
-      BgSetting.onDownloadProgress = null;
-      if (!mounted) return;
+      if (gen == _gen) BgSetting.onDownloadProgress = null;
+      if (!mounted || gen != _gen) return;
       setState(() => _preparing = false);
       if (!widget.enabled) return;   // 下载期间用户关了背景 → 不播
       if (ok && cache.existsSync()) {
-        await _play(VideoPlayerController.file(cache));
+        await _play(VideoPlayerController.file(cache), gen);
       }
     } catch (e) {
       debugPrint('[BgLayer] 初始化失败: $e');
-      if (mounted) setState(() => _preparing = false);
+      if (mounted && gen == _gen) setState(() { _preparing = false; });
     }
   }
 
-  Future<void> _play(VideoPlayerController vc) async {
-    if (!widget.enabled) { vc.dispose(); return; }
-    await vc.initialize();
-    if (!widget.enabled) { vc.dispose(); return; }
-    await vc.setLooping(true);
-    await vc.setVolume(widget.sound ? 0.6 : 0);
-    await vc.play();
-    if (mounted) {
-      setState(() => _vc = vc);
-    } else {
+  Future<void> _play(VideoPlayerController vc, int gen) async {
+    if (!widget.enabled || gen != _gen) { vc.dispose(); return; }
+    try {
+      await vc.initialize();
+      if (!widget.enabled || gen != _gen || !mounted) { vc.dispose(); return; }
+      await vc.setLooping(true);
+      await vc.setVolume(widget.sound ? 0.6 : 0);
+      await vc.play();
+      if (!mounted || gen != _gen) { vc.dispose(); return; }
+      // 换播放器前释放旧的，避免两个 native player 同时占内存
+      final old = _vc;
+      _vc = vc;
+      try { old?.pause(); } catch (_) {}
+      try { old?.dispose(); } catch (_) {}
+      if (_lifePaused) {
+        try { vc.pause(); } catch (_) {}
+      }
+      setState(() {});
+    } catch (e) {
+      debugPrint('[BgLayer] 播放失败: $e');
       vc.dispose();
     }
   }
 
   @override
   void dispose() {
-    _vc?.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    _disposeVc();
     super.dispose();
   }
 
