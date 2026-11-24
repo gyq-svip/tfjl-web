@@ -1238,13 +1238,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheet) {
           Future<void> pick(bool video) async {
+            // 🔴 用 image/video 类型而不是自定义扩展名：iOS 直接进相册，安卓进媒体库
             final picked = await FilePicker.platform.pickFiles(
-              type: FileType.custom,
-              allowedExtensions: video ? ['mp4', 'mov', 'm4v', 'webm'] : ['jpg', 'jpeg', 'png', 'webp', 'gif'],
+              type: video ? FileType.video : FileType.image,
+              allowMultiple: false,
             );
             final p = picked?.files.single.path;
             if (p == null) return;
-            final ext = p.split('.').last.toLowerCase();
+            final ext = (picked?.files.single.extension ?? p.split('.').last).toLowerCase();
             final dst = await BgSetting.copyIntoApp(p, ext);
             if (dst == null) return;
             BgSetting.type = video ? 'video' : 'image';
