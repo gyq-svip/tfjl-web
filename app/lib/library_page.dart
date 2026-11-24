@@ -7,7 +7,9 @@ import 'models.dart';
 import 'data_store.dart';
 import 'card_widget.dart';
 import 'dr_system.dart';
+import 'sheets.dart';
 import 'ui_alpha.dart';
+import 'global_defaults.dart';
 
 /// 📚 阵容图库：⭐精选（在线） / 🏆活动（7天A/B） / 🚢大航海（223套）
 class LibraryPage extends StatefulWidget {
@@ -33,6 +35,7 @@ class _LibraryPageState extends State<LibraryPage> {
     super.initState();
     _initLoad();
     _loadFeatCfg();
+    GlobalCfg.load().then((_) { if (mounted) setState(() {}); });   // 全局默认（卡/战车/减伤）
     // 🔴 2026-11-24 图库独立确保皮肤包就绪：卡图依赖 SkinPack，若主启动时没下完这里补一次
     if (!SkinPack.I.ready) {
       SkinPack.I.ensurePack().then((_) { if (mounted) setState(() {}); });
@@ -230,6 +233,15 @@ class _LibraryPageState extends State<LibraryPage> {
 
   /// 取某组的有效设置（本机设置优先，否则用数据里的战车 + 默认表）
   Map<String, dynamic> _sideCfg(String itemId, bool isMine, Map<String, dynamic> pj) {
+    final scope = itemId.startsWith('act_') ? 'act' : 'feat';
+    final useGlobal = scope == 'act' ? GlobalCfg.actApplyAll : GlobalCfg.featApplyAll;
+    if (useGlobal) {
+      final g = GlobalCfg.sideCfg(scope, isMine);
+      if (g['chariot'] is Map && (g['chariot'] as Map).isNotEmpty) {
+        return {'chariot': Map<String, dynamic>.from(g['chariot'] as Map),
+            'table': g['table']?.toString() ?? (isMine ? '我的' : '队友')};
+      }
+    }
     final k = '${itemId}_${isMine ? "a" : "b"}';
     final c = _featCfg[k];
     Map<String, dynamic> ch = {};
@@ -321,7 +333,7 @@ class _LibraryPageState extends State<LibraryPage> {
 
   /// 头部单行的小胶囊：A🚂走马·我方 51% —— 点击可改战车/减伤表
   Widget _sideChip(String itemId, bool isMine, Map<String, dynamic> pj, Map<String, dynamic> cfg, double? dr,
-      {bool compact = false}) {
+      {bool compact = false, String scope = 'feat'}) {
     final ch = cfg['chariot'] as Map<String, dynamic>;
     final table = cfg['table'] as String;
     final main = (ch['main'] as num?)?.toInt() ?? 0;
@@ -329,7 +341,7 @@ class _LibraryPageState extends State<LibraryPage> {
     final short = main > 0 ? AppData.chariotShort(main, sub) : '未设车';
     final color = isMine ? const Color(0xFF4ECDC4) : const Color(0xFFF0932B);
     return GestureDetector(
-      onTap: () => _showFeatCfg(itemId, isMine, pj),
+      onTap: () => _showFeatCfg(itemId, isMine, pj, scope: scope),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         decoration: BoxDecoration(
@@ -348,7 +360,7 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   /// 🚂 某组设置：战车（主/副/等级/融合）+ 减伤表（本机保存，仅影响自己看到的数值）
-  void _showFeatCfg(String itemId, bool isMine, Map<String, dynamic> pj) {
+  void _showFeatCfg(String itemId, bool isMine, Map<String, dynamic> pj, {String scope = 'feat'}) {
     final key = '${itemId}_${isMine ? "a" : "b"}';
     final cfg = _sideCfg(itemId, isMine, pj);
     final ch = Map<String, dynamic>.from(cfg['chariot'] as Map<String, dynamic>);
@@ -358,6 +370,7 @@ class _LibraryPageState extends State<LibraryPage> {
     var subLv = ((ch['subLv'] as num?)?.toInt() ?? 1).clamp(1, 20);
     var subF = ((ch['subFusion'] as num?)?.toInt() ?? 0).clamp(0, 3);
     var table = cfg['table'] as String;
+    var applyAll = scope == 'act' ? GlobalCfg.actApplyAll : GlobalCfg.featApplyAll;
     final hand = ((isMine ? pj['myHandCards'] : pj['teammateHandCards']) as List?) ?? const [];
 
     showModalBottomSheet(
@@ -391,7 +404,15 @@ class _LibraryPageState extends State<LibraryPage> {
               const SizedBox(height: 2),
               Text('当前减伤：${curDr().toStringAsFixed(1)}%（本机设置，不影响别人）',
                   style: const TextStyle(fontSize: 10, color: Color(0xFF7CFC9B))),
-              const SizedBox(height: 10),
+              CheckboxListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                value: applyAll,
+                title: Text(scope == 'act' ? '应用到全部活动天数（个别可再单独改）' : '应用到精选所有阵容（个别可再单独改）',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF7CFC9B))),
+                onChanged: (v) => setSheet(() => applyAll = v ?? false),
+              ),
+              const SizedBox(height: 4),
               row('主战车', DropdownButton<int>(
                 value: main,
                 isExpanded: true,
@@ -483,9 +504,11 @@ class _LibraryPageState extends State<LibraryPage> {
                 Expanded(
                   child: FilledButton(
                     style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2BB3A3)),
-                    onPressed: () {
+                    onPressed: () async {
                       _featCfg[key] = buildCfg();
-                      _saveFeatCfg();
+                      await _saveFeatCfg();
+                      await GlobalCfg.setSideCfg(scope, isMine, buildCfg());
+                      await GlobalCfg.setApplyAll(scope, applyAll);
                       if (mounted) setState(() {});
                       Navigator.pop(ctx);
                     },
@@ -498,6 +521,40 @@ class _LibraryPageState extends State<LibraryPage> {
         );
       }),
     );
+  }
+
+  /// 精选卡也遵循「卡池设一次，全局默认」：只覆盖用户显式设置过的字段
+  void _applyGlobalCardDefaults(CardData cd) {
+    if (!GlobalCfg.cardApplyAll || cd.name.isEmpty) return;
+    final official = AppData.officialName(cd.name);
+    final def = globalHeroDefaults[official];
+    if (def is! Map) return;
+    if (def['lv'] != null) cd.level = def['lv'].toString();
+    if (def['mohua'] != null) cd.hasMohua = def['mohua'] == true;
+    final fusionName = def['fusion']?.toString() ?? '';
+    if (fusionName.isNotEmpty) {
+      final f = AppData.I.splitFusion(fusionName);
+      if (f != null) {
+        cd.name = fusionName;
+        cd.fusion = f;
+        cd.mainFile = SkinPack.I.skinFile(f[0], def['skin']?.toString() ?? '') ?? SkinPack.I.skinFile(f[0], '');
+        cd.subFile = SkinPack.I.skinFile(f[1], '') ?? SkinPack.I.skinFileByName(f[1]);
+        final sub = def['sub'];
+        if (sub is Map) {
+          cd.subLevel = sub['lv']?.toString() ?? '1';
+          cd.subMohua = sub['mohua'] == true;
+        }
+      }
+    } else {
+      final sk = def['skin']?.toString() ?? '';
+      if (sk.isNotEmpty) {
+        cd.skinName = sk;
+        cd.mainFile = SkinPack.I.skinFile(official, sk) ?? SkinPack.I.skinFileByAny(sk) ?? cd.mainFile;
+      }
+    }
+    if (cd.mainFile != null) {
+      try { cd.mainKey = cd.mainFile!.lastModifiedSync().millisecondsSinceEpoch.toString(); } catch (_) {}
+    }
   }
 
   /// 一组 5×2 = 10 张卡（皮肤图 + 等级盾）；标题行右侧跟战车·减伤表·减伤%胶囊
@@ -533,6 +590,7 @@ class _LibraryPageState extends State<LibraryPage> {
                   CardData cd;
                   try {
                     cd = parseCard(hand[idx], isMine, pj, pack: SkinPack.I);
+                    _applyGlobalCardDefaults(cd);
                   } catch (_) {
                     cd = CardData();
                   }
@@ -577,6 +635,22 @@ class _LibraryPageState extends State<LibraryPage> {
     final day = a['day'] ?? i + 1;
     final aH = (a['A'] as List?)?.map((e) => e.toString()).toList() ?? [];
     final bH = (a['B'] as List?)?.map((e) => e.toString()).toList() ?? [];
+    final fakePj = <String, dynamic>{
+      'myHandCards': [for (final n in aH) {'name': n}],
+      'teammateHandCards': [for (final n in bH) {'name': n}],
+    };
+    final itemId = 'act_$i';
+    final cfgA = _sideCfg(itemId, true, fakePj);
+    final cfgB = _sideCfg(itemId, false, fakePj);
+    double? drA, drB;
+    try {
+      drA = DrSystem.breakdown(handCards: fakePj['myHandCards'] as List, tableName: cfgA['table'] as String,
+          chariot: cfgA['chariot'] as Map<String, dynamic>)['total'];
+    } catch (_) {}
+    try {
+      drB = DrSystem.breakdown(handCards: fakePj['teammateHandCards'] as List, tableName: cfgB['table'] as String,
+          chariot: cfgB['chariot'] as Map<String, dynamic>)['total'];
+    } catch (_) {}
     return Container(
       margin: const EdgeInsets.only(bottom: 7),
       padding: const EdgeInsets.all(7),
@@ -584,8 +658,10 @@ class _LibraryPageState extends State<LibraryPage> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('📜 活动第 $day 天 · 双人 A/B', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))),
         const SizedBox(height: 4),
-        _heroGroup('🅰 A 组（我方）', const Color(0xFF4ECDC4), aH),
-        _heroGroup('🅱 B 组（队友）', const Color(0xFFF0932B), bH),
+        _heroGroup('🅰 A 组（我方）', const Color(0xFF4ECDC4), aH,
+            chip: _sideChip(itemId, true, fakePj, cfgA, drA, scope: 'act')),
+        _heroGroup('🅱 B 组（队友）', const Color(0xFFF0932B), bH,
+            chip: _sideChip(itemId, false, fakePj, cfgB, drB, scope: 'act')),
       ]),
     );
   }
@@ -625,7 +701,7 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   // ------------------------------------------------------------ 一组 10 卡（5列×2排）
-  Widget _heroGroup(String title, Color accent, List<String> heroes) {
+  Widget _heroGroup(String title, Color accent, List<String> heroes, {Widget? chip}) {
     final w = MediaQuery.of(context).size.width - 10 - 10 - 10;
     final gap = 2.0;
     final cw = (w - gap * 4) / 5;
@@ -635,7 +711,14 @@ class _LibraryPageState extends State<LibraryPage> {
       padding: const EdgeInsets.all(5),
       decoration: BoxDecoration(color: accent.withAlpha(20), borderRadius: BorderRadius.circular(8), border: Border.all(color: accent.withAlpha(50))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: accent)),
+        Row(children: [
+          Flexible(child: Text(title, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: accent),
+              overflow: TextOverflow.ellipsis)),
+          if (chip != null) ...[
+            const SizedBox(width: 6),
+            Flexible(child: chip),
+          ],
+        ]),
         const SizedBox(height: 2),
         for (var r = 0; r < 2; r++)
           Padding(
@@ -691,8 +774,21 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   Map<String, dynamic> libSettings() {
-    // 简化：用静态内存（会话内）——持久化走 shared_prefs 由设置面板写
-    return _libSettingsCache;
+    // 全局默认开启时，卡池里的设置覆盖本页单独设置
+    if (!GlobalCfg.cardApplyAll) return _libSettingsCache;
+    final merged = <String, dynamic>{..._libSettingsCache};
+    for (final entry in globalHeroDefaults.entries) {
+      merged[entry.key] = entry.value;
+    }
+    return merged;
+  }
+
+  Future<void> _commitLibSetting(String heroName, Map<String, dynamic> hs) async {
+    _libSettingsCache[heroName] = hs;
+    if (GlobalCfg.cardApplyAll) {
+      globalHeroDefaults[heroName] = hs;
+      await PoolSheetState.saveHeroDefaults();
+    }
   }
 
   /// 图库卡设置面板（等级/皮肤/魔化/融合）
@@ -718,7 +814,19 @@ class _LibraryPageState extends State<LibraryPage> {
             child: SingleChildScrollView(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('⚙️ $heroName', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))),
-                const SizedBox(height: 8),
+                CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: GlobalCfg.cardApplyAll,
+                  title: const Text('应用到所有阵容（卡池/精选/活动）', style: TextStyle(fontSize: 11, color: Color(0xFF7CFC9B))),
+                  onChanged: (v) async {
+                    await GlobalCfg.setCardApplyAll(v ?? false);
+                    if (v == true) await _commitLibSetting(heroName, hs);
+                    setSheet(() {});
+                    setState(() {});
+                  },
+                ),
+                const SizedBox(height: 4),
                 Text('📊 等级：Lv ${hs['lv'] ?? 1}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4ECDC4))),
                 Slider(
                   min: 0, max: (levels.length - 1).toDouble(), divisions: levels.length - 1,
@@ -728,7 +836,7 @@ class _LibraryPageState extends State<LibraryPage> {
                   }(),
                   activeColor: const Color(0xFF4ECDC4),
                   onChanged: (_) {},
-                  onChangeEnd: (v) { hs['lv'] = '${levels[v.round()]}'; st[heroName] = hs; setSheet(() {}); setState(() {}); },
+                  onChangeEnd: (v) { hs['lv'] = '${levels[v.round()]}'; _commitLibSetting(heroName, hs); setSheet(() {}); setState(() {}); },
                 ),
                 const Text('🎨 皮肤', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFFF9800))),
                 SizedBox(
@@ -738,7 +846,7 @@ class _LibraryPageState extends State<LibraryPage> {
                     children: [
                       for (final sk in SkinPack.I.skinsOfHero(baseHero))
                         GestureDetector(
-                          onTap: () { hs['skin'] = '默认' == sk ? '' : sk; st[heroName] = hs; setSheet(() {}); setState(() {}); },
+                          onTap: () { hs['skin'] = '默认' == sk ? '' : sk; _commitLibSetting(heroName, hs); setSheet(() {}); setState(() {}); },
                           child: Container(
                             width: 50, height: 50, margin: const EdgeInsets.only(right: 5), padding: const EdgeInsets.all(2),
                             decoration: BoxDecoration(
@@ -755,7 +863,7 @@ class _LibraryPageState extends State<LibraryPage> {
                 ),
                 const SizedBox(height: 6),
                 GestureDetector(
-                  onTap: () { hs['mohua'] = !(hs['mohua'] == true); st[heroName] = hs; setSheet(() {}); setState(() {}); },
+                  onTap: () { hs['mohua'] = !(hs['mohua'] == true); _commitLibSetting(heroName, hs); setSheet(() {}); setState(() {}); },
                   child: Container(
                     width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 7), alignment: Alignment.center,
                     decoration: BoxDecoration(color: hs['mohua'] == true ? const Color(0xFF7C4BC0) : Colors.white.withAlpha(50), borderRadius: BorderRadius.circular(8)),
@@ -767,7 +875,7 @@ class _LibraryPageState extends State<LibraryPage> {
                 for (final p in AppData.I.fusionVariantsOf(baseHero))
                   if (p[0] + p[1] != (fusion != null ? fusion[0] + fusion[1] : heroName))
                     GestureDetector(
-                      onTap: () { hs['fusion'] = p[0] + p[1]; st[heroName] = hs; setSheet(() {}); setState(() {}); },
+                      onTap: () { hs['fusion'] = p[0] + p[1]; _commitLibSetting(heroName, hs); setSheet(() {}); setState(() {}); },
                       child: Container(
                         width: double.infinity, margin: const EdgeInsets.only(top: 5), padding: const EdgeInsets.symmetric(vertical: 7), alignment: Alignment.center,
                         decoration: BoxDecoration(color: const Color(0x332BB3A3), borderRadius: BorderRadius.circular(8)),
@@ -776,7 +884,7 @@ class _LibraryPageState extends State<LibraryPage> {
                     ),
                 if (fusion != null)
                   GestureDetector(
-                    onTap: () { hs['fusion'] = ''; st[heroName] = hs; setSheet(() {}); setState(() {}); },
+                    onTap: () { hs['fusion'] = ''; _commitLibSetting(heroName, hs); setSheet(() {}); setState(() {}); },
                     child: Container(
                       width: double.infinity, margin: const EdgeInsets.only(top: 5), padding: const EdgeInsets.symmetric(vertical: 7), alignment: Alignment.center,
                       decoration: BoxDecoration(color: Colors.white.withAlpha(70), borderRadius: BorderRadius.circular(8)),

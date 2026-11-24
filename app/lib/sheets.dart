@@ -7,6 +7,7 @@ import 'data_store.dart';
 import 'card_widget.dart';
 import 'dr_system.dart';
 import 'ui_alpha.dart';
+import 'global_defaults.dart';
 
 /// 全局英雄默认配置（官方英雄名 → {lv,skin,mohua,fusion,sub:{lv,skin,mohua}}）
 Map<String, dynamic> globalHeroDefaults = {};
@@ -49,6 +50,7 @@ class PoolSheetState extends State<PoolSheet> {
 
   /// 默认配置改完后让卡池卡片立即按新皮肤/融合/魔化重绘
   void _repaintPoolAfterDefaults() {
+    if (GlobalCfg.cardApplyAll) PoolSheetState.saveHeroDefaults();
     if (mounted) setState(() {});
   }
 
@@ -89,7 +91,22 @@ class PoolSheetState extends State<PoolSheet> {
                 Text('⚙️ $official（默认配置）',
                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A))),
                 const Text('加卡/新建阵容时自动套用', style: TextStyle(fontSize: 9.5, color: Colors.white38)),
-                const SizedBox(height: 8),
+                CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: GlobalCfg.cardApplyAll,
+                  title: const Text('应用到所有阵容（卡池/精选/活动）', style: TextStyle(fontSize: 11, color: Color(0xFF7CFC9B))),
+                  onChanged: (v) async {
+                    await GlobalCfg.setCardApplyAll(v ?? false);
+                    if (v == true) {
+                      globalHeroDefaults[official] = hs;
+                      await PoolSheetState.saveHeroDefaults();
+                    }
+                    setSheet(() {});
+                    _repaintPoolAfterDefaults();
+                  },
+                ),
+                const SizedBox(height: 4),
                 Text('📊 等级：Lv ${levels[lvIdx]}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4ECDC4))),
                 Slider(
                   min: 0, max: (levels.length - 1).toDouble(), divisions: levels.length - 1, value: lvIdx.toDouble(),
