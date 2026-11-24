@@ -16,6 +16,8 @@ class BgSetting {
   static const _opacityKey = 'app_bg_opacity';
   static const _themeKey = 'app_bg_theme';
   static const _soundKey = 'app_bg_sound';
+  // v1.8.9 起声音默认开启；老用户只迁移一次，之后尊重手动开关
+  static const _soundMigratedKey = 'app_bg_sound_default_on_v189';
 
   /// 内置视频主题（与 PC 端同源：Gitee bg-themes 发行版）
   static const builtinThemes = <Map<String, String>>[
@@ -40,7 +42,7 @@ class BgSetting {
   static const defaultThemeId = 'tmvtdwbxi1imx';
 
   static bool enabled = true;             // 总开关（不喜欢背景的可以关）
-  static bool soundOn = false;            // 背景视频声音（默认静音，可开）
+  static bool soundOn = true;             // 背景视频声音（v1.8.9 起默认开启，可关）
   static String type = 'theme';           // none / image / video / theme
   static String path = '';
   static String themeId = defaultThemeId;
@@ -56,7 +58,15 @@ class BgSetting {
   static Future<void> load() async {
     final p = await SharedPreferences.getInstance();
     enabled = p.getBool(_enabledKey) ?? true;
-    soundOn = p.getBool(_soundKey) ?? false;
+    // 🔴 老版本默认是静音；升级到 1.8.9 只迁移一次为「有声」，用户之后手动关掉不会被覆盖
+    final soundMigrated = p.getBool(_soundMigratedKey) ?? false;
+    if (!soundMigrated) {
+      soundOn = true;
+      await p.setBool(_soundKey, true);
+      await p.setBool(_soundMigratedKey, true);
+    } else {
+      soundOn = p.getBool(_soundKey) ?? true;
+    }
     final savedType = p.getString(_typeKey);
     path = p.getString(_pathKey) ?? '';
     themeId = p.getString(_themeKey) ?? defaultThemeId;
@@ -75,6 +85,7 @@ class BgSetting {
     final p = await SharedPreferences.getInstance();
     await p.setBool(_enabledKey, enabled);
     await p.setBool(_soundKey, soundOn);
+    await p.setBool(_soundMigratedKey, true);
     await p.setString(_typeKey, type);
     await p.setString(_pathKey, path);
     await p.setString(_themeKey, themeId);

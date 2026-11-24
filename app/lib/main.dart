@@ -1270,7 +1270,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     ),
                   ),
                 ]),
-                // 背景声音开关（视频有声音；默认静音，需要时打开）
+                // 背景声音开关（视频有声音；默认开启，不需要可关）
                 Row(children: [
                   const Text('🔊 背景声音', style: TextStyle(fontSize: 11.5, color: Colors.white70)),
                   const SizedBox(width: 6),

@@ -279,34 +279,39 @@ class _LibraryPageState extends State<LibraryPage> {
       final w = ((cs.maxWidth - 14 - gap * 4) / 5).clamp(26.0, 74.0);
       return Container(
         margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(7),
+        padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(color: const Color(0xFF15152A), borderRadius: BorderRadius.circular(10)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // 🔴 单行头部：名称 · 分类 · A战车减伤 · B战车减伤 · 用此阵容
-          Row(children: [
-            Flexible(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A)))),
-            if (cat.isNotEmpty) ...[
+          // 🔴 紧凑单行：名称 · 分类 · A战车减伤 · 用此阵容（A组标题不再单独占一行）
+          _featGroup('🅰 A组（我方）', const Color(0xFF4ECDC4), aHand, true, pj, w, itemId, cfgA, drA,
+            titleOverride: Row(children: [
+              Flexible(flex: 3, child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFFFD24A)))),
+              if (cat.isNotEmpty) ...[
+                const SizedBox(width: 3),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                  decoration: BoxDecoration(color: const Color(0x332BB3A3), borderRadius: BorderRadius.circular(3)),
+                  child: Text(cat, maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 7.5, color: Color(0xFF9BE9E0))),
+                ),
+              ],
               const SizedBox(width: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                decoration: BoxDecoration(color: const Color(0x332BB3A3), borderRadius: BorderRadius.circular(4)),
-                child: Text(cat, style: const TextStyle(fontSize: 8.5, color: Color(0xFF9BE9E0))),
+              const Text('🅰', style: TextStyle(fontSize: 9, color: Color(0xFF4ECDC4))),
+              const SizedBox(width: 2),
+              Flexible(flex: 2, child: _sideChip(itemId, true, pj, cfgA, drA, compact: true)),
+              const SizedBox(width: 3),
+              GestureDetector(
+                onTap: () => _useProject(pj, name),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(color: const Color(0xFFFFD24A), borderRadius: BorderRadius.circular(5)),
+                  child: const Text('用此阵容', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF07231F))),
+                ),
               ),
-            ],
-            const Spacer(),
-            GestureDetector(
-              onTap: () => _useProject(pj, name),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                decoration: BoxDecoration(color: const Color(0xFFFFD24A), borderRadius: BorderRadius.circular(6)),
-                child: const Text('📋 用此阵容', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF07231F))),
-              ),
-            ),
-          ]),
-          const SizedBox(height: 5),
-          _featGroup('🅰 A组（我方）', const Color(0xFF4ECDC4), aHand, true, pj, w, itemId, cfgA, drA),
-          const SizedBox(height: 5),
+            ]),
+          ),
+          const SizedBox(height: 4),
           _featGroup('🅱 B组（队友）', const Color(0xFFF0932B), bHand, false, pj, w, itemId, cfgB, drB),
         ]),
       );
@@ -314,7 +319,8 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   /// 头部单行的小胶囊：A🚂走马·我方 51% —— 点击可改战车/减伤表
-  Widget _sideChip(String itemId, bool isMine, Map<String, dynamic> pj, Map<String, dynamic> cfg, double? dr) {
+  Widget _sideChip(String itemId, bool isMine, Map<String, dynamic> pj, Map<String, dynamic> cfg, double? dr,
+      {bool compact = false}) {
     final ch = cfg['chariot'] as Map<String, dynamic>;
     final table = cfg['table'] as String;
     final main = (ch['main'] as num?)?.toInt() ?? 0;
@@ -331,8 +337,10 @@ class _LibraryPageState extends State<LibraryPage> {
           border: Border.all(color: color.withAlpha(90)),
         ),
         child: Text(
-          '${isMine ? "A" : "B"}🚂$short·$table ${(dr ?? 0).toStringAsFixed(1)}%',
-          style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: color),
+          '${compact ? "" : (isMine ? "A" : "B")}🚂$short·$table ${(dr ?? 0).toStringAsFixed(1)}%',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: compact ? 7.5 : 8, fontWeight: FontWeight.bold, color: color),
         ),
       ),
     );
@@ -493,17 +501,18 @@ class _LibraryPageState extends State<LibraryPage> {
 
   /// 一组 5×2 = 10 张卡（皮肤图 + 等级盾）；标题行右侧跟战车·减伤表·减伤%胶囊
   Widget _featGroup(String label, Color color, List hand, bool isMine,
-      Map<String, dynamic> pj, double w, String itemId, Map<String, dynamic> cfg, double? dr) {
+      Map<String, dynamic> pj, double w, String itemId, Map<String, dynamic> cfg, double? dr,
+      {Widget? titleOverride}) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
+      titleOverride ?? Row(children: [
         Text(label, style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: color)),
         const SizedBox(width: 6),
         Flexible(child: _sideChip(itemId, isMine, pj, cfg, dr)),
       ]),
-      const SizedBox(height: 3),
+      const SizedBox(height: 2),
       for (var r = 0; r < 2; r++)
         Padding(
-          padding: EdgeInsets.only(top: r > 0 ? 3 : 0),
+          padding: EdgeInsets.only(top: r > 0 ? 2 : 0),
           child: Row(children: [
             for (var c = 0; c < 5; c++)
               Padding(
