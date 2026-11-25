@@ -1219,13 +1219,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         ),
         // 更新
         _settingsSection('更新'),
-        _settingsRow('🔄', '检查更新', '有新版弹窗：安卓自动安装 / iPhone 复制全能签直链', () async {
+        _settingsRow('🔄', '检查更新', '当前 v${AppData.appVersion} · 有新版会弹窗提示', () async {
           Telemetry.I.action('update_check');
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('正在检查更新…'), duration: Duration(seconds: 1)));
           await VersionCheck.manualCheck(context);
-        }),
-        _settingsRow('📦', '当前版本', 'v${AppData.appVersion}', () {},
-            trailing: Text('v${AppData.appVersion}', style: const TextStyle(fontSize: 11, color: Color(0xFF2BB3A3), fontWeight: FontWeight.bold))),
+        },
+            trailing: Text('v${AppData.appVersion}',
+                style: const TextStyle(fontSize: 11, color: Color(0xFF2BB3A3), fontWeight: FontWeight.bold))),
         // 网络
         _settingsSection('网络'),
         _settingsRow('🌐', '网络自检', '共享打不开？逐环节测试定位问题', _showNetCheck),
@@ -1298,12 +1298,23 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             final picked = await FilePicker.platform.pickFiles(
               type: video ? FileType.video : FileType.image,
               allowMultiple: false,
+              withReadStream: true,   // 安卓 content:// 没有真实路径时用流兜底
             );
-            final p = picked?.files.single.path;
-            if (p == null) return;
-            final ext = (picked?.files.single.extension ?? p.split('.').last).toLowerCase();
-            final dst = await BgSetting.copyIntoApp(p, ext);
-            if (dst == null) return;
+            final pf = picked?.files.single;
+            if (pf == null) return;
+            final ext = (pf.extension ?? (pf.path ?? '').split('.').last).toLowerCase();
+            var dst = pf.path != null ? await BgSetting.copyIntoApp(pf.path!, ext) : null;
+            if (dst == null && pf.readStream != null) {
+              dst = await BgSetting.copyStreamIntoApp(pf.readStream!, ext);
+            }
+            if (dst == null) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('❌ 读取视频失败，请换一个视频或先保存到相册再选'),
+                    duration: Duration(seconds: 3)));
+              }
+              return;
+            }
             BgSetting.type = video ? 'video' : 'image';
             BgSetting.path = dst;
             BgSetting.enabled = true;      // 选了文件即视为要用背景

@@ -170,8 +170,7 @@ class BgSetting {
     }
   }
 
-  /// 选择文件后拷贝到应用目录（保证重启/清缓存后仍可用），返回新路径
-  static Future<String?> copyIntoApp(String srcPath, String ext) async {
+  static Future<Directory?> _prepareBgDir() async {
     try {
       final dir = await getApplicationDocumentsDirectory();
       final bgDir = Directory('${dir.path}/bg');
@@ -181,8 +180,33 @@ class BgSetting {
         if (f.path.contains('theme_')) continue;
         try { f.deleteSync(); } catch (_) {}
       }
+      return bgDir;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 选择文件后拷贝到应用目录（保证重启/清缓存后仍可用），返回新路径
+  static Future<String?> copyIntoApp(String srcPath, String ext) async {
+    try {
+      final bgDir = await _prepareBgDir();
+      if (bgDir == null) return null;
       final dst = '${bgDir.path}/bg_${DateTime.now().millisecondsSinceEpoch}.$ext';
       await File(srcPath).copy(dst);
+      return dst;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 安卓相册/云盘有时只给 content:// 流、没有真实路径：直接写流兜底
+  static Future<String?> copyStreamIntoApp(Stream<List<int>> stream, String ext) async {
+    try {
+      final bgDir = await _prepareBgDir();
+      if (bgDir == null) return null;
+      final dst = '${bgDir.path}/bg_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      final sink = File(dst).openWrite();
+      await stream.pipe(sink);
       return dst;
     } catch (_) {
       return null;
@@ -418,8 +442,14 @@ class _BgLayerState extends State<BgLayer> with WidgetsBindingObserver {
         ),
       );
     }
+    // 🔴 安卓部分机型对 Texture(VideoPlayer) 套 Opacity 会渲染成黑屏；
+    // 改成视频保持不透明、上面盖一层黑色遮罩来调暗，iOS/安卓都稳定。
+    final dim = (1 - widget.opacity).clamp(0.0, 1.0);
     return IgnorePointer(
-      child: Opacity(opacity: widget.opacity, child: SizedBox.expand(child: child)),
+      child: Stack(fit: StackFit.expand, children: [
+        SizedBox.expand(child: child),
+        if (dim > 0.001) ColoredBox(color: Colors.black.withAlpha((dim * 255).round())),
+      ]),
     );
   }
 }
