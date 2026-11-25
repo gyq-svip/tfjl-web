@@ -1,9 +1,9 @@
 {
-  "version": "1.8.17",
-  "apk": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-app-store/releases/download/app-v1/tfjl-android-v1.8.17.apk",
-  "ipa": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-app-store/releases/download/app-v1/tfjl-ios-v1.8.17.ipa",
-  "body": "修正阵容图库中「地精宝库」被误识别为融合卡的问题；优化背景视频在安卓上的播放兼容性；设置页「检查更新」合并显示当前版本；修复若干细节问题。",
-  "updated": "2026-11-25 14:40",
-  "apk2": "https://raw.githubusercontent.com/gyq-svip/tfjl-web/releases/tfjl-android-v1.8.17.apk",
-  "ipa2": "https://raw.githubusercontent.com/gyq-svip/tfjl-web/releases/tfjl-ios-v1.8.17.ipa"
+  "version": "1.8.18",
+  "apk": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-app-store/releases/download/app-v1/tfjl-android-v1.8.18.apk",
+  "ipa": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-app-store/releases/download/app-v1/tfjl-ios-v1.8.18.ipa",
+  "body": "邀请码页面新增「我没有邀请码」入口，展开后可查看群二维码和微信号，默认不显示；同时优化阵容图库卡片识别与安卓背景播放兼容性，修复若干细节问题。",
+  "updated": "2026-11-25 15:52",
+  "apk2": "https://raw.githubusercontent.com/gyq-svip/tfjl-web/releases/tfjl-android-v1.8.18.apk",
+  "ipa2": "https://raw.githubusercontent.com/gyq-svip/tfjl-web/releases/tfjl-ios-v1.8.18.ipa"
 }
