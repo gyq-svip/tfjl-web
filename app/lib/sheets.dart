@@ -8,6 +8,7 @@ import 'card_widget.dart';
 import 'dr_system.dart';
 import 'ui_alpha.dart';
 import 'global_defaults.dart';
+import 'telemetry.dart';
 
 /// 全局英雄默认配置（官方英雄名 → {lv,skin,mohua,fusion,sub:{lv,skin,mohua}}）
 Map<String, dynamic> globalHeroDefaults = {};
@@ -50,6 +51,7 @@ class PoolSheetState extends State<PoolSheet> {
 
   /// 默认配置改完后让卡池卡片立即按新皮肤/融合/魔化重绘
   void _repaintPoolAfterDefaults() {
+    Telemetry.I.action('card_default_change', {'applyAll': GlobalCfg.cardApplyAll});
     if (GlobalCfg.cardApplyAll) PoolSheetState.saveHeroDefaults();
     if (mounted) setState(() {});
   }
@@ -406,6 +408,7 @@ class PoolSheetState extends State<PoolSheet> {
       'type': pc.type,
     };
     hand.add(card);
+    Telemetry.I.action('card_add', {'side': widget.isMine ? 'a' : 'b', 'fusion': selfFusion});
     // 套用该英雄的默认配置（等级/皮肤/魔化/副卡）
     if (def != null) {
       Map<String, dynamic> ensure(String field) {

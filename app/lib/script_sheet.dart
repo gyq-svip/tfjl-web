@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'models.dart';
 import 'script_gen.dart';
+import 'telemetry.dart';
 
 /// 脚本生成面板（活动/隐藏榜/深海）+ 老马脚本解析上卡
 class ScriptSheet extends StatefulWidget {
@@ -110,6 +111,7 @@ class _ScriptSheetState extends State<ScriptSheet> {
     if (parsed.subVehicle.isNotEmpty) widget.proj[isMine ? 'vehicleSub' : 'mateVehicleSub'] = parsed.subVehicle;
     widget.proj[sideKey] = hand;
     widget.onChanged();
+    Telemetry.I.action('script_apply', {'side': isMine ? 'a' : 'b', 'count': hand.length});
     if (mounted) {
       final placedCnt = hand.where((c) => (c['placed'] ?? '').toString().isNotEmpty).length;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'data_store.dart';
+import 'telemetry.dart';
 
 /// 手机在线心跳 —— 上报到诊断 Gist（与桌面托盘同款），platform='mobile'。
 /// 网页诊断面板会显示 📱 手机在线（昵称·版本·平台）。
@@ -13,9 +14,11 @@ class MobileHeartbeat {
   static const _deviceKey = 'mobile_device_anonid';
   static const _nickKey = 'mobile_heartbeat_nick';
   static const _lastKey = 'mobile_heartbeat_last';
-  static const appVersion = '1.8.14';
+  static const appVersion = '1.8.15';
 
   Timer? _timer;
+  bool _writing = false;
+  bool _again = false;
   static final MobileHeartbeat I = MobileHeartbeat._();
   MobileHeartbeat._();
 
@@ -32,6 +35,8 @@ class MobileHeartbeat {
   void pokeNow() { _tick(); }
 
   Future<void> _tick() async {
+    if (_writing) { _again = true; return; }
+    _writing = true;
     try {
       final prefs = await SharedPreferences.getInstance();
       var anonId = prefs.getString(_deviceKey) ?? '';
@@ -44,6 +49,7 @@ class MobileHeartbeat {
           ? prefs.getString('TFJL_UserName')!
           : (prefs.getString(_nickKey) ?? '手机用户');
       final now = DateTime.now().millisecondsSinceEpoch;
+      final tel = Telemetry.I.snapshot();
       // 与网页 payload 同构，platform='mobile' 是关键标识
       final payload = {
         'anonId': anonId,
@@ -61,12 +67,28 @@ class MobileHeartbeat {
         'dayUploads': 1,
         'entries': [],
         'reportCount': 1,
+        // 📊 操作/异常/会话（仅操作名与计数，不含阵容内容/卡名）
+        'events': tel['events'],
+        'session': tel['session'],
+        'actionCounts': tel['actionCounts'],
+        'pageViews': tel['pageViews'],
+        'pageMs': tel['pageMs'],
+        'dropped': tel['dropped'],
       };
       final ok = await GistClient.writeFile(diagGistId, 'diag-$anonId.json', jsonEncode(payload));
-      if (ok) await prefs.setInt(_lastKey, now);
+      if (ok) {
+        await prefs.setInt(_lastKey, now);
+        await Telemetry.I.confirmFlush((tel['seq'] as num?)?.toInt() ?? 0);
+      }
       debugPrint('[心跳] 手机在线上报 ${ok ? '成功' : '失败'} ($anonId)');
     } catch (e) {
       debugPrint('[心跳] 异常: $e');
+    } finally {
+      _writing = false;
+      if (_again) {
+        _again = false;
+        _tick();
+      }
     }
   }
 

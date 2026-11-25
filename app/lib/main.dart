@@ -24,10 +24,23 @@ import 'dr_system.dart';
 import 'bg_setting.dart';
 import 'ui_alpha.dart';
 import 'share_import.dart';
+import 'telemetry.dart';
+import 'dart:ui' show PlatformDispatcher;
 import 'package:file_picker/file_picker.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // 全局异常：记一条（截断堆栈）+ 立即补报心跳，方便定位卡死/白屏
+  FlutterError.onError = (d) {
+    FlutterError.presentError(d);
+    Telemetry.I.error(d.exception, d.stack, page: 'flutter');
+    MobileHeartbeat.I.pokeNow();
+  };
+  PlatformDispatcher.instance.onError = (e, st) {
+    Telemetry.I.error(e, st, page: 'platform');
+    MobileHeartbeat.I.pokeNow();
+    return true;
+  };
   runApp(const TfjlApp());
   // iOS 关键：首帧渲染完、App 进入 active 后再主动发一次公网请求，
   // 把「无线局域网与蜂窝数据」授权拉起来（MQTT 项目已验证：太早发会被系统吞掉）。
@@ -136,6 +149,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         if (mounted) setState(() => _userNick = p.getString('TFJL_UserName') ?? _userNick);
       });
     });
+    await Telemetry.I.start();   // 会话/操作/异常统计（随心跳上报）
     MobileHeartbeat.I.start();   // 手机在线心跳（后台，成功后管理员面板显示📱）
     SkinPack.I.onProgress = (p, s) {
       if (!SkinPack.I.ready && mounted) setState(() { packPct = p; loadStage = s; });
@@ -448,6 +462,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   void _runQuick(String key) {
+    Telemetry.I.action('quick', {'key': key});
     switch (key) {
       case 'notepad': setState(() => notepadOverlayOpen = true);
       case 'library': Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryPage()));
@@ -864,6 +879,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           Positioned.fill(child: BgLayer(type: BgSetting.type, path: BgSetting.path, themeId: BgSetting.themeId,
               opacity: BgSetting.opacity, sound: BgSetting.soundOn, enabled: BgSetting.enabled)),
           ShareImportHandler(onImport: (text, kind) async {
+            Telemetry.I.action('share_import', {'kind': kind});
             if (kind == 'dr') {
               try {
                 final r = await DrSystem.importTxt(text, '我的');
@@ -900,7 +916,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       return Expanded(
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: () => setState(() => navTab = idx),
+          onTap: () {
+            Telemetry.I.action('tab', {'tab': idx});
+            Telemetry.I.enterPage(idx == 0 ? 'home' : (idx == 1 ? 'tools' : 'settings'));
+            setState(() => navTab = idx);
+          },
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             Text(icon, style: TextStyle(fontSize: 17, color: on ? const Color(0xFF2BB3A3) : Colors.white38)),
             const SizedBox(height: 1),
@@ -1071,7 +1091,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   Widget _toolsPage() {
     Widget tool(String icon, String title, String sub, VoidCallback onTap, {Color accent = const Color(0xFF2BB3A3)}) {
       return GestureDetector(
-        onTap: onTap,
+        onTap: () {
+          Telemetry.I.action('tool', {'name': title});
+          onTap();
+        },
         child: Container(
           margin: const EdgeInsets.fromLTRB(10, 0, 10, 8),
           padding: const EdgeInsets.all(11),
@@ -1113,12 +1136,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               tool('✎', '编辑布局', '自由拖动/缩放各模块位置和大小', () => setState(() { navTab = 0; layoutEditing = !layoutEditing; }),
                   accent: const Color(0xFFFFD24A)),
               tool('📥', '导入 PC 备份', '选 PC 端导出的 TFJL-backup-*.json，恢复全部阵容', () async {
+                Telemetry.I.action('backup_import');
                 final r = await BackupTransfer.importFromPc(context);
                 if (r.isNotEmpty && mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r), duration: const Duration(seconds: 3)));
                 }
               }, accent: const Color(0xFF67D2F5)),
               tool('📤', '导出阵容备份', '导出 PC 兼容 TFJL-backup-*.json，PC 端可一键恢复', () async {
+                Telemetry.I.action('backup_export');
                 final r = await BackupTransfer.exportToPc(context);
                 if (r.isNotEmpty && mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r), duration: const Duration(seconds: 3)));
@@ -1195,6 +1220,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         // 更新
         _settingsSection('更新'),
         _settingsRow('🔄', '检查更新', '有新版弹窗：安卓自动安装 / iPhone 复制全能签直链', () async {
+          Telemetry.I.action('update_check');
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('正在检查更新…'), duration: Duration(seconds: 1)));
           await VersionCheck.manualCheck(context);
         }),
@@ -1282,6 +1308,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             BgSetting.path = dst;
             BgSetting.enabled = true;      // 选了文件即视为要用背景
             await BgSetting.save();
+            Telemetry.I.action('bg_set', {'type': video ? 'video' : 'image'});
             if (mounted) setState(() {});
             setSheet(() {});
             if (ctx.mounted) Navigator.pop(ctx);

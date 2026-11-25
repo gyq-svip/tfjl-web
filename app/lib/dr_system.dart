@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
 import 'models.dart';
 import 'ui_alpha.dart';
+import 'telemetry.dart';
 
 /// 🛡 减伤系统 —— 逐条照搬网页 app-core.js：
 /// 数据：drTables = { '我的': {洗炼:{英雄:值}, 小野:0, 酋长:0, 宝库:0}, '队友': {...} }
@@ -424,6 +425,7 @@ class DrSystem {
     }
     _ensureDefaults();
     await save();
+    if (recCount > 0) Telemetry.I.action('dr_import', {'tables': touched.length, 'records': recCount});
     if (touched.length == 1) {
       return '已导入到「${touched.first}」表（共 $recCount 条）';
     } else if (touched.length > 1) {
@@ -450,6 +452,7 @@ class _DrManagePageState extends State<DrManagePage> {
   @override
   void initState() {
     super.initState();
+    Telemetry.I.enterPage('dr');
     table = widget.initialTable;
     DrSystem.load().then((_) async {
       _favs = await DrSystem.loadFavs();
@@ -577,6 +580,12 @@ class _DrManagePageState extends State<DrManagePage> {
       if (ok) setState(() => table = DrSystem.tables.first);
       _toast(ok ? '🗑 已删除「$n」' : '❌ 删除失败');
     }
+  }
+
+  @override
+  void dispose() {
+    Telemetry.I.enterPage('home');
+    super.dispose();
   }
 
   @override

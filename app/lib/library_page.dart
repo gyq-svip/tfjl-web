@@ -10,6 +10,7 @@ import 'dr_system.dart';
 import 'sheets.dart';
 import 'ui_alpha.dart';
 import 'global_defaults.dart';
+import 'telemetry.dart';
 
 /// 📚 阵容图库：⭐精选（在线） / 🏆活动（7天A/B） / 🚢大航海（223套）
 class LibraryPage extends StatefulWidget {
@@ -33,6 +34,8 @@ class _LibraryPageState extends State<LibraryPage> {
   @override
   void initState() {
     super.initState();
+    Telemetry.I.enterPage('library');
+    Telemetry.I.action('library_open');
     _initLoad();
     _loadFeatCfg();
     GlobalCfg.load().then((_) { if (mounted) setState(() {}); });   // 全局默认（卡/战车/减伤）
@@ -118,6 +121,12 @@ class _LibraryPageState extends State<LibraryPage> {
       if (resp.statusCode == 200) return await resp.transform(utf8.decoder).join();
     } catch (_) {}
     return null;
+  }
+
+  @override
+  void dispose() {
+    Telemetry.I.enterPage('home');
+    super.dispose();
   }
 
   @override
@@ -315,7 +324,10 @@ class _LibraryPageState extends State<LibraryPage> {
               Flexible(flex: 2, child: _sideChip(itemId, true, pj, cfgA, drA, compact: true)),
               const SizedBox(width: 3),
               GestureDetector(
-                onTap: () => _useProject(pj, name),
+                onTap: () {
+                  Telemetry.I.action('featured_use');
+                  _useProject(pj, name);
+                },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                   decoration: BoxDecoration(color: const Color(0xFFFFD24A), borderRadius: BorderRadius.circular(5)),
@@ -509,6 +521,7 @@ class _LibraryPageState extends State<LibraryPage> {
                       await _saveFeatCfg();
                       await GlobalCfg.setSideCfg(scope, isMine, buildCfg());
                       await GlobalCfg.setApplyAll(scope, applyAll);
+                      Telemetry.I.action('dr_cfg_save', {'scope': scope, 'applyAll': applyAll});
                       if (mounted) setState(() {});
                       Navigator.pop(ctx);
                     },
