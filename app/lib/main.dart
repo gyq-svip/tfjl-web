@@ -555,7 +555,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         filled: true,
-        fillColor: const Color(0xFF1E1E36),
+        fillColor: UiAlpha.bg(const Color(0xFF1E1E36), 1.4),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
       );
 
@@ -1144,7 +1144,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         // 个人中心（围绕个人用户加功能：昵称 → 邀请码 → 后期扩展）
         _settingsSection('个人'),
         Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(color: const Color(0xFF15152A), borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(color: UiAlpha.bg(const Color(0xFF15152A)), borderRadius: BorderRadius.circular(12)),
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: _userNick.isEmpty ? _registerNick : null,
@@ -1178,7 +1178,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             trailing: Text(layoutEditing ? '编辑中' : '关', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold,
                 color: layoutEditing ? const Color(0xFFFFD24A) : Colors.white38))),
         Container(margin: const EdgeInsets.fromLTRB(0, 0, 0, 10), padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(color: const Color(0xFF15152A), borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(color: UiAlpha.bg(const Color(0xFF15152A)), borderRadius: BorderRadius.circular(12)),
           child: StatefulBuilder(builder: (ctx, setSheet) => SwitchListTile(
             value: topBarAutoHide,
             activeColor: const Color(0xFF2BB3A3),
@@ -1230,7 +1230,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           TextField(controller: ctl, autofocus: true, maxLength: 16,
             style: const TextStyle(color: Colors.white, fontSize: 14),
             decoration: InputDecoration(hintText: '例如：老王的手机', isDense: true, filled: true,
-              fillColor: const Color(0xFF0C0C17), counterText: '',
+              fillColor: UiAlpha.bg(const Color(0xFF0C0C17), 1.4), counterText: '',
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)),
           ),
           const SizedBox(height: 6),
@@ -1502,7 +1502,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(color: const Color(0xFF15152A), borderRadius: BorderRadius.circular(12)),
+        decoration: BoxDecoration(color: UiAlpha.bg(const Color(0xFF15152A)), borderRadius: BorderRadius.circular(12)),
         child: Row(children: [
           Text(icon, style: const TextStyle(fontSize: 18)),
           const SizedBox(width: 10),
