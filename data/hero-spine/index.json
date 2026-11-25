@@ -747,7 +747,8 @@
    "绝影·魔精灵": "jueying",
    "孔明灯·幻精灵": "kongmingdeng",
    "金饭碗·光精灵": "jinfanwan",
-   "紫金铃铛·幻精灵": "huanjinglingpifu"
+   "紫金铃铛·幻精灵": "huanjinglingpifu",
+   "排云掌·雷精灵": "paiyunzhang"
   },
   "modelPngs": {
    "shenhulu_guang": 1,
@@ -768,7 +769,8 @@
    "jingling6_1": 1,
    "kongmingdeng": 1,
    "jinfanwan": 1,
-   "huanjinglingpifu": 1
+   "huanjinglingpifu": 1,
+   "paiyunzhang": 1
   },
   "updated": "2026-10-19",
   "modelHideSlots": {

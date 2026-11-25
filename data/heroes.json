@@ -12049,7 +12049,25 @@
     "note": "太平符咒·雷精灵",
     "model": "taipingfuzhou",
     "folder": "jingling"
-   }
+   },
+    {
+     "id": "383",
+     "itemId": "338335",
+     "heroItemId": "35",
+     "level": "1",
+     "describe": "技能强化：技能附带禁疗效果（无法获得治疗），持续6秒",
+     "skillIdList": "",
+     "EffectType": "",
+     "extraParam": "风云联动礼包获得",
+     "extraParam2": "",
+     "extraParam3": "",
+     "extraInfoType": "",
+     "extraInfo": "",
+     "heroSkinHp": "2400",
+     "note": "排云掌·雷精灵",
+     "model": "paiyunzhang",
+     "folder": "jingling"
+    }
   ]
  },
  {

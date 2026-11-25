@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-11-02T17:33:05.564Z",
+  "updated": "2026-11-25T08:22:15.768Z",
   "note": "融合卡定义：components 为参与融合的2张基础卡。",
   "fusions": {
     "邪能火炮侏儒射线": {
@@ -266,6 +266,14 @@
       ],
       "profession": "射手",
       "quality": "紫"
+    },
+    "天使死神": {
+      "components": [
+        "天使",
+        "死神"
+      ],
+      "profession": "牧师",
+      "quality": "金"
     }
   }
 }

@@ -1,0 +1,181 @@
+
+paiyunzhang.png
+size: 802,802
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+fx/Electricity 015 Charge Radial_00000
+  rotate: false
+  xy: 639, 537
+  size: 130, 131
+  orig: 160, 160
+  offset: 16, 10
+  index: -1
+fx/Electricity 015 Charge Radial_00001
+  rotate: false
+  xy: 688, 48
+  size: 57, 85
+  orig: 160, 160
+  offset: 25, 25
+  index: -1
+fx/Electricity 015 Charge Radial_00002
+  rotate: false
+  xy: 329, 240
+  size: 124, 130
+  orig: 160, 160
+  offset: 20, 10
+  index: -1
+fx/Electricity 015 Charge Radial_00003
+  rotate: false
+  xy: 747, 26
+  size: 48, 69
+  orig: 160, 160
+  offset: 22, 30
+  index: -1
+fx/Electricity 015 Charge Radial_00004
+  rotate: true
+  xy: 575, 250
+  size: 118, 115
+  orig: 160, 160
+  offset: 24, 11
+  index: -1
+fx/Electricity 015 Charge Radial_00005
+  rotate: false
+  xy: 2, 9
+  size: 30, 32
+  orig: 160, 160
+  offset: 23, 49
+  index: -1
+fx/Electricity 015 Charge Radial_00006
+  rotate: true
+  xy: 455, 133
+  size: 114, 117
+  orig: 160, 160
+  offset: 27, 14
+  index: -1
+fx/Electricity 015 Charge Radial_00007
+  rotate: true
+  xy: 747, 97
+  size: 45, 53
+  orig: 160, 160
+  offset: 88, 70
+  index: -1
+fx/Electricity 015 Charge Radial_00008
+  rotate: false
+  xy: 455, 249
+  size: 118, 119
+  orig: 160, 160
+  offset: 22, 15
+  index: -1
+fx/Electricity 015 Charge Radial_00009
+  rotate: false
+  xy: 632, 409
+  size: 56, 88
+  orig: 160, 160
+  offset: 74, 46
+  index: -1
+fx/Electricity 015 Charge Radial_00010
+  rotate: false
+  xy: 329, 114
+  size: 122, 124
+  orig: 160, 160
+  offset: 17, 16
+  index: -1
+fx/Electricity 015 Charge Radial_00011
+  rotate: false
+  xy: 359, 372
+  size: 135, 125
+  orig: 160, 160
+  offset: 14, 17
+  index: -1
+fx/Electricity 015 Charge Radial_00012
+  rotate: true
+  xy: 692, 250
+  size: 74, 97
+  orig: 160, 160
+  offset: 44, 33
+  index: -1
+fx/Electricity 015 Charge Radial_00013
+  rotate: false
+  xy: 639, 670
+  size: 138, 130
+  orig: 160, 160
+  offset: 12, 12
+  index: -1
+fx/Electricity 015 Charge Radial_00014
+  rotate: true
+  xy: 329, 40
+  size: 72, 115
+  orig: 160, 160
+  offset: 38, 12
+  index: -1
+fx/Electricity 015 Charge Radial_00015
+  rotate: false
+  xy: 496, 370
+  size: 134, 127
+  orig: 160, 160
+  offset: 14, 13
+  index: -1
+fx/Electricity 015 Charge Radial_00016
+  rotate: false
+  xy: 690, 144
+  size: 69, 104
+  orig: 160, 160
+  offset: 29, 18
+  index: -1
+fx/fushuidafa_01
+  rotate: false
+  xy: 453, 17
+  size: 116, 114
+  orig: 123, 131
+  offset: 4, 7
+  index: -1
+fx/fushuidafa_02
+  rotate: false
+  xy: 575, 135
+  size: 113, 113
+  orig: 123, 131
+  offset: 5, 8
+  index: -1
+fx/fushuidafa_03
+  rotate: false
+  xy: 571, 16
+  size: 115, 115
+  orig: 123, 131
+  offset: 4, 7
+  index: -1
+fx/fushuidafa_04
+  rotate: false
+  xy: 692, 426
+  size: 108, 109
+  orig: 123, 131
+  offset: 7, 10
+  index: -1
+fx/fushuidafa_05
+  rotate: false
+  xy: 692, 326
+  size: 98, 98
+  orig: 123, 131
+  offset: 12, 14
+  index: -1
+shouzhang
+  rotate: false
+  xy: 2, 43
+  size: 325, 362
+  orig: 442, 442
+  offset: 57, 49
+  index: -1
+shouzhang2
+  rotate: false
+  xy: 2, 407
+  size: 355, 393
+  orig: 442, 442
+  offset: 42, 33
+  index: -1
+yunzi
+  rotate: false
+  xy: 359, 499
+  size: 278, 301
+  orig: 442, 442
+  offset: 81, 72
+  index: -1
