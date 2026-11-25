@@ -19,7 +19,7 @@ class PoolCard {
 }
 
 class AppData {
-  static const appVersion = '1.8.16';
+  static const appVersion = '1.8.17';
   static final AppData I = AppData._();
   AppData._();
 
@@ -50,6 +50,12 @@ class AppData {
 
   static const heroAlias = {
     '火炮': '邪能火炮', '宝库': '地精宝库', '射线': '侏儒射线', '潜艇': '微型潜艇',
+  };
+
+  /// 对齐网页 isOfficialSingleCard：工程 4 字卡是官方整名单卡，绝不能被拆成融合。
+  /// 尤其「地精宝库」前两字「地精」恰好也是英雄，旧的前缀兜底会误拆成 [地精, 宝库]。
+  static const officialSingleCards = {
+    '邪能火炮', '地精宝库', '微型潜艇', '侏儒射线', '咬人娃娃',
   };
 
   Future<void> load() async {
@@ -104,6 +110,9 @@ class AppData {
   /// 融合拆分：云端表 → 内置表 → 英雄前缀兜底；非融合返回 null
   List<String>? splitFusion(String cardName) {
     final name = officialName(cardName);
+    // 🔴 官方整名单卡（含工程 4 字卡）优先保护，和网页 isOfficialSingleCard 一致；
+    // 否则「地精宝库」会被拆成 [地精, 宝库]，工程卡皮肤/等级/魔化全按融合卡算错。
+    if (officialSingleCards.contains(name) || poolByName.containsKey(name)) return null;
     if (cloudFusions[name] != null) return cloudFusions[name]!;
     if (builtinFusions[name] != null) return builtinFusions[name]!;
     // 前缀兜底：查卡池/已知英雄名单
