@@ -47,17 +47,17 @@ class CardSlot extends StatelessWidget {
   Widget build(BuildContext context) {
     final d = data;
     final w = size;
-    final bg = d.filled ? Color(AppData.qualityColor(d.cardType)) : const Color(0xFF191927);
+    // 没上卡的位置完全透明，不再显示黑块（直接露出主题背景）
+    final bg = d.filled ? Color(AppData.qualityColor(d.cardType)) : Colors.transparent;
     Widget content = Container(
       width: w,
       height: w,
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(w * 0.07),
-        border: Border.all(
-          color: d.filled ? Color(AppData.qualityColor(d.cardType)).withAlpha(220) : Colors.white.withAlpha(35),
-          width: 1.4,
-        ),
+        border: d.filled
+            ? Border.all(color: Color(AppData.qualityColor(d.cardType)).withAlpha(220), width: 1.4)
+            : null,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(w * 0.07),
