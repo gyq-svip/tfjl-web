@@ -1,9 +1,9 @@
 {
-  "version": "1.8.14",
-  "apk": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-app-store/releases/download/app-v1/tfjl-android-v1.8.14.apk",
-  "ipa": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-app-store/releases/download/app-v1/tfjl-ios-v1.8.14.ipa",
-  "body": "双端 v1.8.14：设置页的卡片/开关/输入框也接入全局透明度，不再只有主页和工具透明；主页未上卡的卡槽改为完全透明，不再显示黑块，直接露出主题背景。含 v1.8.13 系统分享导入、v1.8.12 全局默认配置、v1.8.11 iOS 假死修复、v1.8.10 透明界面等全部改动",
-  "updated": "2026-11-25 13:02",
-  "apk2": "https://raw.githubusercontent.com/gyq-svip/tfjl-web/releases/tfjl-android-v1.8.14.apk",
-  "ipa2": "https://raw.githubusercontent.com/gyq-svip/tfjl-web/releases/tfjl-ios-v1.8.14.ipa"
+  "version": "1.8.15",
+  "apk": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-app-store/releases/download/app-v1/tfjl-android-v1.8.15.apk",
+  "ipa": "https://gitee.com/dragon-soars-across-the-world_0/tfjl-app-store/releases/download/app-v1/tfjl-ios-v1.8.15.ipa",
+  "body": "优化使用体验与稳定性；改进界面透明效果和空卡槽显示；完善外部文件导入、全局默认配置与阵容图库；修复若干细节问题。",
+  "updated": "2026-11-25 13:41",
+  "apk2": "https://raw.githubusercontent.com/gyq-svip/tfjl-web/releases/tfjl-android-v1.8.15.apk",
+  "ipa2": "https://raw.githubusercontent.com/gyq-svip/tfjl-web/releases/tfjl-ios-v1.8.15.ipa"
 }
