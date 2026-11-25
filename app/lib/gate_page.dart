@@ -1,5 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData, FilteringTextInputFormatter;
 import 'app_gate.dart';
 import 'data_store.dart';
 import 'ui_alpha.dart';
@@ -17,12 +18,18 @@ class GatePage extends StatefulWidget {
 }
 
 class _GatePageState extends State<GatePage> {
+  /// 与网页邀请门保持一致：兜底加这个微信索取邀请码
+  static const _wechatId = 'gyqsvip';
+
   final _nickCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
   int _step = 0;
   bool _busy = false;
   String? _err;
   String _nick = '';
+  bool _showContact = false;
+  bool _qrLoading = false;
+  Map<String, dynamic>? _qrCfg;
 
   @override
   void dispose() {
@@ -64,6 +71,103 @@ class _GatePageState extends State<GatePage> {
     } else {
       setState(() { _busy = false; _err = r.msg; });
     }
+  }
+
+  /// 默认收起；点「我没有邀请码」才加载/展示（复用网页管理员设置的群二维码）
+  void _toggleContact() {
+    final open = !_showContact;
+    setState(() => _showContact = open);
+    if (open && _qrCfg == null) _loadQrCfg();
+  }
+
+  Future<void> _loadQrCfg() async {
+    setState(() => _qrLoading = true);
+    Map<String, dynamic>? cfg;
+    try {
+      final idxTxt = await GistClient.readFileApiFirst(GistClient.masterGist, 'room_index.json')
+          .timeout(const Duration(seconds: 15));
+      if (idxTxt != null && idxTxt.isNotEmpty) {
+        final idx = jsonDecode(idxTxt);
+        final gid = (idx is Map ? idx['fabQrGistId'] : null)?.toString() ?? '';
+        if (gid.isNotEmpty) {
+          final txt = await GistClient.readFileApiFirst(gid, 'fabqrcode.json')
+              .timeout(const Duration(seconds: 15));
+          if (txt != null && txt.isNotEmpty) {
+            final j = jsonDecode(txt);
+            if (j is Map) cfg = Map<String, dynamic>.from(j);
+          }
+        }
+      }
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() { _qrCfg = cfg; _qrLoading = false; });
+  }
+
+  Widget _qrImage(String src) {
+    try {
+      if (src.startsWith('data:image')) {
+        final bytes = base64Decode(src.substring(src.indexOf(',') + 1));
+        return Image.memory(bytes, width: 140, height: 140, fit: BoxFit.contain,
+            filterQuality: FilterQuality.medium, errorBuilder: (_, __, ___) => const SizedBox.shrink());
+      }
+      return Image.network(src, width: 140, height: 140, fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => const SizedBox.shrink());
+    } catch (_) {
+      return const SizedBox.shrink();
+    }
+  }
+
+  Widget _contactPanel() {
+    final cfg = _qrCfg;
+    final qr = (cfg?['fabQrcode'] ?? '').toString();
+    final tip = (cfg?['fabQrcodeTip'] ?? '扫码进群').toString();
+    final ts = (cfg?['fabQrcodeTs'] as num?)?.toInt() ?? 0;
+    final days = ts > 0 ? DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(ts)).inDays : 0;
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: UiAlpha.bg(const Color(0xFF0C0C17), 1.4),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0x332BB3A3)),
+      ),
+      child: Column(children: [
+        if (_qrLoading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 18),
+            child: Text('二维码加载中…', style: TextStyle(fontSize: 11, color: Color(0xFF8A96AC))),
+          ),
+        if (!_qrLoading && qr.isNotEmpty) ...[
+          _qrImage(qr),
+          const SizedBox(height: 4),
+          Text(tip, style: const TextStyle(fontSize: 10.5, color: Color(0xFF4FC3F7))),
+          if (days >= 7)
+            const Padding(
+              padding: EdgeInsets.only(top: 5),
+              child: Text('⚠️ 二维码可能已失效，可加微信索取',
+                  style: TextStyle(fontSize: 10, color: Color(0xFFFFB84D))),
+            ),
+          const SizedBox(height: 6),
+        ],
+        const Text('没有邀请码？加微信索取', style: TextStyle(fontSize: 11, color: Color(0xFF8A96AC))),
+        const SizedBox(height: 4),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          const Text(_wechatId, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold,
+              color: Color(0xFFFFD24A), letterSpacing: 0.6)),
+          const SizedBox(width: 6),
+          InkWell(
+            onTap: () async {
+              await Clipboard.setData(const ClipboardData(text: _wechatId));
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('微信号已复制'), duration: Duration(seconds: 1)));
+              }
+            },
+            child: const Icon(Icons.copy, size: 15, color: Color(0xFF2BB3A3)),
+          ),
+        ]),
+      ]),
+    );
   }
 
   @override
@@ -198,6 +302,14 @@ class _GatePageState extends State<GatePage> {
               : const Text('进入 App', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E))),
         ),
       ),
+      Center(
+        child: TextButton(
+          onPressed: _toggleContact,
+          child: Text(_showContact ? '收起获取方式' : '我没有邀请码？',
+              style: const TextStyle(fontSize: 11.5, color: Color(0xFF4FC3F7))),
+        ),
+      ),
+      if (_showContact) _contactPanel(),
     ]);
   }
 }
